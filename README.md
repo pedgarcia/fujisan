@@ -38,28 +38,162 @@ A modern Qt5 frontend for the Atari800 emulator, providing a native desktop expe
 ## Building
 
 ### Prerequisites
-- Qt5 (Core, Widgets, Gui modules)
-- CMake 3.16+
-- C++17 compiler
-- libatari800 (built in parent directory)
+- **Qt5** (Core, Widgets, Gui modules)
+- **CMake 3.16+**
+- **C++17 compatible compiler**
+- **libatari800** (built in parent atari800 source directory)
+
+### Platform-Specific Setup
+
+#### **macOS**
+```bash
+# Install Qt5 via Homebrew (recommended)
+brew install qt@5
+
+# Install CMake if not available
+brew install cmake
+
+# Add Qt5 to PATH (if needed)
+export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
+```
+
+#### **Linux (Ubuntu/Debian)**
+```bash
+# Install Qt5 development packages
+sudo apt update
+sudo apt install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools
+
+# Install CMake and build tools
+sudo apt install cmake build-essential
+```
+
+#### **Linux (CentOS/RHEL/Fedora)**
+```bash
+# For CentOS/RHEL
+sudo yum install qt5-qtbase-devel cmake gcc-c++
+
+# For Fedora
+sudo dnf install qt5-qtbase-devel cmake gcc-c++
+```
+
+#### **Windows**
+1. **Install Qt5**: Download from [qt.io](https://www.qt.io/download-qt-installer)
+   - Choose Qt 5.15.x or later
+   - Select "MSVC 2019 64-bit" or "MinGW" kit
+2. **Install CMake**: Download from [cmake.org](https://cmake.org/download/)
+3. **Install Visual Studio 2019+** (for MSVC) or **MinGW** (for GCC)
 
 ### Build Steps
+
+#### **Step 1: Build libatari800** (Required)
 ```bash
-# Ensure libatari800 is built first
-cd ..
+# Navigate to atari800 source root
+cd /path/to/atari800-src
+
+# Configure for library target
 ./configure --target=libatari800
+
+# Build the library
 make
 
-# Build Fujisan
+# Verify libatari800.a exists
+ls -la src/libatari800.a
+```
+
+#### **Step 2: Build Fujisan**
+
+**macOS/Linux:**
+```bash
+# Navigate to Fujisan directory
 cd fujisan
-mkdir build && cd build
-cmake ..
+
+# Create and enter build directory
+mkdir -p build && cd build
+
+# Configure with CMake (macOS may need Qt5 path)
+CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake ..
+# OR for Linux typically just:
+# cmake ..
+
+# Build
+make
+
+# Run
+./fujisan
+```
+
+**Windows (Visual Studio):**
+```batch
+REM Navigate to Fujisan directory
+cd fujisan
+
+REM Create build directory
+mkdir build
+cd build
+
+REM Configure (adjust Qt path as needed)
+cmake -DCMAKE_PREFIX_PATH="C:\Qt\5.15.2\msvc2019_64" ..
+
+REM Build
+cmake --build . --config Release
+
+REM Run
+Release\fujisan.exe
+```
+
+**Windows (MinGW):**
+```batch
+REM Navigate to Fujisan directory  
+cd fujisan
+
+REM Create build directory
+mkdir build
+cd build
+
+REM Configure
+cmake -G "MinGW Makefiles" -DCMAKE_PREFIX_PATH="C:\Qt\5.15.2\mingw81_64" ..
+
+REM Build
+mingw32-make
+
+REM Run
+fujisan.exe
+```
+
+### Troubleshooting Build Issues
+
+#### **"Qt5 not found" Error**
+```
+Could NOT find Qt5 (missing: Qt5_DIR)
+```
+**Solution**: Set the correct Qt5 path:
+- **macOS**: `CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake ..`
+- **Linux**: Install Qt5 dev packages or set path
+- **Windows**: `cmake -DCMAKE_PREFIX_PATH="C:\Qt\5.15.2\msvc2019_64" ..`
+
+#### **"libatari800 not found" Error**
+```
+FATAL_ERROR: libatari800 not found
+```
+**Solution**: Build libatari800 first:
+```bash
+cd /path/to/atari800-src
+./configure --target=libatari800
 make
 ```
 
+#### **Missing Build Tools**
+- **macOS**: Install Xcode Command Line Tools: `xcode-select --install`
+- **Linux**: Install build-essential: `sudo apt install build-essential`
+- **Windows**: Install Visual Studio with C++ tools
+
 ### Running
 ```bash
+# macOS/Linux
 ./fujisan
+
+# Windows
+fujisan.exe
 ```
 
 ## Usage
