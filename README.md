@@ -1,6 +1,6 @@
-# Atari800 Qt6 GUI
+# Fujisan - Modern Atari Emulator
 
-A modern Qt6 frontend for the Atari800 emulator, providing a native desktop experience with all the features of the original ImGui version.
+A modern Qt5 frontend for the Atari800 emulator, providing a native desktop experience with full keyboard support, machine configuration, and authentic Atari behavior.
 
 ## Features
 
@@ -11,7 +11,7 @@ A modern Qt6 frontend for the Atari800 emulator, providing a native desktop expe
 - **Real-time Performance**: Proper 49.86 FPS (PAL) / 59.92 FPS (NTSC) timing
 
 ### User Interface
-- **Native Qt6 Menus**: Standard desktop menu bar and dialogs
+- **Native Qt5 Menus**: Standard desktop menu bar and dialogs
 - **File Management**: Native file dialogs for ROM loading
 - **Status Bar**: Real-time feedback for user actions
 - **Focus Management**: Click-to-focus emulator display
@@ -32,13 +32,13 @@ A modern Qt6 frontend for the Atari800 emulator, providing a native desktop expe
 ### Technical Features
 - **Color Accuracy**: Uses actual Atari color table from libatari800
 - **Memory Efficiency**: Direct screen buffer access
-- **Cross-platform**: Qt6 ensures compatibility across desktop platforms
+- **Cross-platform**: Qt5 ensures compatibility across desktop platforms
 - **Clean Architecture**: Separated emulator core, display widget, and UI
 
 ## Building
 
 ### Prerequisites
-- Qt6 (Core, Widgets, Gui modules)
+- Qt5 (Core, Widgets, Gui modules)
 - CMake 3.16+
 - C++17 compiler
 - libatari800 (built in parent directory)
@@ -50,8 +50,8 @@ cd ..
 ./configure --target=libatari800
 make
 
-# Build Qt6 GUI
-cd atari800-qt6
+# Build Fujisan
+cd fujisan
 mkdir build && cd build
 cmake ..
 make
@@ -59,7 +59,7 @@ make
 
 ### Running
 ```bash
-./atari800-qt6
+./fujisan
 ```
 
 ## Usage

@@ -1,3 +1,10 @@
+/*
+ * Fujisan - Modern Atari Emulator
+ * Copyright (c) 2025 Paulo Garcia (8bitrelics.com)
+ * 
+ * Licensed under the MIT License. See LICENSE file for details.
+ */
+
 #include "mainwindow.h"
 #include <QApplication>
 #include <QMessageBox>
@@ -10,7 +17,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_emulator(new AtariEmulator(this))
     , m_emulatorWidget(nullptr)
 {
-    setWindowTitle("Atari800 Qt6 GUI");
+    setWindowTitle("Fujisan");
     setMinimumSize(800, 600);
     resize(1280, 960);
     
@@ -24,7 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
         return;
     }
     
-    qDebug() << "Atari800 Qt6 GUI initialized successfully";
+    qDebug() << "Fujisan initialized successfully";
 }
 
 MainWindow::~MainWindow()
@@ -349,9 +356,9 @@ void MainWindow::setVideoPAL()
 
 void MainWindow::showAbout()
 {
-    QMessageBox::about(this, "About Atari800 Qt6 GUI", 
-        "Atari800 Qt6 GUI\n\n"
-        "A modern Qt6 frontend for the Atari800 emulator.\n"
+    QMessageBox::about(this, "About Fujisan", 
+        "Fujisan - Modern Atari Emulator\n\n"
+        "A modern Qt5 frontend for the Atari800 emulator.\n"
         "Features:\n"
         "• Full keyboard input support\n"
         "• BASIC enable/disable\n"

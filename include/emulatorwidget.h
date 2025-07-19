@@ -1,3 +1,10 @@
+/*
+ * Fujisan - Modern Atari Emulator
+ * Copyright (c) 2025 Paulo Garcia (8bitrelics.com)
+ * 
+ * Licensed under the MIT License. See LICENSE file for details.
+ */
+
 #ifndef EMULATORWIDGET_H
 #define EMULATORWIDGET_H
 
