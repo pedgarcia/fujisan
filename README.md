@@ -237,22 +237,6 @@ fujisan.exe
 - **Performance**: Direct screen buffer access, integer scaling
 - **Maintainability**: Clear class structure, documented interfaces
 
-## Comparison with ImGui Version
-
-### Advantages
-- **Native Look**: Integrates with desktop environment
-- **Menu Shortcuts**: Standard keyboard shortcuts (Ctrl+O, Ctrl+Q)
-- **File Dialogs**: Native file picker with preview
-- **Better Focus**: Proper focus management for input
-- **Accessibility**: Standard Qt accessibility features
-
-### Shared Features
-- Same emulator core (libatari800)
-- Identical keyboard input handling
-- Same color accuracy and timing
-- All BASIC and boot options
-- Same ROM loading capabilities
-
 ## Development Notes
 
 ### Key Classes
