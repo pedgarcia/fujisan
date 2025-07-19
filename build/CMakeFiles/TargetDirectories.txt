@@ -1,0 +1,9 @@
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/fujisan.dir
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/edit_cache.dir
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/rebuild_cache.dir
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/list_install_components.dir
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/install.dir
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/install/local.dir
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/install/strip.dir
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/fujisan_autogen_timestamp_deps.dir
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/build/CMakeFiles/fujisan_autogen.dir

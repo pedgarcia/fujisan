@@ -10,6 +10,7 @@
 
 #include <QMainWindow>
 #include <QMenuBar>
+#include <QToolBar>
 #include <QAction>
 #include <QFileDialog>
 #include <QVBoxLayout>
@@ -46,10 +47,12 @@ private slots:
 
 private:
     void createMenus();
+    void createToolBar();
     void createEmulatorWidget();
     
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
+    QToolBar* m_toolBar;
     bool m_autoRestart = false;
     
     // Menu actions

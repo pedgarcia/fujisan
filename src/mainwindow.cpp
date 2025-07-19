@@ -22,6 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     resize(1280, 960);
     
     createMenus();
+    createToolBar();
     createEmulatorWidget();
     
     // Initialize the emulator
@@ -138,6 +139,20 @@ void MainWindow::createMenus()
     m_aboutAction = new QAction("&About", this);
     connect(m_aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
     helpMenu->addAction(m_aboutAction);
+}
+
+void MainWindow::createToolBar()
+{
+    m_toolBar = addToolBar("Main Toolbar");
+    m_toolBar->setMovable(false);
+    m_toolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    
+    // Add Cold Reset button
+    QAction* coldResetAction = new QAction("Cold Reset", this);
+    coldResetAction->setToolTip("Perform a cold reset of the Atari system");
+    coldResetAction->setIcon(QIcon::fromTheme("view-refresh")); // Use system refresh icon
+    connect(coldResetAction, &QAction::triggered, this, &MainWindow::coldBoot);
+    m_toolBar->addAction(coldResetAction);
 }
 
 void MainWindow::createEmulatorWidget()
