@@ -15,8 +15,12 @@
 #include <QFileDialog>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QLabel>
 #include "atariemulator.h"
 #include "emulatorwidget.h"
+#include "toggleswitch.h"
 
 class MainWindow : public QMainWindow
 {
@@ -31,46 +35,39 @@ protected:
 
 private slots:
     void loadRom();
+    void loadDiskImage();
     void coldBoot();
     void warmBoot();
     void toggleBasic(bool enabled);
     void toggleAltirraOS(bool enabled);
-    void toggleAutoRestart(bool enabled);
-    void restartEmulator();
-    void setMachine800();
-    void setMachineXL();
-    void setMachineXE();
-    void setMachine5200();
-    void setVideoNTSC();
-    void setVideoPAL();
+    void onMachineTypeChanged(int index);
+    void onVideoSystemToggled(bool isPAL);
     void showAbout();
 
 private:
     void createMenus();
     void createToolBar();
     void createEmulatorWidget();
+    void restartEmulator();
     
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
     QToolBar* m_toolBar;
-    bool m_autoRestart = false;
+    
+    // Toolbar widgets
+    ToggleSwitch* m_basicToggle;
+    QComboBox* m_machineCombo;
+    ToggleSwitch* m_videoToggle;
     
     // Menu actions
     QAction* m_loadRomAction;
+    QAction* m_loadDiskAction;
     QAction* m_coldBootAction;
     QAction* m_warmBootAction;
     QAction* m_basicAction;
     QAction* m_altirraOSAction;
-    QAction* m_autoRestartAction;
-    QAction* m_restartAction;
     QAction* m_exitAction;
     QAction* m_aboutAction;
-    
-    // Machine type actions
-    QAction* m_machine800Action;
-    QAction* m_machineXLAction;
-    QAction* m_machineXEAction;
-    QAction* m_machine5200Action;
     
     // Video system actions
     QAction* m_videoNTSCAction;

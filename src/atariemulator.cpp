@@ -12,6 +12,9 @@
 AtariEmulator::AtariEmulator(QObject *parent)
     : QObject(parent)
     , m_frameTimer(new QTimer(this))
+    , m_audioOutput(nullptr)
+    , m_audioDevice(nullptr)
+    , m_audioEnabled(true)
 {
     libatari800_clear_input_array(&m_currentInput);
     
@@ -39,11 +42,22 @@ bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machi
     m_machineType = machineType;
     m_videoSystem = videoSystem;
     
-    // Build argument list with machine type, video system, and BASIC setting
+    // Build argument list with machine type, video system, audio, and BASIC setting
     QStringList argList;
     argList << "atari800";
     argList << machineType;    // -xl, -xe, -atari, -5200, etc.
     argList << videoSystem;    // -ntsc or -pal
+    
+    // Add audio configuration
+    if (m_audioEnabled) {
+        argList << "-sound";
+        argList << "-dsprate" << "44100";
+        argList << "-audio16";
+        argList << "-volume" << "80";
+        argList << "-speaker";  // Enable console speaker (keyboard clicks, boot beeps)
+    } else {
+        argList << "-nosound";
+    }
     
     if (m_altirraOSEnabled) {
         // Use built-in Altirra ROMs
@@ -99,6 +113,11 @@ bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machi
         m_frameTimeMs = 1000.0f / m_targetFps;
         qDebug() << "Target FPS:" << m_targetFps << "Frame time:" << m_frameTimeMs << "ms";
         
+        // Initialize audio output if enabled
+        if (m_audioEnabled) {
+            setupAudio();
+        }
+        
         // Start the frame timer
         m_frameTimer->start(static_cast<int>(m_frameTimeMs));
         return true;
@@ -134,8 +153,26 @@ void AtariEmulator::processFrame()
     }
     
     libatari800_next_frame(&m_currentInput);
-    // Clear input after processing so it doesn't repeat
-    libatari800_clear_input_array(&m_currentInput);
+    
+    // Handle audio output
+    if (m_audioEnabled && m_audioOutput && m_audioDevice) {
+        unsigned char* soundBuffer = libatari800_get_sound_buffer();
+        int soundBufferLen = libatari800_get_sound_buffer_len();
+        
+        if (soundBuffer && soundBufferLen > 0) {
+            qint64 bytesWritten = m_audioDevice->write(reinterpret_cast<const char*>(soundBuffer), soundBufferLen);
+            // Only log incomplete writes if they're significantly incomplete (less than 90%)
+            if (bytesWritten < soundBufferLen * 0.9) {
+                static int underrunCount = 0;
+                underrunCount++;
+                if (underrunCount % 100 == 1) { // Log every 100th underrun to reduce spam
+                    qDebug() << "Audio underrun #" << underrunCount << ":" << bytesWritten << "of" << soundBufferLen << "bytes";
+                }
+            }
+        }
+    }
+    
+    // Don't clear input here - let it persist until key release
     
     emit frameReady();
 }
@@ -147,34 +184,115 @@ const unsigned char* AtariEmulator::getScreen()
 
 bool AtariEmulator::loadFile(const QString& filename)
 {
-    bool result = libatari800_reboot_with_file(filename.toUtf8().constData());
+    qDebug() << "Loading ROM/cartridge:" << filename;
+    
+    // First, explicitly remove any existing cartridge with reboot
+    // This ensures a clean slate before loading the new cartridge
+    CARTRIDGE_RemoveAutoReboot();
+    qDebug() << "Removed existing cartridge";
+    
+    // Now insert the new cartridge with auto-reboot
+    // This provides a complete system reset with the new cartridge
+    int result = CARTRIDGE_InsertAutoReboot(filename.toUtf8().constData());
+    
     if (result) {
-        qDebug() << "Loaded:" << filename;
+        qDebug() << "Successfully loaded cartridge:" << filename;
+        return true;
+    } else {
+        qDebug() << "Failed to load cartridge:" << filename;
+        // Fall back to the original method for non-cartridge files
+        qDebug() << "Trying fallback method with libatari800_reboot_with_file";
+        bool fallback_result = libatari800_reboot_with_file(filename.toUtf8().constData());
+        if (fallback_result) {
+            qDebug() << "Fallback method succeeded for:" << filename;
+        }
+        return fallback_result;
     }
-    return result;
+}
+
+bool AtariEmulator::mountDiskImage(int driveNumber, const QString& filename, bool readOnly)
+{
+    // Validate drive number (1-8 for D1: through D8:)
+    if (driveNumber < 1 || driveNumber > 8) {
+        qDebug() << "Invalid drive number:" << driveNumber << "- must be 1-8";
+        return false;
+    }
+    
+    if (filename.isEmpty()) {
+        qDebug() << "Empty filename provided for drive D" << driveNumber << ":";
+        return false;
+    }
+    
+    qDebug() << "Attempting to mount" << filename << "to drive D" << driveNumber << ":";
+    
+    // Mount the disk image using libatari800
+    int result = libatari800_mount_disk_image(driveNumber, filename.toUtf8().constData(), readOnly ? 1 : 0);
+    
+    qDebug() << "libatari800_mount_disk_image returned:" << result;
+    
+    if (result) {
+        // Store the path for tracking
+        m_diskImages[driveNumber - 1] = filename;
+        qDebug() << "Successfully mounted" << filename << "to drive D" << driveNumber << ":" 
+                 << (readOnly ? "(read-only)" : "(read-write)");
+        qDebug() << "Disk should now be accessible from the emulated Atari";
+        return true;
+    } else {
+        qDebug() << "Failed to mount" << filename << "to drive D" << driveNumber << ":";
+        qDebug() << "Check if file exists and is a valid Atari disk image";
+        return false;
+    }
+}
+
+QString AtariEmulator::getDiskImagePath(int driveNumber) const
+{
+    // Validate drive number (1-8 for D1: through D8:)
+    if (driveNumber < 1 || driveNumber > 8) {
+        return QString();
+    }
+    
+    return m_diskImages[driveNumber - 1];
 }
 
 void AtariEmulator::handleKeyPress(QKeyEvent* event)
 {
-    // Clear previous input
-    libatari800_clear_input_array(&m_currentInput);
+    // Don't clear input here - let keys persist across frames until released
     
     int key = event->key();
     Qt::KeyboardModifiers modifiers = event->modifiers();
     bool shiftPressed = modifiers & Qt::ShiftModifier;
     bool ctrlPressed = modifiers & Qt::ControlModifier;
+    bool metaPressed = modifiers & Qt::MetaModifier;
     
-    qDebug() << "Key pressed:" << key << "modifiers:" << modifiers << "Qt::Key_1:" << Qt::Key_1 << "Qt::Key_Exclam:" << Qt::Key_Exclam;
+    // On macOS, support both Ctrl and Cmd keys for control codes
+    bool controlKeyPressed = ctrlPressed || metaPressed;
     
-    // Handle Ctrl key combinations first
-    if (ctrlPressed && key >= Qt::Key_A && key <= Qt::Key_Z) {
-        // Ctrl+letter generates control codes (1-26)
-        m_currentInput.keychar = key - Qt::Key_A + 1;
-        qDebug() << "Setting keychar to: Ctrl+" << QChar(key) << "(code" << (int)m_currentInput.keychar << ")";
-    } else if (ctrlPressed && key == Qt::Key_C) {
-        // Ctrl+C - interrupt/break
-        m_currentInput.keychar = 3; // ETX character
-        qDebug() << "Setting keychar to: Ctrl+C (break)";
+    qDebug() << "Key pressed:" << key << "modifiers:" << modifiers 
+             << "Ctrl:" << ctrlPressed << "Shift:" << shiftPressed
+             << "Meta:" << metaPressed << "ControlKey:" << controlKeyPressed;
+    
+    // Handle Control key combinations using proper AKEY codes  
+    // Build modifier bits like atari800 SDL does
+    if (controlKeyPressed && key >= Qt::Key_A && key <= Qt::Key_Z) {
+        unsigned char baseKey = convertQtKeyToAtari(key, Qt::NoModifier);
+        if (baseKey != 0) {
+            // Build shiftctrl modifier bits
+            int shiftctrl = 0;
+            if (shiftPressed) shiftctrl |= AKEY_SHFT;
+            if (controlKeyPressed) shiftctrl |= AKEY_CTRL;
+            
+            m_currentInput.keycode = baseKey | shiftctrl;
+            
+            if (shiftPressed && ctrlPressed) {
+                qDebug() << "Setting AKEY_SHFTCTRL keycode for" << QChar(key) << ":" << (int)m_currentInput.keycode
+                         << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(pure control)";
+            } else {
+                qDebug() << "Setting AKEY_CTRL keycode for" << QChar(key) << ":" << (int)m_currentInput.keycode
+                         << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(display control)";
+            }
+        } else {
+            qDebug() << "Could not map" << QChar(key) << "to base AKEY";
+        }
     } else if (key == Qt::Key_CapsLock) {
         // Send CAPS LOCK toggle to the emulator to change its internal state
         m_currentInput.keycode = AKEY_CAPSTOGGLE;
@@ -371,8 +489,9 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
 void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 {
     Q_UNUSED(event)
-    // Clear input when key is released
+    // Clear input when any key is released
     libatari800_clear_input_array(&m_currentInput);
+    qDebug() << "Key released - clearing input";
 }
 
 void AtariEmulator::coldBoot()
@@ -448,5 +567,74 @@ unsigned char AtariEmulator::convertQtKeyToAtari(int key, Qt::KeyboardModifiers 
         case Qt::Key_Right: return AKEY_RIGHT;
         case Qt::Key_F1: return AKEY_F1;
         default: return 0;
+    }
+}
+
+void AtariEmulator::setupAudio()
+{
+    qDebug() << "Setting up audio output...";
+    
+    // Get audio parameters from libatari800
+    int frequency = libatari800_get_sound_frequency();
+    int channels = libatari800_get_num_sound_channels();
+    int sampleSize = libatari800_get_sound_sample_size();
+    
+    qDebug() << "Audio config - Frequency:" << frequency << "Hz, Channels:" << channels << "Sample size:" << sampleSize << "bytes";
+    
+    // Setup Qt audio format
+    QAudioFormat format;
+    format.setSampleRate(frequency);
+    format.setChannelCount(channels);
+    format.setSampleSize(sampleSize * 8); // Convert bytes to bits
+    format.setCodec("audio/pcm");
+    format.setByteOrder(QAudioFormat::LittleEndian);
+    format.setSampleType(sampleSize == 2 ? QAudioFormat::SignedInt : QAudioFormat::UnSignedInt);
+    
+    // Check if format is supported
+    QAudioDeviceInfo info = QAudioDeviceInfo::defaultOutputDevice();
+    if (!info.isFormatSupported(format)) {
+        qDebug() << "Audio format not supported, trying to use nearest format";
+        format = info.nearestFormat(format);
+    }
+    
+    qDebug() << "Using audio format - Rate:" << format.sampleRate() << "Channels:" << format.channelCount() << "Sample size:" << format.sampleSize();
+    
+    // Create and start audio output
+    m_audioOutput = new QAudioOutput(format, this);
+    // Increase buffer size to reduce underruns (44100 Hz * 2 bytes * 2 channels * 0.1 sec = ~17KB)
+    m_audioOutput->setBufferSize(16384); 
+    m_audioDevice = m_audioOutput->start();
+    
+    if (m_audioDevice) {
+        qDebug() << "Audio output started successfully";
+    } else {
+        qDebug() << "Failed to start audio output";
+        m_audioEnabled = false;
+    }
+}
+
+void AtariEmulator::enableAudio(bool enabled)
+{
+    if (m_audioEnabled != enabled) {
+        m_audioEnabled = enabled;
+        
+        if (enabled && !m_audioOutput) {
+            setupAudio();
+        } else if (!enabled && m_audioOutput) {
+            m_audioOutput->stop();
+            delete m_audioOutput;
+            m_audioOutput = nullptr;
+            m_audioDevice = nullptr;
+        }
+        
+        qDebug() << "Audio" << (enabled ? "enabled" : "disabled");
+    }
+}
+
+void AtariEmulator::setVolume(float volume)
+{
+    if (m_audioOutput) {
+        m_audioOutput->setVolume(qBound(0.0f, volume, 1.0f));
+        qDebug() << "Audio volume set to:" << volume;
     }
 }

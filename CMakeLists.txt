@@ -3,13 +3,16 @@
 # Licensed under the MIT License. See LICENSE file for details.
 
 cmake_minimum_required(VERSION 3.16)
-project(fujisan VERSION 1.0.0)
+project(Fujisan VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Set Qt5 path for Homebrew installation
+set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/qt@5/lib/cmake")
+
 # Find Qt5
-find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia)
 
 # Find libatari800 in parent directory
 set(ATARI800_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -36,12 +39,14 @@ set(SOURCES
     src/mainwindow.cpp
     src/emulatorwidget.cpp
     src/atariemulator.cpp
+    src/toggleswitch.cpp
 )
 
 set(HEADERS
     include/mainwindow.h
     include/emulatorwidget.h
     include/atariemulator.h
+    include/toggleswitch.h
 )
 
 # Create executable
@@ -53,6 +58,7 @@ target_link_libraries(${PROJECT_NAME}
     Qt5::Core
     Qt5::Widgets
     Qt5::Gui
+    Qt5::Multimedia
     -lm
 )
 

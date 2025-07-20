@@ -11,6 +11,11 @@
 #include <QObject>
 #include <QTimer>
 #include <QKeyEvent>
+#include <QAudioOutput>
+#include <QAudioFormat>
+#include <QAudioDeviceInfo>
+#include <QIODevice>
+#include <QBuffer>
 
 extern "C" {
     #include "libatari800.h"
@@ -20,6 +25,18 @@ extern "C" {
     // Access cold/warm start functions
     extern void Atari800_Coldstart(void);
     extern void Atari800_Warmstart(void);
+    // Disk mounting functions
+    extern int libatari800_mount_disk_image(int diskno, const char *filename, int readonly);
+    // Cartridge functions  
+    extern void CARTRIDGE_RemoveAutoReboot(void);
+    extern int CARTRIDGE_InsertAutoReboot(const char *filename);
+    // Audio functions
+    extern unsigned char* libatari800_get_sound_buffer(void);
+    extern int libatari800_get_sound_buffer_len(void);
+    extern int libatari800_get_sound_frequency(void);
+    extern int libatari800_get_num_sound_channels(void);
+    extern int libatari800_get_sound_sample_size(void);
+    // AKEY constants are already included via akey.h
 }
 
 class AtariEmulator : public QObject
@@ -37,6 +54,15 @@ public:
     
     const unsigned char* getScreen();
     bool loadFile(const QString& filename);
+    
+    // Disk drive functions
+    bool mountDiskImage(int driveNumber, const QString& filename, bool readOnly = false);
+    QString getDiskImagePath(int driveNumber) const;
+    
+    // Audio functions
+    void enableAudio(bool enabled);
+    bool isAudioEnabled() const { return m_audioEnabled; }
+    void setVolume(float volume);
     
     void handleKeyPress(QKeyEvent* event);
     void handleKeyRelease(QKeyEvent* event);
@@ -68,6 +94,7 @@ signals:
 private:
     unsigned char convertQtKeyToAtari(int key, Qt::KeyboardModifiers modifiers);
     char getShiftedSymbol(int key, bool shiftPressed);
+    void setupAudio();
     
     bool m_basicEnabled = true;
     bool m_altirraOSEnabled = false;
@@ -77,6 +104,14 @@ private:
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;
     QTimer* m_frameTimer;
+    
+    // Disk drive tracking
+    QString m_diskImages[8]; // Paths for D1: through D8:
+    
+    // Audio components
+    QAudioOutput* m_audioOutput;
+    QIODevice* m_audioDevice;
+    bool m_audioEnabled;
 };
 
 #endif // ATARIEMULATOR_H

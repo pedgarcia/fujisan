@@ -11,6 +11,8 @@
 #include <QCloseEvent>
 #include <QStatusBar>
 #include <QDebug>
+#include <QPainter>
+#include <QPixmap>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -52,13 +54,18 @@ void MainWindow::createMenus()
     connect(m_loadRomAction, &QAction::triggered, this, &MainWindow::loadRom);
     fileMenu->addAction(m_loadRomAction);
     
+    m_loadDiskAction = new QAction("Load &Disk Image...", this);
+    m_loadDiskAction->setShortcut(QKeySequence("Ctrl+D"));
+    connect(m_loadDiskAction, &QAction::triggered, this, &MainWindow::loadDiskImage);
+    fileMenu->addAction(m_loadDiskAction);
+    
     fileMenu->addSeparator();
     
-    m_coldBootAction = new QAction("&Cold Boot", this);
+    m_coldBootAction = new QAction("&Cold Reset", this);
     connect(m_coldBootAction, &QAction::triggered, this, &MainWindow::coldBoot);
     fileMenu->addAction(m_coldBootAction);
     
-    m_warmBootAction = new QAction("&Warm Boot", this);
+    m_warmBootAction = new QAction("&Warm Reset", this);
     connect(m_warmBootAction, &QAction::triggered, this, &MainWindow::warmBoot);
     fileMenu->addAction(m_warmBootAction);
     
@@ -84,53 +91,24 @@ void MainWindow::createMenus()
     connect(m_altirraOSAction, &QAction::toggled, this, &MainWindow::toggleAltirraOS);
     systemMenu->addAction(m_altirraOSAction);
     
-    m_autoRestartAction = new QAction("Auto-&restart on changes", this);
-    m_autoRestartAction->setCheckable(true);
-    m_autoRestartAction->setChecked(m_autoRestart);
-    connect(m_autoRestartAction, &QAction::toggled, this, &MainWindow::toggleAutoRestart);
-    systemMenu->addAction(m_autoRestartAction);
-    
-    systemMenu->addSeparator();
-    
-    m_restartAction = new QAction("&Restart with Current Settings", this);
-    connect(m_restartAction, &QAction::triggered, this, &MainWindow::restartEmulator);
-    systemMenu->addAction(m_restartAction);
-    
-    // Machine menu
+    // Machine menu (now just for video system)
     QMenu* machineMenu = menuBar()->addMenu("&Machine");
-    
-    m_machine800Action = new QAction("Atari &400/800", this);
-    m_machine800Action->setCheckable(true);
-    connect(m_machine800Action, &QAction::triggered, this, &MainWindow::setMachine800);
-    machineMenu->addAction(m_machine800Action);
-    
-    m_machineXLAction = new QAction("Atari 800&XL", this);
-    m_machineXLAction->setCheckable(true);
-    m_machineXLAction->setChecked(true); // Default
-    connect(m_machineXLAction, &QAction::triggered, this, &MainWindow::setMachineXL);
-    machineMenu->addAction(m_machineXLAction);
-    
-    m_machineXEAction = new QAction("Atari 130X&E", this);
-    m_machineXEAction->setCheckable(true);
-    connect(m_machineXEAction, &QAction::triggered, this, &MainWindow::setMachineXE);
-    machineMenu->addAction(m_machineXEAction);
-    
-    m_machine5200Action = new QAction("Atari &5200", this);
-    m_machine5200Action->setCheckable(true);
-    connect(m_machine5200Action, &QAction::triggered, this, &MainWindow::setMachine5200);
-    machineMenu->addAction(m_machine5200Action);
-    
-    machineMenu->addSeparator();
     
     m_videoNTSCAction = new QAction("&NTSC Video", this);
     m_videoNTSCAction->setCheckable(true);
-    connect(m_videoNTSCAction, &QAction::triggered, this, &MainWindow::setVideoNTSC);
+    connect(m_videoNTSCAction, &QAction::triggered, [this]() { 
+        m_videoToggle->setChecked(false); // NTSC = OFF position
+        onVideoSystemToggled(false); 
+    });
     machineMenu->addAction(m_videoNTSCAction);
     
     m_videoPALAction = new QAction("&PAL Video", this);
     m_videoPALAction->setCheckable(true);
     m_videoPALAction->setChecked(true); // Default
-    connect(m_videoPALAction, &QAction::triggered, this, &MainWindow::setVideoPAL);
+    connect(m_videoPALAction, &QAction::triggered, [this]() { 
+        m_videoToggle->setChecked(true); // PAL = ON position
+        onVideoSystemToggled(true); 
+    });
     machineMenu->addAction(m_videoPALAction);
     
     // Help menu
@@ -146,11 +124,180 @@ void MainWindow::createToolBar()
     m_toolBar = addToolBar("Main Toolbar");
     m_toolBar->setMovable(false);
     m_toolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_toolBar->setIconSize(QSize(32, 32));
     
-    // Add Cold Reset button
+    // Increase toolbar height to accommodate multiple controls
+    m_toolBar->setMinimumHeight(70);
+    
+    // Add spacer to push controls to the right
+    QWidget* spacer = new QWidget();
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_toolBar->addWidget(spacer);
+    
+    // Machine type dropdown in its own column
+    QWidget* machineContainer = new QWidget();
+    QVBoxLayout* machineLayout = new QVBoxLayout(machineContainer);
+    machineLayout->setContentsMargins(5, 5, 5, 5);
+    machineLayout->setAlignment(Qt::AlignCenter);
+    
+    m_machineCombo = new QComboBox();
+    m_machineCombo->setIconSize(QSize(32, 20)); // Set icon display size
+    m_machineCombo->setMinimumWidth(150); // Slightly wider for icons
+    
+    // Create simple machine icons programmatically
+    auto createMachineIcon = [](const QColor& baseColor, const QString& text) -> QIcon {
+        QPixmap pixmap(32, 20);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        
+        // Draw computer shape
+        painter.setPen(QPen(baseColor.darker(150), 1));
+        painter.setBrush(QBrush(baseColor));
+        painter.drawRoundedRect(2, 2, 28, 16, 2, 2);
+        
+        // Draw screen
+        painter.setBrush(QBrush(Qt::black));
+        painter.drawRect(4, 4, 12, 8);
+        
+        // Draw keyboard area
+        painter.setBrush(QBrush(baseColor.darker(120)));
+        painter.drawRect(4, 13, 24, 4);
+        
+        // Add text label
+        painter.setPen(Qt::white);
+        QFont font = painter.font();
+        font.setPixelSize(6);
+        font.setBold(true);
+        painter.setFont(font);
+        painter.drawText(QRect(18, 4, 12, 8), Qt::AlignCenter, text);
+        
+        return QIcon(pixmap);
+    };
+    
+    // Add items with custom icons
+    m_machineCombo->addItem(createMachineIcon(QColor(139, 69, 19), "400"), "Atari 400/800");     // Brown
+    m_machineCombo->addItem(createMachineIcon(QColor(192, 192, 192), "XL"), "Atari 800XL");      // Silver
+    m_machineCombo->addItem(createMachineIcon(QColor(105, 105, 105), "XE"), "Atari 130XE");      // Dark Gray
+    m_machineCombo->addItem(createMachineIcon(QColor(70, 130, 180), "5200"), "Atari 5200");      // Steel Blue
+    
+    m_machineCombo->setCurrentIndex(1); // Default to 800XL
+    connect(m_machineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
+            this, &MainWindow::onMachineTypeChanged);
+    
+    machineLayout->addWidget(m_machineCombo);
+    
+    m_toolBar->addWidget(machineContainer);
+    
+    // Disk drive button
+    QPixmap diskPixmap(32, 32);
+    diskPixmap.fill(Qt::transparent);
+    QPainter diskPainter(&diskPixmap);
+    diskPainter.setRenderHint(QPainter::Antialiasing);
+    diskPainter.setPen(QPen(Qt::darkBlue, 2));
+    diskPainter.setBrush(QBrush(QColor(100, 100, 100)));
+    diskPainter.drawRoundedRect(4, 8, 24, 16, 2, 2);
+    diskPainter.setBrush(QBrush(Qt::black));
+    diskPainter.drawRect(6, 12, 20, 2);
+    diskPainter.setPen(QPen(Qt::white, 1));
+    diskPainter.drawText(QRect(8, 10, 16, 8), Qt::AlignCenter, "D1");
+    QIcon diskIcon(diskPixmap);
+    
+    QAction* loadDiskAction = new QAction("Load Disk", this);
+    loadDiskAction->setToolTip("Load disk image to drive D1: (Ctrl+D)");
+    loadDiskAction->setIcon(diskIcon);
+    connect(loadDiskAction, &QAction::triggered, this, &MainWindow::loadDiskImage);
+    m_toolBar->addAction(loadDiskAction);
+    
+    // Toggle switches container - stacked vertically on far right
+    QWidget* togglesContainer = new QWidget();
+    QVBoxLayout* togglesLayout = new QVBoxLayout(togglesContainer);
+    togglesLayout->setContentsMargins(5, 5, 5, 5);
+    togglesLayout->setSpacing(4);
+    togglesLayout->setAlignment(Qt::AlignCenter);
+    
+    // BASIC toggle switch
+    QWidget* basicContainer = new QWidget();
+    QHBoxLayout* basicLayout = new QHBoxLayout(basicContainer);
+    basicLayout->setContentsMargins(0, 0, 0, 0);
+    basicLayout->setSpacing(6);
+    
+    QLabel* basicLabel = new QLabel("BASIC:");
+    basicLabel->setMinimumWidth(40);
+    m_basicToggle = new ToggleSwitch();
+    m_basicToggle->setLabels("ON", "OFF");
+    m_basicToggle->setChecked(m_emulator->isBasicEnabled());
+    connect(m_basicToggle, &ToggleSwitch::toggled, this, &MainWindow::toggleBasic);
+    
+    basicLayout->addWidget(basicLabel);
+    basicLayout->addWidget(m_basicToggle);
+    
+    // Video system toggle switch
+    QWidget* videoContainer = new QWidget();
+    QHBoxLayout* videoLayout = new QHBoxLayout(videoContainer);
+    videoLayout->setContentsMargins(0, 0, 0, 0);
+    videoLayout->setSpacing(6);
+    
+    QLabel* videoLabel = new QLabel("Video:");
+    videoLabel->setMinimumWidth(40);
+    m_videoToggle = new ToggleSwitch();
+    m_videoToggle->setLabels("PAL", "NTSC");
+    m_videoToggle->setChecked(true); // Default to PAL (ON position)
+    connect(m_videoToggle, &ToggleSwitch::toggled, this, &MainWindow::onVideoSystemToggled);
+    
+    videoLayout->addWidget(videoLabel);
+    videoLayout->addWidget(m_videoToggle);
+    
+    // Add both toggle switches to the container
+    togglesLayout->addWidget(basicContainer);
+    togglesLayout->addWidget(videoContainer);
+    
+    m_toolBar->addWidget(togglesContainer);
+    
+    // Add small separator space
+    QWidget* separator = new QWidget();
+    separator->setFixedWidth(15);
+    m_toolBar->addWidget(separator);
+    
+    // Create reset icons
+    QPixmap resetPixmap(32, 32);
+    resetPixmap.fill(Qt::transparent);
+    QPainter painter(&resetPixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(Qt::darkBlue, 1.5));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawEllipse(4, 4, 24, 24);
+    painter.drawLine(16, 4, 16, 16);
+    
+    QIcon resetIcon;
+    if (QIcon::hasThemeIcon("system-reboot")) {
+        resetIcon = QIcon::fromTheme("system-reboot");
+    } else if (QIcon::hasThemeIcon("view-refresh")) {
+        resetIcon = QIcon::fromTheme("view-refresh");
+    } else {
+        resetIcon = QIcon(resetPixmap);
+    }
+    
+    QPixmap warmPixmap(32, 32);
+    warmPixmap.fill(Qt::transparent);
+    QPainter warmPainter(&warmPixmap);
+    warmPainter.setRenderHint(QPainter::Antialiasing);
+    warmPainter.setPen(QPen(Qt::darkRed, 1.5));
+    warmPainter.setBrush(Qt::NoBrush);
+    warmPainter.drawEllipse(4, 4, 24, 24);
+    warmPainter.drawLine(16, 8, 16, 16);
+    QIcon warmIcon(warmPixmap);
+    
+    // Add reset buttons
+    QAction* warmResetAction = new QAction("Warm Reset", this);
+    warmResetAction->setToolTip("Perform a warm reset of the Atari system (F5)");
+    warmResetAction->setIcon(warmIcon);
+    connect(warmResetAction, &QAction::triggered, this, &MainWindow::warmBoot);
+    m_toolBar->addAction(warmResetAction);
+    
     QAction* coldResetAction = new QAction("Cold Reset", this);
-    coldResetAction->setToolTip("Perform a cold reset of the Atari system");
-    coldResetAction->setIcon(QIcon::fromTheme("view-refresh")); // Use system refresh icon
+    coldResetAction->setToolTip("Perform a cold reset of the Atari system (Shift+F5)");
+    coldResetAction->setIcon(resetIcon);
     connect(coldResetAction, &QAction::triggered, this, &MainWindow::coldBoot);
     m_toolBar->addAction(coldResetAction);
 }
@@ -194,6 +341,33 @@ void MainWindow::loadRom()
     }
 }
 
+void MainWindow::loadDiskImage()
+{
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        "Load Disk Image to D1:",
+        QString(),
+        "Disk Images (*.atr *.xfd *.dcm *.pro *.atx *.atr.gz *.xfd.gz);;All Files (*)"
+    );
+    
+    if (!fileName.isEmpty()) {
+        if (m_emulator->mountDiskImage(1, fileName, false)) {
+            qDebug() << "Successfully mounted disk:" << fileName;
+            statusBar()->showMessage("Mounted to D1: " + fileName + " - Try typing DIR from BASIC", 5000);
+            
+            // Show a helpful message to the user
+            QMessageBox::information(this, "Disk Mounted", 
+                "Disk image mounted to D1:\n\n" + fileName + 
+                "\n\nTo access the disk:\n" +
+                "• From BASIC: Type DIR or LOAD \"D1:filename\"\n" +
+                "• Boot from disk: Use Cold Reset to boot from the disk\n" +
+                "• DOS: Type DOS to access disk commands");
+        } else {
+            QMessageBox::warning(this, "Error", "Failed to mount disk image: " + fileName);
+        }
+    }
+}
+
 void MainWindow::coldBoot()
 {
     m_emulator->coldBoot();
@@ -209,36 +383,52 @@ void MainWindow::warmBoot()
 void MainWindow::toggleBasic(bool enabled)
 {
     m_emulator->setBasicEnabled(enabled);
-    QString message = enabled ? "BASIC enabled" : "BASIC disabled";
-    if (m_autoRestart) {
-        message += " - restarting...";
-        statusBar()->showMessage(message, 3000);
-        restartEmulator();
-    } else {
-        message += " - restart to apply";
-        statusBar()->showMessage(message, 3000);
-    }
+    QString message = enabled ? "BASIC enabled - restarting..." : "BASIC disabled - restarting...";
+    statusBar()->showMessage(message, 3000);
+    
+    // Also update the menu checkbox to stay in sync
+    m_basicAction->setChecked(enabled);
+    
+    restartEmulator();
 }
 
 void MainWindow::toggleAltirraOS(bool enabled)
 {
     m_emulator->setAltirraOSEnabled(enabled);
-    QString message = enabled ? "Altirra OS enabled" : "Original Atari OS enabled";
-    if (m_autoRestart) {
-        message += " - restarting...";
-        statusBar()->showMessage(message, 3000);
-        restartEmulator();
-    } else {
-        message += " - restart to apply";
-        statusBar()->showMessage(message, 3000);
-    }
+    QString message = enabled ? "Altirra OS enabled - restarting..." : "Original Atari OS enabled - restarting...";
+    statusBar()->showMessage(message, 3000);
+    restartEmulator();
 }
 
-void MainWindow::toggleAutoRestart(bool enabled)
+void MainWindow::onMachineTypeChanged(int index)
 {
-    m_autoRestart = enabled;
-    QString message = enabled ? "Auto-restart enabled" : "Auto-restart disabled";
-    statusBar()->showMessage(message, 2000);
+    QString machineType;
+    QString message;
+    
+    switch (index) {
+        case 0: // Atari 400/800
+            machineType = "-atari";
+            message = "Machine set to Atari 400/800 - restarting...";
+            break;
+        case 1: // Atari 800XL (default)
+            machineType = "-xl";
+            message = "Machine set to Atari 800XL - restarting...";
+            break;
+        case 2: // Atari 130XE
+            machineType = "-xe";
+            message = "Machine set to Atari 130XE - restarting...";
+            break;
+        case 3: // Atari 5200
+            machineType = "-5200";
+            message = "Machine set to Atari 5200 - restarting...";
+            break;
+        default:
+            return;
+    }
+    
+    m_emulator->setMachineType(machineType);
+    statusBar()->showMessage(message, 3000);
+    restartEmulator();
 }
 
 void MainWindow::restartEmulator()
@@ -259,114 +449,23 @@ void MainWindow::restartEmulator()
     }
 }
 
-void MainWindow::setMachine800()
-{
-    // Uncheck other machine options
-    m_machineXLAction->setChecked(false);
-    m_machineXEAction->setChecked(false);
-    m_machine5200Action->setChecked(false);
-    
-    m_emulator->setMachineType("-atari");
-    QString message = "Machine set to Atari 400/800";
-    if (m_autoRestart) {
-        message += " - restarting...";
-        statusBar()->showMessage(message, 3000);
-        restartEmulator();
-    } else {
-        message += " - restart to apply";
-        statusBar()->showMessage(message, 3000);
-    }
-}
 
-void MainWindow::setMachineXL()
+void MainWindow::onVideoSystemToggled(bool isPAL)
 {
-    // Uncheck other machine options
-    m_machine800Action->setChecked(false);
-    m_machineXEAction->setChecked(false);
-    m_machine5200Action->setChecked(false);
-    
-    m_emulator->setMachineType("-xl");
-    QString message = "Machine set to Atari 800XL";
-    if (m_autoRestart) {
-        message += " - restarting...";
-        statusBar()->showMessage(message, 3000);
-        restartEmulator();
+    if (isPAL) {
+        // PAL mode (toggle ON)
+        m_videoPALAction->setChecked(true);
+        m_videoNTSCAction->setChecked(false);
+        m_emulator->setVideoSystem("-pal");
+        statusBar()->showMessage("Video system set to PAL (49.86 fps) - restarting...", 3000);
     } else {
-        message += " - restart to apply";
-        statusBar()->showMessage(message, 3000);
+        // NTSC mode (toggle OFF) 
+        m_videoPALAction->setChecked(false);
+        m_videoNTSCAction->setChecked(true);
+        m_emulator->setVideoSystem("-ntsc");
+        statusBar()->showMessage("Video system set to NTSC (59.92 fps) - restarting...", 3000);
     }
-}
-
-void MainWindow::setMachineXE()
-{
-    // Uncheck other machine options
-    m_machine800Action->setChecked(false);
-    m_machineXLAction->setChecked(false);
-    m_machine5200Action->setChecked(false);
-    
-    m_emulator->setMachineType("-xe");
-    QString message = "Machine set to Atari 130XE";
-    if (m_autoRestart) {
-        message += " - restarting...";
-        statusBar()->showMessage(message, 3000);
-        restartEmulator();
-    } else {
-        message += " - restart to apply";
-        statusBar()->showMessage(message, 3000);
-    }
-}
-
-void MainWindow::setMachine5200()
-{
-    // Uncheck other machine options
-    m_machine800Action->setChecked(false);
-    m_machineXLAction->setChecked(false);
-    m_machineXEAction->setChecked(false);
-    
-    m_emulator->setMachineType("-5200");
-    QString message = "Machine set to Atari 5200";
-    if (m_autoRestart) {
-        message += " - restarting...";
-        statusBar()->showMessage(message, 3000);
-        restartEmulator();
-    } else {
-        message += " - restart to apply";
-        statusBar()->showMessage(message, 3000);
-    }
-}
-
-void MainWindow::setVideoNTSC()
-{
-    // Uncheck PAL option
-    m_videoPALAction->setChecked(false);
-    
-    m_emulator->setVideoSystem("-ntsc");
-    QString message = "Video system set to NTSC (59.92 fps)";
-    if (m_autoRestart) {
-        message += " - restarting...";
-        statusBar()->showMessage(message, 3000);
-        restartEmulator();
-    } else {
-        message += " - restart to apply";
-        statusBar()->showMessage(message, 3000);
-    }
-}
-
-void MainWindow::setVideoPAL()
-{
-    // Uncheck NTSC option
-    m_videoNTSCAction->setChecked(false);
-    
-    m_emulator->setVideoSystem("-pal");
-    QString message = "Video system set to PAL (49.86 fps)";
-    if (m_autoRestart) {
-        message += " - restarting...";
-        statusBar()->showMessage(message, 3000);
-        restartEmulator();
-    } else {
-        message += " - restart to apply";
-        statusBar()->showMessage(message, 3000);
-    }
+    restartEmulator();
 }
 
 void MainWindow::showAbout()
