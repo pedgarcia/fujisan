@@ -19,6 +19,9 @@
 #include <QPushButton>
 #include <QDialogButtonBox>
 #include <QLabel>
+#include <QLineEdit>
+#include <QSpinBox>
+#include <QDoubleSpinBox>
 #include <QSettings>
 #include "atariemulator.h"
 
@@ -37,15 +40,27 @@ private slots:
     void reject() override;
     void restoreDefaults();
 
+private slots:
+    void browseDiskImage(int diskNumber);
+    void browseCassetteImage();
+    void browseHardDriveDirectory(int driveNumber);
+    void browseOSROM();
+    void browseBasicROM();
+    void onMachineTypeChanged();
+    void onAltirraOSChanged();
+
 private:
     void createMachineConfigTab();
     void createHardwareExtensionsTab();
     void createAudioConfigTab();
     void createVideoDisplayTab();
+    void createMediaConfigTab();
     void loadSettings();
     void saveSettings();
     void applySettings();
+    void applyMediaSettings();
     void updateVideoSystemDependentControls();
+    void setupFilePathTooltip(QLineEdit* lineEdit);
     
     AtariEmulator* m_emulator;
     QTabWidget* m_tabWidget;
@@ -59,13 +74,31 @@ private:
     QCheckBox* m_basicEnabledCheck;
     QCheckBox* m_altirraOSCheck;
     
-    // Hardware Extensions controls
+    // ROM Configuration controls
+    QLabel* m_osRomLabel;
+    QLineEdit* m_osRomPath;
+    QPushButton* m_osRomBrowse;
+    QLabel* m_basicRomLabel;
+    QLineEdit* m_basicRomPath;
+    QPushButton* m_basicRomBrowse;
+    
+    // Hardware controls
     QWidget* m_hardwareTab;
     QCheckBox* m_stereoPokey;
     QCheckBox* m_sioAcceleration;
-    QCheckBox* m_rDeviceEnabled;
-    QCheckBox* m_hDeviceEnabled;
-    QCheckBox* m_pDeviceEnabled;
+    
+    // 80-Column Cards
+    QCheckBox* m_xep80Enabled;
+    QCheckBox* m_af80Enabled;
+    QCheckBox* m_bit3Enabled;
+    
+    // PBI Extensions
+    QCheckBox* m_atari1400Enabled;
+    QCheckBox* m_atari1450Enabled;
+    QCheckBox* m_proto80Enabled;
+    
+    // Voice Synthesis
+    QCheckBox* m_voiceboxEnabled;
     
     // Audio Configuration controls  
     QWidget* m_audioTab;
@@ -90,6 +123,34 @@ private:
     QGroupBox* m_ntscGroup;
     QComboBox* m_ntscArtifacting;
     QCheckBox* m_ntscSharpness;
+    
+    // Media Configuration controls
+    QWidget* m_mediaTab;
+    
+    // Floppy Disks (D1-D4)
+    QCheckBox* m_diskEnabled[4];
+    QLineEdit* m_diskPath[4];
+    QPushButton* m_diskBrowse[4];
+    QCheckBox* m_diskReadOnly[4];
+    
+    // Cassette
+    QCheckBox* m_cassetteEnabled;
+    QLineEdit* m_cassettePath;
+    QPushButton* m_cassetteBrowse;
+    QCheckBox* m_cassetteReadOnly;
+    QCheckBox* m_cassetteBootTape;
+    
+    // Hard Drives (H1-H4)
+    QCheckBox* m_hdEnabled[4];
+    QLineEdit* m_hdPath[4];
+    QPushButton* m_hdBrowse[4];
+    QCheckBox* m_hdReadOnly;
+    QLineEdit* m_hdDeviceName;
+    
+    // Special Devices
+    QLineEdit* m_rDeviceName;
+    QCheckBox* m_netSIOEnabled;
+    QCheckBox* m_rtimeEnabled;
     
     // Store original settings for cancel functionality
     struct OriginalSettings {

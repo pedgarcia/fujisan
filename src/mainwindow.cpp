@@ -180,11 +180,17 @@ void MainWindow::createToolBar()
     
     // Add items with custom icons
     m_machineCombo->addItem(createMachineIcon(QColor(139, 69, 19), "400"), "Atari 400/800");     // Brown
+    m_machineCombo->addItem(createMachineIcon(QColor(169, 169, 169), "1200"), "Atari 1200XL");   // Dark Gray
     m_machineCombo->addItem(createMachineIcon(QColor(192, 192, 192), "XL"), "Atari 800XL");      // Silver
     m_machineCombo->addItem(createMachineIcon(QColor(105, 105, 105), "XE"), "Atari 130XE");      // Dark Gray
+    m_machineCombo->addItem(createMachineIcon(QColor(85, 85, 85), "320C"), "Atari 320XE (Compy-Shop)"); // Darker Gray
+    m_machineCombo->addItem(createMachineIcon(QColor(75, 75, 75), "320R"), "Atari 320XE (Rambo XL)");   // Very Dark Gray
+    m_machineCombo->addItem(createMachineIcon(QColor(65, 65, 65), "576"), "Atari 576XE");        // Almost Black
+    m_machineCombo->addItem(createMachineIcon(QColor(55, 55, 55), "1088"), "Atari 1088XE");      // Black
+    m_machineCombo->addItem(createMachineIcon(QColor(128, 0, 128), "XEGS"), "Atari XEGS");       // Purple
     m_machineCombo->addItem(createMachineIcon(QColor(70, 130, 180), "5200"), "Atari 5200");      // Steel Blue
     
-    m_machineCombo->setCurrentIndex(1); // Default to 800XL
+    m_machineCombo->setCurrentIndex(2); // Default to 800XL (updated index)
     connect(m_machineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
             this, &MainWindow::onMachineTypeChanged);
     
@@ -413,15 +419,39 @@ void MainWindow::onMachineTypeChanged(int index)
             machineType = "-atari";
             message = "Machine set to Atari 400/800 - restarting...";
             break;
-        case 1: // Atari 800XL (default)
+        case 1: // Atari 1200XL
+            machineType = "-1200";
+            message = "Machine set to Atari 1200XL - restarting...";
+            break;
+        case 2: // Atari 800XL (default)
             machineType = "-xl";
             message = "Machine set to Atari 800XL - restarting...";
             break;
-        case 2: // Atari 130XE
+        case 3: // Atari 130XE
             machineType = "-xe";
             message = "Machine set to Atari 130XE - restarting...";
             break;
-        case 3: // Atari 5200
+        case 4: // Atari 320XE (Compy-Shop)
+            machineType = "-320xe";
+            message = "Machine set to Atari 320XE (Compy-Shop) - restarting...";
+            break;
+        case 5: // Atari 320XE (Rambo XL)
+            machineType = "-rambo";
+            message = "Machine set to Atari 320XE (Rambo XL) - restarting...";
+            break;
+        case 6: // Atari 576XE
+            machineType = "-576xe";
+            message = "Machine set to Atari 576XE - restarting...";
+            break;
+        case 7: // Atari 1088XE
+            machineType = "-1088xe";
+            message = "Machine set to Atari 1088XE - restarting...";
+            break;
+        case 8: // Atari XEGS
+            machineType = "-xegs";
+            message = "Machine set to Atari XEGS - restarting...";
+            break;
+        case 9: // Atari 5200
             machineType = "-5200";
             message = "Machine set to Atari 5200 - restarting...";
             break;
@@ -489,11 +519,17 @@ void MainWindow::updateToolbarFromSettings()
 {
     // Update machine combo
     QString machineType = m_emulator->getMachineType();
-    int machineIndex = 1; // Default to 800XL
+    int machineIndex = 2; // Default to 800XL (updated index)
     if (machineType == "-atari") machineIndex = 0;
-    else if (machineType == "-xl") machineIndex = 1;
-    else if (machineType == "-xe") machineIndex = 2;
-    else if (machineType == "-5200") machineIndex = 3;
+    else if (machineType == "-1200") machineIndex = 1;
+    else if (machineType == "-xl") machineIndex = 2;
+    else if (machineType == "-xe") machineIndex = 3;
+    else if (machineType == "-320xe") machineIndex = 4;
+    else if (machineType == "-rambo") machineIndex = 5;
+    else if (machineType == "-576xe") machineIndex = 6;
+    else if (machineType == "-1088xe") machineIndex = 7;
+    else if (machineType == "-xegs") machineIndex = 8;
+    else if (machineType == "-5200") machineIndex = 9;
     
     m_machineCombo->blockSignals(true);
     m_machineCombo->setCurrentIndex(machineIndex);
@@ -570,8 +606,57 @@ void MainWindow::loadInitialSettings()
     m_emulator->setAltirraOSEnabled(altirraOSEnabled);
     m_emulator->enableAudio(audioEnabled);
     
+    // Load and apply media settings (disk images, etc.)
+    loadAndApplyMediaSettings();
+    
     // Update toolbar to reflect loaded settings
     updateToolbarFromSettings();
+}
+
+void MainWindow::loadAndApplyMediaSettings()
+{
+    QSettings settings("8bitrelics", "Fujisan");
+    
+    qDebug() << "Loading and applying media settings...";
+    
+    // Load and mount disk images for D1-D4
+    for (int i = 0; i < 4; i++) {
+        QString diskKey = QString("media/disk%1").arg(i + 1);
+        bool diskEnabled = settings.value(diskKey + "Enabled", false).toBool();
+        QString diskPath = settings.value(diskKey + "Path", "").toString();
+        bool diskReadOnly = settings.value(diskKey + "ReadOnly", false).toBool();
+        
+        if (diskEnabled && !diskPath.isEmpty()) {
+            qDebug() << QString("Auto-mounting D%1: %2 (read-only: %3)")
+                        .arg(i + 1).arg(diskPath).arg(diskReadOnly);
+            
+            if (m_emulator->mountDiskImage(i + 1, diskPath, diskReadOnly)) {
+                qDebug() << QString("Successfully auto-mounted D%1:").arg(i + 1);
+            } else {
+                qDebug() << QString("Failed to auto-mount D%1:").arg(i + 1);
+            }
+        }
+    }
+    
+    // TODO: Load cassette settings
+    bool cassetteEnabled = settings.value("media/cassetteEnabled", false).toBool();
+    QString cassettePath = settings.value("media/cassettePath", "").toString();
+    if (cassetteEnabled && !cassettePath.isEmpty()) {
+        qDebug() << "Cassette auto-load not yet implemented";
+    }
+    
+    // TODO: Load hard drive settings  
+    for (int i = 0; i < 4; i++) {
+        QString hdKey = QString("media/hd%1").arg(i + 1);
+        bool hdEnabled = settings.value(hdKey + "Enabled", false).toBool();
+        QString hdPath = settings.value(hdKey + "Path", "").toString();
+        
+        if (hdEnabled && !hdPath.isEmpty()) {
+            qDebug() << QString("H%1: hard drive auto-mount not yet implemented").arg(i + 1);
+        }
+    }
+    
+    qDebug() << "Media settings loaded and applied";
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

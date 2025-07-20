@@ -55,6 +55,7 @@ private:
     void restartEmulator();
     void updateToolbarFromSettings();
     void loadInitialSettings();
+    void loadAndApplyMediaSettings();
     
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
