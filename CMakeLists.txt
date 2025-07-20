@@ -40,6 +40,7 @@ set(SOURCES
     src/emulatorwidget.cpp
     src/atariemulator.cpp
     src/toggleswitch.cpp
+    src/settingsdialog.cpp
 )
 
 set(HEADERS
@@ -47,6 +48,7 @@ set(HEADERS
     include/emulatorwidget.h
     include/atariemulator.h
     include/toggleswitch.h
+    include/settingsdialog.h
 )
 
 # Create executable

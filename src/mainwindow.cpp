@@ -27,12 +27,8 @@ MainWindow::MainWindow(QWidget *parent)
     createToolBar();
     createEmulatorWidget();
     
-    // Initialize the emulator
-    if (!m_emulator->initialize()) {
-        QMessageBox::critical(this, "Error", "Failed to initialize Atari800 emulator");
-        QApplication::quit();
-        return;
-    }
+    // Load initial settings and initialize emulator with them
+    loadInitialSettings();
     
     qDebug() << "Fujisan initialized successfully";
 }
@@ -90,6 +86,13 @@ void MainWindow::createMenus()
     m_altirraOSAction->setChecked(m_emulator->isAltirraOSEnabled());
     connect(m_altirraOSAction, &QAction::toggled, this, &MainWindow::toggleAltirraOS);
     systemMenu->addAction(m_altirraOSAction);
+    
+    systemMenu->addSeparator();
+    
+    m_settingsAction = new QAction("&Settings...", this);
+    m_settingsAction->setShortcut(QKeySequence::Preferences);
+    connect(m_settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
+    systemMenu->addAction(m_settingsAction);
     
     // Machine menu (now just for video system)
     QMenu* machineMenu = menuBar()->addMenu("&Machine");
@@ -468,6 +471,66 @@ void MainWindow::onVideoSystemToggled(bool isPAL)
     restartEmulator();
 }
 
+void MainWindow::showSettings()
+{
+    SettingsDialog dialog(m_emulator, this);
+    connect(&dialog, &SettingsDialog::settingsChanged, this, &MainWindow::onSettingsChanged);
+    dialog.exec();
+}
+
+void MainWindow::onSettingsChanged()
+{
+    qDebug() << "Settings changed - updating toolbar";
+    updateToolbarFromSettings();
+    statusBar()->showMessage("Settings applied and emulator restarted", 3000);
+}
+
+void MainWindow::updateToolbarFromSettings()
+{
+    // Update machine combo
+    QString machineType = m_emulator->getMachineType();
+    int machineIndex = 1; // Default to 800XL
+    if (machineType == "-atari") machineIndex = 0;
+    else if (machineType == "-xl") machineIndex = 1;
+    else if (machineType == "-xe") machineIndex = 2;
+    else if (machineType == "-5200") machineIndex = 3;
+    
+    m_machineCombo->blockSignals(true);
+    m_machineCombo->setCurrentIndex(machineIndex);
+    m_machineCombo->blockSignals(false);
+    
+    // Update BASIC toggle
+    m_basicToggle->blockSignals(true);
+    m_basicToggle->setChecked(m_emulator->isBasicEnabled());
+    m_basicToggle->blockSignals(false);
+    
+    // Update video toggle (PAL = ON, NTSC = OFF)
+    bool isPAL = (m_emulator->getVideoSystem() == "-pal");
+    m_videoToggle->blockSignals(true);
+    m_videoToggle->setChecked(isPAL);
+    m_videoToggle->blockSignals(false);
+    
+    // Update menu actions
+    m_basicAction->blockSignals(true);
+    m_basicAction->setChecked(m_emulator->isBasicEnabled());
+    m_basicAction->blockSignals(false);
+    
+    m_altirraOSAction->blockSignals(true);
+    m_altirraOSAction->setChecked(m_emulator->isAltirraOSEnabled());
+    m_altirraOSAction->blockSignals(false);
+    
+    m_videoPALAction->blockSignals(true);
+    m_videoPALAction->setChecked(isPAL);
+    m_videoPALAction->blockSignals(false);
+    
+    m_videoNTSCAction->blockSignals(true);
+    m_videoNTSCAction->setChecked(!isPAL);
+    m_videoNTSCAction->blockSignals(false);
+    
+    qDebug() << "Toolbar updated - Machine:" << machineType << "BASIC:" << m_emulator->isBasicEnabled() 
+             << "Video:" << m_emulator->getVideoSystem();
+}
+
 void MainWindow::showAbout()
 {
     QMessageBox::about(this, "About Fujisan", 
@@ -480,6 +543,35 @@ void MainWindow::showAbout()
         "• Native file dialogs\n"
         "• Authentic Atari colors\n"
         "• Pixel-perfect scaling");
+}
+
+void MainWindow::loadInitialSettings()
+{
+    QSettings settings("8bitrelics", "Fujisan");
+    
+    // Load saved settings or use defaults
+    QString machineType = settings.value("machine/type", "-xl").toString();
+    QString videoSystem = settings.value("machine/videoSystem", "-pal").toString();
+    bool basicEnabled = settings.value("machine/basicEnabled", true).toBool();
+    bool altirraOSEnabled = settings.value("machine/altirraOS", false).toBool();
+    bool audioEnabled = settings.value("audio/enabled", true).toBool();
+    
+    qDebug() << "Loading initial settings - Machine:" << machineType 
+             << "Video:" << videoSystem << "BASIC:" << basicEnabled;
+    
+    // Initialize emulator with loaded settings
+    if (!m_emulator->initializeWithConfig(basicEnabled, machineType, videoSystem)) {
+        QMessageBox::critical(this, "Error", "Failed to initialize Atari800 emulator");
+        QApplication::quit();
+        return;
+    }
+    
+    // Set additional settings
+    m_emulator->setAltirraOSEnabled(altirraOSEnabled);
+    m_emulator->enableAudio(audioEnabled);
+    
+    // Update toolbar to reflect loaded settings
+    updateToolbarFromSettings();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

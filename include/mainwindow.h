@@ -18,9 +18,11 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QLabel>
+#include <QSettings>
 #include "atariemulator.h"
 #include "emulatorwidget.h"
 #include "toggleswitch.h"
+#include "settingsdialog.h"
 
 class MainWindow : public QMainWindow
 {
@@ -42,6 +44,8 @@ private slots:
     void toggleAltirraOS(bool enabled);
     void onMachineTypeChanged(int index);
     void onVideoSystemToggled(bool isPAL);
+    void showSettings();
+    void onSettingsChanged();
     void showAbout();
 
 private:
@@ -49,6 +53,8 @@ private:
     void createToolBar();
     void createEmulatorWidget();
     void restartEmulator();
+    void updateToolbarFromSettings();
+    void loadInitialSettings();
     
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
@@ -66,6 +72,7 @@ private:
     QAction* m_warmBootAction;
     QAction* m_basicAction;
     QAction* m_altirraOSAction;
+    QAction* m_settingsAction;
     QAction* m_exitAction;
     QAction* m_aboutAction;
     
