@@ -9,7 +9,10 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <QCloseEvent>
+#include <QResizeEvent>
+#include <QKeyEvent>
 #include <QStatusBar>
+#include <QVBoxLayout>
 #include <QDebug>
 #include <QPainter>
 #include <QPixmap>
@@ -18,6 +21,10 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_emulator(new AtariEmulator(this))
     , m_emulatorWidget(nullptr)
+    , m_keepAspectRatio(true)
+    , m_startInFullscreen(false)
+    , m_isInCustomFullscreen(false)
+    , m_fullscreenWidget(nullptr)
 {
     setWindowTitle("Fujisan");
     setMinimumSize(800, 600);
@@ -29,6 +36,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Load initial settings and initialize emulator with them
     loadInitialSettings();
+    loadVideoSettings();
     
     qDebug() << "Fujisan initialized successfully";
 }
@@ -113,6 +121,21 @@ void MainWindow::createMenus()
         onVideoSystemToggled(true); 
     });
     machineMenu->addAction(m_videoPALAction);
+    
+    // View menu
+    QMenu* viewMenu = menuBar()->addMenu("&View");
+    
+    m_fullscreenAction = new QAction("&Fullscreen", this);
+#ifdef Q_OS_MACOS
+    m_fullscreenAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Return));
+    m_fullscreenAction->setToolTip("Toggle fullscreen mode (Cmd+Enter)");
+#else
+    m_fullscreenAction->setShortcut(Qt::Key_F11);
+    m_fullscreenAction->setToolTip("Toggle fullscreen mode (F11)");
+#endif
+    m_fullscreenAction->setCheckable(true);
+    connect(m_fullscreenAction, &QAction::triggered, this, &MainWindow::toggleFullscreen);
+    viewMenu->addAction(m_fullscreenAction);
     
     // Help menu
     QMenu* helpMenu = menuBar()->addMenu("&Help");
@@ -510,8 +533,9 @@ void MainWindow::showSettings()
 
 void MainWindow::onSettingsChanged()
 {
-    qDebug() << "Settings changed - updating toolbar";
+    qDebug() << "Settings changed - updating toolbar and video settings";
     updateToolbarFromSettings();
+    loadVideoSettings();
     statusBar()->showMessage("Settings applied and emulator restarted", 3000);
 }
 
@@ -567,10 +591,87 @@ void MainWindow::updateToolbarFromSettings()
              << "Video:" << m_emulator->getVideoSystem();
 }
 
+void MainWindow::toggleFullscreen()
+{
+    if (m_isInCustomFullscreen) {
+        // Exit fullscreen mode
+        exitCustomFullscreen();
+    } else {
+        // Enter fullscreen mode
+        enterCustomFullscreen();
+    }
+}
+
+void MainWindow::enterCustomFullscreen()
+{
+    if (m_isInCustomFullscreen || !m_emulatorWidget) return;
+    
+    // Create fullscreen widget
+    m_fullscreenWidget = new QWidget(nullptr, Qt::Window | Qt::FramelessWindowHint);
+    m_fullscreenWidget->setWindowTitle("Fujisan - Fullscreen");
+    m_fullscreenWidget->setAttribute(Qt::WA_DeleteOnClose, false);
+    m_fullscreenWidget->setStyleSheet("background-color: black;");
+    
+    // Create layout for the fullscreen widget
+    QVBoxLayout* layout = new QVBoxLayout(m_fullscreenWidget);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    
+    // Create a new EmulatorWidget for fullscreen (don't move the original)
+    EmulatorWidget* fullscreenEmulator = new EmulatorWidget(m_fullscreenWidget);
+    fullscreenEmulator->setEmulator(m_emulator);
+    layout->addWidget(fullscreenEmulator);
+    
+    // Show fullscreen
+    m_fullscreenWidget->showFullScreen();
+    fullscreenEmulator->setFocus();
+    
+    // Install event filter to handle key presses in fullscreen
+    m_fullscreenWidget->installEventFilter(this);
+    
+    // Update state
+    m_isInCustomFullscreen = true;
+    m_fullscreenAction->setChecked(true);
+    
+#ifdef Q_OS_MACOS
+    statusBar()->showMessage("Fullscreen mode enabled - Press Cmd+Enter to exit", 3000);
+#else
+    statusBar()->showMessage("Fullscreen mode enabled - Press F11 to exit", 3000);
+#endif
+}
+
+void MainWindow::exitCustomFullscreen()
+{
+    if (!m_isInCustomFullscreen || !m_fullscreenWidget) return;
+    
+    // Remove event filter
+    m_fullscreenWidget->removeEventFilter(this);
+    
+    // Close and delete the fullscreen widget (this also deletes the fullscreen emulator widget)
+    m_fullscreenWidget->close();
+    delete m_fullscreenWidget;
+    m_fullscreenWidget = nullptr;
+    
+    // Update state
+    m_isInCustomFullscreen = false;
+    m_fullscreenAction->setChecked(false);
+    
+    // Give focus back to the main emulator widget
+    m_emulatorWidget->setFocus();
+    
+    statusBar()->showMessage("Fullscreen mode disabled", 2000);
+}
+
 void MainWindow::showAbout()
 {
+#ifdef Q_OS_MACOS
+    QString shortcut = "Cmd+Enter";
+#else
+    QString shortcut = "F11";
+#endif
+
     QMessageBox::about(this, "About Fujisan", 
-        "Fujisan - Modern Atari Emulator\n\n"
+        QString("Fujisan - Modern Atari Emulator\n\n"
         "A modern Qt5 frontend for the Atari800 emulator.\n"
         "Features:\n"
         "• Full keyboard input support\n"
@@ -578,7 +679,9 @@ void MainWindow::showAbout()
         "• Cold/warm boot options\n"
         "• Native file dialogs\n"
         "• Authentic Atari colors\n"
-        "• Pixel-perfect scaling");
+        "• Pixel-perfect scaling\n"
+        "• 4:3 aspect ratio lock\n"
+        "• Immersive fullscreen mode (%1)").arg(shortcut));
 }
 
 void MainWindow::loadInitialSettings()
@@ -659,8 +762,104 @@ void MainWindow::loadAndApplyMediaSettings()
     qDebug() << "Media settings loaded and applied";
 }
 
+void MainWindow::loadVideoSettings()
+{
+    QSettings settings("8bitrelics", "Fujisan");
+    m_keepAspectRatio = settings.value("video/keepAspectRatio", true).toBool();
+    m_startInFullscreen = settings.value("video/fullscreenMode", false).toBool();
+    
+    // Apply fullscreen setting based on preference
+    if (m_startInFullscreen && !m_isInCustomFullscreen) {
+        enterCustomFullscreen();
+    } else if (!m_startInFullscreen && m_isInCustomFullscreen) {
+        exitCustomFullscreen();
+    }
+    
+    qDebug() << "Video settings loaded - Keep aspect ratio:" << m_keepAspectRatio 
+             << "Start fullscreen:" << m_startInFullscreen;
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    
+    if (m_keepAspectRatio && m_emulatorWidget) {
+        // Calculate the 4:3 aspect ratio constraints
+        const double targetAspectRatio = 4.0 / 3.0;
+        
+        // Get the current size of the central widget area (excluding toolbar/menubar)
+        QSize currentSize = event->size();
+        int toolbarHeight = m_toolBar->height();
+        int menuHeight = menuBar()->height();
+        int statusHeight = statusBar()->height();
+        
+        int availableWidth = currentSize.width();
+        int availableHeight = currentSize.height() - toolbarHeight - menuHeight - statusHeight;
+        
+        // Calculate the optimal size maintaining 4:3 ratio
+        int optimalWidth, optimalHeight;
+        
+        if ((double)availableWidth / availableHeight > targetAspectRatio) {
+            // Window is too wide, constrain by height
+            optimalHeight = availableHeight;
+            optimalWidth = (int)(optimalHeight * targetAspectRatio);
+        } else {
+            // Window is too tall, constrain by width
+            optimalWidth = availableWidth;
+            optimalHeight = (int)(optimalWidth / targetAspectRatio);
+        }
+        
+        // Calculate the total window size needed
+        int totalWidth = optimalWidth;
+        int totalHeight = optimalHeight + toolbarHeight + menuHeight + statusHeight;
+        
+        // Only resize if the current size doesn't match our target
+        QSize targetSize(totalWidth, totalHeight);
+        if (event->size() != targetSize) {
+            // Temporarily disable aspect ratio to prevent infinite recursion
+            bool wasKeepingAspect = m_keepAspectRatio;
+            m_keepAspectRatio = false;
+            resize(targetSize);
+            m_keepAspectRatio = wasKeepingAspect;
+        }
+    }
+}
+
+bool MainWindow::eventFilter(QObject *object, QEvent *event)
+{
+    if (object == m_fullscreenWidget && event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        
+        // Handle fullscreen toggle shortcut
+#ifdef Q_OS_MACOS
+        if (keyEvent->modifiers() & Qt::ControlModifier && keyEvent->key() == Qt::Key_Return) {
+#else
+        if (keyEvent->key() == Qt::Key_F11) {
+#endif
+            toggleFullscreen();
+            return true;
+        }
+        
+        // Handle Escape key to exit fullscreen
+        if (keyEvent->key() == Qt::Key_Escape) {
+            exitCustomFullscreen();
+            return true;
+        }
+        
+        // Let the fullscreen emulator widget handle all other keys normally
+        // Don't intercept - let the event propagate naturally
+    }
+    
+    return QMainWindow::eventFilter(object, event);
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    // Exit fullscreen if active
+    if (m_isInCustomFullscreen) {
+        exitCustomFullscreen();
+    }
+    
     if (m_emulator) {
         m_emulator->shutdown();
     }

@@ -34,6 +34,8 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+    bool eventFilter(QObject *object, QEvent *event) override;
 
 private slots:
     void loadRom();
@@ -46,6 +48,7 @@ private slots:
     void onVideoSystemToggled(bool isPAL);
     void showSettings();
     void onSettingsChanged();
+    void toggleFullscreen();
     void showAbout();
 
 private:
@@ -56,6 +59,9 @@ private:
     void updateToolbarFromSettings();
     void loadInitialSettings();
     void loadAndApplyMediaSettings();
+    void loadVideoSettings();
+    void enterCustomFullscreen();
+    void exitCustomFullscreen();
     
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
@@ -80,6 +86,17 @@ private:
     // Video system actions
     QAction* m_videoNTSCAction;
     QAction* m_videoPALAction;
+    
+    // Video settings
+    bool m_keepAspectRatio;
+    bool m_startInFullscreen;
+    
+    // View menu action
+    QAction* m_fullscreenAction;
+    
+    // Fullscreen state
+    bool m_isInCustomFullscreen;
+    QWidget* m_fullscreenWidget;
 };
 
 #endif // MAINWINDOW_H

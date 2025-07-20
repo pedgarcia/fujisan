@@ -113,6 +113,8 @@ private:
     QComboBox* m_artifactingMode;
     QCheckBox* m_showFPS;
     QCheckBox* m_scalingFilter;
+    QCheckBox* m_keepAspectRatio;
+    QCheckBox* m_fullscreenMode;
     
     // PAL-specific controls
     QGroupBox* m_palGroup;

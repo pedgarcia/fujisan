@@ -317,6 +317,14 @@ void SettingsDialog::createVideoDisplayTab()
     m_scalingFilter->setToolTip("Apply smoothing when scaling the display");
     generalLayout->addRow("", m_scalingFilter);
     
+    m_keepAspectRatio = new QCheckBox("Keep 4:3 Aspect Ratio");
+    m_keepAspectRatio->setToolTip("Maintain authentic 4:3 display proportions when resizing window");
+    generalLayout->addRow("", m_keepAspectRatio);
+    
+    m_fullscreenMode = new QCheckBox("Start in Fullscreen Mode");
+    m_fullscreenMode->setToolTip("Launch application in fullscreen mode for immersive retro experience");
+    generalLayout->addRow("", m_fullscreenMode);
+    
     tabLayout->addWidget(generalGroup);
     
     // PAL-specific settings
@@ -723,6 +731,8 @@ void SettingsDialog::loadSettings()
     
     m_showFPS->setChecked(settings.value("video/showFPS", false).toBool());
     m_scalingFilter->setChecked(settings.value("video/scalingFilter", true).toBool());
+    m_keepAspectRatio->setChecked(settings.value("video/keepAspectRatio", true).toBool());
+    m_fullscreenMode->setChecked(settings.value("video/fullscreenMode", false).toBool());
     
     QString palBlending = settings.value("video/palBlending", "simple").toString();
     for (int i = 0; i < m_palBlending->count(); ++i) {
@@ -828,6 +838,8 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/artifacting", m_artifactingMode->currentData().toString());
     settings.setValue("video/showFPS", m_showFPS->isChecked());
     settings.setValue("video/scalingFilter", m_scalingFilter->isChecked());
+    settings.setValue("video/keepAspectRatio", m_keepAspectRatio->isChecked());
+    settings.setValue("video/fullscreenMode", m_fullscreenMode->isChecked());
     settings.setValue("video/palBlending", m_palBlending->currentData().toString());
     settings.setValue("video/palScanlines", m_palScanlines->isChecked());
     settings.setValue("video/ntscArtifacting", m_ntscArtifacting->currentData().toString());
@@ -1000,6 +1012,8 @@ void SettingsDialog::restoreDefaults()
     m_artifactingMode->setCurrentIndex(0); // None
     m_showFPS->setChecked(false);
     m_scalingFilter->setChecked(true);
+    m_keepAspectRatio->setChecked(true);
+    m_fullscreenMode->setChecked(false);
     m_palBlending->setCurrentIndex(1);     // Simple
     m_palScanlines->setChecked(false);
     m_ntscArtifacting->setCurrentIndex(0); // Standard
