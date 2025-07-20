@@ -165,6 +165,171 @@ void SettingsDialog::createMachineConfigTab()
     
     tabLayout->addWidget(systemGroup);
     
+    // Memory Configuration Group
+    QGroupBox* memoryGroup = new QGroupBox("Memory Configuration");
+    QVBoxLayout* memoryLayout = new QVBoxLayout(memoryGroup);
+    
+    m_enable800RamCheck = new QCheckBox("Enable RAM at 0xC000-0xCFFF (Atari 800)");
+    m_enable800RamCheck->setToolTip("Enable RAM between 0xC000-0xCFFF in Atari 800");
+    memoryLayout->addWidget(m_enable800RamCheck);
+    
+    // Mosaic RAM expansion
+    QHBoxLayout* mosaicLayout = new QHBoxLayout();
+    m_enableMosaicCheck = new QCheckBox("Enable Mosaic RAM expansion:");
+    mosaicLayout->addWidget(m_enableMosaicCheck);
+    
+    m_mosaicSizeSpinBox = new QSpinBox();
+    m_mosaicSizeSpinBox->setRange(64, 1024);
+    m_mosaicSizeSpinBox->setSingleStep(64);
+    m_mosaicSizeSpinBox->setSuffix(" KB");
+    m_mosaicSizeSpinBox->setValue(320);
+    m_mosaicSizeSpinBox->setToolTip("Total RAM size with Mosaic expansion");
+    mosaicLayout->addWidget(m_mosaicSizeSpinBox);
+    mosaicLayout->addStretch();
+    
+    connect(m_enableMosaicCheck, &QCheckBox::toggled, m_mosaicSizeSpinBox, &QSpinBox::setEnabled);
+    m_mosaicSizeSpinBox->setEnabled(false);
+    
+    memoryLayout->addLayout(mosaicLayout);
+    
+    // Axlon RAM expansion
+    QHBoxLayout* axlonLayout = new QHBoxLayout();
+    m_enableAxlonCheck = new QCheckBox("Enable Axlon RAM expansion:");
+    axlonLayout->addWidget(m_enableAxlonCheck);
+    
+    m_axlonSizeSpinBox = new QSpinBox();
+    m_axlonSizeSpinBox->setRange(64, 1024);
+    m_axlonSizeSpinBox->setSingleStep(64);
+    m_axlonSizeSpinBox->setSuffix(" KB");
+    m_axlonSizeSpinBox->setValue(320);
+    m_axlonSizeSpinBox->setToolTip("Total RAM size with Axlon expansion");
+    axlonLayout->addWidget(m_axlonSizeSpinBox);
+    axlonLayout->addStretch();
+    
+    connect(m_enableAxlonCheck, &QCheckBox::toggled, m_axlonSizeSpinBox, &QSpinBox::setEnabled);
+    m_axlonSizeSpinBox->setEnabled(false);
+    
+    memoryLayout->addLayout(axlonLayout);
+    
+    m_axlonShadowCheck = new QCheckBox("Use Axlon shadow at 0x0FC0-0x0FFF");
+    m_axlonShadowCheck->setToolTip("Enable Axlon shadow memory at 0x0FC0-0x0FFF");
+    memoryLayout->addWidget(m_axlonShadowCheck);
+    
+    m_enableMapRamCheck = new QCheckBox("Enable MapRAM (XL/XE machines)");
+    m_enableMapRamCheck->setToolTip("Enable MapRAM feature for XL/XE machines");
+    memoryLayout->addWidget(m_enableMapRamCheck);
+    
+    tabLayout->addWidget(memoryGroup);
+    
+    // Performance Group
+    QGroupBox* performanceGroup = new QGroupBox("Performance");
+    QVBoxLayout* performanceLayout = new QVBoxLayout(performanceGroup);
+    
+    m_turboModeCheck = new QCheckBox("Run as fast as possible (Turbo mode)");
+    m_turboModeCheck->setToolTip("Run emulator at maximum speed, ignoring timing constraints");
+    performanceLayout->addWidget(m_turboModeCheck);
+    
+    tabLayout->addWidget(performanceGroup);
+    
+    // Cartridge Configuration Group
+    QGroupBox* cartridgeGroup = new QGroupBox("Cartridge Configuration");
+    QVBoxLayout* cartridgeLayout = new QVBoxLayout(cartridgeGroup);
+    
+    // Primary cartridge
+    QVBoxLayout* cart1Layout = new QVBoxLayout();
+    QLabel* cart1Label = new QLabel("Primary Cartridge:");
+    cart1Label->setStyleSheet("font-weight: bold;");
+    cart1Layout->addWidget(cart1Label);
+    
+    QHBoxLayout* cart1PathLayout = new QHBoxLayout();
+    m_cartridgeEnabledCheck = new QCheckBox("Enable");
+    cart1PathLayout->addWidget(m_cartridgeEnabledCheck);
+    
+    m_cartridgePath = new QLineEdit();
+    m_cartridgePath->setPlaceholderText("Select cartridge file (.rom, .bin, .car)");
+    setupFilePathTooltip(m_cartridgePath);
+    cart1PathLayout->addWidget(m_cartridgePath, 1);
+    
+    m_cartridgeBrowse = new QPushButton("Browse...");
+    connect(m_cartridgeBrowse, &QPushButton::clicked, this, &SettingsDialog::browseCartridge);
+    cart1PathLayout->addWidget(m_cartridgeBrowse);
+    
+    cart1Layout->addLayout(cart1PathLayout);
+    
+    QHBoxLayout* cart1TypeLayout = new QHBoxLayout();
+    QLabel* cart1TypeLabel = new QLabel("Type:");
+    cart1TypeLayout->addWidget(cart1TypeLabel);
+    
+    m_cartridgeTypeCombo = new QComboBox();
+    m_cartridgeTypeCombo->setToolTip("Cartridge type - use Auto-detect unless you have issues");
+    populateCartridgeTypes(m_cartridgeTypeCombo);
+    cart1TypeLayout->addWidget(m_cartridgeTypeCombo, 1);
+    
+    cart1Layout->addLayout(cart1TypeLayout);
+    cartridgeLayout->addLayout(cart1Layout);
+    
+    // Piggyback cartridge
+    QVBoxLayout* cart2Layout = new QVBoxLayout();
+    QLabel* cart2Label = new QLabel("Piggyback Cartridge:");
+    cart2Label->setStyleSheet("font-weight: bold;");
+    cart2Layout->addWidget(cart2Label);
+    
+    QHBoxLayout* cart2PathLayout = new QHBoxLayout();
+    m_cartridge2EnabledCheck = new QCheckBox("Enable");
+    cart2PathLayout->addWidget(m_cartridge2EnabledCheck);
+    
+    m_cartridge2Path = new QLineEdit();
+    m_cartridge2Path->setPlaceholderText("Select piggyback cartridge file");
+    setupFilePathTooltip(m_cartridge2Path);
+    cart2PathLayout->addWidget(m_cartridge2Path, 1);
+    
+    m_cartridge2Browse = new QPushButton("Browse...");
+    connect(m_cartridge2Browse, &QPushButton::clicked, this, &SettingsDialog::browseCartridge2);
+    cart2PathLayout->addWidget(m_cartridge2Browse);
+    
+    cart2Layout->addLayout(cart2PathLayout);
+    
+    QHBoxLayout* cart2TypeLayout = new QHBoxLayout();
+    QLabel* cart2TypeLabel = new QLabel("Type:");
+    cart2TypeLayout->addWidget(cart2TypeLabel);
+    
+    m_cartridge2TypeCombo = new QComboBox();
+    m_cartridge2TypeCombo->setToolTip("Piggyback cartridge type");
+    populateCartridgeTypes(m_cartridge2TypeCombo);
+    cart2TypeLayout->addWidget(m_cartridge2TypeCombo, 1);
+    
+    cart2Layout->addLayout(cart2TypeLayout);
+    cartridgeLayout->addLayout(cart2Layout);
+    
+    // Cartridge options
+    m_cartridgeAutoRebootCheck = new QCheckBox("Auto-reboot when cartridge changes");
+    m_cartridgeAutoRebootCheck->setToolTip("Automatically restart emulator when cartridges are inserted or removed");
+    m_cartridgeAutoRebootCheck->setChecked(true); // Default to enabled
+    cartridgeLayout->addWidget(m_cartridgeAutoRebootCheck);
+    
+    // Enable/disable controls based on checkboxes
+    connect(m_cartridgeEnabledCheck, &QCheckBox::toggled, [this](bool enabled) {
+        m_cartridgePath->setEnabled(enabled);
+        m_cartridgeBrowse->setEnabled(enabled);
+        m_cartridgeTypeCombo->setEnabled(enabled);
+    });
+    
+    connect(m_cartridge2EnabledCheck, &QCheckBox::toggled, [this](bool enabled) {
+        m_cartridge2Path->setEnabled(enabled);
+        m_cartridge2Browse->setEnabled(enabled);
+        m_cartridge2TypeCombo->setEnabled(enabled);
+    });
+    
+    // Initially disable controls
+    m_cartridgePath->setEnabled(false);
+    m_cartridgeBrowse->setEnabled(false);
+    m_cartridgeTypeCombo->setEnabled(false);
+    m_cartridge2Path->setEnabled(false);
+    m_cartridge2Browse->setEnabled(false);
+    m_cartridge2TypeCombo->setEnabled(false);
+    
+    tabLayout->addWidget(cartridgeGroup);
+    
     // Add stretch to push everything to the top
     tabLayout->addStretch();
 }
@@ -592,6 +757,108 @@ void SettingsDialog::browseBasicROM()
     }
 }
 
+void SettingsDialog::browseCartridge()
+{
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        "Select Cartridge File",
+        QString(),
+        "Cartridge Files (*.rom *.bin *.car *.a52);;ROM Files (*.rom *.bin);;CART Files (*.car);;Atari 5200 (*.a52);;All Files (*)"
+    );
+    
+    if (!fileName.isEmpty()) {
+        m_cartridgePath->setText(fileName);
+        m_cartridgeEnabledCheck->setChecked(true);
+    }
+}
+
+void SettingsDialog::browseCartridge2()
+{
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        "Select Piggyback Cartridge File",
+        QString(),
+        "Cartridge Files (*.rom *.bin *.car *.a52);;ROM Files (*.rom *.bin);;CART Files (*.car);;Atari 5200 (*.a52);;All Files (*)"
+    );
+    
+    if (!fileName.isEmpty()) {
+        m_cartridge2Path->setText(fileName);
+        m_cartridge2EnabledCheck->setChecked(true);
+    }
+}
+
+void SettingsDialog::populateCartridgeTypes(QComboBox* combo)
+{
+    // Add auto-detect first (most common choice)
+    combo->addItem("Auto-detect", -1);
+    
+    // Add most common cartridge types based on Atari800 manual
+    combo->addItem("0 - No cartridge", 0);
+    combo->addItem("1 - Standard 8K", 1);
+    combo->addItem("2 - Standard 16K", 2);
+    combo->addItem("3 - OSS 034M 16K", 3);
+    combo->addItem("4 - 5200 32K", 4);
+    combo->addItem("5 - DB 32K", 5);
+    combo->addItem("6 - Two chip 16K", 6);
+    combo->addItem("7 - Bounty Bob 40K", 7);
+    combo->addItem("8 - 64K Williams", 8);
+    combo->addItem("9 - Express 64K", 9);
+    combo->addItem("10 - Diamond 64K", 10);
+    combo->addItem("11 - SpartaDOS X 64K", 11);
+    combo->addItem("12 - XEGS 32K", 12);
+    combo->addItem("13 - XEGS 64K", 13);
+    combo->addItem("14 - XEGS 128K", 14);
+    combo->addItem("15 - OSS 043M 16K", 15);
+    combo->addItem("16 - One chip 16K", 16);
+    combo->addItem("17 - Atrax 128K", 17);
+    combo->addItem("18 - Bounty Bob 40K", 18);
+    combo->addItem("19 - 5200 8K", 19);
+    combo->addItem("20 - 5200 4K", 20);
+    combo->addItem("21 - Right slot 8K", 21);
+    combo->addItem("22 - 32K Williams", 22);
+    combo->addItem("23 - XEGS 256K", 23);
+    combo->addItem("24 - XEGS 512K", 24);
+    combo->addItem("25 - XEGS 1024K", 25);
+    combo->addItem("26 - MegaCart 16K", 26);
+    combo->addItem("27 - MegaCart 32K", 27);
+    combo->addItem("28 - MegaCart 64K", 28);
+    combo->addItem("29 - MegaCart 128K", 29);
+    combo->addItem("30 - MegaCart 256K", 30);
+    combo->addItem("31 - MegaCart 512K", 31);
+    combo->addItem("32 - MegaCart 1024K", 32);
+    combo->addItem("33 - Switchable XEGS 32K", 33);
+    combo->addItem("34 - Switchable XEGS 64K", 34);
+    combo->addItem("35 - Switchable XEGS 128K", 35);
+    combo->addItem("36 - Switchable XEGS 256K", 36);
+    combo->addItem("37 - Switchable XEGS 512K", 37);
+    combo->addItem("38 - Switchable XEGS 1024K", 38);
+    combo->addItem("39 - Phoenix 8K", 39);
+    combo->addItem("40 - Blizzard 16K", 40);
+    combo->addItem("41 - Atarimax 128K Flash", 41);
+    combo->addItem("42 - Atarimax 1024K Flash", 42);
+    combo->addItem("43 - SpartaDOS X 128K", 43);
+    combo->addItem("44 - OSS 8K", 44);
+    combo->addItem("45 - OSS Two chip 16K", 45);
+    combo->addItem("46 - Blizzard 4K", 46);
+    combo->addItem("47 - AST 32K", 47);
+    combo->addItem("48 - Atrax SDX 64K", 48);
+    combo->addItem("49 - Atrax SDX 128K", 49);
+    combo->addItem("50 - Turbosoft 64K", 50);
+    combo->addItem("51 - Turbosoft 128K", 51);
+    combo->addItem("52 - Ultracart 32K", 52);
+    combo->addItem("53 - Low bank 8K", 53);
+    combo->addItem("54 - SIC! 128K", 54);
+    combo->addItem("55 - SIC! 256K", 55);
+    combo->addItem("56 - SIC! 512K", 56);
+    combo->addItem("57 - Standard 2K", 57);
+    combo->addItem("58 - Standard 4K", 58);
+    combo->addItem("59 - Right slot 4K", 59);
+    combo->addItem("60 - Blizzard 32K", 60);
+    
+    // Set default to auto-detect
+    combo->setCurrentIndex(0);
+}
+
 void SettingsDialog::onMachineTypeChanged()
 {
     QString machineType = m_machineTypeCombo->currentData().toString();
@@ -668,6 +935,45 @@ void SettingsDialog::loadSettings()
     
     m_basicEnabledCheck->setChecked(settings.value("machine/basicEnabled", true).toBool());
     m_altirraOSCheck->setChecked(settings.value("machine/altirraOS", false).toBool());
+    
+    // Load Memory Configuration
+    m_enable800RamCheck->setChecked(settings.value("machine/enable800Ram", false).toBool());
+    m_enableMosaicCheck->setChecked(settings.value("machine/enableMosaic", false).toBool());
+    m_mosaicSizeSpinBox->setValue(settings.value("machine/mosaicSize", 320).toInt());
+    m_enableAxlonCheck->setChecked(settings.value("machine/enableAxlon", false).toBool());
+    m_axlonSizeSpinBox->setValue(settings.value("machine/axlonSize", 320).toInt());
+    m_axlonShadowCheck->setChecked(settings.value("machine/axlonShadow", false).toBool());
+    m_enableMapRamCheck->setChecked(settings.value("machine/enableMapRam", false).toBool());
+    
+    // Load Performance settings
+    m_turboModeCheck->setChecked(settings.value("machine/turboMode", false).toBool());
+    
+    // Load Cartridge Configuration
+    m_cartridgeEnabledCheck->setChecked(settings.value("machine/cartridgeEnabled", false).toBool());
+    m_cartridgePath->setText(settings.value("machine/cartridgePath", "").toString());
+    int cartridgeType = settings.value("machine/cartridgeType", -1).toInt();
+    for (int i = 0; i < m_cartridgeTypeCombo->count(); ++i) {
+        if (m_cartridgeTypeCombo->itemData(i).toInt() == cartridgeType) {
+            m_cartridgeTypeCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_cartridge2EnabledCheck->setChecked(settings.value("machine/cartridge2Enabled", false).toBool());
+    m_cartridge2Path->setText(settings.value("machine/cartridge2Path", "").toString());
+    int cartridge2Type = settings.value("machine/cartridge2Type", -1).toInt();
+    for (int i = 0; i < m_cartridge2TypeCombo->count(); ++i) {
+        if (m_cartridge2TypeCombo->itemData(i).toInt() == cartridge2Type) {
+            m_cartridge2TypeCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_cartridgeAutoRebootCheck->setChecked(settings.value("machine/cartridgeAutoReboot", true).toBool());
+    
+    // Update spinbox enabled state based on checkbox values
+    m_mosaicSizeSpinBox->setEnabled(m_enableMosaicCheck->isChecked());
+    m_axlonSizeSpinBox->setEnabled(m_enableAxlonCheck->isChecked());
     
     // Load ROM paths
     QString currentMachineType = m_machineTypeCombo->currentData().toString();
@@ -809,6 +1115,27 @@ void SettingsDialog::saveSettings()
     QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
     settings.setValue(osRomKey, m_osRomPath->text());
     settings.setValue("machine/basicRom", m_basicRomPath->text());
+    
+    // Save Memory Configuration
+    settings.setValue("machine/enable800Ram", m_enable800RamCheck->isChecked());
+    settings.setValue("machine/enableMosaic", m_enableMosaicCheck->isChecked());
+    settings.setValue("machine/mosaicSize", m_mosaicSizeSpinBox->value());
+    settings.setValue("machine/enableAxlon", m_enableAxlonCheck->isChecked());
+    settings.setValue("machine/axlonSize", m_axlonSizeSpinBox->value());
+    settings.setValue("machine/axlonShadow", m_axlonShadowCheck->isChecked());
+    settings.setValue("machine/enableMapRam", m_enableMapRamCheck->isChecked());
+    
+    // Save Performance settings
+    settings.setValue("machine/turboMode", m_turboModeCheck->isChecked());
+    
+    // Save Cartridge Configuration
+    settings.setValue("machine/cartridgeEnabled", m_cartridgeEnabledCheck->isChecked());
+    settings.setValue("machine/cartridgePath", m_cartridgePath->text());
+    settings.setValue("machine/cartridgeType", m_cartridgeTypeCombo->currentData().toInt());
+    settings.setValue("machine/cartridge2Enabled", m_cartridge2EnabledCheck->isChecked());
+    settings.setValue("machine/cartridge2Path", m_cartridge2Path->text());
+    settings.setValue("machine/cartridge2Type", m_cartridge2TypeCombo->currentData().toInt());
+    settings.setValue("machine/cartridgeAutoReboot", m_cartridgeAutoRebootCheck->isChecked());
     
     // Save Hardware Extensions
     settings.setValue("hardware/stereoPokey", m_stereoPokey->isChecked());
@@ -983,6 +1310,27 @@ void SettingsDialog::restoreDefaults()
     m_basicRomPath->clear();
     onMachineTypeChanged(); // Update ROM labels
     onAltirraOSChanged(); // Update BASIC ROM controls
+    
+    // Memory Configuration defaults
+    m_enable800RamCheck->setChecked(false);
+    m_enableMosaicCheck->setChecked(false);
+    m_mosaicSizeSpinBox->setValue(320);
+    m_enableAxlonCheck->setChecked(false);
+    m_axlonSizeSpinBox->setValue(320);
+    m_axlonShadowCheck->setChecked(false);
+    m_enableMapRamCheck->setChecked(false);
+    
+    // Performance defaults
+    m_turboModeCheck->setChecked(false);
+    
+    // Cartridge Configuration defaults
+    m_cartridgeEnabledCheck->setChecked(false);
+    m_cartridgePath->clear();
+    m_cartridgeTypeCombo->setCurrentIndex(0); // Auto-detect
+    m_cartridge2EnabledCheck->setChecked(false);
+    m_cartridge2Path->clear();
+    m_cartridge2TypeCombo->setCurrentIndex(0); // Auto-detect
+    m_cartridgeAutoRebootCheck->setChecked(true);
     
     // Hardware Extensions defaults
     m_stereoPokey->setChecked(false);

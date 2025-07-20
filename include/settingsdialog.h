@@ -46,6 +46,8 @@ private slots:
     void browseHardDriveDirectory(int driveNumber);
     void browseOSROM();
     void browseBasicROM();
+    void browseCartridge();
+    void browseCartridge2();
     void onMachineTypeChanged();
     void onAltirraOSChanged();
 
@@ -61,6 +63,7 @@ private:
     void applyMediaSettings();
     void updateVideoSystemDependentControls();
     void setupFilePathTooltip(QLineEdit* lineEdit);
+    void populateCartridgeTypes(QComboBox* combo);
     
     AtariEmulator* m_emulator;
     QTabWidget* m_tabWidget;
@@ -73,6 +76,29 @@ private:
     QComboBox* m_videoSystemCombo;
     QCheckBox* m_basicEnabledCheck;
     QCheckBox* m_altirraOSCheck;
+    
+    // Memory Configuration controls
+    QCheckBox* m_enable800RamCheck;
+    QCheckBox* m_enableMosaicCheck;
+    QSpinBox* m_mosaicSizeSpinBox;
+    QCheckBox* m_enableAxlonCheck;
+    QSpinBox* m_axlonSizeSpinBox;
+    QCheckBox* m_axlonShadowCheck;
+    QCheckBox* m_enableMapRamCheck;
+    
+    // Performance controls
+    QCheckBox* m_turboModeCheck;
+    
+    // Cartridge Configuration controls
+    QCheckBox* m_cartridgeEnabledCheck;
+    QLineEdit* m_cartridgePath;
+    QPushButton* m_cartridgeBrowse;
+    QComboBox* m_cartridgeTypeCombo;
+    QCheckBox* m_cartridge2EnabledCheck;
+    QLineEdit* m_cartridge2Path;
+    QPushButton* m_cartridge2Browse;
+    QComboBox* m_cartridge2TypeCombo;
+    QCheckBox* m_cartridgeAutoRebootCheck;
     
     // ROM Configuration controls
     QLabel* m_osRomLabel;
