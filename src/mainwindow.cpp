@@ -722,8 +722,36 @@ void MainWindow::loadAndApplyMediaSettings()
     
     qDebug() << "Loading and applying media settings...";
     
-    // Load and mount disk images for D1-D4
-    for (int i = 0; i < 4; i++) {
+    // Load and apply cartridge settings first (before disk images)
+    bool cartridgeEnabled = settings.value("machine/cartridgeEnabled", false).toBool();
+    QString cartridgePath = settings.value("machine/cartridgePath", "").toString();
+    
+    if (cartridgeEnabled && !cartridgePath.isEmpty()) {
+        qDebug() << "Auto-loading cartridge:" << cartridgePath;
+        
+        if (m_emulator->loadFile(cartridgePath)) {
+            qDebug() << "Successfully auto-loaded cartridge:" << cartridgePath;
+        } else {
+            qDebug() << "Failed to auto-load cartridge:" << cartridgePath;
+        }
+    }
+    
+    // Load piggyback cartridge if enabled
+    bool cartridge2Enabled = settings.value("machine/cartridge2Enabled", false).toBool();
+    QString cartridge2Path = settings.value("machine/cartridge2Path", "").toString();
+    
+    if (cartridge2Enabled && !cartridge2Path.isEmpty()) {
+        qDebug() << "Auto-loading piggyback cartridge:" << cartridge2Path;
+        
+        if (m_emulator->loadFile(cartridge2Path)) {
+            qDebug() << "Successfully auto-loaded piggyback cartridge:" << cartridge2Path;
+        } else {
+            qDebug() << "Failed to auto-load piggyback cartridge:" << cartridge2Path;
+        }
+    }
+    
+    // Load and mount disk images for D1-D8
+    for (int i = 0; i < 8; i++) {
         QString diskKey = QString("media/disk%1").arg(i + 1);
         bool diskEnabled = settings.value(diskKey + "Enabled", false).toBool();
         QString diskPath = settings.value(diskKey + "Path", "").toString();

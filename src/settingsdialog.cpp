@@ -1698,6 +1698,30 @@ void SettingsDialog::applyMediaSettings()
 {
     qDebug() << "Applying media settings to emulator...";
     
+    // Apply cartridge settings
+    if (m_cartridgeEnabledCheck->isChecked() && !m_cartridgePath->text().isEmpty()) {
+        QString cartridgePath = m_cartridgePath->text();
+        qDebug() << "Loading cartridge:" << cartridgePath;
+        
+        if (m_emulator->loadFile(cartridgePath)) {
+            qDebug() << "Successfully loaded cartridge:" << cartridgePath;
+        } else {
+            qDebug() << "Failed to load cartridge:" << cartridgePath;
+        }
+    }
+    
+    // Apply piggyback cartridge settings 
+    if (m_cartridge2EnabledCheck->isChecked() && !m_cartridge2Path->text().isEmpty()) {
+        QString cartridge2Path = m_cartridge2Path->text();
+        qDebug() << "Loading piggyback cartridge:" << cartridge2Path;
+        
+        if (m_emulator->loadFile(cartridge2Path)) {
+            qDebug() << "Successfully loaded piggyback cartridge:" << cartridge2Path;
+        } else {
+            qDebug() << "Failed to load piggyback cartridge:" << cartridge2Path;
+        }
+    }
+    
     // Mount/unmount disk images for D1-D8
     for (int i = 0; i < 8; i++) {
         if (m_diskEnabled[i]->isChecked() && !m_diskPath[i]->text().isEmpty()) {
