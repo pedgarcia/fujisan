@@ -69,7 +69,14 @@ void SettingsDialog::createMachineConfigTab()
     m_machineTab = new QWidget();
     m_tabWidget->addTab(m_machineTab, "Machine Configuration");
     
-    QVBoxLayout* tabLayout = new QVBoxLayout(m_machineTab);
+    // Create main horizontal layout for two columns
+    QHBoxLayout* mainLayout = new QHBoxLayout(m_machineTab);
+    
+    // Left column layout
+    QVBoxLayout* leftColumn = new QVBoxLayout();
+    
+    // Right column layout  
+    QVBoxLayout* rightColumn = new QVBoxLayout();
     
     // Machine Type Group
     QGroupBox* machineGroup = new QGroupBox("Machine Type");
@@ -120,7 +127,7 @@ void SettingsDialog::createMachineConfigTab()
     machineRow->addLayout(romRight, 2);
     
     machineVLayout->addLayout(machineRow);
-    tabLayout->addWidget(machineGroup);
+    leftColumn->addWidget(machineGroup);
     
     // Video System Group
     QGroupBox* videoGroup = new QGroupBox("Video System");
@@ -131,7 +138,7 @@ void SettingsDialog::createMachineConfigTab()
     m_videoSystemCombo->addItem("NTSC (59.92 fps)", "-ntsc");
     
     videoLayout->addRow("Standard:", m_videoSystemCombo);
-    tabLayout->addWidget(videoGroup);
+    leftColumn->addWidget(videoGroup);
     
     // System Options Group
     QGroupBox* systemGroup = new QGroupBox("System Options");
@@ -163,7 +170,7 @@ void SettingsDialog::createMachineConfigTab()
     connect(m_altirraOSCheck, &QCheckBox::toggled, this, &SettingsDialog::onAltirraOSChanged);
     systemLayout->addWidget(m_altirraOSCheck);
     
-    tabLayout->addWidget(systemGroup);
+    leftColumn->addWidget(systemGroup);
     
     // Memory Configuration Group
     QGroupBox* memoryGroup = new QGroupBox("Memory Configuration");
@@ -219,7 +226,7 @@ void SettingsDialog::createMachineConfigTab()
     m_enableMapRamCheck->setToolTip("Enable MapRAM feature for XL/XE machines");
     memoryLayout->addWidget(m_enableMapRamCheck);
     
-    tabLayout->addWidget(memoryGroup);
+    rightColumn->addWidget(memoryGroup);
     
     // Performance Group
     QGroupBox* performanceGroup = new QGroupBox("Performance");
@@ -229,7 +236,7 @@ void SettingsDialog::createMachineConfigTab()
     m_turboModeCheck->setToolTip("Run emulator at maximum speed, ignoring timing constraints");
     performanceLayout->addWidget(m_turboModeCheck);
     
-    tabLayout->addWidget(performanceGroup);
+    rightColumn->addWidget(performanceGroup);
     
     // Cartridge Configuration Group
     QGroupBox* cartridgeGroup = new QGroupBox("Cartridge Configuration");
@@ -328,10 +335,15 @@ void SettingsDialog::createMachineConfigTab()
     m_cartridge2Browse->setEnabled(false);
     m_cartridge2TypeCombo->setEnabled(false);
     
-    tabLayout->addWidget(cartridgeGroup);
+    rightColumn->addWidget(cartridgeGroup);
     
-    // Add stretch to push everything to the top
-    tabLayout->addStretch();
+    // Add stretch to balance columns
+    leftColumn->addStretch();
+    rightColumn->addStretch();
+    
+    // Add both columns to main layout
+    mainLayout->addLayout(leftColumn, 1);
+    mainLayout->addLayout(rightColumn, 1);
 }
 
 void SettingsDialog::createHardwareExtensionsTab()
