@@ -532,94 +532,143 @@ void SettingsDialog::createVideoDisplayTab()
     
     // PAL-specific settings
     m_palGroup = new QGroupBox("PAL Video Options");
-    QFormLayout* palLayout = new QFormLayout(m_palGroup);
+    QVBoxLayout* palLayout = new QVBoxLayout(m_palGroup);
     
+    // Color Blending row
+    QHBoxLayout* blendingRow = new QHBoxLayout();
+    blendingRow->addWidget(new QLabel("Color Blending:"));
     m_palBlending = new QComboBox();
     m_palBlending->addItem("None", "none");
     m_palBlending->addItem("Simple", "simple");
     m_palBlending->addItem("Linear", "linear");
     m_palBlending->setToolTip("PAL color blending mode");
-    palLayout->addRow("Color Blending:", m_palBlending);
+    blendingRow->addWidget(m_palBlending);
+    blendingRow->addStretch();
+    palLayout->addLayout(blendingRow);
     
     m_palScanlines = new QCheckBox("Enable PAL Scanlines");
     m_palScanlines->setToolTip("Simulate PAL CRT scanline effect");
-    palLayout->addRow("", m_palScanlines);
+    palLayout->addWidget(m_palScanlines);
     
-    // PAL Color Adjustment Controls - created individually to avoid signal interference
-    // PAL Saturation
-    QHBoxLayout* palSatLayout = new QHBoxLayout();
-    m_palSaturationSlider = new QSlider(Qt::Horizontal);
-    m_palSaturationSlider->setRange(-100, 100);
+    // PAL Color Adjustment Controls - isolated in separate widgets
+    // PAL Saturation - completely isolated
+    QWidget* palSatWidget = new QWidget();
+    QHBoxLayout* palSatLayout = new QHBoxLayout(palSatWidget);
+    palSatLayout->setContentsMargins(0, 0, 0, 0);
+    m_palSaturationSlider = new QSlider();
+    m_palSaturationSlider->setOrientation(Qt::Horizontal);
+    m_palSaturationSlider->setParent(palSatWidget);
+    m_palSaturationSlider->setMinimum(-100);
+    m_palSaturationSlider->setMaximum(100);
     m_palSaturationSlider->setValue(0);
     palSatLayout->addWidget(m_palSaturationSlider, 1);
-    m_palSaturationLabel = new QLabel("0.00");
+    m_palSaturationLabel = new QLabel("0.00", palSatWidget);
     m_palSaturationLabel->setMinimumWidth(60);
     m_palSaturationLabel->setAlignment(Qt::AlignCenter);
     palSatLayout->addWidget(m_palSaturationLabel);
     connect(m_palSaturationSlider, &QSlider::valueChanged, [this](int value) {
+        qDebug() << "PAL Saturation slider changed to:" << value;
         m_palSaturationLabel->setText(QString::number(value / 100.0, 'f', 2));
     });
-    palLayout->addRow("Saturation:", palSatLayout);
+    // Add saturation row manually
+    QHBoxLayout* palSatRow = new QHBoxLayout();
+    palSatRow->addWidget(new QLabel("Saturation:"));
+    palSatRow->addWidget(palSatWidget, 1);
+    palLayout->addLayout(palSatRow);
+    
+    // TODO: Fix visual bouncing issue - sliders work correctly but bounce visually
     
     // PAL Contrast
-    QHBoxLayout* palContrastLayout = new QHBoxLayout();
-    m_palContrastSlider = new QSlider(Qt::Horizontal);
-    m_palContrastSlider->setRange(-100, 100);
+    QWidget* palContrastWidget = new QWidget();
+    QHBoxLayout* palContrastLayout = new QHBoxLayout(palContrastWidget);
+    palContrastLayout->setContentsMargins(0, 0, 0, 0);
+    m_palContrastSlider = new QSlider();
+    m_palContrastSlider->setOrientation(Qt::Horizontal);
+    m_palContrastSlider->setParent(palContrastWidget);
+    m_palContrastSlider->setMinimum(-100);
+    m_palContrastSlider->setMaximum(100);
     m_palContrastSlider->setValue(0);
     palContrastLayout->addWidget(m_palContrastSlider, 1);
-    m_palContrastLabel = new QLabel("0.00");
+    m_palContrastLabel = new QLabel("0.00", palContrastWidget);
     m_palContrastLabel->setMinimumWidth(60);
     m_palContrastLabel->setAlignment(Qt::AlignCenter);
     palContrastLayout->addWidget(m_palContrastLabel);
     connect(m_palContrastSlider, &QSlider::valueChanged, [this](int value) {
         m_palContrastLabel->setText(QString::number(value / 100.0, 'f', 2));
     });
-    palLayout->addRow("Contrast:", palContrastLayout);
+    QHBoxLayout* palContrastRow = new QHBoxLayout();
+    palContrastRow->addWidget(new QLabel("Contrast:"));
+    palContrastRow->addWidget(palContrastWidget, 1);
+    palLayout->addLayout(palContrastRow);
     
     // PAL Brightness
-    QHBoxLayout* palBrightnessLayout = new QHBoxLayout();
-    m_palBrightnessSlider = new QSlider(Qt::Horizontal);
-    m_palBrightnessSlider->setRange(-100, 100);
+    QWidget* palBrightnessWidget = new QWidget();
+    QHBoxLayout* palBrightnessLayout = new QHBoxLayout(palBrightnessWidget);
+    palBrightnessLayout->setContentsMargins(0, 0, 0, 0);
+    m_palBrightnessSlider = new QSlider();
+    m_palBrightnessSlider->setOrientation(Qt::Horizontal);
+    m_palBrightnessSlider->setParent(palBrightnessWidget);
+    m_palBrightnessSlider->setMinimum(-100);
+    m_palBrightnessSlider->setMaximum(100);
     m_palBrightnessSlider->setValue(0);
     palBrightnessLayout->addWidget(m_palBrightnessSlider, 1);
-    m_palBrightnessLabel = new QLabel("0.00");
+    m_palBrightnessLabel = new QLabel("0.00", palBrightnessWidget);
     m_palBrightnessLabel->setMinimumWidth(60);
     m_palBrightnessLabel->setAlignment(Qt::AlignCenter);
     palBrightnessLayout->addWidget(m_palBrightnessLabel);
     connect(m_palBrightnessSlider, &QSlider::valueChanged, [this](int value) {
         m_palBrightnessLabel->setText(QString::number(value / 100.0, 'f', 2));
     });
-    palLayout->addRow("Brightness:", palBrightnessLayout);
+    QHBoxLayout* palBrightnessRow = new QHBoxLayout();
+    palBrightnessRow->addWidget(new QLabel("Brightness:"));
+    palBrightnessRow->addWidget(palBrightnessWidget, 1);
+    palLayout->addLayout(palBrightnessRow);
     
     // PAL Gamma
-    QHBoxLayout* palGammaLayout = new QHBoxLayout();
-    m_palGammaSlider = new QSlider(Qt::Horizontal);
-    m_palGammaSlider->setRange(10, 400);
+    QWidget* palGammaWidget = new QWidget();
+    QHBoxLayout* palGammaLayout = new QHBoxLayout(palGammaWidget);
+    palGammaLayout->setContentsMargins(0, 0, 0, 0);
+    m_palGammaSlider = new QSlider();
+    m_palGammaSlider->setOrientation(Qt::Horizontal);
+    m_palGammaSlider->setParent(palGammaWidget);
+    m_palGammaSlider->setMinimum(10);
+    m_palGammaSlider->setMaximum(400);
     m_palGammaSlider->setValue(100);
     palGammaLayout->addWidget(m_palGammaSlider, 1);
-    m_palGammaLabel = new QLabel("1.00");
+    m_palGammaLabel = new QLabel("1.00", palGammaWidget);
     m_palGammaLabel->setMinimumWidth(60);
     m_palGammaLabel->setAlignment(Qt::AlignCenter);
     palGammaLayout->addWidget(m_palGammaLabel);
     connect(m_palGammaSlider, &QSlider::valueChanged, [this](int value) {
         m_palGammaLabel->setText(QString::number(value / 100.0, 'f', 2));
     });
-    palLayout->addRow("Gamma:", palGammaLayout);
+    QHBoxLayout* palGammaRow = new QHBoxLayout();
+    palGammaRow->addWidget(new QLabel("Gamma:"));
+    palGammaRow->addWidget(palGammaWidget, 1);
+    palLayout->addLayout(palGammaRow);
     
     // PAL Tint
-    QHBoxLayout* palTintLayout = new QHBoxLayout();
-    m_palTintSlider = new QSlider(Qt::Horizontal);
-    m_palTintSlider->setRange(-180, 180);
+    QWidget* palTintWidget = new QWidget();
+    QHBoxLayout* palTintLayout = new QHBoxLayout(palTintWidget);
+    palTintLayout->setContentsMargins(0, 0, 0, 0);
+    m_palTintSlider = new QSlider();
+    m_palTintSlider->setOrientation(Qt::Horizontal);
+    m_palTintSlider->setParent(palTintWidget);
+    m_palTintSlider->setMinimum(-180);
+    m_palTintSlider->setMaximum(180);
     m_palTintSlider->setValue(0);
     palTintLayout->addWidget(m_palTintSlider, 1);
-    m_palTintLabel = new QLabel("0°");
+    m_palTintLabel = new QLabel("0°", palTintWidget);
     m_palTintLabel->setMinimumWidth(60);
     m_palTintLabel->setAlignment(Qt::AlignCenter);
     palTintLayout->addWidget(m_palTintLabel);
     connect(m_palTintSlider, &QSlider::valueChanged, [this](int value) {
         m_palTintLabel->setText(QString::number(value) + "°");
     });
-    palLayout->addRow("Tint:", palTintLayout);
+    QHBoxLayout* palTintRow = new QHBoxLayout();
+    palTintRow->addWidget(new QLabel("Tint:"));
+    palTintRow->addWidget(palTintWidget, 1);
+    palLayout->addLayout(palTintRow);
     
     // Set tooltips for PAL color controls
     m_palSaturationSlider->setToolTip("Adjust PAL color saturation (-1.0 to 1.0)");
@@ -632,94 +681,141 @@ void SettingsDialog::createVideoDisplayTab()
     
     // NTSC-specific settings
     m_ntscGroup = new QGroupBox("NTSC Video Options");
-    QFormLayout* ntscLayout = new QFormLayout(m_ntscGroup);
+    QVBoxLayout* ntscLayout = new QVBoxLayout(m_ntscGroup);
     
+    // Artifacting row
+    QHBoxLayout* artifactingRow = new QHBoxLayout();
+    artifactingRow->addWidget(new QLabel("Artifacting:"));
     m_ntscArtifacting = new QComboBox();
     m_ntscArtifacting->addItem("Standard", "standard");
     m_ntscArtifacting->addItem("High Quality", "high");
     m_ntscArtifacting->addItem("Composite", "composite");
     m_ntscArtifacting->setToolTip("NTSC color artifacting quality");
-    ntscLayout->addRow("Artifacting:", m_ntscArtifacting);
+    artifactingRow->addWidget(m_ntscArtifacting);
+    artifactingRow->addStretch();
+    ntscLayout->addLayout(artifactingRow);
     
     m_ntscSharpness = new QCheckBox("Enable NTSC Sharpness");
     m_ntscSharpness->setToolTip("Enhance NTSC video sharpness");
-    ntscLayout->addRow("", m_ntscSharpness);
+    ntscLayout->addWidget(m_ntscSharpness);
     
-    // NTSC Color Adjustment Controls - created individually to avoid signal interference
+    // NTSC Color Adjustment Controls - completely isolated
     // NTSC Saturation
-    QHBoxLayout* ntscSatLayout = new QHBoxLayout();
-    m_ntscSaturationSlider = new QSlider(Qt::Horizontal);
-    m_ntscSaturationSlider->setRange(-100, 100);
+    QWidget* ntscSatWidget = new QWidget();
+    QHBoxLayout* ntscSatLayout = new QHBoxLayout(ntscSatWidget);
+    ntscSatLayout->setContentsMargins(0, 0, 0, 0);
+    m_ntscSaturationSlider = new QSlider();
+    m_ntscSaturationSlider->setOrientation(Qt::Horizontal);
+    m_ntscSaturationSlider->setParent(ntscSatWidget);
+    m_ntscSaturationSlider->setMinimum(-100);
+    m_ntscSaturationSlider->setMaximum(100);
     m_ntscSaturationSlider->setValue(0);
     ntscSatLayout->addWidget(m_ntscSaturationSlider, 1);
-    m_ntscSaturationLabel = new QLabel("0.00");
+    m_ntscSaturationLabel = new QLabel("0.00", ntscSatWidget);
     m_ntscSaturationLabel->setMinimumWidth(60);
     m_ntscSaturationLabel->setAlignment(Qt::AlignCenter);
     ntscSatLayout->addWidget(m_ntscSaturationLabel);
     connect(m_ntscSaturationSlider, &QSlider::valueChanged, [this](int value) {
+        qDebug() << "NTSC Saturation slider changed to:" << value;
         m_ntscSaturationLabel->setText(QString::number(value / 100.0, 'f', 2));
     });
-    ntscLayout->addRow("Saturation:", ntscSatLayout);
+    // Add NTSC saturation row manually
+    QHBoxLayout* ntscSatRow = new QHBoxLayout();
+    ntscSatRow->addWidget(new QLabel("Saturation:"));
+    ntscSatRow->addWidget(ntscSatWidget, 1);
+    ntscLayout->addLayout(ntscSatRow);
     
     // NTSC Contrast
-    QHBoxLayout* ntscContrastLayout = new QHBoxLayout();
-    m_ntscContrastSlider = new QSlider(Qt::Horizontal);
-    m_ntscContrastSlider->setRange(-100, 100);
+    QWidget* ntscContrastWidget = new QWidget();
+    QHBoxLayout* ntscContrastLayout = new QHBoxLayout(ntscContrastWidget);
+    ntscContrastLayout->setContentsMargins(0, 0, 0, 0);
+    m_ntscContrastSlider = new QSlider();
+    m_ntscContrastSlider->setOrientation(Qt::Horizontal);
+    m_ntscContrastSlider->setParent(ntscContrastWidget);
+    m_ntscContrastSlider->setMinimum(-100);
+    m_ntscContrastSlider->setMaximum(100);
     m_ntscContrastSlider->setValue(0);
     ntscContrastLayout->addWidget(m_ntscContrastSlider, 1);
-    m_ntscContrastLabel = new QLabel("0.00");
+    m_ntscContrastLabel = new QLabel("0.00", ntscContrastWidget);
     m_ntscContrastLabel->setMinimumWidth(60);
     m_ntscContrastLabel->setAlignment(Qt::AlignCenter);
     ntscContrastLayout->addWidget(m_ntscContrastLabel);
     connect(m_ntscContrastSlider, &QSlider::valueChanged, [this](int value) {
         m_ntscContrastLabel->setText(QString::number(value / 100.0, 'f', 2));
     });
-    ntscLayout->addRow("Contrast:", ntscContrastLayout);
+    QHBoxLayout* ntscContrastRow = new QHBoxLayout();
+    ntscContrastRow->addWidget(new QLabel("Contrast:"));
+    ntscContrastRow->addWidget(ntscContrastWidget, 1);
+    ntscLayout->addLayout(ntscContrastRow);
     
     // NTSC Brightness
-    QHBoxLayout* ntscBrightnessLayout = new QHBoxLayout();
-    m_ntscBrightnessSlider = new QSlider(Qt::Horizontal);
-    m_ntscBrightnessSlider->setRange(-100, 100);
+    QWidget* ntscBrightnessWidget = new QWidget();
+    QHBoxLayout* ntscBrightnessLayout = new QHBoxLayout(ntscBrightnessWidget);
+    ntscBrightnessLayout->setContentsMargins(0, 0, 0, 0);
+    m_ntscBrightnessSlider = new QSlider();
+    m_ntscBrightnessSlider->setOrientation(Qt::Horizontal);
+    m_ntscBrightnessSlider->setParent(ntscBrightnessWidget);
+    m_ntscBrightnessSlider->setMinimum(-100);
+    m_ntscBrightnessSlider->setMaximum(100);
     m_ntscBrightnessSlider->setValue(0);
     ntscBrightnessLayout->addWidget(m_ntscBrightnessSlider, 1);
-    m_ntscBrightnessLabel = new QLabel("0.00");
+    m_ntscBrightnessLabel = new QLabel("0.00", ntscBrightnessWidget);
     m_ntscBrightnessLabel->setMinimumWidth(60);
     m_ntscBrightnessLabel->setAlignment(Qt::AlignCenter);
     ntscBrightnessLayout->addWidget(m_ntscBrightnessLabel);
     connect(m_ntscBrightnessSlider, &QSlider::valueChanged, [this](int value) {
         m_ntscBrightnessLabel->setText(QString::number(value / 100.0, 'f', 2));
     });
-    ntscLayout->addRow("Brightness:", ntscBrightnessLayout);
+    QHBoxLayout* ntscBrightnessRow = new QHBoxLayout();
+    ntscBrightnessRow->addWidget(new QLabel("Brightness:"));
+    ntscBrightnessRow->addWidget(ntscBrightnessWidget, 1);
+    ntscLayout->addLayout(ntscBrightnessRow);
     
     // NTSC Gamma
-    QHBoxLayout* ntscGammaLayout = new QHBoxLayout();
-    m_ntscGammaSlider = new QSlider(Qt::Horizontal);
-    m_ntscGammaSlider->setRange(10, 400);
+    QWidget* ntscGammaWidget = new QWidget();
+    QHBoxLayout* ntscGammaLayout = new QHBoxLayout(ntscGammaWidget);
+    ntscGammaLayout->setContentsMargins(0, 0, 0, 0);
+    m_ntscGammaSlider = new QSlider();
+    m_ntscGammaSlider->setOrientation(Qt::Horizontal);
+    m_ntscGammaSlider->setParent(ntscGammaWidget);
+    m_ntscGammaSlider->setMinimum(10);
+    m_ntscGammaSlider->setMaximum(400);
     m_ntscGammaSlider->setValue(100);
     ntscGammaLayout->addWidget(m_ntscGammaSlider, 1);
-    m_ntscGammaLabel = new QLabel("1.00");
+    m_ntscGammaLabel = new QLabel("1.00", ntscGammaWidget);
     m_ntscGammaLabel->setMinimumWidth(60);
     m_ntscGammaLabel->setAlignment(Qt::AlignCenter);
     ntscGammaLayout->addWidget(m_ntscGammaLabel);
     connect(m_ntscGammaSlider, &QSlider::valueChanged, [this](int value) {
         m_ntscGammaLabel->setText(QString::number(value / 100.0, 'f', 2));
     });
-    ntscLayout->addRow("Gamma:", ntscGammaLayout);
+    QHBoxLayout* ntscGammaRow = new QHBoxLayout();
+    ntscGammaRow->addWidget(new QLabel("Gamma:"));
+    ntscGammaRow->addWidget(ntscGammaWidget, 1);
+    ntscLayout->addLayout(ntscGammaRow);
     
     // NTSC Tint
-    QHBoxLayout* ntscTintLayout = new QHBoxLayout();
-    m_ntscTintSlider = new QSlider(Qt::Horizontal);
-    m_ntscTintSlider->setRange(-180, 180);
+    QWidget* ntscTintWidget = new QWidget();
+    QHBoxLayout* ntscTintLayout = new QHBoxLayout(ntscTintWidget);
+    ntscTintLayout->setContentsMargins(0, 0, 0, 0);
+    m_ntscTintSlider = new QSlider();
+    m_ntscTintSlider->setOrientation(Qt::Horizontal);
+    m_ntscTintSlider->setParent(ntscTintWidget);
+    m_ntscTintSlider->setMinimum(-180);
+    m_ntscTintSlider->setMaximum(180);
     m_ntscTintSlider->setValue(0);
     ntscTintLayout->addWidget(m_ntscTintSlider, 1);
-    m_ntscTintLabel = new QLabel("0°");
+    m_ntscTintLabel = new QLabel("0°", ntscTintWidget);
     m_ntscTintLabel->setMinimumWidth(60);
     m_ntscTintLabel->setAlignment(Qt::AlignCenter);
     ntscTintLayout->addWidget(m_ntscTintLabel);
     connect(m_ntscTintSlider, &QSlider::valueChanged, [this](int value) {
         m_ntscTintLabel->setText(QString::number(value) + "°");
     });
-    ntscLayout->addRow("Tint:", ntscTintLayout);
+    QHBoxLayout* ntscTintRow = new QHBoxLayout();
+    ntscTintRow->addWidget(new QLabel("Tint:"));
+    ntscTintRow->addWidget(ntscTintWidget, 1);
+    ntscLayout->addLayout(ntscTintRow);
     
     // Set tooltips for NTSC color controls
     m_ntscSaturationSlider->setToolTip("Adjust NTSC color saturation (-1.0 to 1.0)");
@@ -1274,7 +1370,7 @@ void SettingsDialog::loadSettings()
     
     m_ntscSharpness->setChecked(settings.value("video/ntscSharpness", true).toBool());
     
-    // Load PAL Color Adjustment settings - block signals to prevent bouncing
+    // Load PAL Color Adjustment settings - blockSignals to prevent bouncing during load
     m_palSaturationSlider->blockSignals(true);
     m_palContrastSlider->blockSignals(true);
     m_palBrightnessSlider->blockSignals(true);
@@ -1300,7 +1396,7 @@ void SettingsDialog::loadSettings()
     m_palGammaSlider->blockSignals(false);
     m_palTintSlider->blockSignals(false);
     
-    // Load NTSC Color Adjustment settings - block signals to prevent bouncing
+    // Load NTSC Color Adjustment settings - blockSignals to prevent bouncing during load
     m_ntscSaturationSlider->blockSignals(true);
     m_ntscContrastSlider->blockSignals(true);
     m_ntscBrightnessSlider->blockSignals(true);
