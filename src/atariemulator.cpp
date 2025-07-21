@@ -638,3 +638,50 @@ void AtariEmulator::setVolume(float volume)
         qDebug() << "Audio volume set to:" << volume;
     }
 }
+
+void AtariEmulator::updateColorSettings(bool isPal, double saturation, double contrast, double brightness, double gamma, double hue)
+{
+    if (isPal) {
+        updatePalColorSettings(saturation, contrast, brightness, gamma, hue);
+    } else {
+        updateNtscColorSettings(saturation, contrast, brightness, gamma, hue);
+    }
+}
+
+void AtariEmulator::updatePalColorSettings(double saturation, double contrast, double brightness, double gamma, double hue)
+{
+    // Convert slider values to actual ranges
+    COLOURS_PAL_setup.saturation = saturation / 100.0;           // -100 to 100 → -1.0 to 1.0
+    COLOURS_PAL_setup.contrast = contrast / 100.0;               // -100 to 100 → -1.0 to 1.0  
+    COLOURS_PAL_setup.brightness = brightness / 100.0;           // -100 to 100 → -1.0 to 1.0
+    COLOURS_PAL_setup.gamma = gamma / 100.0;                     // 10 to 400 → 0.1 to 4.0
+    COLOURS_PAL_setup.hue = hue / 180.0;                         // -180 to 180 → -1.0 to 1.0
+    
+    // Update the color palette
+    Colours_Update();
+    
+    qDebug() << "PAL color settings updated - Sat:" << COLOURS_PAL_setup.saturation 
+             << "Cont:" << COLOURS_PAL_setup.contrast
+             << "Bright:" << COLOURS_PAL_setup.brightness
+             << "Gamma:" << COLOURS_PAL_setup.gamma
+             << "Hue:" << COLOURS_PAL_setup.hue;
+}
+
+void AtariEmulator::updateNtscColorSettings(double saturation, double contrast, double brightness, double gamma, double hue)
+{
+    // Convert slider values to actual ranges
+    COLOURS_NTSC_setup.saturation = saturation / 100.0;           // -100 to 100 → -1.0 to 1.0
+    COLOURS_NTSC_setup.contrast = contrast / 100.0;               // -100 to 100 → -1.0 to 1.0
+    COLOURS_NTSC_setup.brightness = brightness / 100.0;           // -100 to 100 → -1.0 to 1.0
+    COLOURS_NTSC_setup.gamma = gamma / 100.0;                     // 10 to 400 → 0.1 to 4.0
+    COLOURS_NTSC_setup.hue = hue / 180.0;                         // -180 to 180 → -1.0 to 1.0
+    
+    // Update the color palette
+    Colours_Update();
+    
+    qDebug() << "NTSC color settings updated - Sat:" << COLOURS_NTSC_setup.saturation 
+             << "Cont:" << COLOURS_NTSC_setup.contrast
+             << "Bright:" << COLOURS_NTSC_setup.brightness
+             << "Gamma:" << COLOURS_NTSC_setup.gamma
+             << "Hue:" << COLOURS_NTSC_setup.hue;
+}

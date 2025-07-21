@@ -569,6 +569,16 @@ void SettingsDialog::createVideoDisplayTab()
     connect(m_palSaturationSlider, &QSlider::valueChanged, [this](int value) {
         qDebug() << "PAL Saturation slider changed to:" << value;
         m_palSaturationLabel->setText(QString::number(value / 100.0, 'f', 2));
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updatePalColorSettings(
+                m_palSaturationSlider->value(),
+                m_palContrastSlider->value(),
+                m_palBrightnessSlider->value(),
+                m_palGammaSlider->value(),
+                m_palTintSlider->value()
+            );
+        }
     });
     // Add saturation row manually
     QHBoxLayout* palSatRow = new QHBoxLayout();
@@ -595,6 +605,16 @@ void SettingsDialog::createVideoDisplayTab()
     palContrastLayout->addWidget(m_palContrastLabel);
     connect(m_palContrastSlider, &QSlider::valueChanged, [this](int value) {
         m_palContrastLabel->setText(QString::number(value / 100.0, 'f', 2));
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updatePalColorSettings(
+                m_palSaturationSlider->value(),
+                m_palContrastSlider->value(),
+                m_palBrightnessSlider->value(),
+                m_palGammaSlider->value(),
+                m_palTintSlider->value()
+            );
+        }
     });
     QHBoxLayout* palContrastRow = new QHBoxLayout();
     palContrastRow->addWidget(new QLabel("Contrast:"));
@@ -618,6 +638,16 @@ void SettingsDialog::createVideoDisplayTab()
     palBrightnessLayout->addWidget(m_palBrightnessLabel);
     connect(m_palBrightnessSlider, &QSlider::valueChanged, [this](int value) {
         m_palBrightnessLabel->setText(QString::number(value / 100.0, 'f', 2));
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updatePalColorSettings(
+                m_palSaturationSlider->value(),
+                m_palContrastSlider->value(),
+                m_palBrightnessSlider->value(),
+                m_palGammaSlider->value(),
+                m_palTintSlider->value()
+            );
+        }
     });
     QHBoxLayout* palBrightnessRow = new QHBoxLayout();
     palBrightnessRow->addWidget(new QLabel("Brightness:"));
@@ -641,6 +671,16 @@ void SettingsDialog::createVideoDisplayTab()
     palGammaLayout->addWidget(m_palGammaLabel);
     connect(m_palGammaSlider, &QSlider::valueChanged, [this](int value) {
         m_palGammaLabel->setText(QString::number(value / 100.0, 'f', 2));
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updatePalColorSettings(
+                m_palSaturationSlider->value(),
+                m_palContrastSlider->value(),
+                m_palBrightnessSlider->value(),
+                m_palGammaSlider->value(),
+                m_palTintSlider->value()
+            );
+        }
     });
     QHBoxLayout* palGammaRow = new QHBoxLayout();
     palGammaRow->addWidget(new QLabel("Gamma:"));
@@ -664,6 +704,16 @@ void SettingsDialog::createVideoDisplayTab()
     palTintLayout->addWidget(m_palTintLabel);
     connect(m_palTintSlider, &QSlider::valueChanged, [this](int value) {
         m_palTintLabel->setText(QString::number(value) + "°");
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updatePalColorSettings(
+                m_palSaturationSlider->value(),
+                m_palContrastSlider->value(),
+                m_palBrightnessSlider->value(),
+                m_palGammaSlider->value(),
+                m_palTintSlider->value()
+            );
+        }
     });
     QHBoxLayout* palTintRow = new QHBoxLayout();
     palTintRow->addWidget(new QLabel("Tint:"));
@@ -718,6 +768,16 @@ void SettingsDialog::createVideoDisplayTab()
     connect(m_ntscSaturationSlider, &QSlider::valueChanged, [this](int value) {
         qDebug() << "NTSC Saturation slider changed to:" << value;
         m_ntscSaturationLabel->setText(QString::number(value / 100.0, 'f', 2));
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updateNtscColorSettings(
+                m_ntscSaturationSlider->value(),
+                m_ntscContrastSlider->value(),
+                m_ntscBrightnessSlider->value(),
+                m_ntscGammaSlider->value(),
+                m_ntscTintSlider->value()
+            );
+        }
     });
     // Add NTSC saturation row manually
     QHBoxLayout* ntscSatRow = new QHBoxLayout();
@@ -742,6 +802,16 @@ void SettingsDialog::createVideoDisplayTab()
     ntscContrastLayout->addWidget(m_ntscContrastLabel);
     connect(m_ntscContrastSlider, &QSlider::valueChanged, [this](int value) {
         m_ntscContrastLabel->setText(QString::number(value / 100.0, 'f', 2));
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updateNtscColorSettings(
+                m_ntscSaturationSlider->value(),
+                m_ntscContrastSlider->value(),
+                m_ntscBrightnessSlider->value(),
+                m_ntscGammaSlider->value(),
+                m_ntscTintSlider->value()
+            );
+        }
     });
     QHBoxLayout* ntscContrastRow = new QHBoxLayout();
     ntscContrastRow->addWidget(new QLabel("Contrast:"));
@@ -765,6 +835,16 @@ void SettingsDialog::createVideoDisplayTab()
     ntscBrightnessLayout->addWidget(m_ntscBrightnessLabel);
     connect(m_ntscBrightnessSlider, &QSlider::valueChanged, [this](int value) {
         m_ntscBrightnessLabel->setText(QString::number(value / 100.0, 'f', 2));
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updateNtscColorSettings(
+                m_ntscSaturationSlider->value(),
+                m_ntscContrastSlider->value(),
+                m_ntscBrightnessSlider->value(),
+                m_ntscGammaSlider->value(),
+                m_ntscTintSlider->value()
+            );
+        }
     });
     QHBoxLayout* ntscBrightnessRow = new QHBoxLayout();
     ntscBrightnessRow->addWidget(new QLabel("Brightness:"));
@@ -788,6 +868,16 @@ void SettingsDialog::createVideoDisplayTab()
     ntscGammaLayout->addWidget(m_ntscGammaLabel);
     connect(m_ntscGammaSlider, &QSlider::valueChanged, [this](int value) {
         m_ntscGammaLabel->setText(QString::number(value / 100.0, 'f', 2));
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updateNtscColorSettings(
+                m_ntscSaturationSlider->value(),
+                m_ntscContrastSlider->value(),
+                m_ntscBrightnessSlider->value(),
+                m_ntscGammaSlider->value(),
+                m_ntscTintSlider->value()
+            );
+        }
     });
     QHBoxLayout* ntscGammaRow = new QHBoxLayout();
     ntscGammaRow->addWidget(new QLabel("Gamma:"));
@@ -811,6 +901,16 @@ void SettingsDialog::createVideoDisplayTab()
     ntscTintLayout->addWidget(m_ntscTintLabel);
     connect(m_ntscTintSlider, &QSlider::valueChanged, [this](int value) {
         m_ntscTintLabel->setText(QString::number(value) + "°");
+        // Update emulator color settings in real-time
+        if (m_emulator) {
+            m_emulator->updateNtscColorSettings(
+                m_ntscSaturationSlider->value(),
+                m_ntscContrastSlider->value(),
+                m_ntscBrightnessSlider->value(),
+                m_ntscGammaSlider->value(),
+                m_ntscTintSlider->value()
+            );
+        }
     });
     QHBoxLayout* ntscTintRow = new QHBoxLayout();
     ntscTintRow->addWidget(new QLabel("Tint:"));

@@ -36,6 +36,11 @@ extern "C" {
     extern int libatari800_get_sound_frequency(void);
     extern int libatari800_get_num_sound_channels(void);
     extern int libatari800_get_sound_sample_size(void);
+    // Color adjustment functions and structures
+    #include "colours.h"
+    extern Colours_setup_t COLOURS_NTSC_setup;
+    extern Colours_setup_t COLOURS_PAL_setup;
+    extern void Colours_Update(void);
     // AKEY constants are already included via akey.h
 }
 
@@ -84,6 +89,11 @@ public:
     
     float getTargetFPS() const { return m_targetFps; }
     float getFrameTimeMs() const { return m_frameTimeMs; }
+    
+    // Color adjustment methods
+    void updateColorSettings(bool isPal, double saturation, double contrast, double brightness, double gamma, double hue);
+    void updatePalColorSettings(double saturation, double contrast, double brightness, double gamma, double hue);
+    void updateNtscColorSettings(double saturation, double contrast, double brightness, double gamma, double hue);
 
 public slots:
     void processFrame();
