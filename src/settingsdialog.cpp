@@ -82,13 +82,9 @@ void SettingsDialog::createMachineConfigTab()
     QGroupBox* machineGroup = new QGroupBox("Machine Type");
     QVBoxLayout* machineVLayout = new QVBoxLayout(machineGroup);
     
-    // Machine selection and ROM path row
-    QHBoxLayout* machineRow = new QHBoxLayout();
-    
-    // Left side - Machine dropdown
-    QVBoxLayout* machineLeft = new QVBoxLayout();
+    // Machine model selection
     QLabel* modelLabel = new QLabel("Model:");
-    machineLeft->addWidget(modelLabel);
+    machineVLayout->addWidget(modelLabel);
     
     m_machineTypeCombo = new QComboBox();
     m_machineTypeCombo->addItem("Atari 400/800", "-atari");
@@ -105,13 +101,11 @@ void SettingsDialog::createMachineConfigTab()
     connect(m_machineTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &SettingsDialog::onMachineTypeChanged);
     
-    machineLeft->addWidget(m_machineTypeCombo);
-    machineRow->addLayout(machineLeft, 1);
+    machineVLayout->addWidget(m_machineTypeCombo);
     
-    // Right side - OS ROM selector
-    QVBoxLayout* romRight = new QVBoxLayout();
+    // OS ROM selector below machine dropdown
     m_osRomLabel = new QLabel("OS ROM:");
-    romRight->addWidget(m_osRomLabel);
+    machineVLayout->addWidget(m_osRomLabel);
     
     QHBoxLayout* osRomLayout = new QHBoxLayout();
     m_osRomPath = new QLineEdit();
@@ -123,10 +117,7 @@ void SettingsDialog::createMachineConfigTab()
     connect(m_osRomBrowse, &QPushButton::clicked, this, &SettingsDialog::browseOSROM);
     osRomLayout->addWidget(m_osRomBrowse);
     
-    romRight->addLayout(osRomLayout);
-    machineRow->addLayout(romRight, 2);
-    
-    machineVLayout->addLayout(machineRow);
+    machineVLayout->addLayout(osRomLayout);
     leftColumn->addWidget(machineGroup);
     
     // Video System Group
@@ -144,26 +135,26 @@ void SettingsDialog::createMachineConfigTab()
     QGroupBox* systemGroup = new QGroupBox("System Options");
     QVBoxLayout* systemLayout = new QVBoxLayout(systemGroup);
     
-    // BASIC configuration row
-    QHBoxLayout* basicRow = new QHBoxLayout();
+    // BASIC configuration
     m_basicEnabledCheck = new QCheckBox("Enable BASIC");
     m_basicEnabledCheck->setToolTip("Enable or disable the Atari BASIC interpreter");
-    basicRow->addWidget(m_basicEnabledCheck);
+    systemLayout->addWidget(m_basicEnabledCheck);
     
-    // BASIC ROM selector (inline)
-    m_basicRomLabel = new QLabel("ROM:");
-    basicRow->addWidget(m_basicRomLabel);
+    // BASIC ROM selector below checkbox
+    m_basicRomLabel = new QLabel("BASIC ROM:");
+    systemLayout->addWidget(m_basicRomLabel);
     
+    QHBoxLayout* basicRomLayout = new QHBoxLayout();
     m_basicRomPath = new QLineEdit();
     m_basicRomPath->setPlaceholderText("Select BASIC ROM file");
     setupFilePathTooltip(m_basicRomPath);
-    basicRow->addWidget(m_basicRomPath, 1);
+    basicRomLayout->addWidget(m_basicRomPath, 1);
     
     m_basicRomBrowse = new QPushButton("Browse...");
     connect(m_basicRomBrowse, &QPushButton::clicked, this, &SettingsDialog::browseBasicROM);
-    basicRow->addWidget(m_basicRomBrowse);
+    basicRomLayout->addWidget(m_basicRomBrowse);
     
-    systemLayout->addLayout(basicRow);
+    systemLayout->addLayout(basicRomLayout);
     
     m_altirraOSCheck = new QCheckBox("Use Altirra OS (built-in ROMs)");
     m_altirraOSCheck->setToolTip("Use built-in Altirra OS ROMs instead of external ROM files");
