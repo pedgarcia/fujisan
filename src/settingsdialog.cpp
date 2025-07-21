@@ -1426,8 +1426,42 @@ void SettingsDialog::reject()
 void SettingsDialog::updateVideoSystemDependentControls()
 {
     bool isPAL = (m_videoSystemCombo->currentData().toString() == "-pal");
+    
+    // Enable/disable entire groups
     m_palGroup->setEnabled(isPAL);
     m_ntscGroup->setEnabled(!isPAL);
+    
+    // Explicitly disable individual sliders when group is disabled
+    // This ensures no cross-interaction between PAL and NTSC controls
+    if (isPAL) {
+        // PAL mode - disable NTSC sliders explicitly
+        m_ntscSaturationSlider->setEnabled(false);
+        m_ntscContrastSlider->setEnabled(false);
+        m_ntscBrightnessSlider->setEnabled(false);
+        m_ntscGammaSlider->setEnabled(false);
+        m_ntscTintSlider->setEnabled(false);
+        
+        // Ensure PAL sliders are enabled
+        m_palSaturationSlider->setEnabled(true);
+        m_palContrastSlider->setEnabled(true);
+        m_palBrightnessSlider->setEnabled(true);
+        m_palGammaSlider->setEnabled(true);
+        m_palTintSlider->setEnabled(true);
+    } else {
+        // NTSC mode - disable PAL sliders explicitly
+        m_palSaturationSlider->setEnabled(false);
+        m_palContrastSlider->setEnabled(false);
+        m_palBrightnessSlider->setEnabled(false);
+        m_palGammaSlider->setEnabled(false);
+        m_palTintSlider->setEnabled(false);
+        
+        // Ensure NTSC sliders are enabled
+        m_ntscSaturationSlider->setEnabled(true);
+        m_ntscContrastSlider->setEnabled(true);
+        m_ntscBrightnessSlider->setEnabled(true);
+        m_ntscGammaSlider->setEnabled(true);
+        m_ntscTintSlider->setEnabled(true);
+    }
 }
 
 void SettingsDialog::restoreDefaults()
