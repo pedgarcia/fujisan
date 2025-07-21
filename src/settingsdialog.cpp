@@ -581,7 +581,7 @@ void SettingsDialog::createMediaConfigTab()
     QGroupBox* floppyGroup = new QGroupBox("Floppy Disk Drives");
     QVBoxLayout* floppyLayout = new QVBoxLayout(floppyGroup);
     
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 8; i++) {
         QString diskLabel = QString("D%1:").arg(i + 1);
         
         QHBoxLayout* diskLayout = new QHBoxLayout();
@@ -1109,7 +1109,7 @@ void SettingsDialog::loadSettings()
     
     // Load Media Configuration
     // Floppy Disks
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 8; i++) {
         QString diskKey = QString("media/disk%1").arg(i + 1);
         m_diskEnabled[i]->setChecked(settings.value(diskKey + "Enabled", false).toBool());
         m_diskPath[i]->setText(settings.value(diskKey + "Path", "").toString());
@@ -1224,7 +1224,7 @@ void SettingsDialog::saveSettings()
     
     // Save Media Configuration
     // Floppy Disks
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 8; i++) {
         QString diskKey = QString("media/disk%1").arg(i + 1);
         settings.setValue(diskKey + "Enabled", m_diskEnabled[i]->isChecked());
         settings.setValue(diskKey + "Path", m_diskPath[i]->text());
@@ -1269,8 +1269,8 @@ void SettingsDialog::applyMediaSettings()
 {
     qDebug() << "Applying media settings to emulator...";
     
-    // Mount/unmount disk images for D1-D4
-    for (int i = 0; i < 4; i++) {
+    // Mount/unmount disk images for D1-D8
+    for (int i = 0; i < 8; i++) {
         if (m_diskEnabled[i]->isChecked() && !m_diskPath[i]->text().isEmpty()) {
             QString diskPath = m_diskPath[i]->text();
             bool readOnly = m_diskReadOnly[i]->isChecked();
@@ -1423,7 +1423,7 @@ void SettingsDialog::restoreDefaults()
     
     // Media Configuration defaults
     // Floppy Disks - all disabled by default
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 8; i++) {
         m_diskEnabled[i]->setChecked(false);
         m_diskPath[i]->clear();
         m_diskReadOnly[i]->setChecked(false);

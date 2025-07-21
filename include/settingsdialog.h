@@ -160,11 +160,11 @@ private:
     // Media Configuration controls
     QWidget* m_mediaTab;
     
-    // Floppy Disks (D1-D4)
-    QCheckBox* m_diskEnabled[4];
-    QLineEdit* m_diskPath[4];
-    QPushButton* m_diskBrowse[4];
-    QCheckBox* m_diskReadOnly[4];
+    // Floppy Disks (D1-D8)
+    QCheckBox* m_diskEnabled[8];
+    QLineEdit* m_diskPath[8];
+    QPushButton* m_diskBrowse[8];
+    QCheckBox* m_diskReadOnly[8];
     
     // Cassette
     QCheckBox* m_cassetteEnabled;
