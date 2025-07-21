@@ -545,6 +545,20 @@ void SettingsDialog::createVideoDisplayTab()
     m_palScanlines->setToolTip("Simulate PAL CRT scanline effect");
     palLayout->addRow("", m_palScanlines);
     
+    // PAL Color Adjustment Controls
+    createColorSlider(palLayout, "Saturation", m_palSaturationSlider, m_palSaturationLabel, -100, 100, 0, 100, "");
+    createColorSlider(palLayout, "Contrast", m_palContrastSlider, m_palContrastLabel, -100, 100, 0, 100, "");
+    createColorSlider(palLayout, "Brightness", m_palBrightnessSlider, m_palBrightnessLabel, -100, 100, 0, 100, "");
+    createColorSlider(palLayout, "Gamma", m_palGammaSlider, m_palGammaLabel, 10, 400, 100, 100, "");
+    createColorSlider(palLayout, "Tint", m_palTintSlider, m_palTintLabel, -180, 180, 0, 1, "°");
+    
+    // Set tooltips for PAL color controls
+    m_palSaturationSlider->setToolTip("Adjust PAL color saturation (-1.0 to 1.0)");
+    m_palContrastSlider->setToolTip("Adjust PAL contrast (-1.0 to 1.0)");
+    m_palBrightnessSlider->setToolTip("Adjust PAL brightness (-1.0 to 1.0)");
+    m_palGammaSlider->setToolTip("Adjust PAL gamma correction (0.1 to 4.0)");
+    m_palTintSlider->setToolTip("Adjust PAL color tint (-180° to 180°)");
+    
     tabLayout->addWidget(m_palGroup);
     
     // NTSC-specific settings
@@ -561,6 +575,20 @@ void SettingsDialog::createVideoDisplayTab()
     m_ntscSharpness = new QCheckBox("Enable NTSC Sharpness");
     m_ntscSharpness->setToolTip("Enhance NTSC video sharpness");
     ntscLayout->addRow("", m_ntscSharpness);
+    
+    // NTSC Color Adjustment Controls
+    createColorSlider(ntscLayout, "Saturation", m_ntscSaturationSlider, m_ntscSaturationLabel, -100, 100, 0, 100, "");
+    createColorSlider(ntscLayout, "Contrast", m_ntscContrastSlider, m_ntscContrastLabel, -100, 100, 0, 100, "");
+    createColorSlider(ntscLayout, "Brightness", m_ntscBrightnessSlider, m_ntscBrightnessLabel, -100, 100, 0, 100, "");
+    createColorSlider(ntscLayout, "Gamma", m_ntscGammaSlider, m_ntscGammaLabel, 10, 400, 100, 100, "");
+    createColorSlider(ntscLayout, "Tint", m_ntscTintSlider, m_ntscTintLabel, -180, 180, 0, 1, "°");
+    
+    // Set tooltips for NTSC color controls
+    m_ntscSaturationSlider->setToolTip("Adjust NTSC color saturation (-1.0 to 1.0)");
+    m_ntscContrastSlider->setToolTip("Adjust NTSC contrast (-1.0 to 1.0)");
+    m_ntscBrightnessSlider->setToolTip("Adjust NTSC brightness (-1.0 to 1.0)");
+    m_ntscGammaSlider->setToolTip("Adjust NTSC gamma correction (0.1 to 4.0)");
+    m_ntscTintSlider->setToolTip("Adjust NTSC color tint (-180° to 180°)");
     
     tabLayout->addWidget(m_ntscGroup);
     tabLayout->addStretch();
@@ -897,6 +925,35 @@ void SettingsDialog::populateCartridgeTypes(QComboBox* combo)
     combo->setCurrentIndex(0);
 }
 
+void SettingsDialog::createColorSlider(QFormLayout* layout, const QString& label, QSlider*& slider, QLabel*& valueLabel, 
+                                      int minValue, int maxValue, int defaultValue, int precision, const QString& suffix)
+{
+    QHBoxLayout* sliderLayout = new QHBoxLayout();
+    
+    slider = new QSlider(Qt::Horizontal);
+    slider->setRange(minValue, maxValue);
+    slider->setValue(defaultValue);
+    sliderLayout->addWidget(slider, 1);
+    
+    valueLabel = new QLabel();
+    valueLabel->setMinimumWidth(60);
+    valueLabel->setAlignment(Qt::AlignCenter);
+    
+    // Calculate and display the initial value
+    double displayValue = static_cast<double>(defaultValue) / precision;
+    valueLabel->setText(QString::number(displayValue, 'f', (precision == 100) ? 2 : 1) + suffix);
+    
+    sliderLayout->addWidget(valueLabel);
+    
+    // Connect slider to update label
+    connect(slider, &QSlider::valueChanged, [valueLabel, precision, suffix](int value) {
+        double displayValue = static_cast<double>(value) / precision;
+        valueLabel->setText(QString::number(displayValue, 'f', (precision == 100) ? 2 : 1) + suffix);
+    });
+    
+    layout->addRow(label + ":", sliderLayout);
+}
+
 void SettingsDialog::onMachineTypeChanged()
 {
     QString machineType = m_machineTypeCombo->currentData().toString();
@@ -1107,6 +1164,20 @@ void SettingsDialog::loadSettings()
     
     m_ntscSharpness->setChecked(settings.value("video/ntscSharpness", true).toBool());
     
+    // Load PAL Color Adjustment settings
+    m_palSaturationSlider->setValue(settings.value("video/palSaturation", 0).toInt());
+    m_palContrastSlider->setValue(settings.value("video/palContrast", 0).toInt());
+    m_palBrightnessSlider->setValue(settings.value("video/palBrightness", 0).toInt());
+    m_palGammaSlider->setValue(settings.value("video/palGamma", 100).toInt());
+    m_palTintSlider->setValue(settings.value("video/palTint", 0).toInt());
+    
+    // Load NTSC Color Adjustment settings
+    m_ntscSaturationSlider->setValue(settings.value("video/ntscSaturation", 0).toInt());
+    m_ntscContrastSlider->setValue(settings.value("video/ntscContrast", 0).toInt());
+    m_ntscBrightnessSlider->setValue(settings.value("video/ntscBrightness", 0).toInt());
+    m_ntscGammaSlider->setValue(settings.value("video/ntscGamma", 100).toInt());
+    m_ntscTintSlider->setValue(settings.value("video/ntscTint", 0).toInt());
+    
     // Load Media Configuration
     // Floppy Disks
     for (int i = 0; i < 8; i++) {
@@ -1221,6 +1292,20 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/palScanlines", m_palScanlines->isChecked());
     settings.setValue("video/ntscArtifacting", m_ntscArtifacting->currentData().toString());
     settings.setValue("video/ntscSharpness", m_ntscSharpness->isChecked());
+    
+    // Save PAL Color Adjustment settings
+    settings.setValue("video/palSaturation", m_palSaturationSlider->value());
+    settings.setValue("video/palContrast", m_palContrastSlider->value());
+    settings.setValue("video/palBrightness", m_palBrightnessSlider->value());
+    settings.setValue("video/palGamma", m_palGammaSlider->value());
+    settings.setValue("video/palTint", m_palTintSlider->value());
+    
+    // Save NTSC Color Adjustment settings
+    settings.setValue("video/ntscSaturation", m_ntscSaturationSlider->value());
+    settings.setValue("video/ntscContrast", m_ntscContrastSlider->value());
+    settings.setValue("video/ntscBrightness", m_ntscBrightnessSlider->value());
+    settings.setValue("video/ntscGamma", m_ntscGammaSlider->value());
+    settings.setValue("video/ntscTint", m_ntscTintSlider->value());
     
     // Save Media Configuration
     // Floppy Disks
@@ -1420,6 +1505,20 @@ void SettingsDialog::restoreDefaults()
     m_palScanlines->setChecked(false);
     m_ntscArtifacting->setCurrentIndex(0); // Standard
     m_ntscSharpness->setChecked(true);
+    
+    // PAL Color Adjustment defaults
+    m_palSaturationSlider->setValue(0);  // 0.0
+    m_palContrastSlider->setValue(0);    // 0.0
+    m_palBrightnessSlider->setValue(0);  // 0.0
+    m_palGammaSlider->setValue(100);     // 1.0
+    m_palTintSlider->setValue(0);        // 0°
+    
+    // NTSC Color Adjustment defaults
+    m_ntscSaturationSlider->setValue(0); // 0.0
+    m_ntscContrastSlider->setValue(0);   // 0.0
+    m_ntscBrightnessSlider->setValue(0); // 0.0
+    m_ntscGammaSlider->setValue(100);    // 1.0
+    m_ntscTintSlider->setValue(0);       // 0°
     
     // Media Configuration defaults
     // Floppy Disks - all disabled by default

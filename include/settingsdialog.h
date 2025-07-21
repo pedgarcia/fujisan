@@ -65,6 +65,8 @@ private:
     void updateVideoSystemDependentControls();
     void setupFilePathTooltip(QLineEdit* lineEdit);
     void populateCartridgeTypes(QComboBox* combo);
+    void createColorSlider(QFormLayout* layout, const QString& label, QSlider*& slider, QLabel*& valueLabel, 
+                          int minValue, int maxValue, int defaultValue, int precision, const QString& suffix);
     
     AtariEmulator* m_emulator;
     QTabWidget* m_tabWidget;
@@ -151,11 +153,31 @@ private:
     QGroupBox* m_palGroup;
     QComboBox* m_palBlending;
     QCheckBox* m_palScanlines;
+    QSlider* m_palSaturationSlider;
+    QLabel* m_palSaturationLabel;
+    QSlider* m_palContrastSlider;
+    QLabel* m_palContrastLabel;
+    QSlider* m_palBrightnessSlider;
+    QLabel* m_palBrightnessLabel;
+    QSlider* m_palGammaSlider;
+    QLabel* m_palGammaLabel;
+    QSlider* m_palTintSlider;
+    QLabel* m_palTintLabel;
     
     // NTSC-specific controls  
     QGroupBox* m_ntscGroup;
     QComboBox* m_ntscArtifacting;
     QCheckBox* m_ntscSharpness;
+    QSlider* m_ntscSaturationSlider;
+    QLabel* m_ntscSaturationLabel;
+    QSlider* m_ntscContrastSlider;
+    QLabel* m_ntscContrastLabel;
+    QSlider* m_ntscBrightnessSlider;
+    QLabel* m_ntscBrightnessLabel;
+    QSlider* m_ntscGammaSlider;
+    QLabel* m_ntscGammaLabel;
+    QSlider* m_ntscTintSlider;
+    QLabel* m_ntscTintLabel;
     
     // Media Configuration controls
     QWidget* m_mediaTab;
