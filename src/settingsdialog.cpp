@@ -1029,6 +1029,9 @@ void SettingsDialog::createMediaConfigTab()
     m_cartridgeEnabledCheck->setMinimumWidth(50);
     cart1PathLayout->addWidget(m_cartridgeEnabledCheck);
     
+    // Add spacing between checkbox and input field
+    cart1PathLayout->addSpacing(8);
+    
     m_cartridgePath = new QLineEdit();
     m_cartridgePath->setPlaceholderText("Select cartridge file (.rom, .bin, .car)");
     setupFilePathTooltip(m_cartridgePath);
@@ -1065,6 +1068,9 @@ void SettingsDialog::createMediaConfigTab()
     QHBoxLayout* cart2PathLayout = new QHBoxLayout();
     m_cartridge2EnabledCheck = new QCheckBox("Enable");
     cart2PathLayout->addWidget(m_cartridge2EnabledCheck);
+    
+    // Add spacing between checkbox and input field
+    cart2PathLayout->addSpacing(8);
     
     m_cartridge2Path = new QLineEdit();
     m_cartridge2Path->setPlaceholderText("Select piggyback cartridge file");
