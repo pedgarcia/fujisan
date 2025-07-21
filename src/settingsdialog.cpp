@@ -1053,6 +1053,9 @@ void SettingsDialog::createMediaConfigTab()
     cart1Layout->addLayout(cart1TypeLayout);
     cartridgeLayout->addLayout(cart1Layout);
     
+    // Add spacing between primary and piggyback cartridges
+    cartridgeLayout->addSpacing(12);
+    
     // Piggyback cartridge
     QVBoxLayout* cart2Layout = new QVBoxLayout();
     QLabel* cart2Label = new QLabel("Piggyback Cartridge:");
@@ -1086,6 +1089,9 @@ void SettingsDialog::createMediaConfigTab()
     
     cart2Layout->addLayout(cart2TypeLayout);
     cartridgeLayout->addLayout(cart2Layout);
+    
+    // Add spacing before cartridge options
+    cartridgeLayout->addSpacing(8);
     
     // Cartridge options
     m_cartridgeAutoRebootCheck = new QCheckBox("Auto-reboot when cartridge changes");
@@ -1188,6 +1194,9 @@ void SettingsDialog::createMediaConfigTab()
     // Add cartridge group to right column
     rightColumn->addWidget(cartridgeGroup);
     
+    // Add spacing between cartridge and hard drive groups
+    rightColumn->addSpacing(15);
+    
     // Hard Drive Group
     QGroupBox* hdGroup = new QGroupBox("Hard Drive Emulation");
     QVBoxLayout* hdLayout = new QVBoxLayout(hdGroup);
@@ -1215,6 +1224,9 @@ void SettingsDialog::createMediaConfigTab()
         
         hdLayout->addLayout(hdDriveLayout);
     }
+    
+    // Add spacing before hard drive options
+    hdLayout->addSpacing(8);
     
     // Hard Drive Options
     QHBoxLayout* hdOptionsLayout = new QHBoxLayout();
