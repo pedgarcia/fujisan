@@ -1274,19 +1274,57 @@ void SettingsDialog::loadSettings()
     
     m_ntscSharpness->setChecked(settings.value("video/ntscSharpness", true).toBool());
     
-    // Load PAL Color Adjustment settings
+    // Load PAL Color Adjustment settings - block signals to prevent bouncing
+    m_palSaturationSlider->blockSignals(true);
+    m_palContrastSlider->blockSignals(true);
+    m_palBrightnessSlider->blockSignals(true);
+    m_palGammaSlider->blockSignals(true);
+    m_palTintSlider->blockSignals(true);
+    
     m_palSaturationSlider->setValue(settings.value("video/palSaturation", 0).toInt());
     m_palContrastSlider->setValue(settings.value("video/palContrast", 0).toInt());
     m_palBrightnessSlider->setValue(settings.value("video/palBrightness", 0).toInt());
     m_palGammaSlider->setValue(settings.value("video/palGamma", 100).toInt());
     m_palTintSlider->setValue(settings.value("video/palTint", 0).toInt());
     
-    // Load NTSC Color Adjustment settings
+    // Update labels manually since signals are blocked
+    m_palSaturationLabel->setText(QString::number(m_palSaturationSlider->value() / 100.0, 'f', 2));
+    m_palContrastLabel->setText(QString::number(m_palContrastSlider->value() / 100.0, 'f', 2));
+    m_palBrightnessLabel->setText(QString::number(m_palBrightnessSlider->value() / 100.0, 'f', 2));
+    m_palGammaLabel->setText(QString::number(m_palGammaSlider->value() / 100.0, 'f', 2));
+    m_palTintLabel->setText(QString::number(m_palTintSlider->value()) + "°");
+    
+    m_palSaturationSlider->blockSignals(false);
+    m_palContrastSlider->blockSignals(false);
+    m_palBrightnessSlider->blockSignals(false);
+    m_palGammaSlider->blockSignals(false);
+    m_palTintSlider->blockSignals(false);
+    
+    // Load NTSC Color Adjustment settings - block signals to prevent bouncing
+    m_ntscSaturationSlider->blockSignals(true);
+    m_ntscContrastSlider->blockSignals(true);
+    m_ntscBrightnessSlider->blockSignals(true);
+    m_ntscGammaSlider->blockSignals(true);
+    m_ntscTintSlider->blockSignals(true);
+    
     m_ntscSaturationSlider->setValue(settings.value("video/ntscSaturation", 0).toInt());
     m_ntscContrastSlider->setValue(settings.value("video/ntscContrast", 0).toInt());
     m_ntscBrightnessSlider->setValue(settings.value("video/ntscBrightness", 0).toInt());
     m_ntscGammaSlider->setValue(settings.value("video/ntscGamma", 100).toInt());
     m_ntscTintSlider->setValue(settings.value("video/ntscTint", 0).toInt());
+    
+    // Update labels manually since signals are blocked
+    m_ntscSaturationLabel->setText(QString::number(m_ntscSaturationSlider->value() / 100.0, 'f', 2));
+    m_ntscContrastLabel->setText(QString::number(m_ntscContrastSlider->value() / 100.0, 'f', 2));
+    m_ntscBrightnessLabel->setText(QString::number(m_ntscBrightnessSlider->value() / 100.0, 'f', 2));
+    m_ntscGammaLabel->setText(QString::number(m_ntscGammaSlider->value() / 100.0, 'f', 2));
+    m_ntscTintLabel->setText(QString::number(m_ntscTintSlider->value()) + "°");
+    
+    m_ntscSaturationSlider->blockSignals(false);
+    m_ntscContrastSlider->blockSignals(false);
+    m_ntscBrightnessSlider->blockSignals(false);
+    m_ntscGammaSlider->blockSignals(false);
+    m_ntscTintSlider->blockSignals(false);
     
     // Load Media Configuration
     // Floppy Disks
@@ -1537,41 +1575,10 @@ void SettingsDialog::updateVideoSystemDependentControls()
 {
     bool isPAL = (m_videoSystemCombo->currentData().toString() == "-pal");
     
-    // Enable/disable entire groups
+    // Only enable/disable the group boxes - avoid individual slider enable/disable
+    // which might be causing value resets
     m_palGroup->setEnabled(isPAL);
     m_ntscGroup->setEnabled(!isPAL);
-    
-    // Explicitly disable individual sliders when group is disabled
-    // This ensures no cross-interaction between PAL and NTSC controls
-    if (isPAL) {
-        // PAL mode - disable NTSC sliders explicitly
-        m_ntscSaturationSlider->setEnabled(false);
-        m_ntscContrastSlider->setEnabled(false);
-        m_ntscBrightnessSlider->setEnabled(false);
-        m_ntscGammaSlider->setEnabled(false);
-        m_ntscTintSlider->setEnabled(false);
-        
-        // Ensure PAL sliders are enabled
-        m_palSaturationSlider->setEnabled(true);
-        m_palContrastSlider->setEnabled(true);
-        m_palBrightnessSlider->setEnabled(true);
-        m_palGammaSlider->setEnabled(true);
-        m_palTintSlider->setEnabled(true);
-    } else {
-        // NTSC mode - disable PAL sliders explicitly
-        m_palSaturationSlider->setEnabled(false);
-        m_palContrastSlider->setEnabled(false);
-        m_palBrightnessSlider->setEnabled(false);
-        m_palGammaSlider->setEnabled(false);
-        m_palTintSlider->setEnabled(false);
-        
-        // Ensure NTSC sliders are enabled
-        m_ntscSaturationSlider->setEnabled(true);
-        m_ntscContrastSlider->setEnabled(true);
-        m_ntscBrightnessSlider->setEnabled(true);
-        m_ntscGammaSlider->setEnabled(true);
-        m_ntscTintSlider->setEnabled(true);
-    }
 }
 
 void SettingsDialog::restoreDefaults()
