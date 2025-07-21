@@ -65,8 +65,6 @@ private:
     void updateVideoSystemDependentControls();
     void setupFilePathTooltip(QLineEdit* lineEdit);
     void populateCartridgeTypes(QComboBox* combo);
-    void createColorSlider(QFormLayout* layout, const QString& label, QSlider*& slider, QLabel*& valueLabel, 
-                          int minValue, int maxValue, int defaultValue, int precision, const QString& suffix);
     
     AtariEmulator* m_emulator;
     QTabWidget* m_tabWidget;
