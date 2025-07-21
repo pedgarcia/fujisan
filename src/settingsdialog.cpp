@@ -374,6 +374,13 @@ void SettingsDialog::createAudioConfigTab()
     m_soundEnabled->setToolTip("Enable or disable all audio output");
     audioLayout->addRow("", m_soundEnabled);
     
+    // Connect for real-time audio enable/disable
+    connect(m_soundEnabled, &QCheckBox::toggled, [this](bool enabled) {
+        if (m_emulator) {
+            m_emulator->enableAudio(enabled);
+        }
+    });
+    
     m_audioFrequency = new QComboBox();
     m_audioFrequency->addItem("22050 Hz", 22050);
     m_audioFrequency->addItem("44100 Hz", 44100);
@@ -402,6 +409,12 @@ void SettingsDialog::createAudioConfigTab()
     
     connect(m_volumeSlider, &QSlider::valueChanged, [this](int value) {
         m_volumeLabel->setText(QString("%1%").arg(value));
+        
+        // Update emulator volume in real-time
+        if (m_emulator) {
+            float volume = value / 100.0f; // Convert percentage to 0.0-1.0 range
+            m_emulator->setVolume(volume);
+        }
     });
     
     audioLayout->addRow("Volume:", volumeLayout);
