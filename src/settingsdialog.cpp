@@ -428,6 +428,41 @@ void SettingsDialog::createAudioConfigTab()
     m_audioBits->setToolTip("Audio bit depth - 16-bit recommended");
     audioLayout->addRow("Bit Depth:", m_audioBits);
     
+    // Volume control
+    QHBoxLayout* volumeLayout = new QHBoxLayout();
+    m_volumeSlider = new QSlider(Qt::Horizontal);
+    m_volumeSlider->setRange(0, 100);
+    m_volumeSlider->setValue(80);
+    m_volumeSlider->setToolTip("Audio volume level (0-100%)");
+    volumeLayout->addWidget(m_volumeSlider, 1);
+    
+    m_volumeLabel = new QLabel("80%");
+    m_volumeLabel->setMinimumWidth(40);
+    m_volumeLabel->setAlignment(Qt::AlignCenter);
+    volumeLayout->addWidget(m_volumeLabel);
+    
+    connect(m_volumeSlider, &QSlider::valueChanged, [this](int value) {
+        m_volumeLabel->setText(QString("%1%").arg(value));
+    });
+    
+    audioLayout->addRow("Volume:", volumeLayout);
+    
+    // Buffer length
+    m_bufferLengthSpinBox = new QSpinBox();
+    m_bufferLengthSpinBox->setRange(10, 500);
+    m_bufferLengthSpinBox->setValue(100);
+    m_bufferLengthSpinBox->setSuffix(" ms");
+    m_bufferLengthSpinBox->setToolTip("Audio buffer length in milliseconds - lower values reduce latency but may cause audio dropouts");
+    audioLayout->addRow("Buffer Length:", m_bufferLengthSpinBox);
+    
+    // Audio latency
+    m_audioLatencySpinBox = new QSpinBox();
+    m_audioLatencySpinBox->setRange(0, 200);
+    m_audioLatencySpinBox->setValue(20);
+    m_audioLatencySpinBox->setSuffix(" ms");
+    m_audioLatencySpinBox->setToolTip("Additional audio latency for synchronization - adjust if experiencing audio/video sync issues");
+    audioLayout->addRow("Audio Delay:", m_audioLatencySpinBox);
+    
     tabLayout->addWidget(audioGroup);
     
     // Audio Features Group
@@ -1020,6 +1055,15 @@ void SettingsDialog::loadSettings()
         }
     }
     
+    // Load volume control
+    int volume = settings.value("audio/volume", 80).toInt();
+    m_volumeSlider->setValue(volume);
+    m_volumeLabel->setText(QString("%1%").arg(volume));
+    
+    // Load buffer settings
+    m_bufferLengthSpinBox->setValue(settings.value("audio/bufferLength", 100).toInt());
+    m_audioLatencySpinBox->setValue(settings.value("audio/latency", 20).toInt());
+    
     m_consoleSound->setChecked(settings.value("audio/consoleSound", true).toBool());
     m_serialSound->setChecked(settings.value("audio/serialSound", false).toBool());
     
@@ -1155,6 +1199,9 @@ void SettingsDialog::saveSettings()
     settings.setValue("audio/enabled", m_soundEnabled->isChecked());
     settings.setValue("audio/frequency", m_audioFrequency->currentData().toInt());
     settings.setValue("audio/bits", m_audioBits->currentData().toInt());
+    settings.setValue("audio/volume", m_volumeSlider->value());
+    settings.setValue("audio/bufferLength", m_bufferLengthSpinBox->value());
+    settings.setValue("audio/latency", m_audioLatencySpinBox->value());
     settings.setValue("audio/consoleSound", m_consoleSound->isChecked());
     settings.setValue("audio/serialSound", m_serialSound->isChecked());
     
@@ -1350,6 +1397,10 @@ void SettingsDialog::restoreDefaults()
     m_soundEnabled->setChecked(true);
     m_audioFrequency->setCurrentIndex(1); // 44100 Hz
     m_audioBits->setCurrentIndex(1);       // 16-bit
+    m_volumeSlider->setValue(80);          // 80% volume
+    m_volumeLabel->setText("80%");
+    m_bufferLengthSpinBox->setValue(100);  // 100ms buffer
+    m_audioLatencySpinBox->setValue(20);   // 20ms latency
     m_consoleSound->setChecked(true);
     m_serialSound->setChecked(false);
     

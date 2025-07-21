@@ -22,6 +22,7 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QDoubleSpinBox>
+#include <QSlider>
 #include <QSettings>
 #include "atariemulator.h"
 
@@ -131,6 +132,10 @@ private:
     QCheckBox* m_soundEnabled;
     QComboBox* m_audioFrequency;
     QComboBox* m_audioBits;
+    QSlider* m_volumeSlider;
+    QLabel* m_volumeLabel;
+    QSpinBox* m_bufferLengthSpinBox;
+    QSpinBox* m_audioLatencySpinBox;
     QCheckBox* m_consoleSound;
     QCheckBox* m_serialSound;
     
