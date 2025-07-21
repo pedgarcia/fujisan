@@ -41,6 +41,9 @@ extern "C" {
     extern Colours_setup_t COLOURS_NTSC_setup;
     extern Colours_setup_t COLOURS_PAL_setup;
     extern void Colours_Update(void);
+    // Speed control variables
+    extern int Atari800_turbo;
+    extern int Atari800_turbo_speed;
     // AKEY constants are already included via akey.h
 }
 
@@ -94,6 +97,9 @@ public:
     void updateColorSettings(bool isPal, double saturation, double contrast, double brightness, double gamma, double hue);
     void updatePalColorSettings(double saturation, double contrast, double brightness, double gamma, double hue);
     void updateNtscColorSettings(double saturation, double contrast, double brightness, double gamma, double hue);
+    
+    // Speed control
+    void setEmulationSpeed(int percentage);
 
 public slots:
     void processFrame();

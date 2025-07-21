@@ -15,7 +15,7 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     , m_tabWidget(nullptr)
     , m_buttonBox(nullptr)
     , m_defaultsButton(nullptr)
-    , m_machineTab(nullptr)
+    , m_hardwareTab(nullptr)
     , m_machineTypeCombo(nullptr)
     , m_videoSystemCombo(nullptr)
     , m_basicEnabledCheck(nullptr)
@@ -39,10 +39,10 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     mainLayout->addWidget(m_tabWidget);
     
     // Create tabs
-    createMachineConfigTab();
-    createHardwareExtensionsTab();
+    createHardwareTab();
     createAudioConfigTab();
     createVideoDisplayTab();
+    createInputConfigTab();
     createMediaConfigTab();
     
     // Create button box with custom buttons
@@ -64,18 +64,21 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
             this, &SettingsDialog::updateVideoSystemDependentControls);
 }
 
-void SettingsDialog::createMachineConfigTab()
+void SettingsDialog::createHardwareTab()
 {
-    m_machineTab = new QWidget();
-    m_tabWidget->addTab(m_machineTab, "Machine Configuration");
+    m_hardwareTab = new QWidget();
+    m_tabWidget->addTab(m_hardwareTab, "Hardware");
     
-    // Create main horizontal layout for two columns
-    QHBoxLayout* mainLayout = new QHBoxLayout(m_machineTab);
+    // Create main horizontal layout for three columns to keep height manageable
+    QHBoxLayout* mainLayout = new QHBoxLayout(m_hardwareTab);
     
     // Left column layout
     QVBoxLayout* leftColumn = new QVBoxLayout();
     
-    // Right column layout  
+    // Center column layout  
+    QVBoxLayout* centerColumn = new QVBoxLayout();
+    
+    // Right column layout
     QVBoxLayout* rightColumn = new QVBoxLayout();
     
     // Machine Type Group
@@ -113,7 +116,8 @@ void SettingsDialog::createMachineConfigTab()
     setupFilePathTooltip(m_osRomPath);
     osRomLayout->addWidget(m_osRomPath, 1);
     
-    m_osRomBrowse = new QPushButton("Browse...");
+    m_osRomBrowse = new QPushButton("...");
+    m_osRomBrowse->setMaximumWidth(45);
     connect(m_osRomBrowse, &QPushButton::clicked, this, &SettingsDialog::browseOSROM);
     osRomLayout->addWidget(m_osRomBrowse);
     
@@ -150,7 +154,8 @@ void SettingsDialog::createMachineConfigTab()
     setupFilePathTooltip(m_basicRomPath);
     basicRomLayout->addWidget(m_basicRomPath, 1);
     
-    m_basicRomBrowse = new QPushButton("Browse...");
+    m_basicRomBrowse = new QPushButton("...");
+    m_basicRomBrowse->setMaximumWidth(45);
     connect(m_basicRomBrowse, &QPushButton::clicked, this, &SettingsDialog::browseBasicROM);
     basicRomLayout->addWidget(m_basicRomBrowse);
     
@@ -217,7 +222,7 @@ void SettingsDialog::createMachineConfigTab()
     m_enableMapRamCheck->setToolTip("Enable MapRAM feature for XL/XE machines");
     memoryLayout->addWidget(m_enableMapRamCheck);
     
-    rightColumn->addWidget(memoryGroup);
+    centerColumn->addWidget(memoryGroup);
     
     // Performance Group
     QGroupBox* performanceGroup = new QGroupBox("Performance");
@@ -227,181 +232,132 @@ void SettingsDialog::createMachineConfigTab()
     m_turboModeCheck->setToolTip("Run emulator at maximum speed, ignoring timing constraints");
     performanceLayout->addWidget(m_turboModeCheck);
     
+    // Speed Control
+    QWidget* speedWidget = new QWidget();
+    QHBoxLayout* speedLayout = new QHBoxLayout(speedWidget);
+    speedLayout->setContentsMargins(0, 0, 0, 0);
+    
+    QLabel* speedTitleLabel = new QLabel("Emulation Speed:");
+    speedLayout->addWidget(speedTitleLabel);
+    
+    m_speedSlider = new QSlider();
+    m_speedSlider->setOrientation(Qt::Horizontal);
+    m_speedSlider->setMinimum(0);    // 0.5x speed (index 0)
+    m_speedSlider->setMaximum(10);   // 10x speed (index 10)  
+    m_speedSlider->setValue(1);      // 1x default speed (index 1)
+    m_speedSlider->setToolTip("Set emulation speed multiplier (0.5x - 10x)");
+    m_speedSlider->setTickPosition(QSlider::TicksBelow);
+    m_speedSlider->setTickInterval(1);
+    speedLayout->addWidget(m_speedSlider, 1);
+    
+    m_speedLabel = new QLabel("1x");
+    m_speedLabel->setMinimumWidth(60);
+    m_speedLabel->setAlignment(Qt::AlignCenter);
+    speedLayout->addWidget(m_speedLabel);
+    
+    connect(m_speedSlider, &QSlider::valueChanged, [this](int index) {
+        // Convert slider index to speed multiplier
+        double speedMultiplier;
+        QString labelText;
+        
+        if (index == 0) {
+            speedMultiplier = 0.5;
+            labelText = "0.5x";
+        } else {
+            speedMultiplier = index;  // 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+            labelText = QString::number(index) + "x";
+        }
+        
+        m_speedLabel->setText(labelText);
+        
+        // Update emulator speed in real-time
+        if (m_emulator) {
+            int percentage = (int)(speedMultiplier * 100);
+            m_emulator->setEmulationSpeed(percentage);
+        }
+    });
+    
+    performanceLayout->addWidget(speedWidget);
+    
     rightColumn->addWidget(performanceGroup);
-    
-    // Cartridge Configuration Group
-    QGroupBox* cartridgeGroup = new QGroupBox("Cartridge Configuration");
-    QVBoxLayout* cartridgeLayout = new QVBoxLayout(cartridgeGroup);
-    
-    // Primary cartridge
-    QVBoxLayout* cart1Layout = new QVBoxLayout();
-    QLabel* cart1Label = new QLabel("Primary Cartridge:");
-    cart1Label->setStyleSheet("font-weight: bold;");
-    cart1Layout->addWidget(cart1Label);
-    
-    QHBoxLayout* cart1PathLayout = new QHBoxLayout();
-    m_cartridgeEnabledCheck = new QCheckBox("Enable");
-    cart1PathLayout->addWidget(m_cartridgeEnabledCheck);
-    
-    m_cartridgePath = new QLineEdit();
-    m_cartridgePath->setPlaceholderText("Select cartridge file (.rom, .bin, .car)");
-    setupFilePathTooltip(m_cartridgePath);
-    cart1PathLayout->addWidget(m_cartridgePath, 1);
-    
-    m_cartridgeBrowse = new QPushButton("Browse...");
-    connect(m_cartridgeBrowse, &QPushButton::clicked, this, &SettingsDialog::browseCartridge);
-    cart1PathLayout->addWidget(m_cartridgeBrowse);
-    
-    cart1Layout->addLayout(cart1PathLayout);
-    
-    QHBoxLayout* cart1TypeLayout = new QHBoxLayout();
-    QLabel* cart1TypeLabel = new QLabel("Type:");
-    cart1TypeLayout->addWidget(cart1TypeLabel);
-    
-    m_cartridgeTypeCombo = new QComboBox();
-    m_cartridgeTypeCombo->setToolTip("Cartridge type - use Auto-detect unless you have issues");
-    populateCartridgeTypes(m_cartridgeTypeCombo);
-    cart1TypeLayout->addWidget(m_cartridgeTypeCombo, 1);
-    
-    cart1Layout->addLayout(cart1TypeLayout);
-    cartridgeLayout->addLayout(cart1Layout);
-    
-    // Piggyback cartridge
-    QVBoxLayout* cart2Layout = new QVBoxLayout();
-    QLabel* cart2Label = new QLabel("Piggyback Cartridge:");
-    cart2Label->setStyleSheet("font-weight: bold;");
-    cart2Layout->addWidget(cart2Label);
-    
-    QHBoxLayout* cart2PathLayout = new QHBoxLayout();
-    m_cartridge2EnabledCheck = new QCheckBox("Enable");
-    cart2PathLayout->addWidget(m_cartridge2EnabledCheck);
-    
-    m_cartridge2Path = new QLineEdit();
-    m_cartridge2Path->setPlaceholderText("Select piggyback cartridge file");
-    setupFilePathTooltip(m_cartridge2Path);
-    cart2PathLayout->addWidget(m_cartridge2Path, 1);
-    
-    m_cartridge2Browse = new QPushButton("Browse...");
-    connect(m_cartridge2Browse, &QPushButton::clicked, this, &SettingsDialog::browseCartridge2);
-    cart2PathLayout->addWidget(m_cartridge2Browse);
-    
-    cart2Layout->addLayout(cart2PathLayout);
-    
-    QHBoxLayout* cart2TypeLayout = new QHBoxLayout();
-    QLabel* cart2TypeLabel = new QLabel("Type:");
-    cart2TypeLayout->addWidget(cart2TypeLabel);
-    
-    m_cartridge2TypeCombo = new QComboBox();
-    m_cartridge2TypeCombo->setToolTip("Piggyback cartridge type");
-    populateCartridgeTypes(m_cartridge2TypeCombo);
-    cart2TypeLayout->addWidget(m_cartridge2TypeCombo, 1);
-    
-    cart2Layout->addLayout(cart2TypeLayout);
-    cartridgeLayout->addLayout(cart2Layout);
-    
-    // Cartridge options
-    m_cartridgeAutoRebootCheck = new QCheckBox("Auto-reboot when cartridge changes");
-    m_cartridgeAutoRebootCheck->setToolTip("Automatically restart emulator when cartridges are inserted or removed");
-    m_cartridgeAutoRebootCheck->setChecked(true); // Default to enabled
-    cartridgeLayout->addWidget(m_cartridgeAutoRebootCheck);
-    
-    // Enable/disable controls based on checkboxes
-    connect(m_cartridgeEnabledCheck, &QCheckBox::toggled, [this](bool enabled) {
-        m_cartridgePath->setEnabled(enabled);
-        m_cartridgeBrowse->setEnabled(enabled);
-        m_cartridgeTypeCombo->setEnabled(enabled);
-    });
-    
-    connect(m_cartridge2EnabledCheck, &QCheckBox::toggled, [this](bool enabled) {
-        m_cartridge2Path->setEnabled(enabled);
-        m_cartridge2Browse->setEnabled(enabled);
-        m_cartridge2TypeCombo->setEnabled(enabled);
-    });
-    
-    // Initially disable controls
-    m_cartridgePath->setEnabled(false);
-    m_cartridgeBrowse->setEnabled(false);
-    m_cartridgeTypeCombo->setEnabled(false);
-    m_cartridge2Path->setEnabled(false);
-    m_cartridge2Browse->setEnabled(false);
-    m_cartridge2TypeCombo->setEnabled(false);
-    
-    rightColumn->addWidget(cartridgeGroup);
     
     // Add stretch to balance columns
     leftColumn->addStretch();
-    rightColumn->addStretch();
-    
-    // Add both columns to main layout
-    mainLayout->addLayout(leftColumn, 1);
-    mainLayout->addLayout(rightColumn, 1);
-}
-
-void SettingsDialog::createHardwareExtensionsTab()
-{
-    m_hardwareTab = new QWidget();
-    m_tabWidget->addTab(m_hardwareTab, "Hardware");
-    
-    QVBoxLayout* tabLayout = new QVBoxLayout(m_hardwareTab);
+    // Move memory group to center column to balance layout
+    centerColumn->addWidget(memoryGroup);
     
     // POKEY Enhancements Group
-    QGroupBox* pokeyGroup = new QGroupBox("POKEY Sound Chip");
+    QGroupBox* pokeyGroup = new QGroupBox("POKEY");
     QVBoxLayout* pokeyLayout = new QVBoxLayout(pokeyGroup);
     
-    m_stereoPokey = new QCheckBox("Enable Stereo POKEY");
+    m_stereoPokey = new QCheckBox("Stereo POKEY");
     m_stereoPokey->setToolTip("Enable dual POKEY sound chips for stereo audio");
     pokeyLayout->addWidget(m_stereoPokey);
     
-    tabLayout->addWidget(pokeyGroup);
+    rightColumn->addWidget(pokeyGroup);
     
     // SIO Performance Group  
-    QGroupBox* sioGroup = new QGroupBox("SIO Performance");
+    QGroupBox* sioGroup = new QGroupBox("SIO");
     QVBoxLayout* sioLayout = new QVBoxLayout(sioGroup);
     
-    m_sioAcceleration = new QCheckBox("Enable SIO Acceleration");
-    m_sioAcceleration->setToolTip("Accelerate Serial I/O operations for faster disk access");
+    m_sioAcceleration = new QCheckBox("SIO acceleration");
+    m_sioAcceleration->setToolTip("Speed up disk and cassette operations");
     sioLayout->addWidget(m_sioAcceleration);
     
-    tabLayout->addWidget(sioGroup);
+    rightColumn->addWidget(sioGroup);
     
-    // 80-Column Cards Group
-    QGroupBox* column80Group = new QGroupBox("80-Column Display Cards");
-    QVBoxLayout* column80Layout = new QVBoxLayout(column80Group);
+    // 80-Column Display Cards Group
+    QGroupBox* displayGroup = new QGroupBox("80-Column Cards");
+    QVBoxLayout* displayLayout = new QVBoxLayout(displayGroup);
     
-    m_xep80Enabled = new QCheckBox("Enable XEP80 Emulation");
-    m_xep80Enabled->setToolTip("Enable Atari XEP80 80-column interface");
-    column80Layout->addWidget(m_xep80Enabled);
+    m_xep80Enabled = new QCheckBox("XEP80");
+    m_xep80Enabled->setToolTip("Enable XEP80 80-column display interface");
+    displayLayout->addWidget(m_xep80Enabled);
     
-    m_af80Enabled = new QCheckBox("Enable Austin Franklin 80-Column Board");
+    m_af80Enabled = new QCheckBox("Austin Franklin 80");
     m_af80Enabled->setToolTip("Enable Austin Franklin 80-column display board");
-    column80Layout->addWidget(m_af80Enabled);
+    displayLayout->addWidget(m_af80Enabled);
     
-    m_bit3Enabled = new QCheckBox("Enable Bit3 Full View 80-Column Board");
+    m_bit3Enabled = new QCheckBox("Bit3 Full View 80");
     m_bit3Enabled->setToolTip("Enable Bit3 Full View 80-column display board");
-    column80Layout->addWidget(m_bit3Enabled);
+    displayLayout->addWidget(m_bit3Enabled);
     
-    tabLayout->addWidget(column80Group);
+    rightColumn->addWidget(displayGroup);
     
     // PBI Extensions Group
     QGroupBox* pbiGroup = new QGroupBox("PBI Extensions");
     QVBoxLayout* pbiLayout = new QVBoxLayout(pbiGroup);
     
-    m_atari1400Enabled = new QCheckBox("Emulate Atari 1400XL");
-    m_atari1400Enabled->setToolTip("Enable Atari 1400XL PBI system emulation");
+    m_atari1400Enabled = new QCheckBox("1400XL Modem");
+    m_atari1400Enabled->setToolTip("Enable Atari 1400XL built-in modem");
     pbiLayout->addWidget(m_atari1400Enabled);
     
-    m_atari1450Enabled = new QCheckBox("Emulate Atari 1450XLD");
-    m_atari1450Enabled->setToolTip("Enable Atari 1450XLD system emulation");
+    m_atari1450Enabled = new QCheckBox("1450XLD Disk");
+    m_atari1450Enabled->setToolTip("Enable Atari 1450XLD built-in disk drive");
     pbiLayout->addWidget(m_atari1450Enabled);
     
-    m_proto80Enabled = new QCheckBox("Enable Prototype 80-Column Board");
+    m_proto80Enabled = new QCheckBox("Proto 80-Column");
     m_proto80Enabled->setToolTip("Enable prototype 80-column board for 1090");
     pbiLayout->addWidget(m_proto80Enabled);
     
-    tabLayout->addWidget(pbiGroup);
+    // Voice Synthesis
+    m_voiceboxEnabled = new QCheckBox("Voicebox");
+    m_voiceboxEnabled->setToolTip("Enable Voicebox speech synthesis");
+    pbiLayout->addWidget(m_voiceboxEnabled);
     
-    tabLayout->addStretch();
+    rightColumn->addWidget(pbiGroup);
+    
+    // Add stretch to balance columns
+    leftColumn->addStretch();
+    centerColumn->addStretch();
+    rightColumn->addStretch();
+    
+    // Add all three columns to main layout
+    mainLayout->addLayout(leftColumn, 1);
+    mainLayout->addLayout(centerColumn, 1);
+    mainLayout->addLayout(rightColumn, 1);
 }
+
 
 void SettingsDialog::createAudioConfigTab()
 {
@@ -928,6 +884,123 @@ void SettingsDialog::createVideoDisplayTab()
     tabLayout->addStretch();
 }
 
+void SettingsDialog::createInputConfigTab()
+{
+    m_inputTab = new QWidget();
+    m_tabWidget->addTab(m_inputTab, "Input Configuration");
+    
+    // Create main horizontal layout
+    QHBoxLayout* mainLayout = new QHBoxLayout(m_inputTab);
+    
+    // Left column - Joystick Configuration
+    QVBoxLayout* leftColumn = new QVBoxLayout();
+    
+    // Joystick Configuration Group
+    QGroupBox* joystickGroup = new QGroupBox("Joystick Configuration");
+    QVBoxLayout* joystickLayout = new QVBoxLayout(joystickGroup);
+    
+    // Enable/Disable joysticks
+    m_joystickEnabled = new QCheckBox("Enable Joystick Support");
+    m_joystickEnabled->setToolTip("Enable or disable joystick input (equivalent to -nojoystick)");
+    m_joystickEnabled->setChecked(true); // Default enabled
+    joystickLayout->addWidget(m_joystickEnabled);
+    
+    // Hat support for joysticks 0-3
+    QLabel* hatLabel = new QLabel("Hat Support:");
+    hatLabel->setStyleSheet("font-weight: bold; margin-top: 10px;");
+    joystickLayout->addWidget(hatLabel);
+    
+    m_joystick0Hat = new QCheckBox("Use hat of joystick 0 (-joy0hat)");
+    m_joystick0Hat->setToolTip("Use hat switch of joystick 0 for movement");
+    joystickLayout->addWidget(m_joystick0Hat);
+    
+    m_joystick1Hat = new QCheckBox("Use hat of joystick 1 (-joy1hat)");
+    m_joystick1Hat->setToolTip("Use hat switch of joystick 1 for movement");
+    joystickLayout->addWidget(m_joystick1Hat);
+    
+    m_joystick2Hat = new QCheckBox("Use hat of joystick 2 (-joy2hat)");
+    m_joystick2Hat->setToolTip("Use hat switch of joystick 2 for movement");
+    joystickLayout->addWidget(m_joystick2Hat);
+    
+    m_joystick3Hat = new QCheckBox("Use hat of joystick 3 (-joy3hat)");
+    m_joystick3Hat->setToolTip("Use hat switch of joystick 3 for movement");
+    joystickLayout->addWidget(m_joystick3Hat);
+    
+    // Distinct joysticks option
+    m_joyDistinct = new QCheckBox("One input device per emulated stick (-joy-distinct)");
+    m_joyDistinct->setToolTip("Use separate input devices for each emulated joystick");
+    joystickLayout->addWidget(m_joyDistinct);
+    
+    leftColumn->addWidget(joystickGroup);
+    
+    // Keyboard Joystick Emulation Group
+    QGroupBox* kbdJoyGroup = new QGroupBox("Keyboard Joystick Emulation");
+    QVBoxLayout* kbdJoyLayout = new QVBoxLayout(kbdJoyGroup);
+    
+    m_kbdJoy0Enabled = new QCheckBox("Enable joystick 0 keyboard emulation (-kbdjoy0)");
+    m_kbdJoy0Enabled->setToolTip("Allow keyboard keys to emulate joystick 0 (WASD, etc.)");
+    kbdJoyLayout->addWidget(m_kbdJoy0Enabled);
+    
+    m_kbdJoy1Enabled = new QCheckBox("Enable joystick 1 keyboard emulation (-kbdjoy1)");
+    m_kbdJoy1Enabled->setToolTip("Allow keyboard keys to emulate joystick 1");
+    kbdJoyLayout->addWidget(m_kbdJoy1Enabled);
+    
+    leftColumn->addWidget(kbdJoyGroup);
+    leftColumn->addStretch();
+    
+    // Right column - Mouse and Keyboard Configuration
+    QVBoxLayout* rightColumn = new QVBoxLayout();
+    
+    // Mouse Configuration Group
+    QGroupBox* mouseGroup = new QGroupBox("Mouse Configuration");
+    QVBoxLayout* mouseLayout = new QVBoxLayout(mouseGroup);
+    
+    m_grabMouse = new QCheckBox("Grab mouse (-grabmouse)");
+    m_grabMouse->setToolTip("Prevent mouse from leaving emulator window");
+    mouseLayout->addWidget(m_grabMouse);
+    
+    // Mouse device setting
+    QHBoxLayout* mouseDeviceLayout = new QHBoxLayout();
+    QLabel* mouseDeviceLabel = new QLabel("Mouse Device:");
+    mouseDeviceLayout->addWidget(mouseDeviceLabel);
+    
+    m_mouseDevice = new QLineEdit();
+    m_mouseDevice->setPlaceholderText("Default mouse device");
+    m_mouseDevice->setToolTip("Specify custom mouse device (-mouse-device)");
+    mouseDeviceLayout->addWidget(m_mouseDevice, 1);
+    
+    mouseLayout->addLayout(mouseDeviceLayout);
+    rightColumn->addWidget(mouseGroup);
+    
+    // Keyboard Configuration Group
+    QGroupBox* keyboardGroup = new QGroupBox("Keyboard Configuration");
+    QVBoxLayout* keyboardLayout = new QVBoxLayout(keyboardGroup);
+    
+    m_keyboardToggle = new QCheckBox("Enable keyboard toggle functionality (-keyboardtoggle)");
+    m_keyboardToggle->setToolTip("Enable special keyboard toggle features");
+    keyboardLayout->addWidget(m_keyboardToggle);
+    
+    m_keyboardLeds = new QCheckBox("Enable keyboard LEDs (-keyboard-leds)");
+    m_keyboardLeds->setToolTip("Enable keyboard LED indicators (for Atari 1200XL)");
+    keyboardLayout->addWidget(m_keyboardLeds);
+    
+    rightColumn->addWidget(keyboardGroup);
+    rightColumn->addStretch();
+    
+    // Connect joystick enable/disable functionality
+    connect(m_joystickEnabled, &QCheckBox::toggled, [this](bool enabled) {
+        m_joystick0Hat->setEnabled(enabled);
+        m_joystick1Hat->setEnabled(enabled);
+        m_joystick2Hat->setEnabled(enabled);
+        m_joystick3Hat->setEnabled(enabled);
+        m_joyDistinct->setEnabled(enabled);
+    });
+    
+    // Add both columns to main layout
+    mainLayout->addLayout(leftColumn, 1);
+    mainLayout->addLayout(rightColumn, 1);
+}
+
 void SettingsDialog::createMediaConfigTab()
 {
     m_mediaTab = new QWidget();
@@ -936,20 +1009,124 @@ void SettingsDialog::createMediaConfigTab()
     // Create main horizontal layout
     QHBoxLayout* mainLayout = new QHBoxLayout(m_mediaTab);
     
-    // Left column - Floppy and Cassette
+    // Left column - Floppy Disks, Cassette and Special Devices
     QVBoxLayout* leftColumn = new QVBoxLayout();
+    leftColumn->setSpacing(8); // Reduce spacing between groups
+    
+    // Cartridge Configuration Group
+    QGroupBox* cartridgeGroup = new QGroupBox("Cartridge Configuration");
+    QVBoxLayout* cartridgeLayout = new QVBoxLayout(cartridgeGroup);
+    cartridgeLayout->setSpacing(4); // Reduce spacing
+    
+    // Primary cartridge
+    QVBoxLayout* cart1Layout = new QVBoxLayout();
+    QLabel* cart1Label = new QLabel("Primary Cartridge:");
+    cart1Label->setStyleSheet("font-weight: bold;");
+    cart1Layout->addWidget(cart1Label);
+    
+    QHBoxLayout* cart1PathLayout = new QHBoxLayout();
+    m_cartridgeEnabledCheck = new QCheckBox("Enable");
+    m_cartridgeEnabledCheck->setMinimumWidth(50);
+    cart1PathLayout->addWidget(m_cartridgeEnabledCheck);
+    
+    m_cartridgePath = new QLineEdit();
+    m_cartridgePath->setPlaceholderText("Select cartridge file (.rom, .bin, .car)");
+    setupFilePathTooltip(m_cartridgePath);
+    cart1PathLayout->addWidget(m_cartridgePath, 1);
+    
+    m_cartridgeBrowse = new QPushButton("...");
+    m_cartridgeBrowse->setMaximumWidth(45);
+    connect(m_cartridgeBrowse, &QPushButton::clicked, this, &SettingsDialog::browseCartridge);
+    cart1PathLayout->addWidget(m_cartridgeBrowse);
+    
+    cart1Layout->addLayout(cart1PathLayout);
+    
+    QHBoxLayout* cart1TypeLayout = new QHBoxLayout();
+    QLabel* cart1TypeLabel = new QLabel("Type:");
+    cart1TypeLayout->addWidget(cart1TypeLabel);
+    
+    m_cartridgeTypeCombo = new QComboBox();
+    m_cartridgeTypeCombo->setToolTip("Cartridge type - use Auto-detect unless you have issues");
+    populateCartridgeTypes(m_cartridgeTypeCombo);
+    cart1TypeLayout->addWidget(m_cartridgeTypeCombo, 1);
+    
+    cart1Layout->addLayout(cart1TypeLayout);
+    cartridgeLayout->addLayout(cart1Layout);
+    
+    // Piggyback cartridge
+    QVBoxLayout* cart2Layout = new QVBoxLayout();
+    QLabel* cart2Label = new QLabel("Piggyback Cartridge:");
+    cart2Label->setStyleSheet("font-weight: bold;");
+    cart2Layout->addWidget(cart2Label);
+    
+    QHBoxLayout* cart2PathLayout = new QHBoxLayout();
+    m_cartridge2EnabledCheck = new QCheckBox("Enable");
+    cart2PathLayout->addWidget(m_cartridge2EnabledCheck);
+    
+    m_cartridge2Path = new QLineEdit();
+    m_cartridge2Path->setPlaceholderText("Select piggyback cartridge file");
+    setupFilePathTooltip(m_cartridge2Path);
+    cart2PathLayout->addWidget(m_cartridge2Path, 1);
+    
+    m_cartridge2Browse = new QPushButton("...");
+    m_cartridge2Browse->setMaximumWidth(45);
+    connect(m_cartridge2Browse, &QPushButton::clicked, this, &SettingsDialog::browseCartridge2);
+    cart2PathLayout->addWidget(m_cartridge2Browse);
+    
+    cart2Layout->addLayout(cart2PathLayout);
+    
+    QHBoxLayout* cart2TypeLayout = new QHBoxLayout();
+    QLabel* cart2TypeLabel = new QLabel("Type:");
+    cart2TypeLayout->addWidget(cart2TypeLabel);
+    
+    m_cartridge2TypeCombo = new QComboBox();
+    m_cartridge2TypeCombo->setToolTip("Piggyback cartridge type");
+    populateCartridgeTypes(m_cartridge2TypeCombo);
+    cart2TypeLayout->addWidget(m_cartridge2TypeCombo, 1);
+    
+    cart2Layout->addLayout(cart2TypeLayout);
+    cartridgeLayout->addLayout(cart2Layout);
+    
+    // Cartridge options
+    m_cartridgeAutoRebootCheck = new QCheckBox("Auto-reboot when cartridge changes");
+    m_cartridgeAutoRebootCheck->setToolTip("Automatically restart emulator when cartridges are inserted or removed");
+    m_cartridgeAutoRebootCheck->setChecked(true); // Default to enabled
+    cartridgeLayout->addWidget(m_cartridgeAutoRebootCheck);
+    
+    // Enable/disable controls based on checkboxes
+    connect(m_cartridgeEnabledCheck, &QCheckBox::toggled, [this](bool enabled) {
+        m_cartridgePath->setEnabled(enabled);
+        m_cartridgeBrowse->setEnabled(enabled);
+        m_cartridgeTypeCombo->setEnabled(enabled);
+    });
+    
+    connect(m_cartridge2EnabledCheck, &QCheckBox::toggled, [this](bool enabled) {
+        m_cartridge2Path->setEnabled(enabled);
+        m_cartridge2Browse->setEnabled(enabled);
+        m_cartridge2TypeCombo->setEnabled(enabled);
+    });
+    
+    // Initially disable controls
+    m_cartridgePath->setEnabled(false);
+    m_cartridgeBrowse->setEnabled(false);
+    m_cartridgeTypeCombo->setEnabled(false);
+    m_cartridge2Path->setEnabled(false);
+    m_cartridge2Browse->setEnabled(false);
+    m_cartridge2TypeCombo->setEnabled(false);
     
     // Floppy Disks Group
     QGroupBox* floppyGroup = new QGroupBox("Floppy Disk Drives");
     QVBoxLayout* floppyLayout = new QVBoxLayout(floppyGroup);
+    floppyLayout->setSpacing(4); // Reduce spacing between disk drives
     
     for (int i = 0; i < 8; i++) {
         QString diskLabel = QString("D%1:").arg(i + 1);
         
         QHBoxLayout* diskLayout = new QHBoxLayout();
+        diskLayout->setContentsMargins(0, 2, 0, 2); // Tighter margins
         
         m_diskEnabled[i] = new QCheckBox(diskLabel);
-        m_diskEnabled[i]->setMinimumWidth(40);
+        m_diskEnabled[i]->setMinimumWidth(50);
         diskLayout->addWidget(m_diskEnabled[i]);
         
         m_diskPath[i] = new QLineEdit();
@@ -957,7 +1134,8 @@ void SettingsDialog::createMediaConfigTab()
         setupFilePathTooltip(m_diskPath[i]);
         diskLayout->addWidget(m_diskPath[i], 1);
         
-        m_diskBrowse[i] = new QPushButton("Browse...");
+        m_diskBrowse[i] = new QPushButton("...");
+        m_diskBrowse[i]->setMaximumWidth(45);
         connect(m_diskBrowse[i], &QPushButton::clicked, [this, i]() { browseDiskImage(i); });
         diskLayout->addWidget(m_diskBrowse[i]);
         
@@ -972,6 +1150,7 @@ void SettingsDialog::createMediaConfigTab()
     // Cassette Group
     QGroupBox* cassetteGroup = new QGroupBox("Cassette Tape");
     QVBoxLayout* cassetteLayout = new QVBoxLayout(cassetteGroup);
+    cassetteLayout->setSpacing(4); // Reduce spacing
     
     QHBoxLayout* cassettePathLayout = new QHBoxLayout();
     m_cassetteEnabled = new QCheckBox("Enable Cassette");
@@ -982,7 +1161,8 @@ void SettingsDialog::createMediaConfigTab()
     setupFilePathTooltip(m_cassettePath);
     cassettePathLayout->addWidget(m_cassettePath, 1);
     
-    m_cassetteBrowse = new QPushButton("Browse...");
+    m_cassetteBrowse = new QPushButton("...");
+    m_cassetteBrowse->setMaximumWidth(45);
     connect(m_cassetteBrowse, &QPushButton::clicked, this, &SettingsDialog::browseCassetteImage);
     cassettePathLayout->addWidget(m_cassetteBrowse);
     
@@ -1000,22 +1180,27 @@ void SettingsDialog::createMediaConfigTab()
     
     cassetteLayout->addLayout(cassetteOptionsLayout);
     leftColumn->addWidget(cassetteGroup);
-    leftColumn->addStretch();
     
-    // Right column - Hard Drive and Special Devices
+    // Right column - Cartridge and Hard Drive
     QVBoxLayout* rightColumn = new QVBoxLayout();
+    rightColumn->setSpacing(8); // Reduce spacing between groups
+    
+    // Add cartridge group to right column
+    rightColumn->addWidget(cartridgeGroup);
     
     // Hard Drive Group
     QGroupBox* hdGroup = new QGroupBox("Hard Drive Emulation");
     QVBoxLayout* hdLayout = new QVBoxLayout(hdGroup);
+    hdLayout->setSpacing(4); // Reduce spacing between hard drives
     
     for (int i = 0; i < 4; i++) {
         QString hdLabel = QString("H%1:").arg(i + 1);
         
         QHBoxLayout* hdDriveLayout = new QHBoxLayout();
+        hdDriveLayout->setContentsMargins(0, 2, 0, 2); // Tighter margins
         
         m_hdEnabled[i] = new QCheckBox(hdLabel);
-        m_hdEnabled[i]->setMinimumWidth(40);
+        m_hdEnabled[i]->setMinimumWidth(50);
         hdDriveLayout->addWidget(m_hdEnabled[i]);
         
         m_hdPath[i] = new QLineEdit();
@@ -1023,7 +1208,8 @@ void SettingsDialog::createMediaConfigTab()
         setupFilePathTooltip(m_hdPath[i]);
         hdDriveLayout->addWidget(m_hdPath[i], 1);
         
-        m_hdBrowse[i] = new QPushButton("Browse...");
+        m_hdBrowse[i] = new QPushButton("...");
+        m_hdBrowse[i]->setMaximumWidth(45);
         connect(m_hdBrowse[i], &QPushButton::clicked, [this, i]() { browseHardDriveDirectory(i); });
         hdDriveLayout->addWidget(m_hdBrowse[i]);
         
@@ -1077,7 +1263,8 @@ void SettingsDialog::createMediaConfigTab()
     m_rtimeEnabled->setToolTip("Enable R-Time 8 cartridge emulation for real-time clock");
     specialLayout->addWidget(m_rtimeEnabled);
     
-    rightColumn->addWidget(specialGroup);
+    leftColumn->addWidget(specialGroup);
+    leftColumn->addStretch();
     rightColumn->addStretch();
     
     // Add both columns to main layout
@@ -1348,6 +1535,14 @@ void SettingsDialog::loadSettings()
     
     // Load Performance settings
     m_turboModeCheck->setChecked(settings.value("machine/turboMode", false).toBool());
+    int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt(); // Default to 1x (index 1)
+    m_speedSlider->setValue(speedIndex);
+    // Update label based on loaded index
+    if (speedIndex == 0) {
+        m_speedLabel->setText("0.5x");
+    } else {
+        m_speedLabel->setText(QString::number(speedIndex) + "x");
+    }
     
     // Load Cartridge Configuration
     m_cartridgeEnabledCheck->setChecked(settings.value("machine/cartridgeEnabled", false).toBool());
@@ -1522,6 +1717,20 @@ void SettingsDialog::loadSettings()
     m_ntscGammaSlider->blockSignals(false);
     m_ntscTintSlider->blockSignals(false);
     
+    // Load Input Configuration
+    m_joystickEnabled->setChecked(settings.value("input/joystickEnabled", true).toBool());
+    m_joystick0Hat->setChecked(settings.value("input/joystick0Hat", false).toBool());
+    m_joystick1Hat->setChecked(settings.value("input/joystick1Hat", false).toBool());
+    m_joystick2Hat->setChecked(settings.value("input/joystick2Hat", false).toBool());
+    m_joystick3Hat->setChecked(settings.value("input/joystick3Hat", false).toBool());
+    m_joyDistinct->setChecked(settings.value("input/joyDistinct", false).toBool());
+    m_kbdJoy0Enabled->setChecked(settings.value("input/kbdJoy0Enabled", false).toBool());
+    m_kbdJoy1Enabled->setChecked(settings.value("input/kbdJoy1Enabled", false).toBool());
+    m_grabMouse->setChecked(settings.value("input/grabMouse", false).toBool());
+    m_mouseDevice->setText(settings.value("input/mouseDevice", "").toString());
+    m_keyboardToggle->setChecked(settings.value("input/keyboardToggle", false).toBool());
+    m_keyboardLeds->setChecked(settings.value("input/keyboardLeds", false).toBool());
+    
     // Load Media Configuration
     // Floppy Disks
     for (int i = 0; i < 8; i++) {
@@ -1589,6 +1798,7 @@ void SettingsDialog::saveSettings()
     
     // Save Performance settings
     settings.setValue("machine/turboMode", m_turboModeCheck->isChecked());
+    settings.setValue("machine/emulationSpeedIndex", m_speedSlider->value());
     
     // Save Cartridge Configuration
     settings.setValue("machine/cartridgeEnabled", m_cartridgeEnabledCheck->isChecked());
@@ -1650,6 +1860,20 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/ntscBrightness", m_ntscBrightnessSlider->value());
     settings.setValue("video/ntscGamma", m_ntscGammaSlider->value());
     settings.setValue("video/ntscTint", m_ntscTintSlider->value());
+    
+    // Save Input Configuration
+    settings.setValue("input/joystickEnabled", m_joystickEnabled->isChecked());
+    settings.setValue("input/joystick0Hat", m_joystick0Hat->isChecked());
+    settings.setValue("input/joystick1Hat", m_joystick1Hat->isChecked());
+    settings.setValue("input/joystick2Hat", m_joystick2Hat->isChecked());
+    settings.setValue("input/joystick3Hat", m_joystick3Hat->isChecked());
+    settings.setValue("input/joyDistinct", m_joyDistinct->isChecked());
+    settings.setValue("input/kbdJoy0Enabled", m_kbdJoy0Enabled->isChecked());
+    settings.setValue("input/kbdJoy1Enabled", m_kbdJoy1Enabled->isChecked());
+    settings.setValue("input/grabMouse", m_grabMouse->isChecked());
+    settings.setValue("input/mouseDevice", m_mouseDevice->text());
+    settings.setValue("input/keyboardToggle", m_keyboardToggle->isChecked());
+    settings.setValue("input/keyboardLeds", m_keyboardLeds->isChecked());
     
     // Save Media Configuration
     // Floppy Disks
@@ -1772,6 +1996,13 @@ void SettingsDialog::applySettings()
         // Reapply media settings after restart
         applyMediaSettings();
         
+        // Apply speed setting
+        if (m_emulator) {
+            int speedIndex = m_speedSlider->value();
+            int percentage = (speedIndex == 0) ? 50 : speedIndex * 100; // 0.5x = 50%, others = index * 100
+            m_emulator->setEmulationSpeed(percentage);
+        }
+        
         emit settingsChanged();
     } else {
         qDebug() << "Failed to restart emulator with new settings";
@@ -1828,6 +2059,8 @@ void SettingsDialog::restoreDefaults()
     
     // Performance defaults
     m_turboModeCheck->setChecked(false);
+    m_speedSlider->setValue(1);  // Default to 1x speed (index 1)
+    m_speedLabel->setText("1x");
     
     // Cartridge Configuration defaults
     m_cartridgeEnabledCheck->setChecked(false);
@@ -1890,6 +2123,20 @@ void SettingsDialog::restoreDefaults()
     m_ntscBrightnessSlider->setValue(0); // 0.0
     m_ntscGammaSlider->setValue(100);    // 1.0
     m_ntscTintSlider->setValue(0);       // 0°
+    
+    // Input Configuration defaults
+    m_joystickEnabled->setChecked(true);     // Joystick enabled by default
+    m_joystick0Hat->setChecked(false);
+    m_joystick1Hat->setChecked(false);
+    m_joystick2Hat->setChecked(false);
+    m_joystick3Hat->setChecked(false);
+    m_joyDistinct->setChecked(false);
+    m_kbdJoy0Enabled->setChecked(false);
+    m_kbdJoy1Enabled->setChecked(false);
+    m_grabMouse->setChecked(false);
+    m_mouseDevice->clear();
+    m_keyboardToggle->setChecked(false);
+    m_keyboardLeds->setChecked(false);
     
     // Media Configuration defaults
     // Floppy Disks - all disabled by default

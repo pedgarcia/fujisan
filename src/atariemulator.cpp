@@ -685,3 +685,19 @@ void AtariEmulator::updateNtscColorSettings(double saturation, double contrast, 
              << "Gamma:" << COLOURS_NTSC_setup.gamma
              << "Hue:" << COLOURS_NTSC_setup.hue;
 }
+
+void AtariEmulator::setEmulationSpeed(int percentage)
+{
+    // Set the speed: 0 = unlimited turbo, percentage otherwise  
+    if (percentage <= 0) {
+        // Invalid input, set to 100%
+        Atari800_turbo_speed = 100;
+        Atari800_turbo = 0;
+    } else {
+        Atari800_turbo_speed = percentage;
+        // Enable turbo mode if speed is not 100%
+        Atari800_turbo = (percentage != 100) ? 1 : 0;
+    }
+    
+    qDebug() << "Emulation speed set to:" << percentage << "% (turbo=" << Atari800_turbo << ")";
+}

@@ -53,10 +53,10 @@ private slots:
     void onAltirraOSChanged();
 
 private:
-    void createMachineConfigTab();
-    void createHardwareExtensionsTab();
+    void createHardwareTab();
     void createAudioConfigTab();
     void createVideoDisplayTab();
+    void createInputConfigTab();
     void createMediaConfigTab();
     void loadSettings();
     void saveSettings();
@@ -71,8 +71,8 @@ private:
     QDialogButtonBox* m_buttonBox;
     QPushButton* m_defaultsButton;
     
-    // Machine Configuration controls
-    QWidget* m_machineTab;
+    // Hardware Configuration controls
+    QWidget* m_hardwareTab;
     QComboBox* m_machineTypeCombo;
     QComboBox* m_videoSystemCombo;
     QCheckBox* m_basicEnabledCheck;
@@ -89,6 +89,8 @@ private:
     
     // Performance controls
     QCheckBox* m_turboModeCheck;
+    QSlider* m_speedSlider;
+    QLabel* m_speedLabel;
     
     // Cartridge Configuration controls
     QCheckBox* m_cartridgeEnabledCheck;
@@ -109,8 +111,6 @@ private:
     QLineEdit* m_basicRomPath;
     QPushButton* m_basicRomBrowse;
     
-    // Hardware controls
-    QWidget* m_hardwareTab;
     QCheckBox* m_stereoPokey;
     QCheckBox* m_sioAcceleration;
     
@@ -176,6 +176,29 @@ private:
     QLabel* m_ntscGammaLabel;
     QSlider* m_ntscTintSlider;
     QLabel* m_ntscTintLabel;
+    
+    // Input Configuration controls
+    QWidget* m_inputTab;
+    
+    // Joystick Configuration
+    QCheckBox* m_joystickEnabled;
+    QCheckBox* m_joystick0Hat;
+    QCheckBox* m_joystick1Hat;
+    QCheckBox* m_joystick2Hat;
+    QCheckBox* m_joystick3Hat;
+    QCheckBox* m_joyDistinct;
+    
+    // Keyboard Joystick Emulation
+    QCheckBox* m_kbdJoy0Enabled;
+    QCheckBox* m_kbdJoy1Enabled;
+    
+    // Mouse Configuration
+    QCheckBox* m_grabMouse;
+    QLineEdit* m_mouseDevice;
+    
+    // Keyboard Configuration
+    QCheckBox* m_keyboardToggle;
+    QCheckBox* m_keyboardLeds;
     
     // Media Configuration controls
     QWidget* m_mediaTab;
