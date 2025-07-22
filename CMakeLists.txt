@@ -44,6 +44,7 @@ set(SOURCES
     src/configurationprofile.cpp
     src/configurationprofilemanager.cpp
     src/profileselectionwidget.cpp
+    src/debuggerwidget.cpp
 )
 
 set(HEADERS
@@ -55,6 +56,7 @@ set(HEADERS
     include/configurationprofile.h
     include/configurationprofilemanager.h
     include/profileselectionwidget.h
+    include/debuggerwidget.h
 )
 
 # Create executable

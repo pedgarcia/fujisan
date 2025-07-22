@@ -19,10 +19,12 @@
 #include <QCheckBox>
 #include <QLabel>
 #include <QSettings>
+#include <QDockWidget>
 #include "atariemulator.h"
 #include "emulatorwidget.h"
 #include "toggleswitch.h"
 #include "settingsdialog.h"
+#include "debuggerwidget.h"
 
 class MainWindow : public QMainWindow
 {
@@ -50,11 +52,13 @@ private slots:
     void onSettingsChanged();
     void toggleFullscreen();
     void showAbout();
+    void toggleDebugger();
 
 private:
     void createMenus();
     void createToolBar();
     void createEmulatorWidget();
+    void createDebugger();
     void restartEmulator();
     void updateToolbarFromSettings();
     void loadInitialSettings();
@@ -66,6 +70,10 @@ private:
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
     QToolBar* m_toolBar;
+    
+    // Debugger
+    DebuggerWidget* m_debuggerWidget;
+    QDockWidget* m_debuggerDock;
     
     // Toolbar widgets
     ToggleSwitch* m_basicToggle;
@@ -91,8 +99,9 @@ private:
     bool m_keepAspectRatio;
     bool m_startInFullscreen;
     
-    // View menu action
+    // View menu actions
     QAction* m_fullscreenAction;
+    QAction* m_debuggerAction;
     
     // Fullscreen state
     bool m_isInCustomFullscreen;

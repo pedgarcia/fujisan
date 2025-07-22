@@ -30,9 +30,15 @@ MainWindow::MainWindow(QWidget *parent)
     setMinimumSize(800, 600);
     resize(1280, 960);
     
+#ifdef Q_OS_MACOS
+    // Disable automatic macOS fullscreen to prevent duplicate menu items
+    setWindowFlags(windowFlags() & ~Qt::WindowFullscreenButtonHint);
+#endif
+    
     createMenus();
     createToolBar();
     createEmulatorWidget();
+    createDebugger();
     
     // Load initial settings and initialize emulator with them
     loadInitialSettings();
@@ -136,6 +142,15 @@ void MainWindow::createMenus()
     m_fullscreenAction->setCheckable(true);
     connect(m_fullscreenAction, &QAction::triggered, this, &MainWindow::toggleFullscreen);
     viewMenu->addAction(m_fullscreenAction);
+    
+    viewMenu->addSeparator();
+    
+    m_debuggerAction = new QAction("&Debugger", this);
+    m_debuggerAction->setShortcut(QKeySequence(Qt::Key_F12));
+    m_debuggerAction->setToolTip("Toggle debugger panel (F12)");
+    m_debuggerAction->setCheckable(true);
+    connect(m_debuggerAction, &QAction::triggered, this, &MainWindow::toggleDebugger);
+    viewMenu->addAction(m_debuggerAction);
     
     // Help menu
     QMenu* helpMenu = menuBar()->addMenu("&Help");
@@ -352,6 +367,29 @@ void MainWindow::createEmulatorWidget()
     
     // Give the emulator widget focus by default
     m_emulatorWidget->setFocus();
+}
+
+void MainWindow::createDebugger()
+{
+    // Create debugger widget
+    m_debuggerWidget = new DebuggerWidget(m_emulator, this);
+    
+    // Create dock widget for debugger
+    m_debuggerDock = new QDockWidget("Debugger", this);
+    m_debuggerDock->setWidget(m_debuggerWidget);
+    m_debuggerDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    m_debuggerDock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable);
+    
+    // Add dock widget to right side by default
+    addDockWidget(Qt::RightDockWidgetArea, m_debuggerDock);
+    
+    // Hide by default
+    m_debuggerDock->hide();
+    
+    // Connect dock visibility to menu action
+    connect(m_debuggerDock, &QDockWidget::visibilityChanged, [this](bool visible) {
+        m_debuggerAction->setChecked(visible);
+    });
 }
 
 void MainWindow::loadRom()
@@ -889,6 +927,17 @@ bool MainWindow::eventFilter(QObject *object, QEvent *event)
     }
     
     return QMainWindow::eventFilter(object, event);
+}
+
+void MainWindow::toggleDebugger()
+{
+    if (m_debuggerDock->isVisible()) {
+        m_debuggerDock->hide();
+    } else {
+        m_debuggerDock->show();
+        m_debuggerWidget->updateCPUState();
+        m_debuggerWidget->updateMemoryView();
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
