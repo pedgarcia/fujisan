@@ -709,6 +709,16 @@ void MainWindow::loadInitialSettings()
     m_emulator->setAltirraOSEnabled(altirraOSEnabled);
     m_emulator->enableAudio(audioEnabled);
     
+    // Load ROM paths
+    QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
+    QString osRomPath = settings.value(osRomKey, "").toString();
+    QString basicRomPath = settings.value("machine/basicRom", "").toString();
+    
+    m_emulator->setOSRomPath(osRomPath);
+    m_emulator->setBasicRomPath(basicRomPath);
+    
+    qDebug() << "ROM paths - OS:" << osRomPath << "BASIC:" << basicRomPath;
+    
     // Load and apply media settings (disk images, etc.)
     loadAndApplyMediaSettings();
     

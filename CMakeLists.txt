@@ -41,6 +41,9 @@ set(SOURCES
     src/atariemulator.cpp
     src/toggleswitch.cpp
     src/settingsdialog.cpp
+    src/configurationprofile.cpp
+    src/configurationprofilemanager.cpp
+    src/profileselectionwidget.cpp
 )
 
 set(HEADERS
@@ -49,6 +52,9 @@ set(HEADERS
     include/atariemulator.h
     include/toggleswitch.h
     include/settingsdialog.h
+    include/configurationprofile.h
+    include/configurationprofilemanager.h
+    include/profileselectionwidget.h
 )
 
 # Create executable

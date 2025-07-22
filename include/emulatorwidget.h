@@ -36,6 +36,7 @@ private slots:
 
 private:
     void updateScreenTexture();
+    QRect calculateDisplayRect() const;
     
     AtariEmulator* m_emulator;
     QImage m_screenImage;

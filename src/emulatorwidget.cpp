@@ -48,8 +48,11 @@ void EmulatorWidget::paintEvent(QPaintEvent *event)
         m_needsUpdate = false;
     }
     
-    // Fill the entire widget area with the emulator display
-    QRect targetRect(0, 0, width(), height());
+    // Fill widget background with black (overscan area)
+    painter.fillRect(rect(), Qt::black);
+    
+    // Calculate authentic Atari display area with proper aspect ratio
+    QRect targetRect = calculateDisplayRect();
     
     // Use nearest neighbor scaling for crisp pixels
     painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
@@ -131,4 +134,50 @@ void EmulatorWidget::mousePressEvent(QMouseEvent *event)
     // Grab focus when clicked
     setFocus();
     QWidget::mousePressEvent(event);
+}
+
+QRect EmulatorWidget::calculateDisplayRect() const
+{
+    // Get current video system from emulator to apply correct pixel aspect ratio
+    double pixelAspectRatio = 1.0; // Default to square pixels
+    
+    if (m_emulator) {
+        QString videoSystem = m_emulator->getVideoSystem();
+        
+        if (videoSystem == "-ntsc") {
+            // NTSC: Compensates for 14.31818 MHz actual vs ideal 12+3/11 MHz pixel clock
+            pixelAspectRatio = (12.0 + 3.0/11.0) / 14.31818; // ≈ 0.857
+        } else if (videoSystem == "-pal") {
+            // PAL: Use similar compression as NTSC for consistent appearance
+            // Both NTSC and PAL target 4:3 TVs, so should look very similar
+            pixelAspectRatio = 0.87; // Slightly less compression than NTSC
+        }
+    }
+    
+    // Apply pixel aspect ratio correction to source dimensions
+    const double correctedWidth = DISPLAY_WIDTH * pixelAspectRatio;
+    const double correctedHeight = DISPLAY_HEIGHT;
+    
+    // Get available widget dimensions  
+    const int widgetWidth = width();
+    const int widgetHeight = height();
+    
+    // Calculate scaling to fit within widget while preserving aspect ratio
+    const double scaleX = widgetWidth / correctedWidth;
+    const double scaleY = widgetHeight / correctedHeight;
+    const double scale = qMin(scaleX, scaleY);
+    
+    // Apply overscan factor for authentic CRT borders
+    const double overscanFactor = 0.90;
+    const double finalScale = scale * overscanFactor;
+    
+    // Calculate final display dimensions
+    const int displayWidth = static_cast<int>(correctedWidth * finalScale);
+    const int displayHeight = static_cast<int>(correctedHeight * finalScale);
+    
+    // Center the display within the widget
+    const int x = (widgetWidth - displayWidth) / 2;
+    const int y = (widgetHeight - displayHeight) / 2;
+    
+    return QRect(x, y, displayWidth, displayHeight);
 }

@@ -25,6 +25,8 @@
 #include <QSlider>
 #include <QSettings>
 #include "atariemulator.h"
+#include "configurationprofilemanager.h"
+#include "profileselectionwidget.h"
 
 class SettingsDialog : public QDialog
 {
@@ -51,6 +53,11 @@ private slots:
     void browseCartridge2();
     void onMachineTypeChanged();
     void onAltirraOSChanged();
+    
+    // Profile management slots
+    void onProfileChangeRequested(const QString& profileName);
+    void onSaveCurrentProfile(const QString& profileName);
+    void onLoadProfile(const QString& profileName);
 
 private:
     void createHardwareTab();
@@ -66,10 +73,19 @@ private:
     void setupFilePathTooltip(QLineEdit* lineEdit);
     void populateCartridgeTypes(QComboBox* combo);
     
+    // Profile management
+    ConfigurationProfile getCurrentUIState() const;
+    void loadProfileToUI(const ConfigurationProfile& profile);
+    void createProfileSection();
+    
     AtariEmulator* m_emulator;
     QTabWidget* m_tabWidget;
     QDialogButtonBox* m_buttonBox;
     QPushButton* m_defaultsButton;
+    
+    // Profile management
+    ConfigurationProfileManager* m_profileManager;
+    ProfileSelectionWidget* m_profileWidget;
     
     // Hardware Configuration controls
     QWidget* m_hardwareTab;

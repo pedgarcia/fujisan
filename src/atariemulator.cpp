@@ -59,8 +59,11 @@ bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machi
         argList << "-nosound";
     }
     
+    qDebug() << "Altirra OS enabled:" << m_altirraOSEnabled;
+    
     if (m_altirraOSEnabled) {
         // Use built-in Altirra ROMs
+        qDebug() << "Using Altirra OS ROMs";
         if (machineType == "-5200") {
             argList << "-5200-rev" << "altirra";
         } else if (machineType == "-atari") {
@@ -76,19 +79,26 @@ bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machi
             argList << "-nobasic";
         }
     } else {
-        // Use original Atari ROMs
-        if (machineType == "-5200") {
-            argList << "-5200_rom";
-            argList << "/Applications/Emulators/roms/atari/atari5200.rom";
+        // Use original Atari ROMs from user-specified paths or defaults
+        qDebug() << "Using original Atari OS ROMs from user settings";
+        
+        // Only add ROM paths if they are specified in settings
+        if (!m_osRomPath.isEmpty()) {
+            if (machineType == "-5200") {
+                argList << "-5200_rom" << m_osRomPath;
+            } else {
+                argList << "-xlxe_rom" << m_osRomPath;
+            }
         } else {
-            // Use XL/XE ROM for all 8-bit machines (400/800, XL, XE)
-            argList << "-xlxe_rom";
-            argList << "/Applications/Emulators/roms/atari/atarixl.rom";
+            qDebug() << "Warning: No OS ROM path specified, emulator may not start properly";
         }
         
         if (basicEnabled) {
-            argList << "-basic_rom";
-            argList << "/Applications/Emulators/roms/atari/ataribas.rom";
+            if (!m_basicRomPath.isEmpty()) {
+                argList << "-basic_rom" << m_basicRomPath;
+            } else {
+                qDebug() << "Warning: No BASIC ROM path specified";
+            }
             argList << "-basic";  // Actually enable BASIC mode
         } else {
             argList << "-nobasic";

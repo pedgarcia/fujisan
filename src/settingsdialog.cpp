@@ -15,6 +15,8 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     , m_tabWidget(nullptr)
     , m_buttonBox(nullptr)
     , m_defaultsButton(nullptr)
+    , m_profileManager(nullptr)
+    , m_profileWidget(nullptr)
     , m_hardwareTab(nullptr)
     , m_machineTypeCombo(nullptr)
     , m_videoSystemCombo(nullptr)
@@ -33,6 +35,13 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     
     // Create main layout
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    
+    // Initialize profile management
+    m_profileManager = new ConfigurationProfileManager(this);
+    
+    // Create profile selection section
+    createProfileSection();
+    mainLayout->addWidget(m_profileWidget);
     
     // Create tab widget
     m_tabWidget = new QTabWidget();
@@ -2198,4 +2207,344 @@ void SettingsDialog::restoreDefaults()
     
     // Update PAL/NTSC dependent controls
     updateVideoSystemDependentControls();
+}
+
+// Profile management implementation
+void SettingsDialog::createProfileSection()
+{
+    m_profileWidget = new ProfileSelectionWidget(m_profileManager, this);
+    
+    // Connect profile signals
+    connect(m_profileWidget, &ProfileSelectionWidget::profileChangeRequested,
+            this, &SettingsDialog::onProfileChangeRequested);
+    connect(m_profileWidget, &ProfileSelectionWidget::saveCurrentProfile,
+            this, &SettingsDialog::onSaveCurrentProfile);
+    connect(m_profileWidget, &ProfileSelectionWidget::loadProfile,
+            this, &SettingsDialog::onLoadProfile);
+}
+
+void SettingsDialog::onProfileChangeRequested(const QString& profileName)
+{
+    // Update profile manager's current profile
+    m_profileManager->setCurrentProfileName(profileName);
+    qDebug() << "Profile selection changed to:" << profileName;
+}
+
+void SettingsDialog::onSaveCurrentProfile(const QString& profileName)
+{
+    ConfigurationProfile profile = getCurrentUIState();
+    profile.name = profileName;
+    profile.description = QString("Saved on %1").arg(QDateTime::currentDateTime().toString("MMM dd, yyyy"));
+    
+    bool success = m_profileManager->saveProfile(profileName, profile);
+    if (success) {
+        qDebug() << "Profile saved successfully:" << profileName;
+    } else {
+        qWarning() << "Failed to save profile:" << profileName;
+    }
+}
+
+void SettingsDialog::onLoadProfile(const QString& profileName)
+{
+    ConfigurationProfile profile = m_profileManager->loadProfile(profileName);
+    if (profile.isValid()) {
+        loadProfileToUI(profile);
+        m_profileManager->setCurrentProfileName(profileName);
+        qDebug() << "Profile loaded successfully:" << profileName;
+    } else {
+        qWarning() << "Failed to load profile:" << profileName;
+    }
+}
+
+ConfigurationProfile SettingsDialog::getCurrentUIState() const
+{
+    ConfigurationProfile profile;
+    
+    // Machine Configuration
+    profile.machineType = m_machineTypeCombo->currentData().toString();
+    profile.videoSystem = m_videoSystemCombo->currentData().toString();
+    profile.basicEnabled = m_basicEnabledCheck->isChecked();
+    profile.altirraOSEnabled = m_altirraOSCheck->isChecked();
+    profile.osRomPath = m_osRomPath->text();
+    profile.basicRomPath = m_basicRomPath->text();
+    
+    // Memory Configuration
+    profile.enable800Ram = m_enable800RamCheck->isChecked();
+    profile.mosaicSize = m_mosaicSizeSpinBox->value();
+    profile.axlonSize = m_axlonSizeSpinBox->value();
+    profile.axlonShadow = m_axlonShadowCheck->isChecked();
+    profile.enableMapRam = m_enableMapRamCheck->isChecked();
+    
+    // Performance
+    profile.turboMode = m_turboModeCheck->isChecked();
+    profile.emulationSpeedIndex = m_speedSlider->value();
+    
+    // Audio Configuration
+    profile.audioEnabled = m_soundEnabled->isChecked();
+    profile.audioFrequency = m_audioFrequency->currentData().toInt();
+    profile.audioBits = m_audioBits->currentData().toInt();
+    profile.audioVolume = m_volumeSlider->value();
+    profile.audioBufferLength = m_bufferLengthSpinBox->value();
+    profile.audioLatency = m_audioLatencySpinBox->value();
+    profile.consoleSound = m_consoleSound->isChecked();
+    profile.serialSound = m_serialSound->isChecked();
+    profile.stereoPokey = m_stereoPokey->isChecked();
+    
+    // Video Configuration
+    profile.artifactingMode = m_artifactingMode->currentData().toString();
+    profile.showFPS = m_showFPS->isChecked();
+    profile.scalingFilter = m_scalingFilter->isChecked();
+    profile.keepAspectRatio = m_keepAspectRatio->isChecked();
+    profile.fullscreenMode = m_fullscreenMode->isChecked();
+    
+    // Color Settings
+    profile.palSaturation = m_palSaturationSlider->value();
+    profile.palContrast = m_palContrastSlider->value();
+    profile.palBrightness = m_palBrightnessSlider->value();
+    profile.palGamma = m_palGammaSlider->value();
+    profile.palTint = m_palTintSlider->value();
+    
+    profile.ntscSaturation = m_ntscSaturationSlider->value();
+    profile.ntscContrast = m_ntscContrastSlider->value();
+    profile.ntscBrightness = m_ntscBrightnessSlider->value();
+    profile.ntscGamma = m_ntscGammaSlider->value();
+    profile.ntscTint = m_ntscTintSlider->value();
+    
+    // Input Configuration
+    profile.joystickEnabled = m_joystickEnabled->isChecked();
+    profile.joystick0Hat = m_joystick0Hat->isChecked();
+    profile.joystick1Hat = m_joystick1Hat->isChecked();
+    profile.joystick2Hat = m_joystick2Hat->isChecked();
+    profile.joystick3Hat = m_joystick3Hat->isChecked();
+    profile.joyDistinct = m_joyDistinct->isChecked();
+    profile.kbdJoy0Enabled = m_kbdJoy0Enabled->isChecked();
+    profile.kbdJoy1Enabled = m_kbdJoy1Enabled->isChecked();
+    profile.grabMouse = m_grabMouse->isChecked();
+    profile.mouseDevice = m_mouseDevice->text();
+    profile.keyboardToggle = m_keyboardToggle->isChecked();
+    profile.keyboardLeds = m_keyboardLeds->isChecked();
+    
+    // Cartridge Configuration
+    profile.primaryCartridge.enabled = m_cartridgeEnabledCheck->isChecked();
+    profile.primaryCartridge.path = m_cartridgePath->text();
+    profile.primaryCartridge.type = m_cartridgeTypeCombo->currentData().toInt();
+    profile.piggybackCartridge.enabled = m_cartridge2EnabledCheck->isChecked();
+    profile.piggybackCartridge.path = m_cartridge2Path->text();
+    profile.piggybackCartridge.type = m_cartridge2TypeCombo->currentData().toInt();
+    profile.cartridgeAutoReboot = m_cartridgeAutoRebootCheck->isChecked();
+    
+    // Disk Configuration
+    for (int i = 0; i < 8; i++) {
+        profile.disks[i].enabled = m_diskEnabled[i]->isChecked();
+        profile.disks[i].path = m_diskPath[i]->text();
+        profile.disks[i].readOnly = m_diskReadOnly[i]->isChecked();
+    }
+    
+    // Cassette Configuration
+    profile.cassette.enabled = m_cassetteEnabled->isChecked();
+    profile.cassette.path = m_cassettePath->text();
+    profile.cassette.readOnly = m_cassetteReadOnly->isChecked();
+    profile.cassette.bootTape = m_cassetteBootTape->isChecked();
+    
+    // Hard Drive Configuration
+    for (int i = 0; i < 4; i++) {
+        profile.hardDrives[i].enabled = m_hdEnabled[i]->isChecked();
+        profile.hardDrives[i].path = m_hdPath[i]->text();
+    }
+    profile.hdReadOnly = m_hdReadOnly->isChecked();
+    profile.hdDeviceName = m_hdDeviceName->text();
+    
+    // Special Devices
+    profile.rDeviceName = m_rDeviceName->text();
+    profile.netSIOEnabled = m_netSIOEnabled->isChecked();
+    profile.rtimeEnabled = m_rtimeEnabled->isChecked();
+    
+    // Hardware Extensions
+    profile.xep80Enabled = m_xep80Enabled->isChecked();
+    profile.af80Enabled = m_af80Enabled->isChecked();
+    profile.bit3Enabled = m_bit3Enabled->isChecked();
+    profile.atari1400Enabled = m_atari1400Enabled->isChecked();
+    profile.atari1450Enabled = m_atari1450Enabled->isChecked();
+    profile.proto80Enabled = m_proto80Enabled->isChecked();
+    profile.voiceboxEnabled = m_voiceboxEnabled->isChecked();
+    profile.sioAcceleration = m_sioAcceleration->isChecked();
+    
+    return profile;
+}
+
+void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
+{
+    // Block signals to prevent cascading updates
+    const bool wasBlocked = blockSignals(true);
+    
+    // Machine Configuration
+    for (int i = 0; i < m_machineTypeCombo->count(); ++i) {
+        if (m_machineTypeCombo->itemData(i).toString() == profile.machineType) {
+            m_machineTypeCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    for (int i = 0; i < m_videoSystemCombo->count(); ++i) {
+        if (m_videoSystemCombo->itemData(i).toString() == profile.videoSystem) {
+            m_videoSystemCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_basicEnabledCheck->setChecked(profile.basicEnabled);
+    m_altirraOSCheck->setChecked(profile.altirraOSEnabled);
+    m_osRomPath->setText(profile.osRomPath);
+    m_basicRomPath->setText(profile.basicRomPath);
+    
+    // Memory Configuration
+    m_enable800RamCheck->setChecked(profile.enable800Ram);
+    m_mosaicSizeSpinBox->setValue(profile.mosaicSize);
+    m_axlonSizeSpinBox->setValue(profile.axlonSize);
+    m_axlonShadowCheck->setChecked(profile.axlonShadow);
+    m_enableMapRamCheck->setChecked(profile.enableMapRam);
+    
+    // Performance
+    m_turboModeCheck->setChecked(profile.turboMode);
+    m_speedSlider->setValue(profile.emulationSpeedIndex);
+    
+    // Audio Configuration
+    m_soundEnabled->setChecked(profile.audioEnabled);
+    
+    for (int i = 0; i < m_audioFrequency->count(); ++i) {
+        if (m_audioFrequency->itemData(i).toInt() == profile.audioFrequency) {
+            m_audioFrequency->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    for (int i = 0; i < m_audioBits->count(); ++i) {
+        if (m_audioBits->itemData(i).toInt() == profile.audioBits) {
+            m_audioBits->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_volumeSlider->setValue(profile.audioVolume);
+    m_volumeLabel->setText(QString("%1%").arg(profile.audioVolume));
+    m_bufferLengthSpinBox->setValue(profile.audioBufferLength);
+    m_audioLatencySpinBox->setValue(profile.audioLatency);
+    m_consoleSound->setChecked(profile.consoleSound);
+    m_serialSound->setChecked(profile.serialSound);
+    m_stereoPokey->setChecked(profile.stereoPokey);
+    
+    // Video Configuration
+    for (int i = 0; i < m_artifactingMode->count(); ++i) {
+        if (m_artifactingMode->itemData(i).toString() == profile.artifactingMode) {
+            m_artifactingMode->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_showFPS->setChecked(profile.showFPS);
+    m_scalingFilter->setChecked(profile.scalingFilter);
+    m_keepAspectRatio->setChecked(profile.keepAspectRatio);
+    m_fullscreenMode->setChecked(profile.fullscreenMode);
+    
+    // Color Settings
+    m_palSaturationSlider->setValue(profile.palSaturation);
+    m_palSaturationLabel->setText(QString::number(profile.palSaturation));
+    m_palContrastSlider->setValue(profile.palContrast);
+    m_palContrastLabel->setText(QString::number(profile.palContrast));
+    m_palBrightnessSlider->setValue(profile.palBrightness);
+    m_palBrightnessLabel->setText(QString::number(profile.palBrightness));
+    m_palGammaSlider->setValue(profile.palGamma);
+    m_palGammaLabel->setText(QString::number(profile.palGamma));
+    m_palTintSlider->setValue(profile.palTint);
+    m_palTintLabel->setText(QString::number(profile.palTint));
+    
+    m_ntscSaturationSlider->setValue(profile.ntscSaturation);
+    m_ntscSaturationLabel->setText(QString::number(profile.ntscSaturation));
+    m_ntscContrastSlider->setValue(profile.ntscContrast);
+    m_ntscContrastLabel->setText(QString::number(profile.ntscContrast));
+    m_ntscBrightnessSlider->setValue(profile.ntscBrightness);
+    m_ntscBrightnessLabel->setText(QString::number(profile.ntscBrightness));
+    m_ntscGammaSlider->setValue(profile.ntscGamma);
+    m_ntscGammaLabel->setText(QString::number(profile.ntscGamma));
+    m_ntscTintSlider->setValue(profile.ntscTint);
+    m_ntscTintLabel->setText(QString::number(profile.ntscTint));
+    
+    // Input Configuration
+    m_joystickEnabled->setChecked(profile.joystickEnabled);
+    m_joystick0Hat->setChecked(profile.joystick0Hat);
+    m_joystick1Hat->setChecked(profile.joystick1Hat);
+    m_joystick2Hat->setChecked(profile.joystick2Hat);
+    m_joystick3Hat->setChecked(profile.joystick3Hat);
+    m_joyDistinct->setChecked(profile.joyDistinct);
+    m_kbdJoy0Enabled->setChecked(profile.kbdJoy0Enabled);
+    m_kbdJoy1Enabled->setChecked(profile.kbdJoy1Enabled);
+    m_grabMouse->setChecked(profile.grabMouse);
+    m_mouseDevice->setText(profile.mouseDevice);
+    m_keyboardToggle->setChecked(profile.keyboardToggle);
+    m_keyboardLeds->setChecked(profile.keyboardLeds);
+    
+    // Cartridge Configuration
+    m_cartridgeEnabledCheck->setChecked(profile.primaryCartridge.enabled);
+    m_cartridgePath->setText(profile.primaryCartridge.path);
+    for (int i = 0; i < m_cartridgeTypeCombo->count(); ++i) {
+        if (m_cartridgeTypeCombo->itemData(i).toInt() == profile.primaryCartridge.type) {
+            m_cartridgeTypeCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_cartridge2EnabledCheck->setChecked(profile.piggybackCartridge.enabled);
+    m_cartridge2Path->setText(profile.piggybackCartridge.path);
+    for (int i = 0; i < m_cartridge2TypeCombo->count(); ++i) {
+        if (m_cartridge2TypeCombo->itemData(i).toInt() == profile.piggybackCartridge.type) {
+            m_cartridge2TypeCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_cartridgeAutoRebootCheck->setChecked(profile.cartridgeAutoReboot);
+    
+    // Disk Configuration
+    for (int i = 0; i < 8; i++) {
+        m_diskEnabled[i]->setChecked(profile.disks[i].enabled);
+        m_diskPath[i]->setText(profile.disks[i].path);
+        m_diskReadOnly[i]->setChecked(profile.disks[i].readOnly);
+    }
+    
+    // Cassette Configuration
+    m_cassetteEnabled->setChecked(profile.cassette.enabled);
+    m_cassettePath->setText(profile.cassette.path);
+    m_cassetteReadOnly->setChecked(profile.cassette.readOnly);
+    m_cassetteBootTape->setChecked(profile.cassette.bootTape);
+    
+    // Hard Drive Configuration
+    for (int i = 0; i < 4; i++) {
+        m_hdEnabled[i]->setChecked(profile.hardDrives[i].enabled);
+        m_hdPath[i]->setText(profile.hardDrives[i].path);
+    }
+    m_hdReadOnly->setChecked(profile.hdReadOnly);
+    m_hdDeviceName->setText(profile.hdDeviceName);
+    
+    // Special Devices
+    m_rDeviceName->setText(profile.rDeviceName);
+    m_netSIOEnabled->setChecked(profile.netSIOEnabled);
+    m_rtimeEnabled->setChecked(profile.rtimeEnabled);
+    
+    // Hardware Extensions
+    m_xep80Enabled->setChecked(profile.xep80Enabled);
+    m_af80Enabled->setChecked(profile.af80Enabled);
+    m_bit3Enabled->setChecked(profile.bit3Enabled);
+    m_atari1400Enabled->setChecked(profile.atari1400Enabled);
+    m_atari1450Enabled->setChecked(profile.atari1450Enabled);
+    m_proto80Enabled->setChecked(profile.proto80Enabled);
+    m_voiceboxEnabled->setChecked(profile.voiceboxEnabled);
+    m_sioAcceleration->setChecked(profile.sioAcceleration);
+    
+    // Restore signal blocking state
+    blockSignals(wasBlocked);
+    
+    // Update dependent controls
+    updateVideoSystemDependentControls();
+    
+    qDebug() << "Profile loaded to UI successfully";
 }

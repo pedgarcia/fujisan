@@ -90,6 +90,12 @@ public:
     QString getVideoSystem() const { return m_videoSystem; }
     void setVideoSystem(const QString& videoSystem) { m_videoSystem = videoSystem; }
     
+    QString getOSRomPath() const { return m_osRomPath; }
+    void setOSRomPath(const QString& path) { m_osRomPath = path; }
+    
+    QString getBasicRomPath() const { return m_basicRomPath; }
+    void setBasicRomPath(const QString& path) { m_basicRomPath = path; }
+    
     float getTargetFPS() const { return m_targetFps; }
     float getFrameTimeMs() const { return m_frameTimeMs; }
     
@@ -116,6 +122,8 @@ private:
     bool m_altirraOSEnabled = false;
     QString m_machineType = "-xl";
     QString m_videoSystem = "-pal";
+    QString m_osRomPath;
+    QString m_basicRomPath;
     float m_targetFps = 59.92f;
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;
