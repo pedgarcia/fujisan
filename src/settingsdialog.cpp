@@ -705,8 +705,6 @@ void SettingsDialog::createVideoDisplayTab()
     m_palGammaSlider->setToolTip("Adjust PAL gamma correction (0.1 to 4.0)");
     m_palTintSlider->setToolTip("Adjust PAL color tint (-180° to 180°)");
     
-    tabLayout->addWidget(m_palGroup);
-    
     // NTSC-specific settings
     m_ntscGroup = new QGroupBox("NTSC Video Options");
     QVBoxLayout* ntscLayout = new QVBoxLayout(m_ntscGroup);
@@ -902,7 +900,12 @@ void SettingsDialog::createVideoDisplayTab()
     m_ntscGammaSlider->setToolTip("Adjust NTSC gamma correction (0.1 to 4.0)");
     m_ntscTintSlider->setToolTip("Adjust NTSC color tint (-180° to 180°)");
     
-    tabLayout->addWidget(m_ntscGroup);
+    // Add PAL and NTSC group boxes side by side
+    QHBoxLayout* videoOptionsLayout = new QHBoxLayout();
+    videoOptionsLayout->addWidget(m_palGroup);
+    videoOptionsLayout->addWidget(m_ntscGroup);
+    
+    tabLayout->addLayout(videoOptionsLayout);
     tabLayout->addStretch();
 }
 
