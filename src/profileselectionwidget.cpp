@@ -13,6 +13,7 @@ ProfileSelectionWidget::ProfileSelectionWidget(ConfigurationProfileManager* mana
     , m_profileManager(manager)
     , m_groupBox(nullptr)
     , m_profileCombo(nullptr)
+    , m_saveButton(nullptr)
     , m_saveAsButton(nullptr)
     , m_loadButton(nullptr)
     , m_deleteButton(nullptr)
@@ -137,6 +138,37 @@ void ProfileSelectionWidget::onProfileComboChanged()
     }
     
     updateUI();
+}
+
+void ProfileSelectionWidget::onSaveClicked()
+{
+    QString profileName = getCurrentProfileName();
+    
+    if (profileName.isEmpty()) {
+        showErrorMessage("No Profile Selected", "Please select a profile to save to.");
+        return;
+    }
+    
+    if (profileName == "Default") {
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            this,
+            "Save to Default Profile",
+            "Are you sure you want to overwrite the Default profile with current settings?",
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No
+        );
+        
+        if (reply != QMessageBox::Yes) {
+            return;
+        }
+    }
+    
+    emit saveCurrentProfile(profileName);
+    refreshProfileList();
+    setCurrentProfileName(profileName);
+    
+    showInfoMessage("Profile Saved", QString("Profile '%1' has been updated successfully.").arg(profileName));
+    qDebug() << "Profile save requested (overwrite):" << profileName;
 }
 
 void ProfileSelectionWidget::onSaveAsClicked()
@@ -284,55 +316,65 @@ void ProfileSelectionWidget::setupUI()
     mainLayout->setContentsMargins(0, 0, 0, 0);
     
     QVBoxLayout* groupLayout = new QVBoxLayout(m_groupBox);
+    groupLayout->setSpacing(4); // Tight spacing between rows
     
-    // Profile selection row
+    // Profile selection row - dropdown takes remaining space
     QHBoxLayout* selectionLayout = new QHBoxLayout();
     
     QLabel* profileLabel = new QLabel("Profile:");
-    selectionLayout->addWidget(profileLabel);
-    
     m_profileCombo = new QComboBox();
-    m_profileCombo->setMinimumWidth(200);
     m_profileCombo->setToolTip("Select a configuration profile");
-    selectionLayout->addWidget(m_profileCombo, 1);
     
-    selectionLayout->addSpacing(10);
-    
-    m_loadButton = new QPushButton("Load");
-    m_loadButton->setToolTip("Load the selected profile");
-    m_loadButton->setMaximumWidth(60);
-    selectionLayout->addWidget(m_loadButton);
+    selectionLayout->addWidget(profileLabel);
+    selectionLayout->addWidget(m_profileCombo, 1); // Expand to fill space
     
     groupLayout->addLayout(selectionLayout);
     
-    // Profile information
-    m_descriptionLabel = new QLabel();
-    m_descriptionLabel->setStyleSheet("font-style: italic; color: #666;");
-    m_descriptionLabel->setWordWrap(true);
-    groupLayout->addWidget(m_descriptionLabel);
+    // Buttons row with description on the right - tighter spacing
+    QHBoxLayout* buttonDescLayout = new QHBoxLayout();
+    buttonDescLayout->setSpacing(4); // Reduce spacing between buttons
     
-    m_lastUsedLabel = new QLabel();
-    m_lastUsedLabel->setStyleSheet("font-size: 11px; color: #888;");
-    groupLayout->addWidget(m_lastUsedLabel);
-    
-    // Action buttons row
-    QHBoxLayout* actionLayout = new QHBoxLayout();
+    // Buttons on the left
+    m_saveButton = new QPushButton("Save");
+    m_saveButton->setToolTip("Save current settings to the selected profile");
+    buttonDescLayout->addWidget(m_saveButton);
     
     m_saveAsButton = new QPushButton("Save As...");
     m_saveAsButton->setToolTip("Save current settings as a new profile");
-    actionLayout->addWidget(m_saveAsButton);
+    buttonDescLayout->addWidget(m_saveAsButton);
+    
+    m_loadButton = new QPushButton("Load");
+    m_loadButton->setToolTip("Load the selected profile");
+    buttonDescLayout->addWidget(m_loadButton);
     
     m_renameButton = new QPushButton("Rename...");
     m_renameButton->setToolTip("Rename the selected profile");
-    actionLayout->addWidget(m_renameButton);
+    buttonDescLayout->addWidget(m_renameButton);
     
     m_deleteButton = new QPushButton("Delete");
     m_deleteButton->setToolTip("Delete the selected profile");
-    actionLayout->addWidget(m_deleteButton);
+    buttonDescLayout->addWidget(m_deleteButton);
     
-    actionLayout->addStretch();
+    buttonDescLayout->addSpacing(10); // Reduced spacing before description
     
-    groupLayout->addLayout(actionLayout);
+    // Description on the right with last used below it - tighter spacing
+    QVBoxLayout* rightInfoLayout = new QVBoxLayout();
+    rightInfoLayout->setSpacing(2); // Minimal spacing between description and last used
+    
+    m_descriptionLabel = new QLabel();
+    m_descriptionLabel->setStyleSheet("font-style: italic; color: #666;");
+    m_descriptionLabel->setWordWrap(true);
+    m_descriptionLabel->setAlignment(Qt::AlignRight);
+    rightInfoLayout->addWidget(m_descriptionLabel);
+    
+    m_lastUsedLabel = new QLabel();
+    m_lastUsedLabel->setStyleSheet("font-size: 11px; color: #888;");
+    m_lastUsedLabel->setAlignment(Qt::AlignRight);
+    rightInfoLayout->addWidget(m_lastUsedLabel);
+    
+    buttonDescLayout->addLayout(rightInfoLayout, 1); // Expand to fill space
+    
+    groupLayout->addLayout(buttonDescLayout);
 }
 
 void ProfileSelectionWidget::connectSignals()
@@ -340,6 +382,7 @@ void ProfileSelectionWidget::connectSignals()
     connect(m_profileCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ProfileSelectionWidget::onProfileComboChanged);
     
+    connect(m_saveButton, &QPushButton::clicked, this, &ProfileSelectionWidget::onSaveClicked);
     connect(m_saveAsButton, &QPushButton::clicked, this, &ProfileSelectionWidget::onSaveAsClicked);
     connect(m_loadButton, &QPushButton::clicked, this, &ProfileSelectionWidget::onLoadClicked);
     connect(m_deleteButton, &QPushButton::clicked, this, &ProfileSelectionWidget::onDeleteClicked);
@@ -359,6 +402,12 @@ void ProfileSelectionWidget::updateButtonStates()
     bool isDefault = (currentProfile == "Default");
     bool profileExists = hasProfile && m_profileManager->profileExists(currentProfile);
     
+    // Save button: enabled if profile exists (can overwrite existing profile)
+    m_saveButton->setEnabled(profileExists);
+    
+    // Save As button: always enabled (saves current settings)
+    m_saveAsButton->setEnabled(true);
+    
     // Load button: enabled if profile exists
     m_loadButton->setEnabled(profileExists);
     
@@ -367,9 +416,6 @@ void ProfileSelectionWidget::updateButtonStates()
     
     // Rename button: enabled if not Default and profile exists
     m_renameButton->setEnabled(profileExists && !isDefault);
-    
-    // Save As button: always enabled (saves current settings)
-    m_saveAsButton->setEnabled(true);
 }
 
 bool ProfileSelectionWidget::confirmDeleteProfile(const QString& profileName)

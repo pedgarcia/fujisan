@@ -263,81 +263,8 @@ void ConfigurationProfileManager::createDefaultProfilesIfNeeded()
         saveProfile("Default", defaultProfile);
         qDebug() << "Created Default profile";
     }
-    
-    // Create example Gaming profile if it doesn't exist
-    if (!profileExists("Gaming Setup")) {
-        ConfigurationProfile gamingProfile = createGamingProfile();
-        saveProfile("Gaming Setup", gamingProfile);
-        qDebug() << "Created Gaming Setup profile";
-    }
-    
-    // Create example Development profile if it doesn't exist
-    if (!profileExists("Development")) {
-        ConfigurationProfile devProfile = createDevelopmentProfile();
-        saveProfile("Development", devProfile);
-        qDebug() << "Created Development profile";
-    }
 }
 
-ConfigurationProfile ConfigurationProfileManager::createGamingProfile() const
-{
-    ConfigurationProfile profile = createDefaultProfile("Gaming Setup", "Optimized for gaming");
-    
-    // Gaming-optimized settings
-    profile.machineType = "-xl";           // Popular gaming machine
-    profile.videoSystem = "-ntsc";         // Common for games
-    profile.basicEnabled = false;          // Games usually don't need BASIC
-    profile.altirraOSEnabled = true;       // Use built-in OS
-    
-    // Performance settings for gaming
-    profile.turboMode = false;             // Normal speed for authentic feel
-    profile.emulationSpeedIndex = 1;       // 1x speed
-    
-    // Audio settings
-    profile.audioEnabled = true;
-    profile.audioVolume = 90;              // Higher volume for gaming
-    profile.consoleSound = true;           // Enable all sounds
-    profile.serialSound = true;
-    
-    // Video settings
-    profile.artifactingMode = "ntsc-new";  // NTSC artifacts for authentic look
-    profile.scalingFilter = true;
-    profile.keepAspectRatio = true;
-    
-    return profile;
-}
-
-ConfigurationProfile ConfigurationProfileManager::createDevelopmentProfile() const
-{
-    ConfigurationProfile profile = createDefaultProfile("Development", "Setup for programming and development");
-    
-    // Development-oriented settings
-    profile.machineType = "-xe";           // 130XE for more memory
-    profile.videoSystem = "-pal";          // PAL for development
-    profile.basicEnabled = true;           // Enable BASIC for programming
-    profile.altirraOSEnabled = true;       // Use built-in OS
-    
-    // Memory expansions for development
-    profile.enableMapRam = true;
-    
-    // Performance settings
-    profile.turboMode = false;             // Normal speed
-    profile.emulationSpeedIndex = 1;       // 1x speed
-    
-    // Audio settings - quieter for concentration
-    profile.audioEnabled = true;
-    profile.audioVolume = 50;              // Lower volume
-    profile.consoleSound = false;          // Disable keyboard clicks
-    
-    // Video settings
-    profile.artifactingMode = "none";      // Clean display for text
-    profile.showFPS = true;                // Show performance info
-    
-    // Enable SIO acceleration for faster disk access
-    profile.sioAcceleration = true;
-    
-    return profile;
-}
 
 void ConfigurationProfileManager::refreshProfileList()
 {

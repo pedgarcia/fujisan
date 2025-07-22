@@ -46,8 +46,6 @@ public:
     
     // Default profiles
     void createDefaultProfilesIfNeeded();
-    ConfigurationProfile createGamingProfile() const;
-    ConfigurationProfile createDevelopmentProfile() const;
     
 signals:
     void profileChanged(const QString& profileName);

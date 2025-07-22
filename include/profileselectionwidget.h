@@ -44,6 +44,7 @@ public slots:
 
 private slots:
     void onProfileComboChanged();
+    void onSaveClicked();
     void onSaveAsClicked();
     void onLoadClicked();
     void onDeleteClicked();
@@ -63,6 +64,7 @@ private:
     // UI components
     QGroupBox* m_groupBox;
     QComboBox* m_profileCombo;
+    QPushButton* m_saveButton;
     QPushButton* m_saveAsButton;
     QPushButton* m_loadButton;
     QPushButton* m_deleteButton;
