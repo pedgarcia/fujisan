@@ -166,7 +166,10 @@ private:
     // PAL-specific controls
     QGroupBox* m_palGroup;
     QComboBox* m_palBlending;
-    QCheckBox* m_palScanlines;
+    // FUTURE: Universal scanlines controls (commented out - not working)
+    // QSlider* m_scanlinesSlider;
+    // QLabel* m_scanlinesLabel;
+    // QCheckBox* m_scanlinesInterpolation;
     QSlider* m_palSaturationSlider;
     QLabel* m_palSaturationLabel;
     QSlider* m_palContrastSlider;
@@ -180,7 +183,7 @@ private:
     
     // NTSC-specific controls  
     QGroupBox* m_ntscGroup;
-    QComboBox* m_ntscArtifacting;
+    // QComboBox* m_ntscArtifacting;  // Now handled by main artifacting dropdown
     QCheckBox* m_ntscSharpness;
     QSlider* m_ntscSaturationSlider;
     QLabel* m_ntscSaturationLabel;

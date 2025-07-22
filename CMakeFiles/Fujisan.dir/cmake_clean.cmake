@@ -1,0 +1,36 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/Fujisan_autogen.dir/AutogenUsed.txt"
+  "CMakeFiles/Fujisan_autogen.dir/ParseCache.txt"
+  "Fujisan_autogen"
+  "CMakeFiles/Fujisan.dir/Fujisan_autogen/mocs_compilation.cpp.o"
+  "CMakeFiles/Fujisan.dir/Fujisan_autogen/mocs_compilation.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/atariemulator.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/atariemulator.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/configurationprofile.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/configurationprofile.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/configurationprofilemanager.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/configurationprofilemanager.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/emulatorwidget.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/emulatorwidget.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/main.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/main.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/profileselectionwidget.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/profileselectionwidget.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/settingsdialog.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/settingsdialog.cpp.o.d"
+  "CMakeFiles/Fujisan.dir/src/toggleswitch.cpp.o"
+  "CMakeFiles/Fujisan.dir/src/toggleswitch.cpp.o.d"
+  "Fujisan"
+  "Fujisan.pdb"
+  "Fujisan_autogen/mocs_compilation.cpp"
+  "Fujisan_autogen/timestamp"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/Fujisan.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

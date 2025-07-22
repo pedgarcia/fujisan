@@ -529,9 +529,14 @@ void MainWindow::restartEmulator()
 {
     m_emulator->shutdown();
     
+    // Load artifact settings from preferences
+    QSettings settings("8bitrelics", "Fujisan");
+    QString artifactMode = settings.value("video/artifacting", "none").toString();
+    
     if (m_emulator->initializeWithConfig(m_emulator->isBasicEnabled(), 
                                        m_emulator->getMachineType(), 
-                                       m_emulator->getVideoSystem())) {
+                                       m_emulator->getVideoSystem(),
+                                       artifactMode)) {
         QString message = QString("Emulator restarted: %1 %2 with BASIC %3")
                          .arg(m_emulator->getMachineType())
                          .arg(m_emulator->getVideoSystem())
@@ -732,12 +737,13 @@ void MainWindow::loadInitialSettings()
     bool basicEnabled = settings.value("machine/basicEnabled", true).toBool();
     bool altirraOSEnabled = settings.value("machine/altirraOS", false).toBool();
     bool audioEnabled = settings.value("audio/enabled", true).toBool();
+    QString artifactMode = settings.value("video/artifacting", "none").toString();
     
     qDebug() << "Loading initial settings - Machine:" << machineType 
-             << "Video:" << videoSystem << "BASIC:" << basicEnabled;
+             << "Video:" << videoSystem << "BASIC:" << basicEnabled << "Artifacts:" << artifactMode;
     
     // Initialize emulator with loaded settings
-    if (!m_emulator->initializeWithConfig(basicEnabled, machineType, videoSystem)) {
+    if (!m_emulator->initializeWithConfig(basicEnabled, machineType, videoSystem, artifactMode)) {
         QMessageBox::critical(this, "Error", "Failed to initialize Atari800 emulator");
         QApplication::quit();
         return;

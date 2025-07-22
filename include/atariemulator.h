@@ -41,6 +41,21 @@ extern "C" {
     extern Colours_setup_t COLOURS_NTSC_setup;
     extern Colours_setup_t COLOURS_PAL_setup;
     extern void Colours_Update(void);
+    // Artifact functions
+    #include "artifact.h"
+    extern void ARTIFACT_Set(ARTIFACT_t mode);
+    // FUTURE: TV Scanlines Implementation Notes
+    // 
+    // Scanlines are currently not working. Investigation needed:
+    // 1. Command line parameters (-scanlines, -scanlinesint) don't work with current atari800 build
+    // 2. May require full SDL2 build instead of libatari800 (minimal library)
+    // 3. Possible alternatives:
+    //    - Build atari800 with --with-sdl2 --with-opengl flags
+    //    - Implement client-side Qt overlay using QPainter with scanline effect
+    //    - Use different atari800 parameters or build configuration
+    //    - Investigate if specific SDL video features need to be enabled
+    //
+    // Current status: All scanlines code commented out until proper implementation found
     // Speed control variables
     extern int Atari800_turbo;
     extern int Atari800_turbo_speed;
@@ -58,6 +73,9 @@ public:
     bool initialize();
     bool initializeWithBasic(bool basicEnabled);
     bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem);
+    bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode);
+    // FUTURE: Scanlines support (commented out - not working with current atari800 build)
+    // bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode, int scanlinesPercentage, bool scanlinesInterpolation);
     void shutdown();
     
     const unsigned char* getScreen();
@@ -103,6 +121,9 @@ public:
     void updateColorSettings(bool isPal, double saturation, double contrast, double brightness, double gamma, double hue);
     void updatePalColorSettings(double saturation, double contrast, double brightness, double gamma, double hue);
     void updateNtscColorSettings(double saturation, double contrast, double brightness, double gamma, double hue);
+    void updateArtifactSettings(const QString& artifactMode);
+    // FUTURE: Scanlines methods (commented out - not working)
+    // bool needsScanlineRestart() const;
     
     // Speed control
     void setEmulationSpeed(int percentage);

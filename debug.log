@@ -1,0 +1,67 @@
+Starting Fujisan...
+qt.qpa.fonts: Populating font family aliases took 131 ms. Replace uses of missing font family "Courier" with one that exists to avoid this cost. 
+Loading initial settings - Machine: "-xe" Video: "-ntsc" BASIC: true Artifacts: "none"
+Artifact mode requested: "none"
+Altirra OS enabled: false
+Using original Atari OS ROMs from user settings
+Warning: No OS ROM path specified, emulator may not start properly
+Warning: No BASIC ROM path specified
+Emulator initialized with: "atari800 -xe -ntsc -sound -dsprate 44100 -audio16 -volume 80 -speaker -basic"
+Target FPS: 59.9227 Frame time: 16.6882 ms
+Setting up audio output...
+Audio config - Frequency: 44100 Hz, Channels: 1 Sample size: 2 bytes
+Using audio format - Rate: 44100 Channels: 1 Sample size: 16
+Audio output started successfully
+ROM paths - OS: "/Applications/Emulators/roms/atari/atarixl.rom" BASIC: "/Applications/Emulators/roms/atari/ataribas.rom"
+Loading and applying media settings...
+"Auto-mounting D1: /Users/pgarcia/Downloads/Prince_of_Persia/Prince of Persia + DD.atr (read-only: 1)"
+Attempting to mount "/Users/pgarcia/Downloads/Prince_of_Persia/Prince of Persia + DD.atr" to drive D 1 :
+libatari800_mount_disk_image returned: 1
+Successfully mounted "/Users/pgarcia/Downloads/Prince_of_Persia/Prince of Persia + DD.atr" to drive D 1 : (read-only)
+Disk should now be accessible from the emulated Atari
+"Successfully auto-mounted D1:"
+Media settings loaded and applied
+Toolbar updated - Machine: "-xe" BASIC: true Video: "-ntsc"
+Video settings loaded - Keep aspect ratio: false Start fullscreen: false
+Fujisan initialized successfully
+EmulatorWidget gained focus
+Audio underrun # 1 : 1228 of 1472 bytes
+Audio underrun # 101 : 1108 of 1472 bytes
+EmulatorWidget gained focus
+Key pressed: 16777249 modifiers: QFlags<Qt::KeyboardModifier>(ControlModifier) Ctrl: true Shift: false Meta: false ControlKey: true
+Key released - clearing input
+Audio underrun # 201 : 1228 of 1472 bytes
+EmulatorWidget gained focus
+Using Atari800 config file: /Users/pgarcia/.atari800.cfg
+Created by Atari 800 Emulator, Version 5.2.0-FujiNet
+
+Ignored config line: 
+Unrecognized variable or bad parameters: 'XEP80_CHARSET='
+Unrecognized variable or bad parameters: 'AF80_ROM='
+Ignored config line: 
+Unrecognized variable or bad parameters: 'AF80_CHARSET='
+Ignored config line: 
+Unrecognized variable or bad parameters: 'BIT3_ROM='
+Unrecognized variable or bad parameters: 'BIT3_CHARSET='
+Unrecognized variable or bad parameters: 'FILTER_NTSC_SHARPNESS=-0.5'
+Unrecognized variable or bad parameters: 'FILTER_NTSC_RESOLUTION=-0.1'
+Unrecognized variable or bad parameters: 'FILTER_NTSC_ARTIFACTS=0'
+Unrecognized variable or bad parameters: 'FILTER_NTSC_FRINGING=0'
+Unrecognized variable or bad parameters: 'FILTER_NTSC_BLEED=0'
+Unrecognized variable or bad parameters: 'FILTER_NTSC_BURST_PHASE=0'
+Unrecognized variable or bad parameters: 'VIDEOMODE_WINDOW_WIDTH=336'
+Unrecognized variable or bad parameters: 'VIDEOMODE_WINDOW_HEIGHT=240'
+Unrecognized variable or bad parameters: 'VIDEOMODE_FULLSCREEN_WIDTH=336'
+Unrecognized variable or bad parameters: 'VIDEOMODE_FULLSCREEN_HEIGHT=240'
+Unrecognized variable or bad parameters: 'VIDEOMODE_WINDOWED=1'
+Unrecognized variable or bad parameters: 'VIDEOMODE_HORIZONTAL_AREA=TV'
+Unrecognized variable or bad parameters: 'VIDEOMODE_VERTICAL_AREA=TV'
+Unrecognized variable or bad parameters: 'VIDEOMODE_HORIZONTAL_SHIFT=0'
+Unrecognized variable or bad parameters: 'VIDEOMODE_VERTICAL_SHIFT=0'
+Unrecognized variable or bad parameters: 'VIDEOMODE_STRETCH=INTEGRAL'
+Unrecognized variable or bad parameters: 'VIDEOMODE_FIT=BOTH'
+Unrecognized variable or bad parameters: 'VIDEOMODE_IMAGE_ASPECT=SQUARE-PIXELS'
+Unrecognized variable or bad parameters: 'VIDEOMODE_HOST_ASPECT_RATIO=0:0'
+Unrecognized variable or bad parameters: 'VIDEOMODE_80_COLUMN=1'
+Unrecognized variable or bad parameters: 'COMPRESSION_LEVEL=6'
+Error opening "-speaker"

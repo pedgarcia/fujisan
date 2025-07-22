@@ -65,12 +65,33 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     
     mainLayout->addWidget(m_buttonBox);
     
+    // Debug: Check slider values before loading settings
+    qDebug() << "NTSC slider values BEFORE loadSettings() - Sat:" << m_ntscSaturationSlider->value() 
+             << "Cont:" << m_ntscContrastSlider->value() 
+             << "Bright:" << m_ntscBrightnessSlider->value()
+             << "Gamma:" << m_ntscGammaSlider->value() 
+             << "Tint:" << m_ntscTintSlider->value();
+
     // Load current settings
     loadSettings();
+    
+    // Debug: Check slider values after loading settings
+    qDebug() << "NTSC slider values AFTER loadSettings() - Sat:" << m_ntscSaturationSlider->value() 
+             << "Cont:" << m_ntscContrastSlider->value() 
+             << "Bright:" << m_ntscBrightnessSlider->value()
+             << "Gamma:" << m_ntscGammaSlider->value() 
+             << "Tint:" << m_ntscTintSlider->value();
     
     // Connect video system change to update PAL/NTSC controls
     connect(m_videoSystemCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &SettingsDialog::updateVideoSystemDependentControls);
+    
+    // Debug: Final check of slider values after complete initialization
+    qDebug() << "NTSC slider values FINAL (constructor end) - Sat:" << m_ntscSaturationSlider->value() 
+             << "Cont:" << m_ntscContrastSlider->value() 
+             << "Bright:" << m_ntscBrightnessSlider->value()
+             << "Gamma:" << m_ntscGammaSlider->value() 
+             << "Tint:" << m_ntscTintSlider->value();
 }
 
 void SettingsDialog::createHardwareTab()
@@ -485,10 +506,43 @@ void SettingsDialog::createVideoDisplayTab()
     
     m_artifactingMode = new QComboBox();
     m_artifactingMode->addItem("None", "none");
-    m_artifactingMode->addItem("GTIA", "gtia");
-    m_artifactingMode->addItem("CTIA", "ctia");
-    m_artifactingMode->setToolTip("Color artifacting simulation mode");
+    m_artifactingMode->addItem("NTSC Old", "ntsc-old");
+    m_artifactingMode->addItem("NTSC New", "ntsc-new");
+    // Note: ntsc-full and pal-blend disabled in current build
+    m_artifactingMode->setToolTip("Color artifacting simulation mode (NTSC modes work in NTSC video, PAL Simple available for PAL)");
     generalLayout->addRow("Artifacting:", m_artifactingMode);
+    
+    // Connect artifact mode for real-time updates
+    connect(m_artifactingMode, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int) {
+        QString artifactMode = m_artifactingMode->currentData().toString();
+        m_emulator->updateArtifactSettings(artifactMode);
+    });
+    
+    // FUTURE IMPLEMENTATION: TV Scanlines
+    // Scanlines are not working with current atari800 build/parameters
+    // TODO: Investigate proper scanline implementation - may require:
+    //   - Different command line parameters
+    //   - Specific atari800 build configuration  
+    //   - SDL2 video backend instead of libatari800
+    //   - Client-side Qt overlay implementation
+    //
+    // Commented out until proper scanline support is confirmed:
+    //
+    // m_scanlinesSlider = new QSlider(Qt::Horizontal);
+    // m_scanlinesSlider->setRange(0, 100);
+    // m_scanlinesSlider->setValue(0);
+    // m_scanlinesSlider->setToolTip("CRT scanline intensity (0=off, 100=maximum)");
+    // m_scanlinesLabel = new QLabel("0%");
+    // m_scanlinesLabel->setMinimumWidth(30);
+    // QWidget* scanlinesWidget = new QWidget();
+    // QHBoxLayout* scanlinesLayout = new QHBoxLayout(scanlinesWidget);
+    // scanlinesLayout->setContentsMargins(0, 0, 0, 0);
+    // scanlinesLayout->addWidget(m_scanlinesSlider);
+    // scanlinesLayout->addWidget(m_scanlinesLabel);
+    // generalLayout->addRow("Scanlines:", scanlinesWidget);
+    // m_scanlinesInterpolation = new QCheckBox("Scanline Interpolation");
+    // m_scanlinesInterpolation->setToolTip("Enable smooth scanline blending");
+    // generalLayout->addRow("", m_scanlinesInterpolation);
     
     m_showFPS = new QCheckBox("Show FPS Counter");
     m_showFPS->setToolTip("Display frames per second in the corner");
@@ -524,10 +578,6 @@ void SettingsDialog::createVideoDisplayTab()
     blendingRow->addStretch();
     palLayout->addLayout(blendingRow);
     
-    m_palScanlines = new QCheckBox("Enable PAL Scanlines");
-    m_palScanlines->setToolTip("Simulate PAL CRT scanline effect");
-    palLayout->addWidget(m_palScanlines);
-    
     // PAL Color Adjustment Controls - isolated in separate widgets
     // PAL Saturation - completely isolated
     QWidget* palSatWidget = new QWidget();
@@ -539,6 +589,10 @@ void SettingsDialog::createVideoDisplayTab()
     m_palSaturationSlider->setMinimum(-100);
     m_palSaturationSlider->setMaximum(100);
     m_palSaturationSlider->setValue(0);
+    // Debug: Track user vs programmatic moves
+    connect(m_palSaturationSlider, &QSlider::sliderMoved, [this](int value) {
+        qDebug() << "PAL Saturation slider MOVED by user to:" << value;
+    });
     palSatLayout->addWidget(m_palSaturationSlider, 1);
     m_palSaturationLabel = new QLabel("0.00", palSatWidget);
     m_palSaturationLabel->setMinimumWidth(60);
@@ -698,6 +752,49 @@ void SettingsDialog::createVideoDisplayTab()
     palTintRow->addWidget(palTintWidget, 1);
     palLayout->addLayout(palTintRow);
     
+    // PAL Reset Colors Button
+    QHBoxLayout* palResetRow = new QHBoxLayout();
+    QPushButton* resetPalColorsButton = new QPushButton("Reset PAL Colors");
+    resetPalColorsButton->setToolTip("Reset all PAL color settings to defaults");
+    resetPalColorsButton->setMaximumWidth(150);
+    connect(resetPalColorsButton, &QPushButton::clicked, [this]() {
+        // Reset all PAL color sliders to defaults
+        m_palSaturationSlider->blockSignals(true);
+        m_palContrastSlider->blockSignals(true);
+        m_palBrightnessSlider->blockSignals(true);
+        m_palGammaSlider->blockSignals(true);
+        m_palTintSlider->blockSignals(true);
+        
+        m_palSaturationSlider->setValue(0);
+        m_palContrastSlider->setValue(0);
+        m_palBrightnessSlider->setValue(0);
+        m_palGammaSlider->setValue(100);
+        m_palTintSlider->setValue(0);
+        
+        // Update labels
+        m_palSaturationLabel->setText("0.00");
+        m_palContrastLabel->setText("0.00");
+        m_palBrightnessLabel->setText("0.00");
+        m_palGammaLabel->setText("1.00");
+        m_palTintLabel->setText("0°");
+        
+        m_palSaturationSlider->blockSignals(false);
+        m_palContrastSlider->blockSignals(false);
+        m_palBrightnessSlider->blockSignals(false);
+        m_palGammaSlider->blockSignals(false);
+        m_palTintSlider->blockSignals(false);
+        
+        // Apply the reset values to emulator
+        if (m_emulator) {
+            m_emulator->updatePalColorSettings(0, 0, 0, 100, 0);
+        }
+        
+        qDebug() << "PAL colors reset to defaults";
+    });
+    palResetRow->addWidget(resetPalColorsButton);
+    palResetRow->addStretch();
+    palLayout->addLayout(palResetRow);
+    
     // Set tooltips for PAL color controls
     m_palSaturationSlider->setToolTip("Adjust PAL color saturation (-1.0 to 1.0)");
     m_palContrastSlider->setToolTip("Adjust PAL contrast (-1.0 to 1.0)");
@@ -705,21 +802,49 @@ void SettingsDialog::createVideoDisplayTab()
     m_palGammaSlider->setToolTip("Adjust PAL gamma correction (0.1 to 4.0)");
     m_palTintSlider->setToolTip("Adjust PAL color tint (-180° to 180°)");
     
+    // WORKAROUND: Apply custom stylesheet to fix QTBUG-98093 (macOS Monterey slider bounce)
+    QString sliderStyleSheet = 
+        "QSlider::groove:horizontal {"
+            "border: 1px solid #999999;"
+            "height: 6px;"
+            "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #B1B1B1, stop:1 #c4c4c4);"
+            "margin: 2px 0;"
+            "border-radius: 3px;"
+        "}"
+        "QSlider::handle:horizontal {"
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #b4b4b4, stop:1 #8f8f8f);"
+            "border: 1px solid #5c5c5c;"
+            "width: 14px;"
+            "margin: -2px 0;"
+            "border-radius: 3px;"
+        "}"
+        "QSlider::handle:horizontal:hover {"
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #d4d4d4, stop:1 #afafaf);"
+        "}";
+    
+    // Apply stylesheet to all PAL sliders
+    m_palSaturationSlider->setStyleSheet(sliderStyleSheet);
+    m_palContrastSlider->setStyleSheet(sliderStyleSheet);
+    m_palBrightnessSlider->setStyleSheet(sliderStyleSheet);
+    m_palGammaSlider->setStyleSheet(sliderStyleSheet);
+    m_palTintSlider->setStyleSheet(sliderStyleSheet);
+    
     // NTSC-specific settings
     m_ntscGroup = new QGroupBox("NTSC Video Options");
     QVBoxLayout* ntscLayout = new QVBoxLayout(m_ntscGroup);
     
-    // Artifacting row
-    QHBoxLayout* artifactingRow = new QHBoxLayout();
-    artifactingRow->addWidget(new QLabel("Artifacting:"));
-    m_ntscArtifacting = new QComboBox();
-    m_ntscArtifacting->addItem("Standard", "standard");
-    m_ntscArtifacting->addItem("High Quality", "high");
-    m_ntscArtifacting->addItem("Composite", "composite");
-    m_ntscArtifacting->setToolTip("NTSC color artifacting quality");
-    artifactingRow->addWidget(m_ntscArtifacting);
-    artifactingRow->addStretch();
-    ntscLayout->addLayout(artifactingRow);
+    // Note: NTSC artifacting is now handled by the main artifacting dropdown in General Video
+    // This redundant NTSC artifacting dropdown is commented out
+    // QHBoxLayout* artifactingRow = new QHBoxLayout();
+    // artifactingRow->addWidget(new QLabel("Artifacting:"));
+    // m_ntscArtifacting = new QComboBox();
+    // m_ntscArtifacting->addItem("Standard", "standard");
+    // m_ntscArtifacting->addItem("High Quality", "high");
+    // m_ntscArtifacting->addItem("Composite", "composite");
+    // m_ntscArtifacting->setToolTip("NTSC color artifacting quality");
+    // artifactingRow->addWidget(m_ntscArtifacting);
+    // artifactingRow->addStretch();
+    // ntscLayout->addLayout(artifactingRow);
     
     m_ntscSharpness = new QCheckBox("Enable NTSC Sharpness");
     m_ntscSharpness->setToolTip("Enhance NTSC video sharpness");
@@ -736,6 +861,10 @@ void SettingsDialog::createVideoDisplayTab()
     m_ntscSaturationSlider->setMinimum(-100);
     m_ntscSaturationSlider->setMaximum(100);
     m_ntscSaturationSlider->setValue(0);
+    // Debug: Override setValue to track programmatic changes
+    connect(m_ntscSaturationSlider, &QSlider::sliderMoved, [this](int value) {
+        qDebug() << "NTSC Saturation slider MOVED by user to:" << value;
+    });
     ntscSatLayout->addWidget(m_ntscSaturationSlider, 1);
     m_ntscSaturationLabel = new QLabel("0.00", ntscSatWidget);
     m_ntscSaturationLabel->setMinimumWidth(60);
@@ -744,10 +873,10 @@ void SettingsDialog::createVideoDisplayTab()
     connect(m_ntscSaturationSlider, &QSlider::valueChanged, [this](int value) {
         qDebug() << "NTSC Saturation slider changed to:" << value;
         m_ntscSaturationLabel->setText(QString::number(value / 100.0, 'f', 2));
-        // Update emulator color settings in real-time
+        // Update emulator color settings in real-time - ONLY pass the changed value
         if (m_emulator) {
             m_emulator->updateNtscColorSettings(
-                m_ntscSaturationSlider->value(),
+                value,  // Only pass the changed saturation value
                 m_ntscContrastSlider->value(),
                 m_ntscBrightnessSlider->value(),
                 m_ntscGammaSlider->value(),
@@ -771,18 +900,23 @@ void SettingsDialog::createVideoDisplayTab()
     m_ntscContrastSlider->setMinimum(-100);
     m_ntscContrastSlider->setMaximum(100);
     m_ntscContrastSlider->setValue(0);
+    // Debug: Track user vs programmatic moves
+    connect(m_ntscContrastSlider, &QSlider::sliderMoved, [this](int value) {
+        qDebug() << "NTSC Contrast slider MOVED by user to:" << value;
+    });
     ntscContrastLayout->addWidget(m_ntscContrastSlider, 1);
     m_ntscContrastLabel = new QLabel("0.00", ntscContrastWidget);
     m_ntscContrastLabel->setMinimumWidth(60);
     m_ntscContrastLabel->setAlignment(Qt::AlignCenter);
     ntscContrastLayout->addWidget(m_ntscContrastLabel);
     connect(m_ntscContrastSlider, &QSlider::valueChanged, [this](int value) {
+        qDebug() << "NTSC Contrast slider changed to:" << value;
         m_ntscContrastLabel->setText(QString::number(value / 100.0, 'f', 2));
         // Update emulator color settings in real-time
         if (m_emulator) {
             m_emulator->updateNtscColorSettings(
                 m_ntscSaturationSlider->value(),
-                m_ntscContrastSlider->value(),
+                value,  // Use the changed value directly
                 m_ntscBrightnessSlider->value(),
                 m_ntscGammaSlider->value(),
                 m_ntscTintSlider->value()
@@ -810,13 +944,14 @@ void SettingsDialog::createVideoDisplayTab()
     m_ntscBrightnessLabel->setAlignment(Qt::AlignCenter);
     ntscBrightnessLayout->addWidget(m_ntscBrightnessLabel);
     connect(m_ntscBrightnessSlider, &QSlider::valueChanged, [this](int value) {
+        qDebug() << "NTSC Brightness slider changed to:" << value;
         m_ntscBrightnessLabel->setText(QString::number(value / 100.0, 'f', 2));
         // Update emulator color settings in real-time
         if (m_emulator) {
             m_emulator->updateNtscColorSettings(
                 m_ntscSaturationSlider->value(),
                 m_ntscContrastSlider->value(),
-                m_ntscBrightnessSlider->value(),
+                value,  // Use the changed value directly
                 m_ntscGammaSlider->value(),
                 m_ntscTintSlider->value()
             );
@@ -843,6 +978,7 @@ void SettingsDialog::createVideoDisplayTab()
     m_ntscGammaLabel->setAlignment(Qt::AlignCenter);
     ntscGammaLayout->addWidget(m_ntscGammaLabel);
     connect(m_ntscGammaSlider, &QSlider::valueChanged, [this](int value) {
+        qDebug() << "NTSC Gamma slider changed to:" << value;
         m_ntscGammaLabel->setText(QString::number(value / 100.0, 'f', 2));
         // Update emulator color settings in real-time
         if (m_emulator) {
@@ -850,7 +986,7 @@ void SettingsDialog::createVideoDisplayTab()
                 m_ntscSaturationSlider->value(),
                 m_ntscContrastSlider->value(),
                 m_ntscBrightnessSlider->value(),
-                m_ntscGammaSlider->value(),
+                value,  // Use the changed value directly
                 m_ntscTintSlider->value()
             );
         }
@@ -876,6 +1012,7 @@ void SettingsDialog::createVideoDisplayTab()
     m_ntscTintLabel->setAlignment(Qt::AlignCenter);
     ntscTintLayout->addWidget(m_ntscTintLabel);
     connect(m_ntscTintSlider, &QSlider::valueChanged, [this](int value) {
+        qDebug() << "NTSC Tint slider changed to:" << value;
         m_ntscTintLabel->setText(QString::number(value) + "°");
         // Update emulator color settings in real-time
         if (m_emulator) {
@@ -884,7 +1021,7 @@ void SettingsDialog::createVideoDisplayTab()
                 m_ntscContrastSlider->value(),
                 m_ntscBrightnessSlider->value(),
                 m_ntscGammaSlider->value(),
-                m_ntscTintSlider->value()
+                value  // Use the changed value directly
             );
         }
     });
@@ -893,12 +1030,63 @@ void SettingsDialog::createVideoDisplayTab()
     ntscTintRow->addWidget(ntscTintWidget, 1);
     ntscLayout->addLayout(ntscTintRow);
     
+    // NTSC Reset Colors Button
+    QHBoxLayout* ntscResetRow = new QHBoxLayout();
+    QPushButton* resetNtscColorsButton = new QPushButton("Reset NTSC Colors");
+    resetNtscColorsButton->setToolTip("Reset all NTSC color settings to defaults");
+    resetNtscColorsButton->setMaximumWidth(150);
+    connect(resetNtscColorsButton, &QPushButton::clicked, [this]() {
+        // Reset all NTSC color sliders to defaults
+        m_ntscSaturationSlider->blockSignals(true);
+        m_ntscContrastSlider->blockSignals(true);
+        m_ntscBrightnessSlider->blockSignals(true);
+        m_ntscGammaSlider->blockSignals(true);
+        m_ntscTintSlider->blockSignals(true);
+        
+        m_ntscSaturationSlider->setValue(0);
+        m_ntscContrastSlider->setValue(0);
+        m_ntscBrightnessSlider->setValue(0);
+        m_ntscGammaSlider->setValue(100);
+        m_ntscTintSlider->setValue(0);
+        
+        // Update labels
+        m_ntscSaturationLabel->setText("0.00");
+        m_ntscContrastLabel->setText("0.00");
+        m_ntscBrightnessLabel->setText("0.00");
+        m_ntscGammaLabel->setText("1.00");
+        m_ntscTintLabel->setText("0°");
+        
+        m_ntscSaturationSlider->blockSignals(false);
+        m_ntscContrastSlider->blockSignals(false);
+        m_ntscBrightnessSlider->blockSignals(false);
+        m_ntscGammaSlider->blockSignals(false);
+        m_ntscTintSlider->blockSignals(false);
+        
+        // Apply the reset values to emulator
+        if (m_emulator) {
+            m_emulator->updateNtscColorSettings(0, 0, 0, 100, 0);
+        }
+        
+        qDebug() << "NTSC colors reset to defaults";
+    });
+    ntscResetRow->addWidget(resetNtscColorsButton);
+    ntscResetRow->addStretch();
+    ntscLayout->addLayout(ntscResetRow);
+    
     // Set tooltips for NTSC color controls
     m_ntscSaturationSlider->setToolTip("Adjust NTSC color saturation (-1.0 to 1.0)");
     m_ntscContrastSlider->setToolTip("Adjust NTSC contrast (-1.0 to 1.0)");
     m_ntscBrightnessSlider->setToolTip("Adjust NTSC brightness (-1.0 to 1.0)");
     m_ntscGammaSlider->setToolTip("Adjust NTSC gamma correction (0.1 to 4.0)");
     m_ntscTintSlider->setToolTip("Adjust NTSC color tint (-180° to 180°)");
+    
+    // WORKAROUND: Apply same custom stylesheet to fix QTBUG-98093 (macOS Monterey slider bounce)
+    // Apply stylesheet to all NTSC sliders
+    m_ntscSaturationSlider->setStyleSheet(sliderStyleSheet);
+    m_ntscContrastSlider->setStyleSheet(sliderStyleSheet);
+    m_ntscBrightnessSlider->setStyleSheet(sliderStyleSheet);
+    m_ntscGammaSlider->setStyleSheet(sliderStyleSheet);
+    m_ntscTintSlider->setStyleSheet(sliderStyleSheet);
     
     // Add PAL and NTSC group boxes side by side
     QHBoxLayout* videoOptionsLayout = new QHBoxLayout();
@@ -1696,15 +1884,19 @@ void SettingsDialog::loadSettings()
         }
     }
     
-    m_palScanlines->setChecked(settings.value("video/palScanlines", false).toBool());
+    // FUTURE: Load universal scanlines settings (commented out - not working)
+    // m_scanlinesSlider->setValue(settings.value("video/scanlinesPercentage", 0).toInt());
+    // m_scanlinesLabel->setText(QString("%1%").arg(m_scanlinesSlider->value()));
+    // m_scanlinesInterpolation->setChecked(settings.value("video/scanlinesInterpolation", false).toBool());
     
-    QString ntscArtifacting = settings.value("video/ntscArtifacting", "standard").toString();
-    for (int i = 0; i < m_ntscArtifacting->count(); ++i) {
-        if (m_ntscArtifacting->itemData(i).toString() == ntscArtifacting) {
-            m_ntscArtifacting->setCurrentIndex(i);
-            break;
-        }
-    }
+    // NTSC artifacting is now handled by the main artifacting dropdown
+    // QString ntscArtifacting = settings.value("video/ntscArtifacting", "standard").toString();
+    // for (int i = 0; i < m_ntscArtifacting->count(); ++i) {
+    //     if (m_ntscArtifacting->itemData(i).toString() == ntscArtifacting) {
+    //         m_ntscArtifacting->setCurrentIndex(i);
+    //         break;
+    //     }
+    // }
     
     m_ntscSharpness->setChecked(settings.value("video/ntscSharpness", true).toBool());
     
@@ -1886,8 +2078,11 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/keepAspectRatio", m_keepAspectRatio->isChecked());
     settings.setValue("video/fullscreenMode", m_fullscreenMode->isChecked());
     settings.setValue("video/palBlending", m_palBlending->currentData().toString());
-    settings.setValue("video/palScanlines", m_palScanlines->isChecked());
-    settings.setValue("video/ntscArtifacting", m_ntscArtifacting->currentData().toString());
+    // FUTURE: Save universal scanlines settings (commented out - not working)
+    // settings.setValue("video/scanlinesPercentage", m_scanlinesSlider->value());
+    // settings.setValue("video/scanlinesInterpolation", m_scanlinesInterpolation->isChecked());
+    // NTSC artifacting is now handled by the main artifacting dropdown
+    // settings.setValue("video/ntscArtifacting", m_ntscArtifacting->currentData().toString());
     settings.setValue("video/ntscSharpness", m_ntscSharpness->isChecked());
     
     // Save PAL Color Adjustment settings
@@ -2031,9 +2226,14 @@ void SettingsDialog::applySettings()
     
     // Restart emulator with new settings
     m_emulator->shutdown();
+    
+    // Get artifact settings from UI
+    QString artifactMode = m_artifactingMode->currentData().toString();
+    
     if (m_emulator->initializeWithConfig(m_emulator->isBasicEnabled(), 
                                        m_emulator->getMachineType(), 
-                                       m_emulator->getVideoSystem())) {
+                                       m_emulator->getVideoSystem(),
+                                       artifactMode)) {
         qDebug() << "Emulator restarted with new settings";
         
         // Reapply media settings after restart
@@ -2149,8 +2349,12 @@ void SettingsDialog::restoreDefaults()
     m_keepAspectRatio->setChecked(true);
     m_fullscreenMode->setChecked(false);
     m_palBlending->setCurrentIndex(1);     // Simple
-    m_palScanlines->setChecked(false);
-    m_ntscArtifacting->setCurrentIndex(0); // Standard
+    // FUTURE: Universal scanlines defaults (commented out - not working)
+    // m_scanlinesSlider->setValue(0);
+    // m_scanlinesLabel->setText("0%");
+    // m_scanlinesInterpolation->setChecked(false);
+    // NTSC artifacting is now handled by the main artifacting dropdown
+    // m_ntscArtifacting->setCurrentIndex(0); // Standard
     m_ntscSharpness->setChecked(true);
     
     // PAL Color Adjustment defaults
@@ -2449,28 +2653,58 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_keepAspectRatio->setChecked(profile.keepAspectRatio);
     m_fullscreenMode->setChecked(profile.fullscreenMode);
     
-    // Color Settings
+    // Color Settings - block individual slider signals to prevent visual bouncing
+    // PAL Color Settings
+    m_palSaturationSlider->blockSignals(true);
+    m_palContrastSlider->blockSignals(true);
+    m_palBrightnessSlider->blockSignals(true);
+    m_palGammaSlider->blockSignals(true);
+    m_palTintSlider->blockSignals(true);
+    
     m_palSaturationSlider->setValue(profile.palSaturation);
-    m_palSaturationLabel->setText(QString::number(profile.palSaturation));
     m_palContrastSlider->setValue(profile.palContrast);
-    m_palContrastLabel->setText(QString::number(profile.palContrast));
     m_palBrightnessSlider->setValue(profile.palBrightness);
-    m_palBrightnessLabel->setText(QString::number(profile.palBrightness));
     m_palGammaSlider->setValue(profile.palGamma);
-    m_palGammaLabel->setText(QString::number(profile.palGamma));
     m_palTintSlider->setValue(profile.palTint);
-    m_palTintLabel->setText(QString::number(profile.palTint));
+    
+    // Update labels manually since signals are blocked
+    m_palSaturationLabel->setText(QString::number(profile.palSaturation / 100.0, 'f', 2));
+    m_palContrastLabel->setText(QString::number(profile.palContrast / 100.0, 'f', 2));
+    m_palBrightnessLabel->setText(QString::number(profile.palBrightness / 100.0, 'f', 2));
+    m_palGammaLabel->setText(QString::number(profile.palGamma / 100.0, 'f', 2));
+    m_palTintLabel->setText(QString::number(profile.palTint) + "°");
+    
+    m_palSaturationSlider->blockSignals(false);
+    m_palContrastSlider->blockSignals(false);
+    m_palBrightnessSlider->blockSignals(false);
+    m_palGammaSlider->blockSignals(false);
+    m_palTintSlider->blockSignals(false);
+    
+    // NTSC Color Settings
+    m_ntscSaturationSlider->blockSignals(true);
+    m_ntscContrastSlider->blockSignals(true);
+    m_ntscBrightnessSlider->blockSignals(true);
+    m_ntscGammaSlider->blockSignals(true);
+    m_ntscTintSlider->blockSignals(true);
     
     m_ntscSaturationSlider->setValue(profile.ntscSaturation);
-    m_ntscSaturationLabel->setText(QString::number(profile.ntscSaturation));
     m_ntscContrastSlider->setValue(profile.ntscContrast);
-    m_ntscContrastLabel->setText(QString::number(profile.ntscContrast));
     m_ntscBrightnessSlider->setValue(profile.ntscBrightness);
-    m_ntscBrightnessLabel->setText(QString::number(profile.ntscBrightness));
     m_ntscGammaSlider->setValue(profile.ntscGamma);
-    m_ntscGammaLabel->setText(QString::number(profile.ntscGamma));
     m_ntscTintSlider->setValue(profile.ntscTint);
-    m_ntscTintLabel->setText(QString::number(profile.ntscTint));
+    
+    // Update labels manually since signals are blocked
+    m_ntscSaturationLabel->setText(QString::number(profile.ntscSaturation / 100.0, 'f', 2));
+    m_ntscContrastLabel->setText(QString::number(profile.ntscContrast / 100.0, 'f', 2));
+    m_ntscBrightnessLabel->setText(QString::number(profile.ntscBrightness / 100.0, 'f', 2));
+    m_ntscGammaLabel->setText(QString::number(profile.ntscGamma / 100.0, 'f', 2));
+    m_ntscTintLabel->setText(QString::number(profile.ntscTint) + "°");
+    
+    m_ntscSaturationSlider->blockSignals(false);
+    m_ntscContrastSlider->blockSignals(false);
+    m_ntscBrightnessSlider->blockSignals(false);
+    m_ntscGammaSlider->blockSignals(false);
+    m_ntscTintSlider->blockSignals(false);
     
     // Input Configuration
     m_joystickEnabled->setChecked(profile.joystickEnabled);

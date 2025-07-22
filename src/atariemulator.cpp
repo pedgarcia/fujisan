@@ -38,15 +38,56 @@ bool AtariEmulator::initializeWithBasic(bool basicEnabled)
 
 bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem)
 {
+    return initializeWithConfig(basicEnabled, machineType, videoSystem, "none");
+}
+
+bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode)
+{
+    // FUTURE: Scanlines support would go here when working
+    // return initializeWithConfig(basicEnabled, machineType, videoSystem, artifactMode, 0, false);
+    
+    // Current implementation without scanlines:
     m_basicEnabled = basicEnabled;
     m_machineType = machineType;
     m_videoSystem = videoSystem;
     
-    // Build argument list with machine type, video system, audio, and BASIC setting
+    // Build argument list with machine type, video system, artifacts, audio, and BASIC setting
     QStringList argList;
     argList << "atari800";
     argList << machineType;    // -xl, -xe, -atari, -5200, etc.
     argList << videoSystem;    // -ntsc or -pal
+    
+    // Add artifact settings - only supported modes for current build
+    qDebug() << "Artifact mode requested:" << artifactMode;
+    if (artifactMode != "none") {
+        if (videoSystem == "-ntsc") {
+            // Only ntsc-old and ntsc-new are supported (ntsc-full disabled in build)
+            if (artifactMode == "ntsc-old" || artifactMode == "ntsc-new") {
+                argList << "-ntsc-artif" << artifactMode;
+                qDebug() << "Adding NTSC artifact parameters:" << "-ntsc-artif" << artifactMode;
+            }
+        } else if (videoSystem == "-pal") {
+            // Map NTSC artifact modes to PAL simple (pal-blend disabled in build)
+            if (artifactMode == "ntsc-old" || artifactMode == "ntsc-new") {
+                argList << "-pal-artif" << "pal-simple";
+                qDebug() << "Adding PAL artifact parameters:" << "-pal-artif" << "pal-simple";
+            }
+        }
+    }
+    
+    // FUTURE: Scanlines support (commented out - parameters don't work with current build)
+    // Add scanline settings - requires investigation of correct atari800 scanline support
+    // May need different parameters, specific build flags, or SDL2 backend
+    //
+    // qDebug() << "Scanlines requested - Percentage:" << scanlinesPercentage << "Interpolation:" << scanlinesInterpolation;
+    // if (scanlinesPercentage > 0) {
+    //     argList << "-scanlines" << QString::number(scanlinesPercentage);
+    //     qDebug() << "Adding scanlines parameter:" << "-scanlines" << scanlinesPercentage;
+    //     if (scanlinesInterpolation) {
+    //         argList << "-scanlinesint";
+    //         qDebug() << "Adding scanlines interpolation parameter: -scanlinesint";
+    //     }
+    // }
     
     // Add audio configuration
     if (m_audioEnabled) {
@@ -695,6 +736,36 @@ void AtariEmulator::updateNtscColorSettings(double saturation, double contrast, 
              << "Gamma:" << COLOURS_NTSC_setup.gamma
              << "Hue:" << COLOURS_NTSC_setup.hue;
 }
+
+void AtariEmulator::updateArtifactSettings(const QString& artifactMode)
+{
+    qDebug() << "Updating artifact mode to:" << artifactMode;
+    
+    // Map string mode to ARTIFACT_t enum
+    ARTIFACT_t mode = ARTIFACT_NONE;
+    
+    if (artifactMode == "none") {
+        mode = ARTIFACT_NONE;
+    } else if (artifactMode == "ntsc-old") {
+        mode = ARTIFACT_NTSC_OLD;
+    } else if (artifactMode == "ntsc-new") {
+        mode = ARTIFACT_NTSC_NEW;
+    } else {
+        qDebug() << "Warning: Unknown artifact mode:" << artifactMode << "- using NONE";
+        mode = ARTIFACT_NONE;
+    }
+    
+    // Apply the artifact setting immediately
+    ARTIFACT_Set(mode);
+    qDebug() << "Artifact mode set to:" << mode;
+}
+
+// FUTURE: Scanlines method (commented out - not working)
+// bool AtariEmulator::needsScanlineRestart() const
+// {
+//     // In libatari800, scanlines require restart since no SDL runtime control
+//     return true;
+// }
 
 void AtariEmulator::setEmulationSpeed(int percentage)
 {
