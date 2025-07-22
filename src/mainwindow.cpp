@@ -529,14 +529,30 @@ void MainWindow::restartEmulator()
 {
     m_emulator->shutdown();
     
-    // Load artifact settings from preferences
+    // Load display and artifact settings from preferences
     QSettings settings("8bitrelics", "Fujisan");
     QString artifactMode = settings.value("video/artifacting", "none").toString();
     
-    if (m_emulator->initializeWithConfig(m_emulator->isBasicEnabled(), 
-                                       m_emulator->getMachineType(), 
-                                       m_emulator->getVideoSystem(),
-                                       artifactMode)) {
+    // Load display settings
+    QString horizontalArea = settings.value("video/horizontalArea", "tv").toString();
+    QString verticalArea = settings.value("video/verticalArea", "tv").toString();
+    int horizontalShift = settings.value("video/horizontalShift", 0).toInt();
+    int verticalShift = settings.value("video/verticalShift", 0).toInt();
+    QString fitScreen = settings.value("video/fitScreen", "both").toString();
+    bool show80Column = settings.value("video/show80Column", false).toBool();
+    bool vSyncEnabled = settings.value("video/vSyncEnabled", false).toBool();
+    
+    qDebug() << "Display settings - HArea:" << horizontalArea << "VArea:" << verticalArea 
+             << "HShift:" << horizontalShift << "VShift:" << verticalShift 
+             << "Fit:" << fitScreen << "80Col:" << show80Column << "VSync:" << vSyncEnabled;
+    
+    if (m_emulator->initializeWithDisplayConfig(m_emulator->isBasicEnabled(), 
+                                              m_emulator->getMachineType(), 
+                                              m_emulator->getVideoSystem(),
+                                              artifactMode,
+                                              horizontalArea, verticalArea,
+                                              horizontalShift, verticalShift,
+                                              fitScreen, show80Column, vSyncEnabled)) {
         QString message = QString("Emulator restarted: %1 %2 with BASIC %3")
                          .arg(m_emulator->getMachineType())
                          .arg(m_emulator->getVideoSystem())
@@ -739,11 +755,22 @@ void MainWindow::loadInitialSettings()
     bool audioEnabled = settings.value("audio/enabled", true).toBool();
     QString artifactMode = settings.value("video/artifacting", "none").toString();
     
+    // Load display settings for initial setup
+    QString horizontalArea = settings.value("video/horizontalArea", "tv").toString();
+    QString verticalArea = settings.value("video/verticalArea", "tv").toString();
+    int horizontalShift = settings.value("video/horizontalShift", 0).toInt();
+    int verticalShift = settings.value("video/verticalShift", 0).toInt();
+    QString fitScreen = settings.value("video/fitScreen", "both").toString();
+    bool show80Column = settings.value("video/show80Column", false).toBool();
+    bool vSyncEnabled = settings.value("video/vSyncEnabled", false).toBool();
+    
     qDebug() << "Loading initial settings - Machine:" << machineType 
              << "Video:" << videoSystem << "BASIC:" << basicEnabled << "Artifacts:" << artifactMode;
     
-    // Initialize emulator with loaded settings
-    if (!m_emulator->initializeWithConfig(basicEnabled, machineType, videoSystem, artifactMode)) {
+    // Initialize emulator with loaded settings including display options
+    if (!m_emulator->initializeWithDisplayConfig(basicEnabled, machineType, videoSystem, artifactMode,
+                                                horizontalArea, verticalArea, horizontalShift, verticalShift,
+                                                fitScreen, show80Column, vSyncEnabled)) {
         QMessageBox::critical(this, "Error", "Failed to initialize Atari800 emulator");
         QApplication::quit();
         return;

@@ -43,6 +43,15 @@ bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machi
 
 bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode)
 {
+    // Use default display settings
+    return initializeWithDisplayConfig(basicEnabled, machineType, videoSystem, artifactMode,
+                                     "tv", "tv", 0, 0, "both", false, false);
+}
+
+bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
+                                               const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
+                                               const QString& fitScreen, bool show80Column, bool vSyncEnabled)
+{
     // FUTURE: Scanlines support would go here when working
     // return initializeWithConfig(basicEnabled, machineType, videoSystem, artifactMode, 0, false);
     
@@ -88,6 +97,27 @@ bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machi
     //         qDebug() << "Adding scanlines interpolation parameter: -scanlinesint";
     //     }
     // }
+    
+    // LIMITATION: Display configuration parameters are NOT supported by libatari800
+    // These parameters are only available in the full SDL build of atari800, not in the minimal libatari800 library.
+    // The UI controls are preserved for future compatibility when we migrate to full SDL build.
+    qDebug() << "=== SCREEN DISPLAY CONFIGURATION ===";
+    qDebug() << "Display settings - HArea:" << horizontalArea << "VArea:" << verticalArea 
+             << "HShift:" << horizontalShift << "VShift:" << verticalShift 
+             << "Fit:" << fitScreen << "80Col:" << show80Column << "VSync:" << vSyncEnabled;
+    qDebug() << "WARNING: libatari800 does not support display parameters - controls saved but not applied to emulator";
+    
+    // TODO: Display parameters - commented out because libatari800 doesn't support them
+    // These would work with full SDL atari800 build:
+    // argList << "-horiz-area" << horizontalArea;
+    // argList << "-vert-area" << verticalArea;
+    // if (horizontalShift != 0) argList << "-horiz-shift" << QString::number(horizontalShift);
+    // if (verticalShift != 0) argList << "-vert-shift" << QString::number(verticalShift);
+    // argList << "-fit-screen" << fitScreen;
+    // if (show80Column) argList << "-80column"; else argList << "-no-80column";
+    // if (vSyncEnabled) argList << "-vsync"; else argList << "-no-vsync";
+    
+    qDebug() << "=== END SCREEN DISPLAY CONFIGURATION ===";
     
     // Add audio configuration
     if (m_audioEnabled) {
@@ -158,8 +188,14 @@ bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machi
     }
     args[argBytes.size()] = nullptr;
     
+    qDebug() << "=== COMPLETE COMMAND LINE ===";
+    qDebug() << "Full atari800 command line:" << argList.join(" ");
+    qDebug() << "Number of arguments:" << argBytes.size();
+    qDebug() << "Note: Display parameters excluded due to libatari800 limitations";
+    
     if (libatari800_init(argBytes.size(), args)) {
-        qDebug() << "Emulator initialized with:" << argList.join(" ");
+        qDebug() << "✓ Emulator initialized successfully";
+        qDebug() << "  Display settings saved to profile but not applied (requires full SDL atari800)";
         m_targetFps = libatari800_get_fps();
         m_frameTimeMs = 1000.0f / m_targetFps;
         qDebug() << "Target FPS:" << m_targetFps << "Frame time:" << m_frameTimeMs << "ms";
@@ -174,7 +210,7 @@ bool AtariEmulator::initializeWithConfig(bool basicEnabled, const QString& machi
         return true;
     }
     
-    qDebug() << "Failed to initialize emulator with:" << argList.join(" ");
+    qDebug() << "✗ Failed to initialize emulator with:" << argList.join(" ");
     return false;
 }
 

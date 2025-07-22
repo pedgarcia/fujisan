@@ -163,6 +163,15 @@ private:
     QCheckBox* m_keepAspectRatio;
     QCheckBox* m_fullscreenMode;
     
+    // Screen Display Options
+    QComboBox* m_horizontalArea;
+    QComboBox* m_verticalArea;
+    QSpinBox* m_horizontalShift;
+    QSpinBox* m_verticalShift;
+    QComboBox* m_fitScreen;
+    QCheckBox* m_show80Column;
+    QCheckBox* m_vSyncEnabled;
+    
     // PAL-specific controls
     QGroupBox* m_palGroup;
     QComboBox* m_palBlending;

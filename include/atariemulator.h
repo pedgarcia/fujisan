@@ -74,6 +74,10 @@ public:
     bool initializeWithBasic(bool basicEnabled);
     bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem);
     bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode);
+    bool initializeWithDisplayConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
+                                   const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
+                                   const QString& fitScreen, bool show80Column, bool vSyncEnabled);
+    // Note: Display parameters are saved to profiles but not applied due to libatari800 limitations
     // FUTURE: Scanlines support (commented out - not working with current atari800 build)
     // bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode, int scanlinesPercentage, bool scanlinesInterpolation);
     void shutdown();

@@ -58,6 +58,15 @@ struct ConfigurationProfile {
     bool keepAspectRatio = true;
     bool fullscreenMode = false;
     
+    // Screen Display Options
+    QString horizontalArea = "tv";
+    QString verticalArea = "tv";
+    int horizontalShift = 0;
+    int verticalShift = 0;
+    QString fitScreen = "both";
+    bool show80Column = false;
+    bool vSyncEnabled = false;
+    
     // PAL Color Settings (slider values -100 to 100, except gamma 10-400)
     int palSaturation = 0;
     int palContrast = 0;

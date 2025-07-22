@@ -500,17 +500,24 @@ void SettingsDialog::createVideoDisplayTab()
     
     QVBoxLayout* tabLayout = new QVBoxLayout(m_videoTab);
     
-    // General Video Group
+    // General Video Group - 3 column layout for space efficiency
     QGroupBox* generalGroup = new QGroupBox("General Video");
-    QFormLayout* generalLayout = new QFormLayout(generalGroup);
+    QHBoxLayout* generalMainLayout = new QHBoxLayout(generalGroup);
     
+    // Column 1: Artifacting and Core Settings
+    QVBoxLayout* generalCol1 = new QVBoxLayout();
+    
+    QHBoxLayout* artifactRow = new QHBoxLayout();
+    artifactRow->addWidget(new QLabel("Artifacting:"));
     m_artifactingMode = new QComboBox();
     m_artifactingMode->addItem("None", "none");
     m_artifactingMode->addItem("NTSC Old", "ntsc-old");
     m_artifactingMode->addItem("NTSC New", "ntsc-new");
     // Note: ntsc-full and pal-blend disabled in current build
     m_artifactingMode->setToolTip("Color artifacting simulation mode (NTSC modes work in NTSC video, PAL Simple available for PAL)");
-    generalLayout->addRow("Artifacting:", m_artifactingMode);
+    artifactRow->addWidget(m_artifactingMode);
+    artifactRow->addStretch();
+    generalCol1->addLayout(artifactRow);
     
     // Connect artifact mode for real-time updates
     connect(m_artifactingMode, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int) {
@@ -518,49 +525,118 @@ void SettingsDialog::createVideoDisplayTab()
         m_emulator->updateArtifactSettings(artifactMode);
     });
     
-    // FUTURE IMPLEMENTATION: TV Scanlines
-    // Scanlines are not working with current atari800 build/parameters
-    // TODO: Investigate proper scanline implementation - may require:
-    //   - Different command line parameters
-    //   - Specific atari800 build configuration  
-    //   - SDL2 video backend instead of libatari800
-    //   - Client-side Qt overlay implementation
-    //
-    // Commented out until proper scanline support is confirmed:
-    //
-    // m_scanlinesSlider = new QSlider(Qt::Horizontal);
-    // m_scanlinesSlider->setRange(0, 100);
-    // m_scanlinesSlider->setValue(0);
-    // m_scanlinesSlider->setToolTip("CRT scanline intensity (0=off, 100=maximum)");
-    // m_scanlinesLabel = new QLabel("0%");
-    // m_scanlinesLabel->setMinimumWidth(30);
-    // QWidget* scanlinesWidget = new QWidget();
-    // QHBoxLayout* scanlinesLayout = new QHBoxLayout(scanlinesWidget);
-    // scanlinesLayout->setContentsMargins(0, 0, 0, 0);
-    // scanlinesLayout->addWidget(m_scanlinesSlider);
-    // scanlinesLayout->addWidget(m_scanlinesLabel);
-    // generalLayout->addRow("Scanlines:", scanlinesWidget);
-    // m_scanlinesInterpolation = new QCheckBox("Scanline Interpolation");
-    // m_scanlinesInterpolation->setToolTip("Enable smooth scanline blending");
-    // generalLayout->addRow("", m_scanlinesInterpolation);
-    
     m_showFPS = new QCheckBox("Show FPS Counter");
     m_showFPS->setToolTip("Display frames per second in the corner");
-    generalLayout->addRow("", m_showFPS);
+    generalCol1->addWidget(m_showFPS);
+    generalCol1->addStretch();
+    
+    // Column 2: Scaling and Aspect Settings
+    QVBoxLayout* generalCol2 = new QVBoxLayout();
     
     m_scalingFilter = new QCheckBox("Enable Scaling Filter");
     m_scalingFilter->setToolTip("Apply smoothing when scaling the display");
-    generalLayout->addRow("", m_scalingFilter);
+    generalCol2->addWidget(m_scalingFilter);
     
     m_keepAspectRatio = new QCheckBox("Keep 4:3 Aspect Ratio");
     m_keepAspectRatio->setToolTip("Maintain authentic 4:3 display proportions when resizing window");
-    generalLayout->addRow("", m_keepAspectRatio);
+    generalCol2->addWidget(m_keepAspectRatio);
+    generalCol2->addStretch();
+    
+    // Column 3: Fullscreen Settings
+    QVBoxLayout* generalCol3 = new QVBoxLayout();
     
     m_fullscreenMode = new QCheckBox("Start in Fullscreen Mode");
     m_fullscreenMode->setToolTip("Launch application in fullscreen mode for immersive retro experience");
-    generalLayout->addRow("", m_fullscreenMode);
+    generalCol3->addWidget(m_fullscreenMode);
+    generalCol3->addStretch();
+    
+    // Add columns to main layout
+    generalMainLayout->addLayout(generalCol1, 1);
+    generalMainLayout->addLayout(generalCol2, 1);
+    generalMainLayout->addLayout(generalCol3, 1);
     
     tabLayout->addWidget(generalGroup);
+    
+    // Screen Display Options Group - 3 column layout for space efficiency
+    QGroupBox* displayGroup = new QGroupBox("Screen Display Options");
+    QHBoxLayout* displayMainLayout = new QHBoxLayout(displayGroup);
+    
+    // Column 1: Area Controls
+    QVBoxLayout* displayCol1 = new QVBoxLayout();
+    
+    QHBoxLayout* horizAreaRow = new QHBoxLayout();
+    horizAreaRow->addWidget(new QLabel("Horizontal Area:"));
+    m_horizontalArea = new QComboBox();
+    m_horizontalArea->addItem("Narrow", "narrow");
+    m_horizontalArea->addItem("TV Safe Area", "tv");
+    m_horizontalArea->addItem("Full Width", "full");
+    m_horizontalArea->setToolTip("Set horizontal visible area (narrow=320px, tv=336px, full=384px)");
+    horizAreaRow->addWidget(m_horizontalArea);
+    displayCol1->addLayout(horizAreaRow);
+    
+    QHBoxLayout* vertAreaRow = new QHBoxLayout();
+    vertAreaRow->addWidget(new QLabel("Vertical Area:"));
+    m_verticalArea = new QComboBox();
+    m_verticalArea->addItem("Short", "short");
+    m_verticalArea->addItem("TV Safe Area", "tv");
+    m_verticalArea->addItem("Full Height", "full");
+    m_verticalArea->setToolTip("Set vertical visible area (short=200px, tv=240px, full=300px)");
+    vertAreaRow->addWidget(m_verticalArea);
+    displayCol1->addLayout(vertAreaRow);
+    displayCol1->addStretch();
+    
+    // Column 2: Shift Controls
+    QVBoxLayout* displayCol2 = new QVBoxLayout();
+    
+    QHBoxLayout* horizShiftRow = new QHBoxLayout();
+    horizShiftRow->addWidget(new QLabel("H Shift:"));
+    m_horizontalShift = new QSpinBox();
+    m_horizontalShift->setRange(-384, 384);
+    m_horizontalShift->setValue(0);
+    m_horizontalShift->setSuffix(" px");
+    m_horizontalShift->setToolTip("Shift display horizontally (-384 to 384 pixels)");
+    horizShiftRow->addWidget(m_horizontalShift);
+    displayCol2->addLayout(horizShiftRow);
+    
+    QHBoxLayout* vertShiftRow = new QHBoxLayout();
+    vertShiftRow->addWidget(new QLabel("V Shift:"));
+    m_verticalShift = new QSpinBox();
+    m_verticalShift->setRange(-300, 300);
+    m_verticalShift->setValue(0);
+    m_verticalShift->setSuffix(" px");
+    m_verticalShift->setToolTip("Shift display vertically (-300 to 300 pixels)");
+    vertShiftRow->addWidget(m_verticalShift);
+    displayCol2->addLayout(vertShiftRow);
+    displayCol2->addStretch();
+    
+    // Column 3: Mode Controls
+    QVBoxLayout* displayCol3 = new QVBoxLayout();
+    
+    QHBoxLayout* fitScreenRow = new QHBoxLayout();
+    fitScreenRow->addWidget(new QLabel("Fit Screen:"));
+    m_fitScreen = new QComboBox();
+    m_fitScreen->addItem("Fit Width", "width");
+    m_fitScreen->addItem("Fit Height", "height");
+    m_fitScreen->addItem("Fit Both", "both");
+    m_fitScreen->setToolTip("Method for fitting image to screen size");
+    fitScreenRow->addWidget(m_fitScreen);
+    displayCol3->addLayout(fitScreenRow);
+    
+    m_show80Column = new QCheckBox("Enable 80-Column Display");
+    m_show80Column->setToolTip("Show 80-column text mode (requires compatible software)");
+    displayCol3->addWidget(m_show80Column);
+    
+    m_vSyncEnabled = new QCheckBox("Enable Vertical Sync");
+    m_vSyncEnabled->setToolTip("Synchronize display to monitor refresh rate (reduces tearing)");
+    displayCol3->addWidget(m_vSyncEnabled);
+    displayCol3->addStretch();
+    
+    // Add columns to main layout
+    displayMainLayout->addLayout(displayCol1, 1);
+    displayMainLayout->addLayout(displayCol2, 1);
+    displayMainLayout->addLayout(displayCol3, 1);
+    
+    tabLayout->addWidget(displayGroup);
     
     // PAL-specific settings
     m_palGroup = new QGroupBox("PAL Video Options");
@@ -1876,6 +1952,37 @@ void SettingsDialog::loadSettings()
     m_keepAspectRatio->setChecked(settings.value("video/keepAspectRatio", true).toBool());
     m_fullscreenMode->setChecked(settings.value("video/fullscreenMode", false).toBool());
     
+    // Load Screen Display Options
+    QString horizontalArea = settings.value("video/horizontalArea", "tv").toString();
+    for (int i = 0; i < m_horizontalArea->count(); ++i) {
+        if (m_horizontalArea->itemData(i).toString() == horizontalArea) {
+            m_horizontalArea->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    QString verticalArea = settings.value("video/verticalArea", "tv").toString();
+    for (int i = 0; i < m_verticalArea->count(); ++i) {
+        if (m_verticalArea->itemData(i).toString() == verticalArea) {
+            m_verticalArea->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_horizontalShift->setValue(settings.value("video/horizontalShift", 0).toInt());
+    m_verticalShift->setValue(settings.value("video/verticalShift", 0).toInt());
+    
+    QString fitScreen = settings.value("video/fitScreen", "both").toString();
+    for (int i = 0; i < m_fitScreen->count(); ++i) {
+        if (m_fitScreen->itemData(i).toString() == fitScreen) {
+            m_fitScreen->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_show80Column->setChecked(settings.value("video/show80Column", false).toBool());
+    m_vSyncEnabled->setChecked(settings.value("video/vSyncEnabled", false).toBool());
+    
     QString palBlending = settings.value("video/palBlending", "simple").toString();
     for (int i = 0; i < m_palBlending->count(); ++i) {
         if (m_palBlending->itemData(i).toString() == palBlending) {
@@ -2077,6 +2184,15 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/scalingFilter", m_scalingFilter->isChecked());
     settings.setValue("video/keepAspectRatio", m_keepAspectRatio->isChecked());
     settings.setValue("video/fullscreenMode", m_fullscreenMode->isChecked());
+    
+    // Save Screen Display Options
+    settings.setValue("video/horizontalArea", m_horizontalArea->currentData().toString());
+    settings.setValue("video/verticalArea", m_verticalArea->currentData().toString());
+    settings.setValue("video/horizontalShift", m_horizontalShift->value());
+    settings.setValue("video/verticalShift", m_verticalShift->value());
+    settings.setValue("video/fitScreen", m_fitScreen->currentData().toString());
+    settings.setValue("video/show80Column", m_show80Column->isChecked());
+    settings.setValue("video/vSyncEnabled", m_vSyncEnabled->isChecked());
     settings.setValue("video/palBlending", m_palBlending->currentData().toString());
     // FUTURE: Save universal scanlines settings (commented out - not working)
     // settings.setValue("video/scanlinesPercentage", m_scanlinesSlider->value());
@@ -2348,6 +2464,16 @@ void SettingsDialog::restoreDefaults()
     m_scalingFilter->setChecked(true);
     m_keepAspectRatio->setChecked(true);
     m_fullscreenMode->setChecked(false);
+    
+    // Screen Display Options defaults
+    m_horizontalArea->setCurrentIndex(1);  // TV Safe Area
+    m_verticalArea->setCurrentIndex(1);    // TV Safe Area
+    m_horizontalShift->setValue(0);        // No shift
+    m_verticalShift->setValue(0);          // No shift
+    m_fitScreen->setCurrentIndex(2);       // Fit Both
+    m_show80Column->setChecked(false);     // Standard display
+    m_vSyncEnabled->setChecked(false);     // VSync off (for performance)
+    
     m_palBlending->setCurrentIndex(1);     // Simple
     // FUTURE: Universal scanlines defaults (commented out - not working)
     // m_scanlinesSlider->setValue(0);
@@ -2504,6 +2630,15 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.keepAspectRatio = m_keepAspectRatio->isChecked();
     profile.fullscreenMode = m_fullscreenMode->isChecked();
     
+    // Screen Display Options
+    profile.horizontalArea = m_horizontalArea->currentData().toString();
+    profile.verticalArea = m_verticalArea->currentData().toString();
+    profile.horizontalShift = m_horizontalShift->value();
+    profile.verticalShift = m_verticalShift->value();
+    profile.fitScreen = m_fitScreen->currentData().toString();
+    profile.show80Column = m_show80Column->isChecked();
+    profile.vSyncEnabled = m_vSyncEnabled->isChecked();
+    
     // Color Settings
     profile.palSaturation = m_palSaturationSlider->value();
     profile.palContrast = m_palContrastSlider->value();
@@ -2652,6 +2787,34 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_scalingFilter->setChecked(profile.scalingFilter);
     m_keepAspectRatio->setChecked(profile.keepAspectRatio);
     m_fullscreenMode->setChecked(profile.fullscreenMode);
+    
+    // Screen Display Options
+    for (int i = 0; i < m_horizontalArea->count(); ++i) {
+        if (m_horizontalArea->itemData(i).toString() == profile.horizontalArea) {
+            m_horizontalArea->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    for (int i = 0; i < m_verticalArea->count(); ++i) {
+        if (m_verticalArea->itemData(i).toString() == profile.verticalArea) {
+            m_verticalArea->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_horizontalShift->setValue(profile.horizontalShift);
+    m_verticalShift->setValue(profile.verticalShift);
+    
+    for (int i = 0; i < m_fitScreen->count(); ++i) {
+        if (m_fitScreen->itemData(i).toString() == profile.fitScreen) {
+            m_fitScreen->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    m_show80Column->setChecked(profile.show80Column);
+    m_vSyncEnabled->setChecked(profile.vSyncEnabled);
     
     // Color Settings - block individual slider signals to prevent visual bouncing
     // PAL Color Settings
