@@ -818,3 +818,132 @@ void AtariEmulator::setEmulationSpeed(int percentage)
     
     qDebug() << "Emulation speed set to:" << percentage << "% (turbo=" << Atari800_turbo << ")";
 }
+
+void AtariEmulator::injectCharacter(char ch)
+{
+    // Clear previous input
+    libatari800_clear_input_array(&m_currentInput);
+    
+    if (ch >= 'A' && ch <= 'Z') {
+        // Uppercase letters - use keycode approach
+        unsigned char atariKey = 0;
+        switch (ch) {
+            case 'A': atariKey = AKEY_a; break;
+            case 'B': atariKey = AKEY_b; break;
+            case 'C': atariKey = AKEY_c; break;
+            case 'D': atariKey = AKEY_d; break;
+            case 'E': atariKey = AKEY_e; break;
+            case 'F': atariKey = AKEY_f; break;
+            case 'G': atariKey = AKEY_g; break;
+            case 'H': atariKey = AKEY_h; break;
+            case 'I': atariKey = AKEY_i; break;
+            case 'J': atariKey = AKEY_j; break;
+            case 'K': atariKey = AKEY_k; break;
+            case 'L': m_currentInput.keychar = 'l'; return;
+            case 'M': atariKey = AKEY_m; break;
+            case 'N': atariKey = AKEY_n; break;
+            case 'O': atariKey = AKEY_o; break;
+            case 'P': atariKey = AKEY_p; break;
+            case 'Q': atariKey = AKEY_q; break;
+            case 'R': atariKey = AKEY_r; break;
+            case 'S': atariKey = AKEY_s; break;
+            case 'T': atariKey = AKEY_t; break;
+            case 'U': atariKey = AKEY_u; break;
+            case 'V': atariKey = AKEY_v; break;
+            case 'W': atariKey = AKEY_w; break;
+            case 'X': atariKey = AKEY_x; break;
+            case 'Y': atariKey = AKEY_y; break;
+            case 'Z': atariKey = AKEY_z; break;
+        }
+        if (atariKey != 0) {
+            m_currentInput.keycode = atariKey;
+        }
+    } else if (ch >= 'a' && ch <= 'z') {
+        // Lowercase letters - use keycode approach
+        unsigned char atariKey = 0;
+        switch (ch) {
+            case 'a': atariKey = AKEY_a; break;
+            case 'b': atariKey = AKEY_b; break;
+            case 'c': atariKey = AKEY_c; break;
+            case 'd': atariKey = AKEY_d; break;
+            case 'e': atariKey = AKEY_e; break;
+            case 'f': atariKey = AKEY_f; break;
+            case 'g': atariKey = AKEY_g; break;
+            case 'h': atariKey = AKEY_h; break;
+            case 'i': atariKey = AKEY_i; break;
+            case 'j': atariKey = AKEY_j; break;
+            case 'k': atariKey = AKEY_k; break;
+            case 'l': m_currentInput.keychar = 'l'; return;
+            case 'm': atariKey = AKEY_m; break;
+            case 'n': atariKey = AKEY_n; break;
+            case 'o': atariKey = AKEY_o; break;
+            case 'p': atariKey = AKEY_p; break;
+            case 'q': atariKey = AKEY_q; break;
+            case 'r': atariKey = AKEY_r; break;
+            case 's': atariKey = AKEY_s; break;
+            case 't': atariKey = AKEY_t; break;
+            case 'u': atariKey = AKEY_u; break;
+            case 'v': atariKey = AKEY_v; break;
+            case 'w': atariKey = AKEY_w; break;
+            case 'x': atariKey = AKEY_x; break;
+            case 'y': atariKey = AKEY_y; break;
+            case 'z': atariKey = AKEY_z; break;
+        }
+        if (atariKey != 0) {
+            m_currentInput.keycode = atariKey;
+        }
+    } else if (ch >= '0' && ch <= '9') {
+        // Numbers - use keychar approach
+        m_currentInput.keychar = ch;
+    } else if (ch == ' ') {
+        // Space
+        m_currentInput.keychar = ' ';
+    } else if (ch == '\r' || ch == '\n') {
+        // Return
+        m_currentInput.keycode = AKEY_RETURN;
+    } else if (ch == '"') {
+        // Quote - use keychar
+        m_currentInput.keychar = '"';
+    } else {
+        return;
+    }
+}
+
+void AtariEmulator::clearInput()
+{
+    libatari800_clear_input_array(&m_currentInput);
+}
+
+void AtariEmulator::pauseEmulation()
+{
+    if (!m_emulationPaused) {
+        m_frameTimer->stop();
+        m_emulationPaused = true;
+        qDebug() << "Emulation paused";
+    }
+}
+
+void AtariEmulator::resumeEmulation()
+{
+    if (m_emulationPaused) {
+        m_frameTimer->start();
+        m_emulationPaused = false;
+        qDebug() << "Emulation resumed";
+    }
+}
+
+bool AtariEmulator::isEmulationPaused() const
+{
+    return m_emulationPaused;
+}
+
+void AtariEmulator::stepOneFrame()
+{
+    if (m_emulationPaused) {
+        // Execute one frame manually when paused
+        processFrame();
+        qDebug() << "Stepped one frame - PC:" << QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+    } else {
+        qDebug() << "Cannot step frame - emulation not paused";
+    }
+}

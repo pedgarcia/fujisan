@@ -30,13 +30,14 @@ public:
     
     void updateCPUState();
     void updateMemoryView();
+    void updateDisassemblyView();
     
 public slots:
-    void onStepClicked();
+    void onStepIntoClicked();
+    void onStepOverClicked(); 
     void onRunClicked();
     void onPauseClicked();
     void onMemoryAddressChanged();
-    void onRefreshClicked();
 
 private slots:
     void refreshDebugInfo();
@@ -46,8 +47,16 @@ private:
     void connectSignals();
     void updateCPURegisters();
     void updateMemoryDisplay();
+    void updateCurrentInstruction();
+    void updateDisassemblyDisplay();
     QString formatHexByte(unsigned char value);
     QString formatHexWord(unsigned short value);
+    QString formatCurrentInstruction(unsigned short pc);
+    QString formatInstructionLine(unsigned short pc, bool isCurrent = false);
+    int getInstructionSize(unsigned char opcode);
+    bool isSubroutineCall(unsigned char opcode);
+    void stepSingleInstruction();
+    void stepOverSubroutine();
     
     AtariEmulator* m_emulator;
     QTimer* m_refreshTimer;
@@ -63,21 +72,27 @@ private:
     
     // Step Controls UI
     QGroupBox* m_controlGroup;
-    QPushButton* m_stepButton;
+    QPushButton* m_stepIntoButton;
+    QPushButton* m_stepOverButton;
     QPushButton* m_runButton;
     QPushButton* m_pauseButton;
-    QPushButton* m_refreshButton;
     
     // Memory Viewer UI
     QGroupBox* m_memoryGroup;
     QSpinBox* m_memoryAddressSpinBox;
     QTextEdit* m_memoryTextEdit;
     
+    // Disassembly UI
+    QGroupBox* m_disassemblyGroup;
+    QLabel* m_currentInstructionLabel;
+    QTextEdit* m_disassemblyTextEdit;
+    
     // State tracking
     bool m_isRunning;
     int m_currentMemoryAddress;
+    unsigned short m_stepOverBreakPC;  // PC to break at for step over
     
-    static const int MEMORY_DISPLAY_ROWS = 16;
+    static const int MEMORY_DISPLAY_ROWS = 20;  // Increased to 20 for more memory context
     static const int MEMORY_DISPLAY_COLS = 16;
 };
 

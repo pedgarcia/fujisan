@@ -25,6 +25,10 @@ MainWindow::MainWindow(QWidget *parent)
     , m_startInFullscreen(false)
     , m_isInCustomFullscreen(false)
     , m_fullscreenWidget(nullptr)
+    , m_pasteTimer(new QTimer(this))
+    , m_pasteIndex(0)
+    , m_originalEmulationSpeed(100)
+    , m_pasteCharacterSent(false)
 {
     setWindowTitle("Fujisan");
     setMinimumSize(800, 600);
@@ -40,9 +44,17 @@ MainWindow::MainWindow(QWidget *parent)
     createEmulatorWidget();
     createDebugger();
     
+    // Setup paste timer
+    m_pasteTimer->setSingleShot(false);
+    m_pasteTimer->setInterval(75); // 75ms for character/clear cycle
+    connect(m_pasteTimer, &QTimer::timeout, this, &MainWindow::sendNextCharacter);
+    
     // Load initial settings and initialize emulator with them
     loadInitialSettings();
     loadVideoSettings();
+    
+    // Show initial status message
+    statusBar()->showMessage("Fujisan ready", 3000);
     
     qDebug() << "Fujisan initialized successfully";
 }
@@ -85,6 +97,15 @@ void MainWindow::createMenus()
     m_exitAction->setShortcut(QKeySequence::Quit);
     connect(m_exitAction, &QAction::triggered, this, &QWidget::close);
     fileMenu->addAction(m_exitAction);
+    
+    // Edit menu
+    QMenu* editMenu = menuBar()->addMenu("&Edit");
+    
+    m_pasteAction = new QAction("&Paste Text", this);
+    m_pasteAction->setShortcut(QKeySequence::Paste);
+    m_pasteAction->setToolTip("Paste clipboard text into emulator (Ctrl+V)");
+    connect(m_pasteAction, &QAction::triggered, this, &MainWindow::pasteText);
+    editMenu->addAction(m_pasteAction);
     
     // System menu
     QMenu* systemMenu = menuBar()->addMenu("&System");
@@ -729,18 +750,73 @@ void MainWindow::showAbout()
     QString shortcut = "F11";
 #endif
 
-    QMessageBox::about(this, "About Fujisan", 
-        QString("Fujisan - Modern Atari Emulator\n\n"
-        "A modern Qt5 frontend for the Atari800 emulator.\n"
-        "Features:\n"
-        "• Full keyboard input support\n"
-        "• BASIC enable/disable\n"
-        "• Cold/warm boot options\n"
-        "• Native file dialogs\n"
-        "• Authentic Atari colors\n"
-        "• Pixel-perfect scaling\n"
-        "• 4:3 aspect ratio lock\n"
-        "• Immersive fullscreen mode (%1)").arg(shortcut));
+    // Create custom about dialog
+    QDialog aboutDialog(this);
+    aboutDialog.setWindowTitle("About Fujisan");
+    aboutDialog.setFixedSize(500, 400);
+    aboutDialog.setModal(true);
+    
+    QVBoxLayout* layout = new QVBoxLayout(&aboutDialog);
+    layout->setSpacing(15);
+    layout->setContentsMargins(20, 20, 20, 20);
+    
+    // Logo
+    QLabel* logoLabel = new QLabel();
+    QPixmap logo("/Users/pgarcia/Downloads/fujisanlogo.png");
+    if (!logo.isNull()) {
+        // Scale logo to fit nicely in the dialog
+        QPixmap scaledLogo = logo.scaled(300, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        logoLabel->setPixmap(scaledLogo);
+        logoLabel->setAlignment(Qt::AlignCenter);
+    } else {
+        logoLabel->setText("FUJISAN");
+        logoLabel->setAlignment(Qt::AlignCenter);
+        QFont logoFont = logoLabel->font();
+        logoFont.setPointSize(24);
+        logoFont.setBold(true);
+        logoLabel->setFont(logoFont);
+    }
+    layout->addWidget(logoLabel);
+    
+    // Title and description
+    QLabel* titleLabel = new QLabel("Modern Atari Emulator");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    QFont titleFont = titleLabel->font();
+    titleFont.setPointSize(14);
+    titleFont.setBold(true);
+    titleLabel->setFont(titleFont);
+    layout->addWidget(titleLabel);
+    
+    // Description
+    QLabel* descriptionLabel = new QLabel("A modern Qt5 frontend for the Atari800 emulator.");
+    descriptionLabel->setAlignment(Qt::AlignCenter);
+    descriptionLabel->setWordWrap(true);
+    layout->addWidget(descriptionLabel);
+    
+    // Credits and copyright
+    QLabel* creditsLabel = new QLabel(
+        "Built on the Atari800 emulator project\n"
+        "Copyright © 2025 Paulo Garcia (8bitrelics.com)\n"
+        "Licensed under the MIT License");
+    creditsLabel->setAlignment(Qt::AlignCenter);
+    QFont creditsFont = creditsLabel->font();
+    creditsFont.setPointSize(10);
+    creditsLabel->setFont(creditsFont);
+    creditsLabel->setStyleSheet("color: #666666;");
+    layout->addWidget(creditsLabel);
+    
+    // OK button
+    QPushButton* okButton = new QPushButton("OK");
+    okButton->setDefault(true);
+    connect(okButton, &QPushButton::clicked, &aboutDialog, &QDialog::accept);
+    
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(okButton);
+    buttonLayout->addStretch();
+    layout->addLayout(buttonLayout);
+    
+    aboutDialog.exec();
 }
 
 void MainWindow::loadInitialSettings()
@@ -973,11 +1049,96 @@ void MainWindow::toggleDebugger()
     }
 }
 
+void MainWindow::pasteText()
+{
+    if (!m_emulator) {
+        return;
+    }
+    
+    QClipboard* clipboard = QApplication::clipboard();
+    QString text = clipboard->text();
+    
+    if (text.isEmpty()) {
+        qDebug() << "Clipboard is empty, nothing to paste";
+        return;
+    }
+    
+    sendTextToEmulator(text);
+}
+
+void MainWindow::sendTextToEmulator(const QString& text)
+{
+    if (!m_emulator || text.isEmpty()) {
+        return;
+    }
+    
+    // Stop any existing paste operation
+    if (m_pasteTimer->isActive()) {
+        m_pasteTimer->stop();
+        // Restore original speed if previous paste was interrupted
+        m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
+    }
+    
+    // Store current emulation speed and boost it moderately for pasting
+    m_originalEmulationSpeed = 100; // Assume 100% as default, could be made configurable
+    m_emulator->setEmulationSpeed(200); // 2x speed for more reliable pasting
+    
+    // Setup the paste buffer
+    m_pasteBuffer = text;
+    m_pasteIndex = 0;
+    m_pasteCharacterSent = false;
+    
+    // Start the timer to send characters
+    m_pasteTimer->start();
+    
+}
+
+void MainWindow::sendNextCharacter()
+{
+    if (!m_emulator) {
+        return;
+    }
+    
+    if (!m_pasteCharacterSent) {
+        // Check if we've finished all characters
+        if (m_pasteIndex >= m_pasteBuffer.length()) {
+            // Finished pasting - restore original emulation speed
+            m_pasteTimer->stop();
+            m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
+            m_pasteBuffer.clear();
+            m_pasteIndex = 0;
+            m_pasteCharacterSent = false;
+            return;
+        }
+        
+        // Send character
+        QChar ch = m_pasteBuffer.at(m_pasteIndex);
+        m_emulator->injectCharacter(ch.toLatin1());
+        m_pasteCharacterSent = true;
+    } else {
+        // Clear input and advance to next character
+        m_emulator->clearInput();
+        m_pasteIndex++;
+        m_pasteCharacterSent = false;
+    }
+    
+    // Allow some processing time
+    QCoreApplication::processEvents();
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     // Exit fullscreen if active
     if (m_isInCustomFullscreen) {
         exitCustomFullscreen();
+    }
+    
+    // Stop paste timer if running and restore speed
+    if (m_pasteTimer && m_pasteTimer->isActive()) {
+        m_pasteTimer->stop();
+        if (m_emulator) {
+            m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
+        }
     }
     
     if (m_emulator) {

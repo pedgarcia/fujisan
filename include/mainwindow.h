@@ -20,6 +20,10 @@
 #include <QLabel>
 #include <QSettings>
 #include <QDockWidget>
+#include <QTimer>
+#include <QClipboard>
+#include <QDialog>
+#include <QPixmap>
 #include "atariemulator.h"
 #include "emulatorwidget.h"
 #include "toggleswitch.h"
@@ -53,6 +57,8 @@ private slots:
     void toggleFullscreen();
     void showAbout();
     void toggleDebugger();
+    void pasteText();
+    void sendNextCharacter();
 
 private:
     void createMenus();
@@ -66,6 +72,7 @@ private:
     void loadVideoSettings();
     void enterCustomFullscreen();
     void exitCustomFullscreen();
+    void sendTextToEmulator(const QString& text);
     
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
@@ -90,6 +97,7 @@ private:
     QAction* m_settingsAction;
     QAction* m_exitAction;
     QAction* m_aboutAction;
+    QAction* m_pasteAction;
     
     // Video system actions
     QAction* m_videoNTSCAction;
@@ -106,6 +114,13 @@ private:
     // Fullscreen state
     bool m_isInCustomFullscreen;
     QWidget* m_fullscreenWidget;
+    
+    // Paste functionality
+    QTimer* m_pasteTimer;
+    QString m_pasteBuffer;
+    int m_pasteIndex;
+    int m_originalEmulationSpeed;
+    bool m_pasteCharacterSent;
 };
 
 #endif // MAINWINDOW_H

@@ -59,6 +59,13 @@ extern "C" {
     // Speed control variables
     extern int Atari800_turbo;
     extern int Atari800_turbo_speed;
+    // CPU registers for debugging
+    extern unsigned short CPU_regPC;
+    extern unsigned char CPU_regA;
+    extern unsigned char CPU_regX;
+    extern unsigned char CPU_regY;
+    extern unsigned char CPU_regS;
+    extern unsigned char CPU_regP;
     // AKEY constants are already included via akey.h
 }
 
@@ -131,6 +138,16 @@ public:
     
     // Speed control
     void setEmulationSpeed(int percentage);
+    
+    // Direct input injection for paste functionality
+    void injectCharacter(char ch);
+    void clearInput();
+    
+    // Debug/execution control
+    void pauseEmulation();
+    void resumeEmulation();
+    bool isEmulationPaused() const;
+    void stepOneFrame();
 
 public slots:
     void processFrame();
@@ -153,6 +170,9 @@ private:
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;
     QTimer* m_frameTimer;
+    
+    // Debug/execution state
+    bool m_emulationPaused = false;
     
     // Disk drive tracking
     QString m_diskImages[8]; // Paths for D1: through D8:
