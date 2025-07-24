@@ -53,6 +53,7 @@ private slots:
     void toggleAltirraOS(bool enabled);
     void onMachineTypeChanged(int index);
     void onVideoSystemToggled(bool isPAL);
+    void onSpeedToggled(bool isFullSpeed);
     void showSettings();
     void onSettingsChanged();
     void toggleFullscreen();
@@ -102,10 +103,17 @@ private:
     QDockWidget* m_mediaPeripheralsDockWidget;
     QPushButton* m_mediaToggleButton;
     
+    // Console buttons
+    QPushButton* m_startButton;
+    QPushButton* m_selectButton;
+    QPushButton* m_optionButton;
+    QPushButton* m_breakButton;
+    
     // Toolbar widgets
     ToggleSwitch* m_basicToggle;
     QComboBox* m_machineCombo;
     ToggleSwitch* m_videoToggle;
+    ToggleSwitch* m_speedToggle;
     
     // Menu actions
     QAction* m_loadRomAction;

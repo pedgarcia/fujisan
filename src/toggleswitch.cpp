@@ -17,6 +17,8 @@ ToggleSwitch::ToggleSwitch(QWidget* parent)
     , m_offset(THUMB_MARGIN)
     , m_onLabel("ON")
     , m_offLabel("OFF")
+    , m_checkedColor(52, 199, 89)    // Default green for ON
+    , m_uncheckedColor(120, 120, 128) // Default gray for OFF
 {
     setFixedSize(SWITCH_WIDTH, SWITCH_HEIGHT);
     setCursor(Qt::PointingHandCursor);
@@ -49,6 +51,13 @@ void ToggleSwitch::setLabels(const QString& onLabel, const QString& offLabel)
     update();
 }
 
+void ToggleSwitch::setColors(const QColor& checkedColor, const QColor& uncheckedColor)
+{
+    m_checkedColor = checkedColor;
+    m_uncheckedColor = uncheckedColor;
+    update();
+}
+
 void ToggleSwitch::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event)
@@ -57,7 +66,7 @@ void ToggleSwitch::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing);
     
     // Background track
-    QColor trackColor = m_checked ? QColor(52, 199, 89) : QColor(120, 120, 128);
+    QColor trackColor = m_checked ? m_checkedColor : m_uncheckedColor;
     if (m_hovered) {
         trackColor = trackColor.lighter(110);
     }

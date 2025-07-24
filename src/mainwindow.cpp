@@ -197,122 +197,11 @@ void MainWindow::createToolBar()
     // Increase toolbar height to accommodate multiple controls
     m_toolBar->setMinimumHeight(70);
     
-    // Add spacer to push controls to the right
+    // Add spacer to push cold reset button to the right
     QWidget* spacer = new QWidget();
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_toolBar->addWidget(spacer);
     
-    // Machine type dropdown in its own column
-    QWidget* machineContainer = new QWidget();
-    QVBoxLayout* machineLayout = new QVBoxLayout(machineContainer);
-    machineLayout->setContentsMargins(5, 5, 5, 5);
-    machineLayout->setAlignment(Qt::AlignCenter);
-    
-    m_machineCombo = new QComboBox();
-    m_machineCombo->setIconSize(QSize(32, 20)); // Set icon display size
-    m_machineCombo->setMinimumWidth(150); // Slightly wider for icons
-    
-    // Create simple machine icons programmatically
-    auto createMachineIcon = [](const QColor& baseColor, const QString& text) -> QIcon {
-        QPixmap pixmap(32, 20);
-        pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing);
-        
-        // Draw computer shape
-        painter.setPen(QPen(baseColor.darker(150), 1));
-        painter.setBrush(QBrush(baseColor));
-        painter.drawRoundedRect(2, 2, 28, 16, 2, 2);
-        
-        // Draw screen
-        painter.setBrush(QBrush(Qt::black));
-        painter.drawRect(4, 4, 12, 8);
-        
-        // Draw keyboard area
-        painter.setBrush(QBrush(baseColor.darker(120)));
-        painter.drawRect(4, 13, 24, 4);
-        
-        // Add text label
-        painter.setPen(Qt::white);
-        QFont font = painter.font();
-        font.setPixelSize(6);
-        font.setBold(true);
-        painter.setFont(font);
-        painter.drawText(QRect(18, 4, 12, 8), Qt::AlignCenter, text);
-        
-        return QIcon(pixmap);
-    };
-    
-    // Add items with custom icons
-    m_machineCombo->addItem(createMachineIcon(QColor(139, 69, 19), "400"), "Atari 400/800");     // Brown
-    m_machineCombo->addItem(createMachineIcon(QColor(169, 169, 169), "1200"), "Atari 1200XL");   // Dark Gray
-    m_machineCombo->addItem(createMachineIcon(QColor(192, 192, 192), "XL"), "Atari 800XL");      // Silver
-    m_machineCombo->addItem(createMachineIcon(QColor(105, 105, 105), "XE"), "Atari 130XE");      // Dark Gray
-    m_machineCombo->addItem(createMachineIcon(QColor(85, 85, 85), "320C"), "Atari 320XE (Compy-Shop)"); // Darker Gray
-    m_machineCombo->addItem(createMachineIcon(QColor(75, 75, 75), "320R"), "Atari 320XE (Rambo XL)");   // Very Dark Gray
-    m_machineCombo->addItem(createMachineIcon(QColor(65, 65, 65), "576"), "Atari 576XE");        // Almost Black
-    m_machineCombo->addItem(createMachineIcon(QColor(55, 55, 55), "1088"), "Atari 1088XE");      // Black
-    m_machineCombo->addItem(createMachineIcon(QColor(128, 0, 128), "XEGS"), "Atari XEGS");       // Purple
-    m_machineCombo->addItem(createMachineIcon(QColor(70, 130, 180), "5200"), "Atari 5200");      // Steel Blue
-    
-    m_machineCombo->setCurrentIndex(2); // Default to 800XL (updated index)
-    connect(m_machineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
-            this, &MainWindow::onMachineTypeChanged);
-    
-    machineLayout->addWidget(m_machineCombo);
-    
-    m_toolBar->addWidget(machineContainer);
-    
-    
-    // Toggle switches container - stacked vertically on far right
-    QWidget* togglesContainer = new QWidget();
-    QVBoxLayout* togglesLayout = new QVBoxLayout(togglesContainer);
-    togglesLayout->setContentsMargins(5, 5, 5, 5);
-    togglesLayout->setSpacing(4);
-    togglesLayout->setAlignment(Qt::AlignCenter);
-    
-    // BASIC toggle switch
-    QWidget* basicContainer = new QWidget();
-    QHBoxLayout* basicLayout = new QHBoxLayout(basicContainer);
-    basicLayout->setContentsMargins(0, 0, 0, 0);
-    basicLayout->setSpacing(6);
-    
-    QLabel* basicLabel = new QLabel("BASIC:");
-    basicLabel->setMinimumWidth(40);
-    m_basicToggle = new ToggleSwitch();
-    m_basicToggle->setLabels("ON", "OFF");
-    m_basicToggle->setChecked(m_emulator->isBasicEnabled());
-    connect(m_basicToggle, &ToggleSwitch::toggled, this, &MainWindow::toggleBasic);
-    
-    basicLayout->addWidget(basicLabel);
-    basicLayout->addWidget(m_basicToggle);
-    
-    // Video system toggle switch
-    QWidget* videoContainer = new QWidget();
-    QHBoxLayout* videoLayout = new QHBoxLayout(videoContainer);
-    videoLayout->setContentsMargins(0, 0, 0, 0);
-    videoLayout->setSpacing(6);
-    
-    QLabel* videoLabel = new QLabel("Video:");
-    videoLabel->setMinimumWidth(40);
-    m_videoToggle = new ToggleSwitch();
-    m_videoToggle->setLabels("PAL", "NTSC");
-    m_videoToggle->setChecked(true); // Default to PAL (ON position)
-    connect(m_videoToggle, &ToggleSwitch::toggled, this, &MainWindow::onVideoSystemToggled);
-    
-    videoLayout->addWidget(videoLabel);
-    videoLayout->addWidget(m_videoToggle);
-    
-    // Add both toggle switches to the container
-    togglesLayout->addWidget(basicContainer);
-    togglesLayout->addWidget(videoContainer);
-    
-    m_toolBar->addWidget(togglesContainer);
-    
-    // Add small separator space
-    QWidget* separator = new QWidget();
-    separator->setFixedWidth(15);
-    m_toolBar->addWidget(separator);
     
     // Create reset icons
     QPixmap resetPixmap(32, 32);
@@ -333,23 +222,7 @@ void MainWindow::createToolBar()
         resetIcon = QIcon(resetPixmap);
     }
     
-    QPixmap warmPixmap(32, 32);
-    warmPixmap.fill(Qt::transparent);
-    QPainter warmPainter(&warmPixmap);
-    warmPainter.setRenderHint(QPainter::Antialiasing);
-    warmPainter.setPen(QPen(Qt::darkRed, 1.5));
-    warmPainter.setBrush(Qt::NoBrush);
-    warmPainter.drawEllipse(4, 4, 24, 24);
-    warmPainter.drawLine(16, 8, 16, 16);
-    QIcon warmIcon(warmPixmap);
-    
-    // Add reset buttons
-    QAction* warmResetAction = new QAction("Warm Reset", this);
-    warmResetAction->setToolTip("Perform a warm reset of the Atari system (F5)");
-    warmResetAction->setIcon(warmIcon);
-    connect(warmResetAction, &QAction::triggered, this, &MainWindow::warmBoot);
-    m_toolBar->addAction(warmResetAction);
-    
+    // Add only cold reset button (warm reset removed, handled by console buttons)
     QAction* coldResetAction = new QAction("Cold Reset", this);
     coldResetAction->setToolTip("Perform a cold reset of the Atari system (Shift+F5)");
     coldResetAction->setIcon(resetIcon);
@@ -565,6 +438,19 @@ void MainWindow::onVideoSystemToggled(bool isPAL)
     restartEmulator();
 }
 
+void MainWindow::onSpeedToggled(bool isFullSpeed)
+{
+    if (isFullSpeed) {
+        // Full speed mode (toggle ON) - enable turbo for maximum host speed
+        m_emulator->setEmulationSpeed(1000); // High percentage to enable turbo mode
+        statusBar()->showMessage("Emulation speed set to Full (host speed)", 2000);
+    } else {
+        // Real speed mode (toggle OFF) - authentic Atari timing
+        m_emulator->setEmulationSpeed(100);
+        statusBar()->showMessage("Emulation speed set to Real (authentic Atari speed)", 2000);
+    }
+}
+
 void MainWindow::showSettings()
 {
     SettingsDialog dialog(m_emulator, this);
@@ -614,6 +500,11 @@ void MainWindow::updateToolbarFromSettings()
     m_videoToggle->blockSignals(true);
     m_videoToggle->setChecked(isPAL);
     m_videoToggle->blockSignals(false);
+    
+    // Update speed toggle (default to normal speed)
+    m_speedToggle->blockSignals(true);
+    m_speedToggle->setChecked(false); // Default to normal speed (100%)
+    m_speedToggle->blockSignals(false);
     
     // Update menu actions
     m_basicAction->blockSignals(true);
@@ -907,9 +798,200 @@ void MainWindow::createMediaPeripheralsDock()
     mainLayout->addSpacing(2);
     mainLayout->addWidget(m_mediaToggleButton);
     
+    // Create console buttons section
+    QWidget* consoleButtonsContainer = new QWidget(this);
+    QVBoxLayout* buttonsLayout = new QVBoxLayout(consoleButtonsContainer);
+    buttonsLayout->setContentsMargins(2, 2, 2, 2);
+    buttonsLayout->setSpacing(1);
+    
+    // Create console buttons - wider than tall for compact stacking
+    m_startButton = new QPushButton("START", this);
+    m_selectButton = new QPushButton("SELECT", this);
+    m_optionButton = new QPushButton("OPTION", this);
+    m_breakButton = new QPushButton("BREAK", this);
+    
+    // Style console buttons - wide and short
+    QString buttonStyle = 
+        "QPushButton {"
+        "    font-size: 9px;"
+        "    font-weight: bold;"
+        "    padding: 1px 4px;"
+        "    margin: 0px;"
+        "    border: 1px solid gray;"
+        "    background-color: #f0f0f0;"
+        "    min-width: 50px;"
+        "    max-width: 60px;"
+        "    min-height: 10px;"
+        "    max-height: 12px;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: #d0d0d0;"
+        "    border: 1px solid black;"
+        "}";
+    
+    m_startButton->setStyleSheet(buttonStyle);
+    m_selectButton->setStyleSheet(buttonStyle);
+    m_optionButton->setStyleSheet(buttonStyle);
+    m_breakButton->setStyleSheet(buttonStyle);
+    
+    // Add tooltips
+    m_startButton->setToolTip("START button (F2)");
+    m_selectButton->setToolTip("SELECT button (F3)");
+    m_optionButton->setToolTip("OPTION button (F4)");
+    m_breakButton->setToolTip("BREAK key (F7)");
+    
+    // Add buttons to layout
+    buttonsLayout->addWidget(m_startButton);
+    buttonsLayout->addWidget(m_selectButton);
+    buttonsLayout->addWidget(m_optionButton);
+    buttonsLayout->addWidget(m_breakButton);
+    
+    // Connect console button signals
+    connect(m_startButton, &QPushButton::clicked, this, [this]() {
+        QKeyEvent event(QEvent::KeyPress, Qt::Key_F2, Qt::NoModifier);
+        m_emulator->handleKeyPress(&event);
+    });
+    connect(m_selectButton, &QPushButton::clicked, this, [this]() {
+        QKeyEvent event(QEvent::KeyPress, Qt::Key_F3, Qt::NoModifier);
+        m_emulator->handleKeyPress(&event);
+    });
+    connect(m_optionButton, &QPushButton::clicked, this, [this]() {
+        QKeyEvent event(QEvent::KeyPress, Qt::Key_F4, Qt::NoModifier);
+        m_emulator->handleKeyPress(&event);
+    });
+    connect(m_breakButton, &QPushButton::clicked, this, [this]() {
+        QKeyEvent event(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier);
+        m_emulator->handleKeyPress(&event);
+    });
+    
+    // Create machine controls container (machine dropdown on top, toggles side by side below)
+    QWidget* machineControlsContainer = new QWidget(this);
+    QVBoxLayout* machineControlsLayout = new QVBoxLayout(machineControlsContainer);
+    machineControlsLayout->setContentsMargins(2, 2, 2, 2);
+    machineControlsLayout->setSpacing(2);
+    
+    // Machine selector on top
+    m_machineCombo = new QComboBox();
+    m_machineCombo->setIconSize(QSize(32, 20));
+    m_machineCombo->setMinimumWidth(150);
+    
+    // Create machine icons (same as original createToolBar)
+    auto createMachineIcon = [](const QColor& baseColor, const QString& text) -> QIcon {
+        QPixmap pixmap(32, 20);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        
+        // Draw computer shape
+        painter.setPen(QPen(baseColor.darker(150), 1));
+        painter.setBrush(QBrush(baseColor));
+        painter.drawRoundedRect(2, 2, 28, 16, 2, 2);
+        
+        // Draw screen
+        painter.setBrush(QBrush(Qt::black));
+        painter.drawRect(4, 4, 12, 8);
+        
+        // Draw keyboard area
+        painter.setBrush(QBrush(baseColor.darker(120)));
+        painter.drawRect(4, 13, 24, 4);
+        
+        // Add text label
+        painter.setPen(Qt::white);
+        QFont font = painter.font();
+        font.setPixelSize(6);
+        font.setBold(true);
+        painter.setFont(font);
+        painter.drawText(QRect(18, 4, 12, 8), Qt::AlignCenter, text);
+        
+        return QIcon(pixmap);
+    };
+    
+    // Add machine items
+    m_machineCombo->addItem(createMachineIcon(QColor(139, 69, 19), "400"), "Atari 400/800");
+    m_machineCombo->addItem(createMachineIcon(QColor(169, 169, 169), "1200"), "Atari 1200XL");
+    m_machineCombo->addItem(createMachineIcon(QColor(192, 192, 192), "XL"), "Atari 800XL");
+    m_machineCombo->addItem(createMachineIcon(QColor(105, 105, 105), "XE"), "Atari 130XE");
+    m_machineCombo->addItem(createMachineIcon(QColor(85, 85, 85), "320C"), "Atari 320XE (Compy-Shop)");
+    m_machineCombo->addItem(createMachineIcon(QColor(75, 75, 75), "320R"), "Atari 320XE (Rambo XL)");
+    m_machineCombo->addItem(createMachineIcon(QColor(65, 65, 65), "576"), "Atari 576XE");
+    m_machineCombo->addItem(createMachineIcon(QColor(55, 55, 55), "1088"), "Atari 1088XE");
+    m_machineCombo->addItem(createMachineIcon(QColor(128, 0, 128), "XEGS"), "Atari XEGS");
+    m_machineCombo->addItem(createMachineIcon(QColor(70, 130, 180), "5200"), "Atari 5200");
+    
+    m_machineCombo->setCurrentIndex(2); // Default to 800XL
+    connect(m_machineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
+            this, &MainWindow::onMachineTypeChanged);
+    
+    machineControlsLayout->addWidget(m_machineCombo);
+    
+    // Toggle switches container - BASIC, Video, and Speed side by side under machine selector
+    QWidget* togglesContainer = new QWidget();
+    QHBoxLayout* togglesLayout = new QHBoxLayout(togglesContainer);
+    togglesLayout->setContentsMargins(0, 0, 0, 0);
+    togglesLayout->setSpacing(6);
+    
+    // Create BASIC toggle container
+    QWidget* basicContainer = new QWidget();
+    QHBoxLayout* basicLayout = new QHBoxLayout(basicContainer);
+    basicLayout->setContentsMargins(0, 0, 0, 0);
+    basicLayout->setSpacing(4);
+    
+    QLabel* basicLabel = new QLabel("BASIC:");
+    basicLabel->setMinimumWidth(35);
+    m_basicToggle = new ToggleSwitch();
+    m_basicToggle->setLabels("ON", "OFF");
+    m_basicToggle->setChecked(m_emulator->isBasicEnabled());
+    connect(m_basicToggle, &ToggleSwitch::toggled, this, &MainWindow::toggleBasic);
+    
+    basicLayout->addWidget(basicLabel);
+    basicLayout->addWidget(m_basicToggle);
+    
+    // Create video system toggle container  
+    QWidget* videoContainer = new QWidget();
+    QHBoxLayout* videoLayout = new QHBoxLayout(videoContainer);
+    videoLayout->setContentsMargins(0, 0, 0, 0);
+    videoLayout->setSpacing(4);
+    
+    QLabel* videoLabel = new QLabel("Video:");
+    videoLabel->setMinimumWidth(35);
+    m_videoToggle = new ToggleSwitch();
+    m_videoToggle->setLabels("PAL", "NTSC");
+    m_videoToggle->setColors(QColor(70, 130, 180), QColor(70, 130, 180)); // Steel blue for both states
+    m_videoToggle->setChecked(true); // Default to PAL (ON position)
+    connect(m_videoToggle, &ToggleSwitch::toggled, this, &MainWindow::onVideoSystemToggled);
+    
+    videoLayout->addWidget(videoLabel);
+    videoLayout->addWidget(m_videoToggle);
+    
+    // Create speed toggle container
+    QWidget* speedContainer = new QWidget();
+    QHBoxLayout* speedLayout = new QHBoxLayout(speedContainer);
+    speedLayout->setContentsMargins(0, 0, 0, 0);
+    speedLayout->setSpacing(4);
+    
+    QLabel* speedLabel = new QLabel("Speed:");
+    speedLabel->setMinimumWidth(35);
+    m_speedToggle = new ToggleSwitch();
+    m_speedToggle->setLabels("Full", "Real");
+    m_speedToggle->setColors(QColor(70, 130, 180), QColor(70, 130, 180)); // Steel blue for both states
+    m_speedToggle->setChecked(false); // Default to Real speed (OFF position = authentic Atari speed)
+    connect(m_speedToggle, &ToggleSwitch::toggled, this, &MainWindow::onSpeedToggled);
+    
+    speedLayout->addWidget(speedLabel);
+    speedLayout->addWidget(m_speedToggle);
+    
+    // Add all three toggle switches to the container
+    togglesLayout->addWidget(basicContainer);
+    togglesLayout->addWidget(videoContainer);
+    togglesLayout->addWidget(speedContainer);
+    
+    machineControlsLayout->addWidget(togglesContainer);
+    
     // Add to toolbar at the beginning (left side)
     m_toolBar->insertWidget(m_toolBar->actions().first(), diskContainer);
-    m_toolBar->insertSeparator(m_toolBar->actions().at(1));
+    m_toolBar->insertWidget(m_toolBar->actions().at(1), consoleButtonsContainer);
+    m_toolBar->insertWidget(m_toolBar->actions().at(2), machineControlsContainer);
+    m_toolBar->insertSeparator(m_toolBar->actions().at(3));
 }
 
 void MainWindow::toggleMediaDock()

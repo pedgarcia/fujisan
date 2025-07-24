@@ -23,6 +23,7 @@ public:
     void setChecked(bool checked);
     bool isChecked() const { return m_checked; }
     void setLabels(const QString& onLabel, const QString& offLabel);
+    void setColors(const QColor& checkedColor, const QColor& uncheckedColor);
 
 signals:
     void toggled(bool checked);
@@ -45,6 +46,8 @@ private:
     QPropertyAnimation* m_animation;
     QString m_onLabel;
     QString m_offLabel;
+    QColor m_checkedColor;
+    QColor m_uncheckedColor;
     
     static const int SWITCH_WIDTH = 50;
     static const int SWITCH_HEIGHT = 22;
