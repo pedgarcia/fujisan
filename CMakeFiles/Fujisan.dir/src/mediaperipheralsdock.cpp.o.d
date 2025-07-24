@@ -902,6 +902,9 @@ CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QLabel \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlabel.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFrame \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractscrollarea.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrivewidget.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPixmap \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QTimer \
@@ -950,9 +953,4 @@ CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o: \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours_external.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/artifact.h \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/config.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDebug \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdebug.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtextstream.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlocale.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcontiguouscache.h
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/config.h

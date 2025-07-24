@@ -907,6 +907,7 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenuBar \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMessageBox \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPushButton \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollArea \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSlider \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSpinBox \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QTabWidget \
@@ -943,6 +944,7 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmessagebox.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qpushbutton.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qrubberband.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollarea.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qsizepolicy.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qslider.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qspinbox.h \
@@ -1182,6 +1184,8 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QTabWidget:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSpinBox:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollArea:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPushButton:
 
@@ -2894,6 +2898,8 @@ include/settingsdialog.h:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/piecewise_construct.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/size.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollarea.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/copy_move_common.h:
 

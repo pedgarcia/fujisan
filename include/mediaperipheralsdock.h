@@ -15,6 +15,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QFrame>
+#include <QScrollArea>
 #include "diskdrivewidget.h"
 #include "cassettewidget.h"
 #include "cartridgewidget.h"
@@ -74,6 +75,10 @@ private:
     QGroupBox* m_cassetteGroup;
     QGroupBox* m_diskDrivesGroup;
     QGroupBox* m_printerGroup;
+    
+    // Scrollable drive section components
+    QScrollArea* m_driveScrollArea;
+    QWidget* m_driveScrollWidget;
     
     // Device widgets
     CartridgeWidget* m_cartridgeWidget;

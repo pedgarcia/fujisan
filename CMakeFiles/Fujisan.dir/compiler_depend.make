@@ -907,6 +907,7 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenuBar \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMessageBox \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPushButton \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollArea \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSlider \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSpinBox \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QTabWidget \
@@ -943,6 +944,7 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmessagebox.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qpushbutton.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qrubberband.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollarea.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qsizepolicy.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qslider.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qspinbox.h \
@@ -2044,6 +2046,7 @@ CMakeFiles/Fujisan.dir/Fujisan_autogen/mocs_compilation.cpp.o: Fujisan_autogen/m
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMenuBar \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMessageBox \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QPushButton \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSlider \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSpinBox \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QTabWidget \
@@ -2080,6 +2083,7 @@ CMakeFiles/Fujisan.dir/Fujisan_autogen/mocs_compilation.cpp.o: Fujisan_autogen/m
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmessagebox.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qpushbutton.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qsizepolicy.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qslider.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qspinbox.h \
@@ -11577,6 +11581,7 @@ CMakeFiles/Fujisan.dir/src/main.cpp.o: src/main.cpp \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMenuBar \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMessageBox \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QPushButton \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSlider \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSpinBox \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QTabWidget \
@@ -11614,6 +11619,7 @@ CMakeFiles/Fujisan.dir/src/main.cpp.o: src/main.cpp \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmessagebox.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qpushbutton.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qsizepolicy.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qslider.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qspinbox.h \
@@ -12633,6 +12639,7 @@ CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o: src/mainwindow.cpp \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMenuBar \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMessageBox \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QPushButton \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSlider \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSpinBox \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QStatusBar \
@@ -12671,6 +12678,7 @@ CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o: src/mainwindow.cpp \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmessagebox.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qpushbutton.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qsizepolicy.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qslider.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qspinbox.h \
@@ -13626,8 +13634,10 @@ CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o: src/mediaperipheralsdock.
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QHBoxLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QLabel \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMenu \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QVBoxLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QWidget \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractscrollarea.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qaction.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qactiongroup.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qboxlayout.h \
@@ -13638,6 +13648,7 @@ CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o: src/mediaperipheralsdock.
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlayout.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlayoutitem.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmenu.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qsizepolicy.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtwidgets-config.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtwidgetsglobal.h \
@@ -16557,6 +16568,8 @@ CMakeFiles/Fujisan.dir/src/toggleswitch.cpp.o: src/toggleswitch.cpp \
 
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qsizepolicy.h:
 
+/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h:
+
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h:
 
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmainwindow.h:
@@ -16606,8 +16619,6 @@ CMakeFiles/Fujisan.dir/src/toggleswitch.cpp.o: src/toggleswitch.cpp \
 /opt/homebrew/opt/qt@5/lib/QtMultimedia.framework/Headers/QAudioFormat:
 
 /opt/homebrew/opt/qt@5/lib/QtMultimedia.framework/Headers/QAudioDeviceInfo:
-
-/opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qwindowdefs.h:
 
 /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qvalidator.h:
 
@@ -17068,6 +17079,10 @@ Fujisan_autogen/6YEA5652QU/moc_diskdrawerwidget.cpp:
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QTabWidget:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSpinBox:
+
+/opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qwindowdefs.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollArea:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPushButton:
 
@@ -17844,6 +17859,8 @@ include/profileselectionwidget.h:
 /opt/homebrew/share/cmake/Modules/Platform/Apple-AppleClang-C.cmake:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_trivial.h:
+
+/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/make_projected.h:
 
@@ -19082,6 +19099,8 @@ include/settingsdialog.h:
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsharedpointer_impl.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/size.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollarea.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/copy_move_common.h:
 

@@ -1048,5 +1048,7 @@ CMakeFiles/Fujisan.dir/src/main.cpp.o: \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mediaperipheralsdock.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QGridLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFrame \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cassettewidget.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cartridgewidget.h

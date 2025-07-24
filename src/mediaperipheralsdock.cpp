@@ -7,7 +7,7 @@
 
 #include "mediaperipheralsdock.h"
 #include "atariemulator.h"
-#include <QDebug>
+#include <QScrollArea>
 
 MediaPeripheralsDock::MediaPeripheralsDock(AtariEmulator* emulator, QWidget* parent)
     : QWidget(parent)
@@ -17,6 +17,8 @@ MediaPeripheralsDock::MediaPeripheralsDock(AtariEmulator* emulator, QWidget* par
     , m_cassetteGroup(nullptr)
     , m_diskDrivesGroup(nullptr)
     , m_printerGroup(nullptr)
+    , m_driveScrollArea(nullptr)
+    , m_driveScrollWidget(nullptr)
     , m_cartridgeWidget(nullptr)
     , m_cassetteWidget(nullptr)
     , m_printerWidget(nullptr)
@@ -74,11 +76,24 @@ void MediaPeripheralsDock::createCassetteSection()
 void MediaPeripheralsDock::createDiskDrivesSection()
 {
     m_diskDrivesGroup = new QGroupBox("Disk Drives", this);
-    QVBoxLayout* diskLayout = new QVBoxLayout(m_diskDrivesGroup);
-    diskLayout->setContentsMargins(WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING);
-    diskLayout->setSpacing(WIDGET_SPACING);
+    QVBoxLayout* diskGroupLayout = new QVBoxLayout(m_diskDrivesGroup);
+    diskGroupLayout->setContentsMargins(WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING);
+    diskGroupLayout->setSpacing(0);
     
-    // Create drives D2-D8 vertically stacked for narrower dock
+    // Create scroll area for drives
+    m_driveScrollArea = new QScrollArea(m_diskDrivesGroup);
+    m_driveScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_driveScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_driveScrollArea->setWidgetResizable(true);
+    m_driveScrollArea->setFrameStyle(QFrame::NoFrame);
+    
+    // Create the scroll widget that will contain all drives
+    m_driveScrollWidget = new QWidget();
+    QVBoxLayout* scrollLayout = new QVBoxLayout(m_driveScrollWidget);
+    scrollLayout->setContentsMargins(0, 0, 0, 0);
+    scrollLayout->setSpacing(WIDGET_SPACING);
+    
+    // Create drives D2-D8 in the scrollable area
     for (int i = 0; i < 7; i++) {
         int driveNumber = i + 2; // D2-D8
         
@@ -90,9 +105,19 @@ void MediaPeripheralsDock::createDiskDrivesSection()
         driveContainerLayout->setContentsMargins(0, 0, 0, 0);
         driveContainerLayout->addWidget(m_driveWidgets[i], 0, Qt::AlignCenter);
         
-        diskLayout->addWidget(driveContainer);
+        scrollLayout->addWidget(driveContainer);
     }
     
+    // Set the scroll widget to the scroll area
+    m_driveScrollArea->setWidget(m_driveScrollWidget);
+    
+    // Calculate height for 4 drives (D2-D5 visible by default)
+    // Each drive is approximately 52 pixels (84% of original 62px height) + spacing
+    int singleDriveHeight = static_cast<int>(62 * 0.84) + WIDGET_SPACING;
+    int visibleDrivesHeight = 4 * singleDriveHeight + WIDGET_SPACING; // 4 drives + extra padding
+    m_driveScrollArea->setFixedHeight(visibleDrivesHeight);
+    
+    diskGroupLayout->addWidget(m_driveScrollArea);
     m_mainLayout->addWidget(m_diskDrivesGroup);
 }
 
@@ -171,48 +196,40 @@ void MediaPeripheralsDock::updateAllDevices()
 
 void MediaPeripheralsDock::onDiskInserted(int driveNumber, const QString& diskPath)
 {
-    qDebug() << "Media dock: Disk inserted in drive" << driveNumber << ":" << diskPath;
     emit diskInserted(driveNumber, diskPath);
 }
 
 void MediaPeripheralsDock::onDiskEjected(int driveNumber)
 {
-    qDebug() << "Media dock: Disk ejected from drive" << driveNumber;
     emit diskEjected(driveNumber);
 }
 
 void MediaPeripheralsDock::onDriveStateChanged(int driveNumber, bool enabled)
 {
-    qDebug() << "Media dock: Drive" << driveNumber << "state changed to" << (enabled ? "on" : "off");
     emit driveStateChanged(driveNumber, enabled);
 }
 
 void MediaPeripheralsDock::onCassetteInserted(const QString& cassettePath)
 {
-    qDebug() << "Media dock: Cassette inserted:" << cassettePath;
     emit cassetteInserted(cassettePath);
 }
 
 void MediaPeripheralsDock::onCassetteEjected()
 {
-    qDebug() << "Media dock: Cassette ejected";
     emit cassetteEjected();
 }
 
 void MediaPeripheralsDock::onCassetteStateChanged(bool enabled)
 {
-    qDebug() << "Media dock: Cassette state changed to" << (enabled ? "on" : "off");
     emit cassetteStateChanged(enabled);
 }
 
 void MediaPeripheralsDock::onCartridgeInserted(const QString& cartridgePath)
 {
-    qDebug() << "Media dock: Cartridge inserted:" << cartridgePath;
     emit cartridgeInserted(cartridgePath);
 }
 
 void MediaPeripheralsDock::onCartridgeEjected()
 {
-    qDebug() << "Media dock: Cartridge ejected";
     emit cartridgeEjected();
 }
