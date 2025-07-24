@@ -29,6 +29,9 @@ CassetteWidget::CassetteWidget(AtariEmulator* emulator, QWidget *parent)
     // Initial state
     setState(Off);
     updateFromEmulator();
+    
+    // Force initial display update
+    updateDisplay();
 }
 
 void CassetteWidget::setupUI()
@@ -60,23 +63,27 @@ void CassetteWidget::loadImages()
     
     for (const QString& path : imagePaths) {
         QString offPath = path + "cassetteoff.png";
-        if (QFileInfo::exists(offPath)) {
+        QString onPath = path + "cassetteon.png";
+        
+        if (QFileInfo::exists(offPath) && QFileInfo::exists(onPath)) {
             bool success = true;
             success &= m_offImage.load(offPath);
-            success &= m_onImage.load(path + "cassetteon.png");
+            success &= m_onImage.load(onPath);
             
             if (success) {
                 return;
-            } else {
             }
         }
     }
-    
     
     // Create fallback placeholder images if loading fails
     if (m_offImage.isNull()) {
         m_offImage = QPixmap(CASSETTE_WIDTH, CASSETTE_HEIGHT);
         m_offImage.fill(Qt::gray);
+    }
+    if (m_onImage.isNull()) {
+        m_onImage = QPixmap(CASSETTE_WIDTH, CASSETTE_HEIGHT);
+        m_onImage.fill(Qt::lightGray);
     }
 }
 

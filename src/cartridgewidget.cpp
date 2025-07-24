@@ -28,6 +28,9 @@ CartridgeWidget::CartridgeWidget(AtariEmulator* emulator, QWidget *parent)
     // Initial state
     setState(Off);
     updateFromEmulator();
+    
+    // Force initial display update
+    updateDisplay();
 }
 
 void CartridgeWidget::setupUI()
@@ -59,23 +62,27 @@ void CartridgeWidget::loadImages()
     
     for (const QString& path : imagePaths) {
         QString offPath = path + "cartridgeoff.png";
-        if (QFileInfo::exists(offPath)) {
+        QString onPath = path + "cartridgeon.png";
+        
+        if (QFileInfo::exists(offPath) && QFileInfo::exists(onPath)) {
             bool success = true;
             success &= m_offImage.load(offPath);
-            success &= m_onImage.load(path + "cartridgeon.png");
+            success &= m_onImage.load(onPath);
             
             if (success) {
                 return;
-            } else {
             }
         }
     }
-    
     
     // Create fallback placeholder images if loading fails
     if (m_offImage.isNull()) {
         m_offImage = QPixmap(CARTRIDGE_WIDTH, CARTRIDGE_HEIGHT);
         m_offImage.fill(Qt::gray);
+    }
+    if (m_onImage.isNull()) {
+        m_onImage = QPixmap(CARTRIDGE_WIDTH, CARTRIDGE_HEIGHT);
+        m_onImage.fill(Qt::lightGray);
     }
 }
 
@@ -149,7 +156,6 @@ void CartridgeWidget::updateDisplay()
         QPixmap scaledImage = currentImage.scaled(
             size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
         m_imageLabel->setPixmap(scaledImage);
-        qDebug() << "Cartridge displaying state" << m_currentState << "image size:" << currentImage.size();
     } else {
         // Create a placeholder if image is missing
         QPixmap placeholder(size());
@@ -159,7 +165,6 @@ void CartridgeWidget::updateDisplay()
         painter.drawText(placeholder.rect(), Qt::AlignCenter, 
             QString("CARTRIDGE\n%1").arg(m_currentState == Off ? "EMPTY" : "LOADED"));
         m_imageLabel->setPixmap(placeholder);
-        qDebug() << "Cartridge showing placeholder for state" << m_currentState;
     }
 }
 
