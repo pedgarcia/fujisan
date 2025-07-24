@@ -797,8 +797,9 @@ void MainWindow::createMediaPeripheralsDock()
     m_mediaPeripheralsDockWidget->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
     m_mediaPeripheralsDockWidget->setTitleBarWidget(new QWidget()); // Hide title bar completely
     
-    // Set dock width to match D1 drive width with extra padding for alignment
-    int dockWidth = m_diskDrive1->width() + 30; // D1 width plus extra padding for alignment
+    // Set dock width to match dock drives width (94px) with extra padding for alignment  
+    // Note: dock drives are full size (94px) while D1 is 20% smaller (75px)
+    int dockWidth = 94 + 30; // Dock drive width plus extra padding for alignment
     m_mediaPeripheralsDockWidget->setMinimumWidth(dockWidth);
     m_mediaPeripheralsDockWidget->setMaximumWidth(dockWidth);
     m_mediaPeripheralsDockWidget->setFeatures(QDockWidget::DockWidgetMovable | 
@@ -811,8 +812,8 @@ void MainWindow::createMediaPeripheralsDock()
     // Initially hidden
     m_mediaPeripheralsDockWidget->hide();
     
-    // Create media dock toggle button
-    int buttonWidth = m_diskDrive1->width(); // Only spans D1 now
+    // Create media dock toggle button  
+    int buttonWidth = m_diskDrive1->width(); // Matches D1 width (now 20% smaller)
     m_mediaToggleButton = new QPushButton("≡", this);
     m_mediaToggleButton->setToolTip("Show/Hide Media & Peripherals dock");
     m_mediaToggleButton->setFixedSize(buttonWidth, 12);
@@ -901,7 +902,8 @@ void MainWindow::createMediaPeripheralsDock()
     mainLayout->setContentsMargins(0, 2, 0, 2);
     mainLayout->setSpacing(0);
     
-    mainLayout->addWidget(m_diskDrive1);
+    // Center the D1 drive horizontally in the container
+    mainLayout->addWidget(m_diskDrive1, 0, Qt::AlignCenter);
     mainLayout->addSpacing(2);
     mainLayout->addWidget(m_mediaToggleButton);
     

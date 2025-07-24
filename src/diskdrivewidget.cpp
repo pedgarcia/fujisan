@@ -52,9 +52,17 @@ DiskDriveWidget::DiskDriveWidget(int driveNumber, AtariEmulator* emulator, QWidg
 
 void DiskDriveWidget::setupUI()
 {
-    // For dock drives, use the same width as toolbar drives but keep proportional height
-    int width = DISK_WIDTH;   // All drives use same width now
-    int height = m_isDrawerDrive ? (DISK_HEIGHT * 0.84) : DISK_HEIGHT; // Dock drives slightly shorter
+    // D1 drive (toolbar) is 20% smaller than dock drives for better fit
+    int width, height;
+    if (m_isDrawerDrive) {
+        // Dock drives (D2-D8) - full size but slightly shorter
+        width = DISK_WIDTH;   
+        height = DISK_HEIGHT * 0.84; // Dock drives slightly shorter
+    } else {
+        // Toolbar drive (D1) - 20% smaller
+        width = DISK_WIDTH * 0.8;    // 20% smaller width
+        height = DISK_HEIGHT * 0.8;  // 20% smaller height
+    }
     
     setFixedSize(width, height);
     setContextMenuPolicy(Qt::DefaultContextMenu);
