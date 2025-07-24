@@ -222,7 +222,13 @@ void MainWindow::createToolBar()
         resetIcon = QIcon(resetPixmap);
     }
     
-    // Add only cold reset button (warm reset removed, handled by console buttons)
+    // Add reset button (F5) and cold reset button
+    QAction* resetAction = new QAction("Reset", this);
+    resetAction->setToolTip("Reset the Atari system (F5)");
+    resetAction->setIcon(resetIcon);
+    connect(resetAction, &QAction::triggered, this, &MainWindow::warmBoot);
+    m_toolBar->addAction(resetAction);
+    
     QAction* coldResetAction = new QAction("Cold Reset", this);
     coldResetAction->setToolTip("Perform a cold reset of the Atari system (Shift+F5)");
     coldResetAction->setIcon(resetIcon);

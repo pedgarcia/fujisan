@@ -13,6 +13,12 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QPainter>
+#include <QMimeData>
+#include <QUrl>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDragLeaveEvent>
+#include <QDropEvent>
 
 DiskDriveWidget::DiskDriveWidget(int driveNumber, AtariEmulator* emulator, QWidget *parent, bool isDrawerDrive)
     : QWidget(parent)
@@ -33,6 +39,9 @@ DiskDriveWidget::DiskDriveWidget(int driveNumber, AtariEmulator* emulator, QWidg
     setupUI();
     loadImages();
     createContextMenu();
+    
+    // Enable drag and drop
+    setAcceptDrops(true);
     
     // Setup blinking timer
     m_blinkTimer->setInterval(BLINK_INTERVAL);
@@ -391,6 +400,93 @@ void DiskDriveWidget::mousePressEvent(QMouseEvent* event)
 void DiskDriveWidget::paintEvent(QPaintEvent* event)
 {
     QWidget::paintEvent(event);
+}
+
+void DiskDriveWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    // Only accept file drops if drive is enabled
+    if (!m_driveEnabled) {
+        event->ignore();
+        return;
+    }
+    
+    // Check if we have file URLs
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidDiskFile(fileName)) {
+                event->acceptProposedAction();
+                setStyleSheet("QWidget { border: 2px dashed #0078d4; background-color: rgba(0, 120, 212, 0.1); }");
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void DiskDriveWidget::dragMoveEvent(QDragMoveEvent* event)
+{
+    // Only accept if drive is enabled and file is valid
+    if (!m_driveEnabled) {
+        event->ignore();
+        return;
+    }
+    
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidDiskFile(fileName)) {
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void DiskDriveWidget::dragLeaveEvent(QDragLeaveEvent* event)
+{
+    // Clear visual feedback when drag leaves the widget
+    setStyleSheet("");
+    QWidget::dragLeaveEvent(event);
+}
+
+void DiskDriveWidget::dropEvent(QDropEvent* event)
+{
+    // Clear visual feedback
+    setStyleSheet("");
+    
+    // Only accept if drive is enabled
+    if (!m_driveEnabled) {
+        event->ignore();
+        return;
+    }
+    
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidDiskFile(fileName)) {
+                insertDisk(fileName);
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+bool DiskDriveWidget::isValidDiskFile(const QString& fileName) const
+{
+    QFileInfo fileInfo(fileName);
+    QString extension = fileInfo.suffix().toLower();
+    
+    // Valid Atari disk image extensions
+    QStringList validExtensions = {"atr", "xfd", "dcm"};
+    
+    return validExtensions.contains(extension);
 }
 
 void DiskDriveWidget::onToggleDrive()

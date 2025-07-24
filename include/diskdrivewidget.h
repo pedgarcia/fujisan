@@ -16,6 +16,10 @@
 #include <QAction>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDragLeaveEvent>
+#include <QDropEvent>
 #include <QString>
 
 class AtariEmulator;
@@ -74,6 +78,10 @@ protected:
     void contextMenuEvent(QContextMenuEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
     
 private slots:
     void onToggleDrive();
@@ -90,6 +98,7 @@ private:
     void updateTooltip();
     void startBlinking(DriveState blinkState);
     void stopBlinking();
+    bool isValidDiskFile(const QString& fileName) const;
     
     // Properties
     int m_driveNumber;

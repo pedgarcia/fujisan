@@ -15,6 +15,10 @@
 #include <QAction>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDragLeaveEvent>
+#include <QDropEvent>
 #include <QString>
 
 class AtariEmulator;
@@ -60,6 +64,10 @@ signals:
 protected:
     void contextMenuEvent(QContextMenuEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
     
 private slots:
     void onToggleCassette();
@@ -72,6 +80,7 @@ private:
     void updateDisplay();
     void createContextMenu();
     void updateTooltip();
+    bool isValidCassetteFile(const QString& fileName) const;
     
     // Properties
     AtariEmulator* m_emulator;

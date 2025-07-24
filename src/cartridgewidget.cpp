@@ -13,6 +13,12 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QPainter>
+#include <QMimeData>
+#include <QUrl>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDragLeaveEvent>
+#include <QDropEvent>
 
 CartridgeWidget::CartridgeWidget(AtariEmulator* emulator, QWidget *parent)
     : QWidget(parent)
@@ -24,6 +30,9 @@ CartridgeWidget::CartridgeWidget(AtariEmulator* emulator, QWidget *parent)
     setupUI();
     loadImages();
     createContextMenu();
+    
+    // Enable drag and drop
+    setAcceptDrops(true);
     
     // Initial state
     setState(Off);
@@ -212,6 +221,75 @@ void CartridgeWidget::mousePressEvent(QMouseEvent* event)
     } else {
         QWidget::mousePressEvent(event);
     }
+}
+
+void CartridgeWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    // Check if we have file URLs
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidCartridgeFile(fileName)) {
+                event->acceptProposedAction();
+                setStyleSheet("QWidget { border: 2px dashed #0078d4; background-color: rgba(0, 120, 212, 0.1); }");
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void CartridgeWidget::dragMoveEvent(QDragMoveEvent* event)
+{
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidCartridgeFile(fileName)) {
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void CartridgeWidget::dragLeaveEvent(QDragLeaveEvent* event)
+{
+    // Clear visual feedback when drag leaves the widget
+    setStyleSheet("");
+    QWidget::dragLeaveEvent(event);
+}
+
+void CartridgeWidget::dropEvent(QDropEvent* event)
+{
+    // Clear visual feedback
+    setStyleSheet("");
+    
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidCartridgeFile(fileName)) {
+                loadCartridge(fileName);
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+bool CartridgeWidget::isValidCartridgeFile(const QString& fileName) const
+{
+    QFileInfo fileInfo(fileName);
+    QString extension = fileInfo.suffix().toLower();
+    
+    // Valid Atari cartridge extensions
+    QStringList validExtensions = {"rom", "car", "bin"};
+    
+    return validExtensions.contains(extension);
 }
 
 void CartridgeWidget::onInsertCartridge()

@@ -13,6 +13,12 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QPainter>
+#include <QMimeData>
+#include <QUrl>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDragLeaveEvent>
+#include <QDropEvent>
 
 CassetteWidget::CassetteWidget(AtariEmulator* emulator, QWidget *parent)
     : QWidget(parent)
@@ -25,6 +31,9 @@ CassetteWidget::CassetteWidget(AtariEmulator* emulator, QWidget *parent)
     setupUI();
     loadImages();
     createContextMenu();
+    
+    // Enable drag and drop
+    setAcceptDrops(true);
     
     // Initial state
     setState(Off);
@@ -266,4 +275,91 @@ void CassetteWidget::onEjectCassette()
     if (m_cassetteEnabled && hasCassette()) {
         ejectCassette();
     }
+}
+
+void CassetteWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    // Only accept file drops if cassette is enabled
+    if (!m_cassetteEnabled) {
+        event->ignore();
+        return;
+    }
+    
+    // Check if we have file URLs
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidCassetteFile(fileName)) {
+                event->acceptProposedAction();
+                setStyleSheet("QWidget { border: 2px dashed #0078d4; background-color: rgba(0, 120, 212, 0.1); }");
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void CassetteWidget::dragMoveEvent(QDragMoveEvent* event)
+{
+    // Only accept if cassette is enabled and file is valid
+    if (!m_cassetteEnabled) {
+        event->ignore();
+        return;
+    }
+    
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidCassetteFile(fileName)) {
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void CassetteWidget::dragLeaveEvent(QDragLeaveEvent* event)
+{
+    // Clear visual feedback when drag leaves the widget
+    setStyleSheet("");
+    QWidget::dragLeaveEvent(event);
+}
+
+void CassetteWidget::dropEvent(QDropEvent* event)
+{
+    // Clear visual feedback
+    setStyleSheet("");
+    
+    // Only accept if cassette is enabled
+    if (!m_cassetteEnabled) {
+        event->ignore();
+        return;
+    }
+    
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidCassetteFile(fileName)) {
+                loadCassette(fileName);
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+bool CassetteWidget::isValidCassetteFile(const QString& fileName) const
+{
+    QFileInfo fileInfo(fileName);
+    QString extension = fileInfo.suffix().toLower();
+    
+    // Valid Atari cassette extensions
+    QStringList validExtensions = {"cas", "wav"};
+    
+    return validExtensions.contains(extension);
 }
