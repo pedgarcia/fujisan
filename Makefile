@@ -248,6 +248,54 @@ src/atariemulator.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/atariemulator.cpp.s
 .PHONY : src/atariemulator.cpp.s
 
+src/cartridgewidget.o: src/cartridgewidget.cpp.o
+.PHONY : src/cartridgewidget.o
+
+# target to build an object file
+src/cartridgewidget.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o
+.PHONY : src/cartridgewidget.cpp.o
+
+src/cartridgewidget.i: src/cartridgewidget.cpp.i
+.PHONY : src/cartridgewidget.i
+
+# target to preprocess a source file
+src/cartridgewidget.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.i
+.PHONY : src/cartridgewidget.cpp.i
+
+src/cartridgewidget.s: src/cartridgewidget.cpp.s
+.PHONY : src/cartridgewidget.s
+
+# target to generate assembly for a file
+src/cartridgewidget.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.s
+.PHONY : src/cartridgewidget.cpp.s
+
+src/cassettewidget.o: src/cassettewidget.cpp.o
+.PHONY : src/cassettewidget.o
+
+# target to build an object file
+src/cassettewidget.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o
+.PHONY : src/cassettewidget.cpp.o
+
+src/cassettewidget.i: src/cassettewidget.cpp.i
+.PHONY : src/cassettewidget.i
+
+# target to preprocess a source file
+src/cassettewidget.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.i
+.PHONY : src/cassettewidget.cpp.i
+
+src/cassettewidget.s: src/cassettewidget.cpp.s
+.PHONY : src/cassettewidget.s
+
+# target to generate assembly for a file
+src/cassettewidget.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.s
+.PHONY : src/cassettewidget.cpp.s
+
 src/configurationprofile.o: src/configurationprofile.cpp.o
 .PHONY : src/configurationprofile.o
 
@@ -320,6 +368,54 @@ src/debuggerwidget.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.s
 .PHONY : src/debuggerwidget.cpp.s
 
+src/diskdrawerwidget.o: src/diskdrawerwidget.cpp.o
+.PHONY : src/diskdrawerwidget.o
+
+# target to build an object file
+src/diskdrawerwidget.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o
+.PHONY : src/diskdrawerwidget.cpp.o
+
+src/diskdrawerwidget.i: src/diskdrawerwidget.cpp.i
+.PHONY : src/diskdrawerwidget.i
+
+# target to preprocess a source file
+src/diskdrawerwidget.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.i
+.PHONY : src/diskdrawerwidget.cpp.i
+
+src/diskdrawerwidget.s: src/diskdrawerwidget.cpp.s
+.PHONY : src/diskdrawerwidget.s
+
+# target to generate assembly for a file
+src/diskdrawerwidget.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.s
+.PHONY : src/diskdrawerwidget.cpp.s
+
+src/diskdrivewidget.o: src/diskdrivewidget.cpp.o
+.PHONY : src/diskdrivewidget.o
+
+# target to build an object file
+src/diskdrivewidget.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o
+.PHONY : src/diskdrivewidget.cpp.o
+
+src/diskdrivewidget.i: src/diskdrivewidget.cpp.i
+.PHONY : src/diskdrivewidget.i
+
+# target to preprocess a source file
+src/diskdrivewidget.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.i
+.PHONY : src/diskdrivewidget.cpp.i
+
+src/diskdrivewidget.s: src/diskdrivewidget.cpp.s
+.PHONY : src/diskdrivewidget.s
+
+# target to generate assembly for a file
+src/diskdrivewidget.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.s
+.PHONY : src/diskdrivewidget.cpp.s
+
 src/emulatorwidget.o: src/emulatorwidget.cpp.o
 .PHONY : src/emulatorwidget.o
 
@@ -391,6 +487,30 @@ src/mainwindow.s: src/mainwindow.cpp.s
 src/mainwindow.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/mainwindow.cpp.s
 .PHONY : src/mainwindow.cpp.s
+
+src/mediaperipheralsdock.o: src/mediaperipheralsdock.cpp.o
+.PHONY : src/mediaperipheralsdock.o
+
+# target to build an object file
+src/mediaperipheralsdock.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o
+.PHONY : src/mediaperipheralsdock.cpp.o
+
+src/mediaperipheralsdock.i: src/mediaperipheralsdock.cpp.i
+.PHONY : src/mediaperipheralsdock.i
+
+# target to preprocess a source file
+src/mediaperipheralsdock.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.i
+.PHONY : src/mediaperipheralsdock.cpp.i
+
+src/mediaperipheralsdock.s: src/mediaperipheralsdock.cpp.s
+.PHONY : src/mediaperipheralsdock.s
+
+# target to generate assembly for a file
+src/mediaperipheralsdock.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.s
+.PHONY : src/mediaperipheralsdock.cpp.s
 
 src/profileselectionwidget.o: src/profileselectionwidget.cpp.o
 .PHONY : src/profileselectionwidget.o
@@ -485,6 +605,12 @@ help:
 	@echo "... src/atariemulator.o"
 	@echo "... src/atariemulator.i"
 	@echo "... src/atariemulator.s"
+	@echo "... src/cartridgewidget.o"
+	@echo "... src/cartridgewidget.i"
+	@echo "... src/cartridgewidget.s"
+	@echo "... src/cassettewidget.o"
+	@echo "... src/cassettewidget.i"
+	@echo "... src/cassettewidget.s"
 	@echo "... src/configurationprofile.o"
 	@echo "... src/configurationprofile.i"
 	@echo "... src/configurationprofile.s"
@@ -494,6 +620,12 @@ help:
 	@echo "... src/debuggerwidget.o"
 	@echo "... src/debuggerwidget.i"
 	@echo "... src/debuggerwidget.s"
+	@echo "... src/diskdrawerwidget.o"
+	@echo "... src/diskdrawerwidget.i"
+	@echo "... src/diskdrawerwidget.s"
+	@echo "... src/diskdrivewidget.o"
+	@echo "... src/diskdrivewidget.i"
+	@echo "... src/diskdrivewidget.s"
 	@echo "... src/emulatorwidget.o"
 	@echo "... src/emulatorwidget.i"
 	@echo "... src/emulatorwidget.s"
@@ -503,6 +635,9 @@ help:
 	@echo "... src/mainwindow.o"
 	@echo "... src/mainwindow.i"
 	@echo "... src/mainwindow.s"
+	@echo "... src/mediaperipheralsdock.o"
+	@echo "... src/mediaperipheralsdock.i"
+	@echo "... src/mediaperipheralsdock.s"
 	@echo "... src/profileselectionwidget.o"
 	@echo "... src/profileselectionwidget.i"
 	@echo "... src/profileselectionwidget.s"

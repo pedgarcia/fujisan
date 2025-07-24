@@ -112,6 +112,18 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cartridgewidget.h",
+			"Mu",
+			"6YEA5652QU/moc_cartridgewidget.cpp",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cassettewidget.h",
+			"Mu",
+			"6YEA5652QU/moc_cassettewidget.cpp",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/configurationprofile.h",
 			"Mu",
 			"6YEA5652QU/moc_configurationprofile.cpp",
@@ -130,6 +142,18 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrawerwidget.h",
+			"Mu",
+			"6YEA5652QU/moc_diskdrawerwidget.cpp",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrivewidget.h",
+			"Mu",
+			"6YEA5652QU/moc_diskdrivewidget.cpp",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/emulatorwidget.h",
 			"Mu",
 			"6YEA5652QU/moc_emulatorwidget.cpp",
@@ -139,6 +163,12 @@
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mainwindow.h",
 			"Mu",
 			"6YEA5652QU/moc_mainwindow.cpp",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mediaperipheralsdock.h",
+			"Mu",
+			"6YEA5652QU/moc_mediaperipheralsdock.cpp",
 			null
 		],
 		[
@@ -233,6 +263,16 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cartridgewidget.cpp",
+			"Mu",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cassettewidget.cpp",
+			"Mu",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/configurationprofile.cpp",
 			"Mu",
 			null
@@ -248,6 +288,16 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrawerwidget.cpp",
+			"Mu",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrivewidget.cpp",
+			"Mu",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/emulatorwidget.cpp",
 			"Mu",
 			null
@@ -259,6 +309,11 @@
 		],
 		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mainwindow.cpp",
+			"Mu",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mediaperipheralsdock.cpp",
 			"Mu",
 			null
 		],

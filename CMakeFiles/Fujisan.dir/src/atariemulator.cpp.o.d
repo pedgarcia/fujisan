@@ -893,6 +893,7 @@ CMakeFiles/Fujisan.dir/src/atariemulator.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QIODevice \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QBuffer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qbuffer.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSet \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/libatari800/libatari800.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/akey.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours.h \
@@ -914,4 +915,5 @@ CMakeFiles/Fujisan.dir/src/atariemulator.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeventloop.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qcursor.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qguiapplication.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qinputmethod.h
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qinputmethod.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QMetaObject

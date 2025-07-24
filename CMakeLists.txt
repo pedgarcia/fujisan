@@ -45,6 +45,11 @@ set(SOURCES
     src/configurationprofilemanager.cpp
     src/profileselectionwidget.cpp
     src/debuggerwidget.cpp
+    src/diskdrivewidget.cpp
+    src/diskdrawerwidget.cpp
+    src/cassettewidget.cpp
+    src/cartridgewidget.cpp
+    src/mediaperipheralsdock.cpp
 )
 
 set(HEADERS
@@ -57,6 +62,11 @@ set(HEADERS
     include/configurationprofilemanager.h
     include/profileselectionwidget.h
     include/debuggerwidget.h
+    include/diskdrivewidget.h
+    include/diskdrawerwidget.h
+    include/cassettewidget.h
+    include/cartridgewidget.h
+    include/mediaperipheralsdock.h
 )
 
 # Create executable

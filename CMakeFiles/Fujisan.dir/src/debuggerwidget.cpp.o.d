@@ -950,6 +950,7 @@ CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QIODevice \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QBuffer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qbuffer.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSet \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/libatari800/libatari800.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/akey.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours.h \
@@ -966,4 +967,8 @@ CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollBar \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollbar.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractslider.h
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractslider.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QCoreApplication \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreapplication.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeventloop.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QFontMetrics

@@ -1,7 +1,8 @@
-CMakeFiles/Fujisan.dir/src/main.cpp.o: \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/main.cpp \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QApplication \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qapplication.h \
+CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o: \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrawerwidget.cpp \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrawerwidget.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QWidget \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qwidget.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtwidgetsglobal.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtguiglobal.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qglobal.h \
@@ -810,19 +811,19 @@ CMakeFiles/Fujisan.dir/src/main.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qversiontagging.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtgui-config.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtwidgets-config.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreapplication.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qwindowdefs.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobjectdefs.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qnamespace.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobjectdefs_impl.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobject.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qstring.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qchar.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qbytearray.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qrefcount.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qnamespace.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qarraydata.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qstringliteral.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qstringalgorithms.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qstringview.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobject.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobjectdefs.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobjectdefs_impl.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlist.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qalgorithms.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qiterator.h \
@@ -858,34 +859,11 @@ CMakeFiles/Fujisan.dir/src/main.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/map \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__tree \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobject_impl.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreevent.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeventloop.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qwindowdefs.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpoint.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsize.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qmargins.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qcursor.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qguiapplication.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qinputmethod.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlocale.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qvariant.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qmap.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qhash.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qshareddata.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDebug \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdebug.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtextstream.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qiodevice.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qset.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcontiguouscache.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsharedpointer.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsharedpointer_impl.h \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mainwindow.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMainWindow \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmainwindow.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qwidget.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpaintdevice.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qrect.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsize.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpoint.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpalette.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qcolor.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qrgb.h \
@@ -895,76 +873,61 @@ CMakeFiles/Fujisan.dir/src/main.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpolygon.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qregion.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdatastream.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qiodevice.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qline.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtransform.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qimage.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpixelformat.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpixmap.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsharedpointer.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qshareddata.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qhash.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsharedpointer_impl.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qfont.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qfontmetrics.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qfontinfo.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qsizepolicy.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qcursor.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qkeysequence.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabwidget.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qicon.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMenuBar \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmenubar.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmenu.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qaction.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qactiongroup.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QToolBar \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtoolbar.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QAction \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFileDialog \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qfiledialog.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdir.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfileinfo.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfile.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfiledevice.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qurl.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qdialog.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QVBoxLayout \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qboxlayout.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QGridLayout \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qgridlayout.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlayout.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlayoutitem.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qgridlayout.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QWidget \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QComboBox \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qcombobox.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractitemdelegate.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qstyleoption.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractspinbox.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qvalidator.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qregularexpression.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qslider.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractslider.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qstyle.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabbar.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qframe.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractitemmodel.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QCheckBox \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qcheckbox.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qboxlayout.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QPushButton \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qpushbutton.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractbutton.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qicon.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFrame \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qframe.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrivewidget.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QLabel \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlabel.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSettings \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsettings.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QDockWidget \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qdockwidget.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPixmap \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QTimer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtimer.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qbasictimer.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QClipboard \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qclipboard.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QDialog \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPixmap \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMenu \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmenu.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qaction.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qvariant.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qmap.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qactiongroup.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QAction \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QMouseEvent \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qevent.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreevent.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qset.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qurl.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfile.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfiledevice.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qvector2d.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtouchdevice.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QContextMenuEvent \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QString \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/atariemulator.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QKeyEvent \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qevent.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qvector2d.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtouchdevice.h \
   /opt/homebrew/opt/qt@5/lib/QtMultimedia.framework/Headers/QAudioOutput \
   /opt/homebrew/opt/qt@5/lib/QtMultimedia.framework/Headers/qaudiooutput.h \
   /opt/homebrew/opt/qt@5/lib/QtMultimedia.framework/Headers/qtmultimediaglobal.h \
@@ -985,68 +948,31 @@ CMakeFiles/Fujisan.dir/src/main.cpp.o: \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours_external.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/artifact.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/config.h \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/emulatorwidget.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPaintEvent \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QImage \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/toggleswitch.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QMouseEvent \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QPropertyAnimation \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpropertyanimation.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qvariantanimation.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeasingcurve.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractanimation.h \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/settingsdialog.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QTabWidget \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QHBoxLayout \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFormLayout \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qformlayout.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QLayout \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QGroupBox \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qgroupbox.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QPushButton \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qpushbutton.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QDialogButtonBox \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qdialogbuttonbox.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QLineEdit \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlineedit.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtextcursor.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtextformat.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpen.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QVBoxLayout \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QApplication \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qapplication.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreapplication.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeventloop.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qguiapplication.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qinputmethod.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlocale.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPainter \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpainter.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtextoption.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSpinBox \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qspinbox.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QDoubleSpinBox \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSlider \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/configurationprofilemanager.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QStringList \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/configurationprofile.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QString \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDateTime \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdatetime.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QJsonObject \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qjsonobject.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qjsonvalue.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcborvalue.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcborcommon.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/quuid.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QJsonDocument \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qjsondocument.h \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/profileselectionwidget.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QInputDialog \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qinputdialog.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMessageBox \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmessagebox.h \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/debuggerwidget.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QTextEdit \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtextedit.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractscrollarea.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtextdocument.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QFont \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrivewidget.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMenu \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QContextMenuEvent \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mediaperipheralsdock.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QGridLayout \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFrame \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cassettewidget.h \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cartridgewidget.h
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpen.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QStyleOption \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qstyleoption.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractspinbox.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qvalidator.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qregularexpression.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qslider.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractslider.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qstyle.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabbar.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabwidget.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractitemmodel.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDebug \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdebug.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtextstream.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcontiguouscache.h

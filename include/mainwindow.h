@@ -29,6 +29,8 @@
 #include "toggleswitch.h"
 #include "settingsdialog.h"
 #include "debuggerwidget.h"
+#include "diskdrivewidget.h"
+#include "mediaperipheralsdock.h"
 
 class MainWindow : public QMainWindow
 {
@@ -45,7 +47,6 @@ protected:
 
 private slots:
     void loadRom();
-    void loadDiskImage();
     void coldBoot();
     void warmBoot();
     void toggleBasic(bool enabled);
@@ -59,16 +60,29 @@ private slots:
     void toggleDebugger();
     void pasteText();
     void sendNextCharacter();
+    void toggleMediaDock();
+    void onDiskInserted(int driveNumber, const QString& diskPath);
+    void onDiskEjected(int driveNumber);
+    void onDriveStateChanged(int driveNumber, bool enabled);
+    void onCassetteInserted(const QString& cassettePath);
+    void onCassetteEjected();
+    void onCassetteStateChanged(bool enabled);
+    void onCartridgeInserted(const QString& cartridgePath);
+    void onCartridgeEjected();
 
 private:
     void createMenus();
     void createToolBar();
     void createEmulatorWidget();
     void createDebugger();
+    void createMediaPeripheralsDock();
     void restartEmulator();
     void updateToolbarFromSettings();
     void loadInitialSettings();
     void loadAndApplyMediaSettings();
+    void saveDiskToSettings(int driveNumber, const QString& diskPath, bool readOnly = false);
+    void clearDiskFromSettings(int driveNumber);
+    void saveDriveStateToSettings(int driveNumber, bool enabled);
     void loadVideoSettings();
     void enterCustomFullscreen();
     void exitCustomFullscreen();
@@ -82,6 +96,12 @@ private:
     DebuggerWidget* m_debuggerWidget;
     QDockWidget* m_debuggerDock;
     
+    // Media & Peripherals Dock
+    DiskDriveWidget* m_diskDrive1;              // D1 stays on toolbar
+    MediaPeripheralsDock* m_mediaPeripheralsDock; // D2-D8, cassette, cartridge, printer
+    QDockWidget* m_mediaPeripheralsDockWidget;
+    QPushButton* m_mediaToggleButton;
+    
     // Toolbar widgets
     ToggleSwitch* m_basicToggle;
     QComboBox* m_machineCombo;
@@ -89,7 +109,6 @@ private:
     
     // Menu actions
     QAction* m_loadRomAction;
-    QAction* m_loadDiskAction;
     QAction* m_coldBootAction;
     QAction* m_warmBootAction;
     QAction* m_basicAction;

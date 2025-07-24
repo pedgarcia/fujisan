@@ -705,21 +705,31 @@
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/CMakeLists.txt
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/Fujisan_autogen/moc_predefs.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/atariemulator.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cartridgewidget.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cassettewidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/configurationprofile.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/configurationprofilemanager.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/debuggerwidget.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrawerwidget.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrivewidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/emulatorwidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mainwindow.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mediaperipheralsdock.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/profileselectionwidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/settingsdialog.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/toggleswitch.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/atariemulator.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cartridgewidget.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cassettewidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/configurationprofile.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/configurationprofilemanager.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/debuggerwidget.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrawerwidget.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrivewidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/emulatorwidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/main.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mainwindow.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mediaperipheralsdock.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/profileselectionwidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/settingsdialog.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/toggleswitch.cpp
@@ -736,6 +746,7 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonObject
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QObject
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QPropertyAnimation
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QSet
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QSettings
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QString
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QStringList
@@ -825,12 +836,16 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qvarlengtharray.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qvector.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qversiontagging.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QClipboard
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QContextMenuEvent
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QFont
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QImage
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QKeyEvent
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QMouseEvent
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPaintEvent
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPixmap
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qbrush.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qclipboard.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qcolor.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qcursor.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qevent.h
@@ -880,6 +895,8 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QDoubleSpinBox
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QFileDialog
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QFormLayout
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QFrame
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QGridLayout
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QGroupBox
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QHBoxLayout
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QInputDialog
@@ -887,6 +904,7 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLayout
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLineEdit
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMainWindow
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenu
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenuBar
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMessageBox
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPushButton

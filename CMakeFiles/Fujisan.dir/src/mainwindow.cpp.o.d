@@ -940,11 +940,15 @@ CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsettings.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QDockWidget \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qdockwidget.h \
-  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/atariemulator.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QTimer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtimer.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qbasictimer.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QClipboard \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qclipboard.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QDialog \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPixmap \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/atariemulator.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QKeyEvent \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qevent.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreevent.h \
@@ -964,6 +968,7 @@ CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QIODevice \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QBuffer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qbuffer.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSet \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/libatari800/libatari800.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/akey.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours.h \
@@ -981,7 +986,6 @@ CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeasingcurve.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractanimation.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/settingsdialog.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QDialog \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QTabWidget \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QHBoxLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFormLayout \
@@ -1031,6 +1035,14 @@ CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractscrollarea.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtextdocument.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QFont \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrivewidget.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMenu \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QContextMenuEvent \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mediaperipheralsdock.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QGridLayout \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFrame \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cassettewidget.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/cartridgewidget.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QApplication \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qapplication.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreapplication.h \
@@ -1043,5 +1055,4 @@ CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qstatusbar.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDebug \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPainter \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpainter.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPixmap
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpainter.h

@@ -16,6 +16,7 @@
 #include <QDebug>
 #include <QPainter>
 #include <QPixmap>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -29,6 +30,10 @@ MainWindow::MainWindow(QWidget *parent)
     , m_pasteIndex(0)
     , m_originalEmulationSpeed(100)
     , m_pasteCharacterSent(false)
+    , m_diskDrive1(nullptr)
+    , m_mediaPeripheralsDock(nullptr)
+    , m_mediaPeripheralsDockWidget(nullptr)
+    , m_mediaToggleButton(nullptr)
 {
     setWindowTitle("Fujisan");
     setMinimumSize(800, 600);
@@ -43,6 +48,12 @@ MainWindow::MainWindow(QWidget *parent)
     createToolBar();
     createEmulatorWidget();
     createDebugger();
+    createMediaPeripheralsDock();
+    
+    // Enable hybrid disk activity system
+    m_emulator->setDiskActivityCallback([](int driveNumber, bool isWriting) {
+        // Activity callback handled via Qt signals
+    });
     
     // Setup paste timer
     m_pasteTimer->setSingleShot(false);
@@ -75,11 +86,6 @@ void MainWindow::createMenus()
     m_loadRomAction->setShortcut(QKeySequence::Open);
     connect(m_loadRomAction, &QAction::triggered, this, &MainWindow::loadRom);
     fileMenu->addAction(m_loadRomAction);
-    
-    m_loadDiskAction = new QAction("Load &Disk Image...", this);
-    m_loadDiskAction->setShortcut(QKeySequence("Ctrl+D"));
-    connect(m_loadDiskAction, &QAction::triggered, this, &MainWindow::loadDiskImage);
-    fileMenu->addAction(m_loadDiskAction);
     
     fileMenu->addSeparator();
     
@@ -257,25 +263,6 @@ void MainWindow::createToolBar()
     
     m_toolBar->addWidget(machineContainer);
     
-    // Disk drive button
-    QPixmap diskPixmap(32, 32);
-    diskPixmap.fill(Qt::transparent);
-    QPainter diskPainter(&diskPixmap);
-    diskPainter.setRenderHint(QPainter::Antialiasing);
-    diskPainter.setPen(QPen(Qt::darkBlue, 2));
-    diskPainter.setBrush(QBrush(QColor(100, 100, 100)));
-    diskPainter.drawRoundedRect(4, 8, 24, 16, 2, 2);
-    diskPainter.setBrush(QBrush(Qt::black));
-    diskPainter.drawRect(6, 12, 20, 2);
-    diskPainter.setPen(QPen(Qt::white, 1));
-    diskPainter.drawText(QRect(8, 10, 16, 8), Qt::AlignCenter, "D1");
-    QIcon diskIcon(diskPixmap);
-    
-    QAction* loadDiskAction = new QAction("Load Disk", this);
-    loadDiskAction->setToolTip("Load disk image to drive D1: (Ctrl+D)");
-    loadDiskAction->setIcon(diskIcon);
-    connect(loadDiskAction, &QAction::triggered, this, &MainWindow::loadDiskImage);
-    m_toolBar->addAction(loadDiskAction);
     
     // Toggle switches container - stacked vertically on far right
     QWidget* togglesContainer = new QWidget();
@@ -432,32 +419,6 @@ void MainWindow::loadRom()
     }
 }
 
-void MainWindow::loadDiskImage()
-{
-    QString fileName = QFileDialog::getOpenFileName(
-        this,
-        "Load Disk Image to D1:",
-        QString(),
-        "Disk Images (*.atr *.xfd *.dcm *.pro *.atx *.atr.gz *.xfd.gz);;All Files (*)"
-    );
-    
-    if (!fileName.isEmpty()) {
-        if (m_emulator->mountDiskImage(1, fileName, false)) {
-            qDebug() << "Successfully mounted disk:" << fileName;
-            statusBar()->showMessage("Mounted to D1: " + fileName + " - Try typing DIR from BASIC", 5000);
-            
-            // Show a helpful message to the user
-            QMessageBox::information(this, "Disk Mounted", 
-                "Disk image mounted to D1:\n\n" + fileName + 
-                "\n\nTo access the disk:\n" +
-                "• From BASIC: Type DIR or LOAD \"D1:filename\"\n" +
-                "• Boot from disk: Use Cold Reset to boot from the disk\n" +
-                "• DOS: Type DOS to access disk commands");
-        } else {
-            QMessageBox::warning(this, "Error", "Failed to mount disk image: " + fileName);
-        }
-    }
-}
 
 void MainWindow::coldBoot()
 {
@@ -616,6 +577,10 @@ void MainWindow::onSettingsChanged()
     qDebug() << "Settings changed - updating toolbar and video settings";
     updateToolbarFromSettings();
     loadVideoSettings();
+    
+    // Reload media settings to sync disk widgets with any changes made in settings dialog
+    loadAndApplyMediaSettings();
+    
     statusBar()->showMessage("Settings applied and emulator restarted", 3000);
 }
 
@@ -819,6 +784,206 @@ void MainWindow::showAbout()
     aboutDialog.exec();
 }
 
+void MainWindow::createMediaPeripheralsDock()
+{
+    // Create D1 drive for toolbar first (so we can get its width)
+    m_diskDrive1 = new DiskDriveWidget(1, m_emulator, this);
+    
+    // Create Media & Peripherals dock widget
+    m_mediaPeripheralsDock = new MediaPeripheralsDock(m_emulator, this);
+    
+    m_mediaPeripheralsDockWidget = new QDockWidget("", this);
+    m_mediaPeripheralsDockWidget->setWidget(m_mediaPeripheralsDock);
+    m_mediaPeripheralsDockWidget->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    m_mediaPeripheralsDockWidget->setTitleBarWidget(new QWidget()); // Hide title bar completely
+    
+    // Set dock width to match D1 drive width with extra padding for alignment
+    int dockWidth = m_diskDrive1->width() + 30; // D1 width plus extra padding for alignment
+    m_mediaPeripheralsDockWidget->setMinimumWidth(dockWidth);
+    m_mediaPeripheralsDockWidget->setMaximumWidth(dockWidth);
+    m_mediaPeripheralsDockWidget->setFeatures(QDockWidget::DockWidgetMovable | 
+                                              QDockWidget::DockWidgetFloatable | 
+                                              QDockWidget::DockWidgetClosable);
+    
+    // Add dock to left side 
+    addDockWidget(Qt::LeftDockWidgetArea, m_mediaPeripheralsDockWidget);
+    
+    // Initially hidden
+    m_mediaPeripheralsDockWidget->hide();
+    
+    // Create media dock toggle button
+    int buttonWidth = m_diskDrive1->width(); // Only spans D1 now
+    m_mediaToggleButton = new QPushButton("≡", this);
+    m_mediaToggleButton->setToolTip("Show/Hide Media & Peripherals dock");
+    m_mediaToggleButton->setFixedSize(buttonWidth, 12);
+    m_mediaToggleButton->setCheckable(true);
+    m_mediaToggleButton->setStyleSheet(
+        "QPushButton {"
+        "    margin: 0px;"
+        "    padding: 0px;"
+        "    border: 1px solid gray;"
+        "}"
+        "QPushButton:checked {"
+        "    background-color: lightblue;"
+        "    border: 1px solid blue;"
+        "}"
+    );
+    
+    // Connect signals
+    connect(m_diskDrive1, &DiskDriveWidget::diskInserted, this, &MainWindow::onDiskInserted);
+    connect(m_diskDrive1, &DiskDriveWidget::diskEjected, this, &MainWindow::onDiskEjected);
+    connect(m_diskDrive1, &DiskDriveWidget::driveStateChanged, this, &MainWindow::onDriveStateChanged);
+    
+    // Connect media dock signals
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::diskInserted, this, &MainWindow::onDiskInserted);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::diskEjected, this, &MainWindow::onDiskEjected);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::driveStateChanged, this, &MainWindow::onDriveStateChanged);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteInserted, this, &MainWindow::onCassetteInserted);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteEjected, this, &MainWindow::onCassetteEjected);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteStateChanged, this, &MainWindow::onCassetteStateChanged);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cartridgeInserted, this, &MainWindow::onCartridgeInserted);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cartridgeEjected, this, &MainWindow::onCartridgeEjected);
+    
+    // Connect solid LED disk I/O monitoring
+    connect(m_emulator, &AtariEmulator::diskIOStart, this, [this](int driveNumber, bool isWriting) {
+        qDebug() << "*** MainWindow received diskIOStart signal for D" << driveNumber << ":" << (isWriting ? "WRITE" : "READ") << "***";
+        // Turn LED ON on D1 (toolbar drive)
+        if (driveNumber == 1 && m_diskDrive1) {
+            qDebug() << "*** Calling turnOn" << (isWriting ? "Write" : "Read") << "LED() for D1 ***";
+            if (isWriting) {
+                m_diskDrive1->turnOnWriteLED();
+            } else {
+                m_diskDrive1->turnOnReadLED();
+            }
+        }
+        // Turn LED ON on D2-D8 (dock drives)
+        else if (driveNumber >= 2 && driveNumber <= 8) {
+            qDebug() << "*** Looking for dock drive widget D" << driveNumber << "***";
+            DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+            if (driveWidget) {
+                qDebug() << "*** Calling turnOn" << (isWriting ? "Write" : "Read") << "LED() for dock drive D" << driveNumber << "***";
+                if (isWriting) {
+                    driveWidget->turnOnWriteLED();
+                } else {
+                    driveWidget->turnOnReadLED();
+                }
+            } else {
+                qDebug() << "*** ERROR: Could not find dock drive widget for D" << driveNumber << "***";
+            }
+        }
+    });
+    
+    connect(m_emulator, &AtariEmulator::diskIOEnd, this, [this](int driveNumber) {
+        qDebug() << "*** MainWindow received diskIOEnd signal for D" << driveNumber << ":" << "***";
+        // Turn LED OFF on D1 (toolbar drive)
+        if (driveNumber == 1 && m_diskDrive1) {
+            qDebug() << "*** Calling turnOffActivityLED() for D1 ***";
+            m_diskDrive1->turnOffActivityLED();
+        }
+        // Turn LED OFF on D2-D8 (dock drives)
+        else if (driveNumber >= 2 && driveNumber <= 8) {
+            qDebug() << "*** Looking for dock drive widget D" << driveNumber << "for LED OFF ***";
+            DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+            if (driveWidget) {
+                qDebug() << "*** Calling turnOffActivityLED() for dock drive D" << driveNumber << "***";
+                driveWidget->turnOffActivityLED();
+            } else {
+                qDebug() << "*** ERROR: Could not find dock drive widget for D" << driveNumber << "for LED OFF ***";
+            }
+        }
+    });
+    
+    connect(m_mediaToggleButton, &QPushButton::clicked, this, &MainWindow::toggleMediaDock);
+    
+    // Add D1 and toggle button to toolbar
+    QWidget* diskContainer = new QWidget(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(diskContainer);
+    mainLayout->setContentsMargins(0, 2, 0, 2);
+    mainLayout->setSpacing(0);
+    
+    mainLayout->addWidget(m_diskDrive1);
+    mainLayout->addSpacing(2);
+    mainLayout->addWidget(m_mediaToggleButton);
+    
+    // Add to toolbar at the beginning (left side)
+    m_toolBar->insertWidget(m_toolBar->actions().first(), diskContainer);
+    m_toolBar->insertSeparator(m_toolBar->actions().at(1));
+}
+
+void MainWindow::toggleMediaDock()
+{
+    if (m_mediaPeripheralsDockWidget->isVisible()) {
+        m_mediaPeripheralsDockWidget->hide();
+        m_mediaToggleButton->setChecked(false);
+    } else {
+        m_mediaPeripheralsDockWidget->show();
+        m_mediaToggleButton->setChecked(true);
+    }
+}
+
+void MainWindow::onDiskInserted(int driveNumber, const QString& diskPath)
+{
+    QFileInfo fileInfo(diskPath);
+    statusBar()->showMessage(QString("Disk mounted to D%1: %2 - Try typing DIR from BASIC")
+                            .arg(driveNumber).arg(fileInfo.fileName()), 5000);
+    qDebug() << "Disk inserted in drive" << driveNumber << ":" << diskPath;
+    
+    // Save disk insertion to settings
+    saveDiskToSettings(driveNumber, diskPath, false); // Assume not read-only for now
+}
+
+void MainWindow::onDiskEjected(int driveNumber)
+{
+    statusBar()->showMessage(QString("Disk ejected from D%1:").arg(driveNumber), 3000);
+    qDebug() << "Disk ejected from drive" << driveNumber;
+    
+    // Clear disk from settings
+    clearDiskFromSettings(driveNumber);
+}
+
+void MainWindow::onDriveStateChanged(int driveNumber, bool enabled)
+{
+    QString message = QString("Drive D%1: %2").arg(driveNumber).arg(enabled ? "On" : "Off");
+    statusBar()->showMessage(message, 2000);
+    qDebug() << "Drive" << driveNumber << "state changed to" << (enabled ? "on" : "off");
+    
+    // Save drive state to settings
+    saveDriveStateToSettings(driveNumber, enabled);
+}
+
+void MainWindow::onCassetteInserted(const QString& cassettePath)
+{
+    QFileInfo fileInfo(cassettePath);
+    statusBar()->showMessage(QString("Cassette inserted: %1").arg(fileInfo.fileName()), 3000);
+    qDebug() << "Cassette inserted:" << cassettePath;
+}
+
+void MainWindow::onCassetteEjected()
+{
+    statusBar()->showMessage("Cassette ejected", 2000);
+    qDebug() << "Cassette ejected";
+}
+
+void MainWindow::onCassetteStateChanged(bool enabled)
+{
+    QString message = QString("Cassette recorder: %1").arg(enabled ? "On" : "Off");
+    statusBar()->showMessage(message, 2000);
+    qDebug() << "Cassette state changed to" << (enabled ? "on" : "off");
+}
+
+void MainWindow::onCartridgeInserted(const QString& cartridgePath)
+{
+    QFileInfo fileInfo(cartridgePath);
+    statusBar()->showMessage(QString("Cartridge loaded: %1").arg(fileInfo.fileName()), 3000);
+    qDebug() << "Cartridge inserted:" << cartridgePath;
+}
+
+void MainWindow::onCartridgeEjected()
+{
+    statusBar()->showMessage("Cartridge ejected", 2000);
+    qDebug() << "Cartridge ejected";
+}
+
 void MainWindow::loadInitialSettings()
 {
     QSettings settings("8bitrelics", "Fujisan");
@@ -920,6 +1085,20 @@ void MainWindow::loadAndApplyMediaSettings()
             
             if (m_emulator->mountDiskImage(i + 1, diskPath, diskReadOnly)) {
                 qDebug() << QString("Successfully auto-mounted D%1:").arg(i + 1);
+                
+                // Update the corresponding disk widget to reflect the mounted disk
+                if (i + 1 == 1 && m_diskDrive1) {
+                    // D1 is on toolbar
+                    m_diskDrive1->setDriveEnabled(true);
+                    m_diskDrive1->updateFromEmulator();
+                } else if (i + 1 >= 2 && i + 1 <= 8 && m_mediaPeripheralsDock) {
+                    // D2-D8 are in dock
+                    DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(i + 1);
+                    if (driveWidget) {
+                        driveWidget->setDriveEnabled(true);
+                        driveWidget->updateFromEmulator();
+                    }
+                }
             } else {
                 qDebug() << QString("Failed to auto-mount D%1:").arg(i + 1);
             }
@@ -945,6 +1124,45 @@ void MainWindow::loadAndApplyMediaSettings()
     }
     
     qDebug() << "Media settings loaded and applied";
+}
+
+void MainWindow::saveDiskToSettings(int driveNumber, const QString& diskPath, bool readOnly)
+{
+    QSettings settings("8bitrelics", "Fujisan");
+    QString diskKey = QString("media/disk%1").arg(driveNumber);
+    
+    settings.setValue(diskKey + "Enabled", true);
+    settings.setValue(diskKey + "Path", diskPath);
+    settings.setValue(diskKey + "ReadOnly", readOnly);
+    settings.sync();
+    
+    qDebug() << QString("Saved D%1 to settings: %2 (read-only: %3)")
+                .arg(driveNumber).arg(diskPath).arg(readOnly);
+}
+
+void MainWindow::clearDiskFromSettings(int driveNumber)
+{
+    QSettings settings("8bitrelics", "Fujisan");
+    QString diskKey = QString("media/disk%1").arg(driveNumber);
+    
+    settings.setValue(diskKey + "Enabled", false);
+    settings.setValue(diskKey + "Path", "");
+    settings.setValue(diskKey + "ReadOnly", false);
+    settings.sync();
+    
+    qDebug() << QString("Cleared D%1 from settings").arg(driveNumber);
+}
+
+void MainWindow::saveDriveStateToSettings(int driveNumber, bool enabled)
+{
+    QSettings settings("8bitrelics", "Fujisan");
+    QString diskKey = QString("media/disk%1").arg(driveNumber);
+    
+    // Only update the enabled state, preserve existing path and read-only settings
+    settings.setValue(diskKey + "Enabled", enabled);
+    settings.sync();
+    
+    qDebug() << QString("Saved D%1 state to settings: %2").arg(driveNumber).arg(enabled ? "enabled" : "disabled");
 }
 
 void MainWindow::loadVideoSettings()

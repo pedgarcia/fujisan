@@ -232,6 +232,76 @@ CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/debuggerwidget.cpp -o CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.s
 
+CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o: CMakeFiles/Fujisan.dir/flags.make
+CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o: src/diskdrivewidget.cpp
+CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o: CMakeFiles/Fujisan.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o -MF CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o.d -o CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o -c /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrivewidget.cpp
+
+CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrivewidget.cpp > CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.i
+
+CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrivewidget.cpp -o CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.s
+
+CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o: CMakeFiles/Fujisan.dir/flags.make
+CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o: src/diskdrawerwidget.cpp
+CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o: CMakeFiles/Fujisan.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o -MF CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o.d -o CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o -c /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrawerwidget.cpp
+
+CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrawerwidget.cpp > CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.i
+
+CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrawerwidget.cpp -o CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.s
+
+CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o: CMakeFiles/Fujisan.dir/flags.make
+CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o: src/cassettewidget.cpp
+CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o: CMakeFiles/Fujisan.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o -MF CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o.d -o CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o -c /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cassettewidget.cpp
+
+CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cassettewidget.cpp > CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.i
+
+CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cassettewidget.cpp -o CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.s
+
+CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o: CMakeFiles/Fujisan.dir/flags.make
+CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o: src/cartridgewidget.cpp
+CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o: CMakeFiles/Fujisan.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o -MF CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o.d -o CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o -c /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cartridgewidget.cpp
+
+CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cartridgewidget.cpp > CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.i
+
+CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cartridgewidget.cpp -o CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.s
+
+CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o: CMakeFiles/Fujisan.dir/flags.make
+CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o: src/mediaperipheralsdock.cpp
+CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o: CMakeFiles/Fujisan.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o -MF CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o.d -o CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o -c /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mediaperipheralsdock.cpp
+
+CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mediaperipheralsdock.cpp > CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.i
+
+CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mediaperipheralsdock.cpp -o CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.s
+
 # Object files for target Fujisan
 Fujisan_OBJECTS = \
 "CMakeFiles/Fujisan.dir/Fujisan_autogen/mocs_compilation.cpp.o" \
@@ -244,7 +314,12 @@ Fujisan_OBJECTS = \
 "CMakeFiles/Fujisan.dir/src/configurationprofile.cpp.o" \
 "CMakeFiles/Fujisan.dir/src/configurationprofilemanager.cpp.o" \
 "CMakeFiles/Fujisan.dir/src/profileselectionwidget.cpp.o" \
-"CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o"
+"CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o" \
+"CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o" \
+"CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o" \
+"CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o" \
+"CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o" \
+"CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o"
 
 # External object files for target Fujisan
 Fujisan_EXTERNAL_OBJECTS =
@@ -260,6 +335,11 @@ Fujisan: CMakeFiles/Fujisan.dir/src/configurationprofile.cpp.o
 Fujisan: CMakeFiles/Fujisan.dir/src/configurationprofilemanager.cpp.o
 Fujisan: CMakeFiles/Fujisan.dir/src/profileselectionwidget.cpp.o
 Fujisan: CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o
+Fujisan: CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o
+Fujisan: CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o
+Fujisan: CMakeFiles/Fujisan.dir/src/cassettewidget.cpp.o
+Fujisan: CMakeFiles/Fujisan.dir/src/cartridgewidget.cpp.o
+Fujisan: CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o
 Fujisan: CMakeFiles/Fujisan.dir/build.make
 Fujisan: /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/libatari800.a
 Fujisan: /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/QtWidgets
@@ -268,7 +348,7 @@ Fujisan: /opt/homebrew/opt/qt@5/lib/QtGui.framework/QtGui
 Fujisan: /opt/homebrew/opt/qt@5/lib/QtNetwork.framework/QtNetwork
 Fujisan: /opt/homebrew/opt/qt@5/lib/QtCore.framework/QtCore
 Fujisan: CMakeFiles/Fujisan.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Linking CXX executable Fujisan"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Linking CXX executable Fujisan"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/Fujisan.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

@@ -16,6 +16,8 @@
 #include <QAudioDeviceInfo>
 #include <QIODevice>
 #include <QBuffer>
+#include <functional>
+#include <QSet>
 
 extern "C" {
     #include "libatari800.h"
@@ -27,6 +29,14 @@ extern "C" {
     extern void Atari800_Warmstart(void);
     // Disk mounting functions
     extern int libatari800_mount_disk_image(int diskno, const char *filename, int readonly);
+    // Memory access
+    extern unsigned char* libatari800_get_main_memory_ptr();
+    // SIO monitoring variables
+    extern int SIO_last_op;
+    extern int SIO_last_op_time;
+    extern int SIO_last_drive;
+    #define SIO_LAST_READ 0
+    #define SIO_LAST_WRITE 1
     // Cartridge functions  
     extern void CARTRIDGE_RemoveAutoReboot(void);
     extern int CARTRIDGE_InsertAutoReboot(const char *filename);
@@ -94,7 +104,11 @@ public:
     
     // Disk drive functions
     bool mountDiskImage(int driveNumber, const QString& filename, bool readOnly = false);
+    void dismountDiskImage(int driveNumber);
     QString getDiskImagePath(int driveNumber) const;
+    
+    // Disk I/O monitoring
+    void setDiskActivityCallback(std::function<void(int, bool)> callback); // drive, isWriting
     
     // Audio functions
     void enableAudio(bool enabled);
@@ -153,12 +167,16 @@ public slots:
     void processFrame();
 
 signals:
+    void diskActivity(int driveNumber, bool isWriting);  // Legacy blinking
+    void diskIOStart(int driveNumber, bool isWriting);   // Turn LED ON
+    void diskIOEnd(int driveNumber);                     // Turn LED OFF
     void frameReady();
 
 private:
     unsigned char convertQtKeyToAtari(int key, Qt::KeyboardModifiers modifiers);
     char getShiftedSymbol(int key, bool shiftPressed);
     void setupAudio();
+    void triggerDiskActivity();
     
     bool m_basicEnabled = true;
     bool m_altirraOSEnabled = false;
@@ -176,6 +194,9 @@ private:
     
     // Disk drive tracking
     QString m_diskImages[8]; // Paths for D1: through D8:
+    
+    // Disk I/O detection using libatari800 API
+    QSet<int> m_mountedDrives;
     
     // Audio components
     QAudioOutput* m_audioOutput;

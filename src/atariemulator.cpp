@@ -8,6 +8,31 @@
 #include "atariemulator.h"
 #include <QDebug>
 #include <QApplication>
+#include <QMetaObject>
+#include <QTimer>
+
+// Static callback function for libatari800 disk activity
+static AtariEmulator* s_emulatorInstance = nullptr;
+static void diskActivityCallback(int drive, int operation) {
+    if (s_emulatorInstance) {
+        // Convert libatari800 operation to Qt signal parameters
+        bool isWriting = (operation == 1);  // SIO_LAST_WRITE = 1, SIO_LAST_READ = 0
+        
+        qDebug() << "🔥 LIBATARI800 CALLBACK: Drive D" << drive 
+                 << (isWriting ? "WRITE" : "READ") << "operation";
+        
+        // Emit Qt signal on the main thread
+        QMetaObject::invokeMethod(s_emulatorInstance, "diskIOStart", Qt::QueuedConnection,
+                                Q_ARG(int, drive), Q_ARG(bool, isWriting));
+        
+        // Set a timer to turn the LED off after a short time (hardware-accurate timing)
+        QTimer::singleShot(100, s_emulatorInstance, [drive]() {
+            qDebug() << "🔥 LIBATARI800 CALLBACK: Drive D" << drive << "operation complete";
+            QMetaObject::invokeMethod(s_emulatorInstance, "diskIOEnd", Qt::QueuedConnection,
+                                    Q_ARG(int, drive));
+        });
+    }
+}
 
 AtariEmulator::AtariEmulator(QObject *parent)
     : QObject(parent)
@@ -18,11 +43,19 @@ AtariEmulator::AtariEmulator(QObject *parent)
 {
     libatari800_clear_input_array(&m_currentInput);
     
+    // Set up the global instance pointer for the callback
+    s_emulatorInstance = this;
+    
     connect(m_frameTimer, &QTimer::timeout, this, &AtariEmulator::processFrame);
 }
 
 AtariEmulator::~AtariEmulator()
 {
+    // Clear the global instance pointer
+    if (s_emulatorInstance == this) {
+        s_emulatorInstance = nullptr;
+        libatari800_set_disk_activity_callback(nullptr);
+    }
     shutdown();
 }
 
@@ -200,6 +233,10 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         m_frameTimeMs = 1000.0f / m_targetFps;
         qDebug() << "Target FPS:" << m_targetFps << "Frame time:" << m_frameTimeMs << "ms";
         
+        // Set up the disk activity callback for hardware-level monitoring
+        libatari800_set_disk_activity_callback(diskActivityCallback);
+        qDebug() << "✓ Disk activity callback registered with libatari800";
+        
         // Initialize audio output if enabled
         if (m_audioEnabled) {
             setupAudio();
@@ -224,22 +261,24 @@ void AtariEmulator::processFrame()
 {
     // Debug what we're sending to the emulator
     if (m_currentInput.keychar != 0) {
-        qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)m_currentInput.keychar << "'" << QChar(m_currentInput.keychar) << "' ***";
+        // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)m_currentInput.keychar << "'" << QChar(m_currentInput.keychar) << "' ***";
     }
     // Always debug L key specifically since AKEY_l = 0
     bool hasInput = m_currentInput.keychar != 0 || m_currentInput.keycode != 0 || m_currentInput.special != 0 ||
                    m_currentInput.start != 0 || m_currentInput.select != 0 || m_currentInput.option != 0;
     
     if (hasInput) {
-        qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)m_currentInput.keychar 
-                 << " keycode=" << (int)m_currentInput.keycode 
-                 << " special=" << (int)m_currentInput.special 
-                 << " start=" << (int)m_currentInput.start
-                 << " select=" << (int)m_currentInput.select
-                 << " option=" << (int)m_currentInput.option << " ***";
+        // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)m_currentInput.keychar 
+        //          << " keycode=" << (int)m_currentInput.keycode 
+        //          << " special=" << (int)m_currentInput.special 
+        //          << " start=" << (int)m_currentInput.start
+        //          << " select=" << (int)m_currentInput.select
+        //          << " option=" << (int)m_currentInput.option << " ***";
     }
     
     libatari800_next_frame(&m_currentInput);
+    
+    // Disk I/O monitoring is now handled by libatari800 callback
     
     // Handle audio output
     if (m_audioEnabled && m_audioOutput && m_audioDevice) {
@@ -320,15 +359,31 @@ bool AtariEmulator::mountDiskImage(int driveNumber, const QString& filename, boo
     if (result) {
         // Store the path for tracking
         m_diskImages[driveNumber - 1] = filename;
+        m_mountedDrives.insert(driveNumber);
+        
         qDebug() << "Successfully mounted" << filename << "to drive D" << driveNumber << ":" 
                  << (readOnly ? "(read-only)" : "(read-write)");
         qDebug() << "Disk should now be accessible from the emulated Atari";
+        qDebug() << "Disk activity LEDs will now be controlled by libatari800 callback";
+        
         return true;
     } else {
         qDebug() << "Failed to mount" << filename << "to drive D" << driveNumber << ":";
         qDebug() << "Check if file exists and is a valid Atari disk image";
         return false;
     }
+}
+
+void AtariEmulator::dismountDiskImage(int driveNumber)
+{
+    if (driveNumber < 1 || driveNumber > 8) {
+        qWarning() << "Invalid drive number for dismount:" << driveNumber;
+        return;
+    }
+    
+    m_diskImages[driveNumber - 1].clear();
+    m_mountedDrives.remove(driveNumber);
+    qDebug() << "Dismounted drive D" << driveNumber << ":";
 }
 
 QString AtariEmulator::getDiskImagePath(int driveNumber) const
@@ -947,3 +1002,90 @@ void AtariEmulator::stepOneFrame()
         qDebug() << "Cannot step frame - emulation not paused";
     }
 }
+
+void AtariEmulator::setDiskActivityCallback(std::function<void(int, bool)> callback)
+{
+    // Conservative approach - only trigger activity on mount/dismount events
+    // No continuous background activity
+    Q_UNUSED(callback);
+}
+
+void AtariEmulator::triggerDiskActivity()
+{
+    // Conservative approach - no background activity
+    // Only mount/dismount events trigger LEDs
+}
+
+// REMOVED: PC-based monitoring replaced with libatari800 callback
+/*
+void AtariEmulator::checkForDiskIO()
+{
+    // Back to PC monitoring since SIO variables aren't working
+    // But use a much simpler drive detection approach
+    
+    unsigned short currentPC = CPU_regPC;
+    
+    // Check if we're in DOS disk routines (the ranges that were working)
+    bool inDiskRoutine = (currentPC >= 0x1300 && currentPC <= 0x17FF); // DOS 2.5 ranges from your log
+    
+    // Debug: print every 60 frames to see if we're detecting anything
+    static int debugCounter = 0;
+    if (++debugCounter >= 60) {
+        qDebug() << "PC monitoring: currentPC=" << QString("$%1").arg(currentPC, 4, 16, QChar('0')).toUpper() 
+                 << "inDiskRoutine=" << inDiskRoutine << "mountedDrives=" << m_mountedDrives.size();
+        debugCounter = 0;
+    }
+    
+    static bool wasInDiskRoutine = false;
+    static int activeDrive = -1;
+    
+    if (inDiskRoutine && !wasInDiskRoutine) {
+        // Just entered disk routine - turn LED ON
+        qDebug() << "*** DISK ROUTINE DETECTED at PC:" << QString("$%1").arg(currentPC, 4, 16, QChar('0')).toUpper() << "***";
+        
+        // SIMPLE approach: cycle through mounted drives based on recent activity
+        static int lastUsedDrive = 1;
+        int driveNumber = lastUsedDrive;
+        
+        // If we have multiple mounted drives, try to detect which one
+        if (m_mountedDrives.size() > 1) {
+            // Very simple heuristic: if we recently used D1, try D2, etc.
+            QList<int> drives = m_mountedDrives.values();
+            std::sort(drives.begin(), drives.end());
+            
+            // Find next drive after the last one used
+            auto it = std::find(drives.begin(), drives.end(), lastUsedDrive);
+            if (it != drives.end() && (it + 1) != drives.end()) {
+                driveNumber = *(it + 1);
+            } else {
+                driveNumber = drives.first();
+            }
+        } else if (!m_mountedDrives.isEmpty()) {
+            driveNumber = m_mountedDrives.values().first();
+        }
+        
+        // Better read/write detection based on PC patterns
+        // Look at the specific PC addresses from actual operations
+        bool isWriting = (currentPC >= 0x1640 && currentPC <= 0x1680) ||  // Some write routines
+                        (currentPC >= 0x1500 && currentPC <= 0x1550);    // More write routines
+        
+        activeDrive = driveNumber;
+        lastUsedDrive = driveNumber;
+        
+        qDebug() << "=== LED SIGNAL SENT ===" 
+                 << "Drive D" << driveNumber << ":" << (isWriting ? "WRITE" : "READ")
+                 << "PC:" << QString("$%1").arg(currentPC, 4, 16, QChar('0')).toUpper()
+                 << "Mounted drives:" << m_mountedDrives;
+        
+        emit diskIOStart(driveNumber, isWriting);
+        
+    } else if (!inDiskRoutine && wasInDiskRoutine && activeDrive != -1) {
+        // Exited disk routine - turn LED OFF
+        qDebug() << "=== LED OFF SIGNAL SENT === Drive D" << activeDrive << ":";
+        emit diskIOEnd(activeDrive);
+        activeDrive = -1;
+    }
+    
+    wasInDiskRoutine = inDiskRoutine;
+}
+*/

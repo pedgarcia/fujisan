@@ -1,0 +1,486 @@
+/*
+ * Fujisan - Modern Atari Emulator
+ * Copyright (c) 2025 Paulo Garcia (8bitrelics.com)
+ * 
+ * Licensed under the MIT License. See LICENSE file for details.
+ */
+
+#include "diskdrivewidget.h"
+#include "atariemulator.h"
+#include <QVBoxLayout>
+#include <QFileDialog>
+#include <QDebug>
+#include <QApplication>
+#include <QFileInfo>
+#include <QPainter>
+
+DiskDriveWidget::DiskDriveWidget(int driveNumber, AtariEmulator* emulator, QWidget *parent, bool isDrawerDrive)
+    : QWidget(parent)
+    , m_driveNumber(driveNumber)
+    , m_emulator(emulator)
+    , m_currentState(Off)
+    , m_baseState(Off)
+    , m_driveEnabled(false)
+    , m_imageLabel(nullptr)
+    , m_contextMenu(nullptr)
+    , m_blinkTimer(new QTimer(this))
+    , m_blinkVisible(true)
+    , m_blinkState(Off)
+    , m_ledDebounceTimer(new QTimer(this))
+    , m_pendingOffState(Off)
+    , m_isDrawerDrive(isDrawerDrive)
+{
+    setupUI();
+    loadImages();
+    createContextMenu();
+    
+    // Setup blinking timer
+    m_blinkTimer->setInterval(BLINK_INTERVAL);
+    connect(m_blinkTimer, &QTimer::timeout, this, &DiskDriveWidget::onBlinkTimer);
+    
+    // Setup LED debounce timer (750ms delay)
+    m_ledDebounceTimer->setSingleShot(true);
+    m_ledDebounceTimer->setInterval(750);
+    connect(m_ledDebounceTimer, &QTimer::timeout, this, &DiskDriveWidget::onLedDebounceTimeout);
+    
+    // Initial state - explicitly set drive as disabled (off) and force display update
+    m_driveEnabled = false;
+    setState(Off);
+    updateDisplay(); // Force initial display update
+    updateFromEmulator();
+}
+
+void DiskDriveWidget::setupUI()
+{
+    // For dock drives, use the same width as toolbar drives but keep proportional height
+    int width = DISK_WIDTH;   // All drives use same width now
+    int height = m_isDrawerDrive ? (DISK_HEIGHT * 0.84) : DISK_HEIGHT; // Dock drives slightly shorter
+    
+    setFixedSize(width, height);
+    setContextMenuPolicy(Qt::DefaultContextMenu);
+    
+    QVBoxLayout* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    
+    m_imageLabel = new QLabel(this);
+    m_imageLabel->setAlignment(Qt::AlignCenter);
+    m_imageLabel->setScaledContents(true);
+    m_imageLabel->setContentsMargins(0, 0, 0, 0);  // No margins on the image label
+    layout->addWidget(m_imageLabel);
+    
+    // Add a simple status indicator for debugging
+    m_statusIndicator = new QLabel(this);
+    m_statusIndicator->setFixedSize(10, 10);
+    m_statusIndicator->setStyleSheet("background-color: gray; border: 1px solid black;");
+    layout->addWidget(m_statusIndicator);
+}
+
+void DiskDriveWidget::loadImages()
+{
+    // Try multiple paths to find the images
+    QStringList imagePaths = {
+        "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/images/",
+        QApplication::applicationDirPath() + "/../fujisan/images/",
+        QApplication::applicationDirPath() + "/images/",
+        ":/images/",
+        "./images/"
+    };
+    
+    for (const QString& path : imagePaths) {
+        QString offPath = path + "atari810off.png";
+        if (QFileInfo::exists(offPath)) {
+            bool success = true;
+            success &= m_offImage.load(offPath);
+            success &= m_emptyImage.load(path + "atari810emtpy.png");  // Note: keeping original filename with typo
+            success &= m_closedImage.load(path + "atari810closed.png");
+            success &= m_readImage.load(path + "atari810read.png");
+            success &= m_writeImage.load(path + "atari810write.png");
+            
+            if (success) {
+                qDebug() << "Successfully loaded all disk drive images from:" << path;
+                qDebug() << "Drive" << m_driveNumber << "images loaded - Off image size:" << m_offImage.size();
+                return;
+            } else {
+                qWarning() << "Some images failed to load from:" << path;
+            }
+        }
+    }
+    
+    qWarning() << "Failed to load disk drive images! Searched paths:" << imagePaths;
+    
+    // Create fallback placeholder images if loading fails
+    if (m_offImage.isNull()) {
+        m_offImage = QPixmap(72, 48);
+        m_offImage.fill(Qt::gray);
+        qDebug() << "Created fallback off image for drive" << m_driveNumber;
+    }
+}
+
+void DiskDriveWidget::createContextMenu()
+{
+    m_contextMenu = new QMenu(this);
+    
+    m_toggleAction = new QAction(this);
+    connect(m_toggleAction, &QAction::triggered, this, &DiskDriveWidget::onToggleDrive);
+    m_contextMenu->addAction(m_toggleAction);
+    
+    m_contextMenu->addSeparator();
+    
+    m_insertAction = new QAction("Insert Disk Image...", this);
+    connect(m_insertAction, &QAction::triggered, this, &DiskDriveWidget::onInsertDisk);
+    m_contextMenu->addAction(m_insertAction);
+    
+    m_ejectAction = new QAction("Eject", this);
+    connect(m_ejectAction, &QAction::triggered, this, &DiskDriveWidget::onEjectDisk);
+    m_contextMenu->addAction(m_ejectAction);
+}
+
+void DiskDriveWidget::setState(DriveState state)
+{
+    if (m_currentState != state) {
+        qDebug() << "Drive" << m_driveNumber << "changing state from" << m_currentState << "to" << state;
+        m_currentState = state;
+        m_baseState = state;
+        stopBlinking();
+        updateDisplay();
+        updateTooltip();
+    }
+}
+
+void DiskDriveWidget::insertDisk(const QString& diskPath)
+{
+    if (m_emulator && m_emulator->mountDiskImage(m_driveNumber, diskPath, false)) {
+        m_diskPath = diskPath;
+        setState(m_driveEnabled ? Closed : Off);
+        updateTooltip();
+        emit diskInserted(m_driveNumber, diskPath);
+        qDebug() << "Mounted disk" << diskPath << "to drive" << m_driveNumber;
+    }
+}
+
+void DiskDriveWidget::ejectDisk()
+{
+    if (m_emulator && hasDisk()) {
+        // TODO: Add libatari800 unmount functionality when available
+        m_diskPath.clear();
+        setState(m_driveEnabled ? Empty : Off);
+        updateTooltip();
+        emit diskEjected(m_driveNumber);
+        qDebug() << "Ejected disk from drive" << m_driveNumber;
+    }
+}
+
+void DiskDriveWidget::setDriveEnabled(bool enabled)
+{
+    if (m_driveEnabled != enabled) {
+        m_driveEnabled = enabled;
+        
+        // Update state based on whether we have a disk or not
+        if (enabled) {
+            setState(hasDisk() ? Closed : Empty);
+        } else {
+            setState(Off);
+        }
+        
+        emit driveStateChanged(m_driveNumber, enabled);
+    }
+}
+
+void DiskDriveWidget::showReadActivity()
+{
+    if (m_currentState == Closed) {
+        startBlinking(Reading);
+    }
+}
+
+void DiskDriveWidget::showWriteActivity()
+{
+    if (m_currentState == Closed) {
+        startBlinking(Writing);
+    }
+}
+
+void DiskDriveWidget::turnOnReadLED()
+{
+    if (m_currentState == Closed || m_currentState == Empty || m_currentState == Writing) {
+        // Cancel any pending LED off timer
+        m_ledDebounceTimer->stop();
+        
+        stopBlinking();
+        m_currentState = Reading;
+        updateDisplay();
+        qDebug() << "Drive" << m_driveNumber << "READ LED turned ON (state now READING) - debounce cancelled";
+    } else {
+        qDebug() << "Drive" << m_driveNumber << "turnOnReadLED() called but state is" << m_currentState;
+    }
+}
+
+void DiskDriveWidget::turnOnWriteLED()
+{
+    if (m_currentState == Closed || m_currentState == Empty || m_currentState == Reading) {
+        // Cancel any pending LED off timer
+        m_ledDebounceTimer->stop();
+        
+        stopBlinking();
+        m_currentState = Writing;
+        updateDisplay();
+        qDebug() << "Drive" << m_driveNumber << "WRITE LED turned ON (state now WRITING) - debounce cancelled";
+    } else {
+        qDebug() << "Drive" << m_driveNumber << "turnOnWriteLED() called but state is" << m_currentState;
+    }
+}
+
+void DiskDriveWidget::turnOffActivityLED()
+{
+    if (m_currentState == Reading || m_currentState == Writing) {
+        // Don't turn off immediately - start debounce timer
+        m_pendingOffState = m_baseState; // Remember what state to return to
+        m_ledDebounceTimer->start();
+        qDebug() << "Drive" << m_driveNumber << "LED off requested - starting 750ms debounce timer";
+    }
+}
+
+void DiskDriveWidget::updateFromEmulator()
+{
+    if (!m_emulator) return;
+    
+    // Get current disk image path from emulator
+    QString currentPath = m_emulator->getDiskImagePath(m_driveNumber);
+    
+    if (!currentPath.isEmpty() && currentPath != m_diskPath) {
+        m_diskPath = currentPath;
+        if (m_driveEnabled) {
+            setState(Closed);
+        }
+    } else if (currentPath.isEmpty() && !m_diskPath.isEmpty()) {
+        m_diskPath.clear();
+        setState(m_driveEnabled ? Empty : Off);
+    }
+    
+    updateTooltip();
+}
+
+void DiskDriveWidget::updateDisplay()
+{
+    if (!m_imageLabel) return;
+    
+    QPixmap currentImage;
+    QString imageName;
+    switch (m_currentState) {
+        case Off:
+            currentImage = m_offImage;
+            imageName = "atari810off.png";
+            break;
+        case Empty:
+            currentImage = m_emptyImage;
+            imageName = "atari810emtpy.png";
+            break;
+        case Closed:
+            currentImage = m_closedImage;
+            imageName = "atari810closed.png";
+            break;
+        case Reading:
+            currentImage = m_readImage;
+            imageName = "atari810read.png";
+            break;
+        case Writing:
+            currentImage = m_writeImage;
+            imageName = "atari810write.png";
+            break;
+    }
+    
+    // Always display something, even if the image is null
+    if (!currentImage.isNull()) {
+        // Scale image to fit widget while maintaining aspect ratio
+        QPixmap scaledImage = currentImage.scaled(
+            size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        m_imageLabel->setPixmap(scaledImage);
+        QString stateName = (m_currentState == Off) ? "OFF" :
+                           (m_currentState == Empty) ? "EMPTY" :
+                           (m_currentState == Closed) ? "CLOSED" :
+                           (m_currentState == Reading) ? "READING" : "WRITING";
+        qDebug() << "Drive" << m_driveNumber << "displaying state" << m_currentState << "(" << stateName << ")" 
+                 << "using image:" << imageName << "size:" << currentImage.size() 
+                 << "isNull:" << currentImage.isNull();
+        
+        // Update status indicator color based on state
+        QString indicatorColor;
+        switch (m_currentState) {
+            case Off:
+                indicatorColor = "background-color: black; border: 1px solid gray;";
+                break;
+            case Empty:
+                indicatorColor = "background-color: gray; border: 1px solid black;";
+                break;
+            case Closed:
+                indicatorColor = "background-color: blue; border: 1px solid black;";
+                break;
+            case Reading:
+                indicatorColor = "background-color: green; border: 1px solid black;";
+                break;
+            case Writing:
+                indicatorColor = "background-color: red; border: 1px solid black;";
+                break;
+        }
+        if (m_statusIndicator) {
+            m_statusIndicator->setStyleSheet(indicatorColor);
+        }
+    } else {
+        // Create a placeholder if image is missing
+        QPixmap placeholder(size());
+        placeholder.fill(Qt::lightGray);
+        QPainter painter(&placeholder);
+        painter.setPen(Qt::black);
+        painter.drawText(placeholder.rect(), Qt::AlignCenter, QString("D%1\n%2").arg(m_driveNumber).arg(
+            m_currentState == Off ? "OFF" : 
+            m_currentState == Empty ? "EMPTY" :
+            m_currentState == Closed ? "CLOSED" : 
+            m_currentState == Reading ? "READ" : "WRITE"));
+        m_imageLabel->setPixmap(placeholder);
+        qDebug() << "Drive" << m_driveNumber << "showing placeholder for state" << m_currentState;
+    }
+}
+
+void DiskDriveWidget::updateTooltip()
+{
+    QString tooltip = QString("Drive D%1:").arg(m_driveNumber);
+    
+    switch (m_currentState) {
+        case Off:
+            tooltip += " Off";
+            break;
+        case Empty:
+            tooltip += " On (Empty)";
+            break;
+        case Closed:
+        case Reading:
+        case Writing:
+            if (hasDisk()) {
+                QFileInfo fileInfo(m_diskPath);
+                tooltip += QString(" %1").arg(fileInfo.fileName());
+            } else {
+                tooltip += " On (Disk Inserted)";
+            }
+            break;
+    }
+    
+    setToolTip(tooltip);
+}
+
+void DiskDriveWidget::startBlinking(DriveState blinkState)
+{
+    m_blinkState = blinkState;
+    m_blinkVisible = true;
+    m_blinkTimer->start();
+}
+
+void DiskDriveWidget::stopBlinking()
+{
+    m_blinkTimer->stop();
+    m_currentState = m_baseState;
+    updateDisplay();
+}
+
+QSize DiskDriveWidget::sizeHint() const
+{
+    int width = DISK_WIDTH;   // All drives use same width now
+    int height = m_isDrawerDrive ? (DISK_HEIGHT * 0.84) : DISK_HEIGHT; // Dock drives slightly shorter
+    return QSize(width, height);
+}
+
+QSize DiskDriveWidget::minimumSizeHint() const
+{
+    int width = DISK_WIDTH;   // All drives use same width now
+    int height = m_isDrawerDrive ? (DISK_HEIGHT * 0.84) : DISK_HEIGHT; // Dock drives slightly shorter
+    return QSize(width, height);
+}
+
+void DiskDriveWidget::contextMenuEvent(QContextMenuEvent* event)
+{
+    // Update menu items based on current state
+    if (m_driveEnabled) {
+        m_toggleAction->setText("Turn Off");
+    } else {
+        m_toggleAction->setText("Turn On");
+    }
+    
+    m_insertAction->setEnabled(m_driveEnabled);
+    m_ejectAction->setEnabled(m_driveEnabled && hasDisk());
+    
+    m_contextMenu->exec(event->globalPos());
+}
+
+void DiskDriveWidget::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::RightButton) {
+        // Context menu is handled by contextMenuEvent
+        event->accept();
+    } else {
+        QWidget::mousePressEvent(event);
+    }
+}
+
+void DiskDriveWidget::paintEvent(QPaintEvent* event)
+{
+    QWidget::paintEvent(event);
+}
+
+void DiskDriveWidget::onToggleDrive()
+{
+    setDriveEnabled(!m_driveEnabled);
+}
+
+void DiskDriveWidget::onInsertDisk()
+{
+    if (!m_driveEnabled) return;
+    
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        QString("Select Disk Image for Drive D%1:").arg(m_driveNumber),
+        QString(),
+        "Atari Disk Images (*.atr *.ATR *.xfd *.XFD *.dcm *.DCM);;All Files (*)"
+    );
+    
+    if (!fileName.isEmpty()) {
+        insertDisk(fileName);
+    }
+}
+
+void DiskDriveWidget::onEjectDisk()
+{
+    if (m_driveEnabled && hasDisk()) {
+        ejectDisk();
+    }
+}
+
+void DiskDriveWidget::onBlinkTimer()
+{
+    m_blinkVisible = !m_blinkVisible;
+    
+    if (m_blinkVisible) {
+        m_currentState = m_blinkState;
+    } else {
+        m_currentState = m_baseState;
+    }
+    
+    updateDisplay();
+    
+    // Stop blinking after a reasonable time (2 seconds)
+    static int blinkCount = 0;
+    if (++blinkCount >= (2000 / BLINK_INTERVAL)) {
+        blinkCount = 0;
+        stopBlinking();
+    }
+}
+
+void DiskDriveWidget::onLedDebounceTimeout()
+{
+    // Debounce timer expired - actually turn off the LED now
+    if (m_currentState == Reading || m_currentState == Writing) {
+        stopBlinking();
+        m_currentState = m_pendingOffState; // Return to saved state
+        updateDisplay();
+        qDebug() << "Drive" << m_driveNumber << "LED debounce timeout - LED actually turned OFF";
+    }
+}
