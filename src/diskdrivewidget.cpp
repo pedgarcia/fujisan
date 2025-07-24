@@ -54,21 +54,26 @@ void DiskDriveWidget::setupUI()
 {
     // D1 drive (toolbar) is 20% smaller than dock drives for better fit
     int width, height;
+    int margin;
     if (m_isDrawerDrive) {
         // Dock drives (D2-D8) - full size but slightly shorter
         width = DISK_WIDTH;   
         height = DISK_HEIGHT * 0.84; // Dock drives slightly shorter
+        margin = 0; // No extra margin for dock drives
     } else {
-        // Toolbar drive (D1) - 20% smaller
-        width = DISK_WIDTH * 0.8;    // 20% smaller width
-        height = DISK_HEIGHT * 0.8;  // 20% smaller height
+        // Toolbar drive (D1) - 20% smaller image + 5px margin on all sides
+        int imageWidth = DISK_WIDTH * 0.8;    // 75px image width
+        int imageHeight = DISK_HEIGHT * 0.8;  // 50px image height
+        margin = 5; // 5px margin around the image
+        width = imageWidth + (margin * 2);    // 85px total width
+        height = imageHeight + (margin * 2);  // 60px total height
     }
     
     setFixedSize(width, height);
     setContextMenuPolicy(Qt::DefaultContextMenu);
     
     QVBoxLayout* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setContentsMargins(margin, margin, margin, margin);
     layout->setSpacing(0);
     
     m_imageLabel = new QLabel(this);
