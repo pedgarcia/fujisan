@@ -102,7 +102,6 @@ private:
     
     // UI Components
     QLabel* m_imageLabel;
-    QLabel* m_statusIndicator;  // Simple colored rectangle for debugging
     QMenu* m_contextMenu;
     QAction* m_toggleAction;
     QAction* m_insertAction;

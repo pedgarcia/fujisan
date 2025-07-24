@@ -17,7 +17,6 @@ int main(int argc, char *argv[])
     app.setApplicationVersion("1.0.0");
     app.setOrganizationName("Atari800 Project");
     
-    qDebug() << "Starting Fujisan...";
     
     MainWindow window;
     window.show();

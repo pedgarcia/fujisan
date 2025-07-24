@@ -69,11 +69,6 @@ void DiskDriveWidget::setupUI()
     m_imageLabel->setContentsMargins(0, 0, 0, 0);  // No margins on the image label
     layout->addWidget(m_imageLabel);
     
-    // Add a simple status indicator for debugging
-    m_statusIndicator = new QLabel(this);
-    m_statusIndicator->setFixedSize(10, 10);
-    m_statusIndicator->setStyleSheet("background-color: gray; border: 1px solid black;");
-    layout->addWidget(m_statusIndicator);
 }
 
 void DiskDriveWidget::loadImages()
@@ -98,22 +93,17 @@ void DiskDriveWidget::loadImages()
             success &= m_writeImage.load(path + "atari810write.png");
             
             if (success) {
-                qDebug() << "Successfully loaded all disk drive images from:" << path;
-                qDebug() << "Drive" << m_driveNumber << "images loaded - Off image size:" << m_offImage.size();
                 return;
             } else {
-                qWarning() << "Some images failed to load from:" << path;
             }
         }
     }
     
-    qWarning() << "Failed to load disk drive images! Searched paths:" << imagePaths;
     
     // Create fallback placeholder images if loading fails
     if (m_offImage.isNull()) {
         m_offImage = QPixmap(72, 48);
         m_offImage.fill(Qt::gray);
-        qDebug() << "Created fallback off image for drive" << m_driveNumber;
     }
 }
 
@@ -139,7 +129,6 @@ void DiskDriveWidget::createContextMenu()
 void DiskDriveWidget::setState(DriveState state)
 {
     if (m_currentState != state) {
-        qDebug() << "Drive" << m_driveNumber << "changing state from" << m_currentState << "to" << state;
         m_currentState = state;
         m_baseState = state;
         stopBlinking();
@@ -155,7 +144,6 @@ void DiskDriveWidget::insertDisk(const QString& diskPath)
         setState(m_driveEnabled ? Closed : Off);
         updateTooltip();
         emit diskInserted(m_driveNumber, diskPath);
-        qDebug() << "Mounted disk" << diskPath << "to drive" << m_driveNumber;
     }
 }
 
@@ -167,7 +155,6 @@ void DiskDriveWidget::ejectDisk()
         setState(m_driveEnabled ? Empty : Off);
         updateTooltip();
         emit diskEjected(m_driveNumber);
-        qDebug() << "Ejected disk from drive" << m_driveNumber;
     }
 }
 
@@ -210,9 +197,6 @@ void DiskDriveWidget::turnOnReadLED()
         stopBlinking();
         m_currentState = Reading;
         updateDisplay();
-        qDebug() << "Drive" << m_driveNumber << "READ LED turned ON (state now READING) - debounce cancelled";
-    } else {
-        qDebug() << "Drive" << m_driveNumber << "turnOnReadLED() called but state is" << m_currentState;
     }
 }
 
@@ -225,9 +209,6 @@ void DiskDriveWidget::turnOnWriteLED()
         stopBlinking();
         m_currentState = Writing;
         updateDisplay();
-        qDebug() << "Drive" << m_driveNumber << "WRITE LED turned ON (state now WRITING) - debounce cancelled";
-    } else {
-        qDebug() << "Drive" << m_driveNumber << "turnOnWriteLED() called but state is" << m_currentState;
     }
 }
 
@@ -237,7 +218,6 @@ void DiskDriveWidget::turnOffActivityLED()
         // Don't turn off immediately - start debounce timer
         m_pendingOffState = m_baseState; // Remember what state to return to
         m_ledDebounceTimer->start();
-        qDebug() << "Drive" << m_driveNumber << "LED off requested - starting 750ms debounce timer";
     }
 }
 
@@ -300,32 +280,7 @@ void DiskDriveWidget::updateDisplay()
                            (m_currentState == Empty) ? "EMPTY" :
                            (m_currentState == Closed) ? "CLOSED" :
                            (m_currentState == Reading) ? "READING" : "WRITING";
-        qDebug() << "Drive" << m_driveNumber << "displaying state" << m_currentState << "(" << stateName << ")" 
-                 << "using image:" << imageName << "size:" << currentImage.size() 
-                 << "isNull:" << currentImage.isNull();
         
-        // Update status indicator color based on state
-        QString indicatorColor;
-        switch (m_currentState) {
-            case Off:
-                indicatorColor = "background-color: black; border: 1px solid gray;";
-                break;
-            case Empty:
-                indicatorColor = "background-color: gray; border: 1px solid black;";
-                break;
-            case Closed:
-                indicatorColor = "background-color: blue; border: 1px solid black;";
-                break;
-            case Reading:
-                indicatorColor = "background-color: green; border: 1px solid black;";
-                break;
-            case Writing:
-                indicatorColor = "background-color: red; border: 1px solid black;";
-                break;
-        }
-        if (m_statusIndicator) {
-            m_statusIndicator->setStyleSheet(indicatorColor);
-        }
     } else {
         // Create a placeholder if image is missing
         QPixmap placeholder(size());
@@ -338,7 +293,6 @@ void DiskDriveWidget::updateDisplay()
             m_currentState == Closed ? "CLOSED" : 
             m_currentState == Reading ? "READ" : "WRITE"));
         m_imageLabel->setPixmap(placeholder);
-        qDebug() << "Drive" << m_driveNumber << "showing placeholder for state" << m_currentState;
     }
 }
 
@@ -481,6 +435,5 @@ void DiskDriveWidget::onLedDebounceTimeout()
         stopBlinking();
         m_currentState = m_pendingOffState; // Return to saved state
         updateDisplay();
-        qDebug() << "Drive" << m_driveNumber << "LED debounce timeout - LED actually turned OFF";
     }
 }

@@ -18,8 +18,6 @@ static void diskActivityCallback(int drive, int operation) {
         // Convert libatari800 operation to Qt signal parameters
         bool isWriting = (operation == 1);  // SIO_LAST_WRITE = 1, SIO_LAST_READ = 0
         
-        qDebug() << "🔥 LIBATARI800 CALLBACK: Drive D" << drive 
-                 << (isWriting ? "WRITE" : "READ") << "operation";
         
         // Emit Qt signal on the main thread
         QMetaObject::invokeMethod(s_emulatorInstance, "diskIOStart", Qt::QueuedConnection,
@@ -27,7 +25,6 @@ static void diskActivityCallback(int drive, int operation) {
         
         // Set a timer to turn the LED off after a short time (hardware-accurate timing)
         QTimer::singleShot(100, s_emulatorInstance, [drive]() {
-            qDebug() << "🔥 LIBATARI800 CALLBACK: Drive D" << drive << "operation complete";
             QMetaObject::invokeMethod(s_emulatorInstance, "diskIOEnd", Qt::QueuedConnection,
                                     Q_ARG(int, drive));
         });
