@@ -13525,7 +13525,6 @@ CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrivewidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mediaperipheralsdock.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QBuffer
- /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDebug
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QIODevice
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSet
@@ -13545,10 +13544,8 @@ CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qconfig.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcontainerfwd.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcontainertools_impl.h
- /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcontiguouscache.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreevent.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdatastream.h
- /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdebug.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfile.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfiledevice.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qflags.h
@@ -13561,7 +13558,6 @@ CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qiterator.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qline.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlist.h
- /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlocale.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlogging.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qmap.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qmargins.h
@@ -13594,7 +13590,6 @@ CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsysinfo.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsystemdetection.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtcore-config.h
- /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtextstream.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtimer.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtypeinfo.h
  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qurl.h

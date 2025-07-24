@@ -66,22 +66,17 @@ void CassetteWidget::loadImages()
             success &= m_onImage.load(path + "cassetteon.png");
             
             if (success) {
-                qDebug() << "Successfully loaded cassette images from:" << path;
-                qDebug() << "Cassette images loaded - Off image size:" << m_offImage.size();
                 return;
             } else {
-                qWarning() << "Some cassette images failed to load from:" << path;
             }
         }
     }
     
-    qWarning() << "Failed to load cassette images! Searched paths:" << imagePaths;
     
     // Create fallback placeholder images if loading fails
     if (m_offImage.isNull()) {
         m_offImage = QPixmap(CASSETTE_WIDTH, CASSETTE_HEIGHT);
         m_offImage.fill(Qt::gray);
-        qDebug() << "Created fallback cassette off image";
     }
 }
 

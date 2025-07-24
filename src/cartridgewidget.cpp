@@ -65,22 +65,17 @@ void CartridgeWidget::loadImages()
             success &= m_onImage.load(path + "cartridgeon.png");
             
             if (success) {
-                qDebug() << "Successfully loaded cartridge images from:" << path;
-                qDebug() << "Cartridge images loaded - Off image size:" << m_offImage.size();
                 return;
             } else {
-                qWarning() << "Some cartridge images failed to load from:" << path;
             }
         }
     }
     
-    qWarning() << "Failed to load cartridge images! Searched paths:" << imagePaths;
     
     // Create fallback placeholder images if loading fails
     if (m_offImage.isNull()) {
         m_offImage = QPixmap(CARTRIDGE_WIDTH, CARTRIDGE_HEIGHT);
         m_offImage.fill(Qt::gray);
-        qDebug() << "Created fallback cartridge off image";
     }
 }
 

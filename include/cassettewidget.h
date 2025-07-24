@@ -91,8 +91,8 @@ private:
     QPixmap m_onImage;
     
     // Constants
-    static const int CASSETTE_WIDTH = 120;
-    static const int CASSETTE_HEIGHT = 80;
+    static const int CASSETTE_WIDTH = 94;   // Reduced from 120 to match disk drive width
+    static const int CASSETTE_HEIGHT = 64;  // Reduced from 80 for better dock fit
 };
 
 #endif // CASSETTEWIDGET_H
