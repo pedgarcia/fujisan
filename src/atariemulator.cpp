@@ -40,6 +40,12 @@ AtariEmulator::AtariEmulator(QObject *parent)
 {
     libatari800_clear_input_array(&m_currentInput);
     
+    // Initialize joysticks to center position (15 = all directions released)
+    m_currentInput.joy0 = 15;
+    m_currentInput.joy1 = 15;
+    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+    
     // Set up the global instance pointer for the callback
     s_emulatorInstance = this;
     
@@ -248,6 +254,137 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     return false;
 }
 
+bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
+                                            const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
+                                            const QString& fitScreen, bool show80Column, bool vSyncEnabled,
+                                            bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks)
+{
+    qDebug() << "Initializing emulator with input config - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
+    
+    // Store display system and input configuration
+    m_machineType = machineType;
+    m_videoSystem = videoSystem;
+    m_kbdJoy0Enabled = kbdJoy0Enabled;
+    m_kbdJoy1Enabled = kbdJoy1Enabled;
+    m_swapJoysticks = swapJoysticks;
+    
+    // Build argument list with machine type, video system, artifacts, audio, BASIC setting, and input settings
+    QStringList argList;
+    argList << "atari800";
+    argList << machineType;    // -xl, -xe, -atari, -5200, etc.
+    argList << videoSystem;    // -ntsc or -pal
+    
+    // Add artifact settings - only supported modes for current build
+    qDebug() << "Artifact mode requested:" << artifactMode;
+    if (artifactMode != "none") {
+        if (videoSystem == "-ntsc") {
+            // Only ntsc-old and ntsc-new are supported (ntsc-full disabled in build)
+            if (artifactMode == "ntsc-old" || artifactMode == "ntsc-new") {
+                argList << "-ntsc-artif" << artifactMode;
+                qDebug() << "Adding NTSC artifact parameters:" << "-ntsc-artif" << artifactMode;
+            }
+        } else if (videoSystem == "-pal") {
+            // Map NTSC artifact modes to PAL simple (pal-blend disabled in build)
+            if (artifactMode == "ntsc-old" || artifactMode == "ntsc-new") {
+                argList << "-pal-artif" << "pal-simple";
+                qDebug() << "Adding PAL artifact parameters:" << "-pal-artif" << "pal-simple";
+            }
+        }
+    }
+    
+    // Disable libatari800's internal keyboard joystick emulation
+    // We handle joystick emulation ourselves via input_template_t.joy0/joy1
+    qDebug() << "=== KEYBOARD JOYSTICK CONFIGURATION ===" ;
+    argList << "-no-kbdjoy0";
+    argList << "-no-kbdjoy1";
+    qDebug() << "Disabled libatari800 internal keyboard joystick - using manual joystick control";
+    
+    // Audio is enabled by default for libatari800
+    qDebug() << "Audio enabled for emulator";
+    
+    // Add OS and BASIC ROM configuration based on Altirra OS setting
+    if (m_altirraOSEnabled) {
+        qDebug() << "Using built-in Altirra OS ROMs";
+        
+        // Use built-in Altirra OS
+        if (machineType == "-xl") {
+            // For 800XL, explicitly set rev. 2 for better compatibility
+            argList << "-xl-rev" << "2";
+        } else {
+            argList << "-xl-rev" << "altirra";
+        }
+        
+        if (basicEnabled) {
+            argList << "-basic-rev" << "altirra";
+            argList << "-basic";  // Actually enable BASIC mode
+        } else {
+            argList << "-nobasic";
+        }
+    } else {
+        // Use original Atari ROMs from user-specified paths or defaults
+        qDebug() << "Using original Atari OS ROMs from user settings";
+        
+        if (!m_osRomPath.isEmpty()) {
+            argList << "-osrom" << m_osRomPath;
+            qDebug() << "Adding OS ROM path:" << m_osRomPath;
+        } else {
+            qDebug() << "Warning: No OS ROM path specified, emulator may not start properly";
+        }
+        
+        if (basicEnabled) {
+            if (!m_basicRomPath.isEmpty()) {
+                argList << "-basic_rom" << m_basicRomPath;
+            } else {
+                qDebug() << "Warning: No BASIC ROM path specified";
+            }
+            argList << "-basic";  // Actually enable BASIC mode
+        } else {
+            argList << "-nobasic";
+        }
+    }
+    
+    // Convert QStringList to char* array
+    QList<QByteArray> argBytes;
+    for (const QString& arg : argList) {
+        argBytes.append(arg.toUtf8());
+    }
+    
+    char* args[argBytes.size() + 1];
+    for (int i = 0; i < argBytes.size(); ++i) {
+        args[i] = argBytes[i].data();
+    }
+    args[argBytes.size()] = nullptr;
+    
+    qDebug() << "=== COMPLETE COMMAND LINE WITH INPUT SETTINGS ===" ;
+    qDebug() << "Full atari800 command line:" << argList.join(" ");
+    qDebug() << "Number of arguments:" << argBytes.size();
+    qDebug() << "Keyboard Joystick 0 (Numpad + RCtrl):" << (kbdJoy0Enabled ? "ENABLED" : "DISABLED");
+    qDebug() << "Keyboard Joystick 1 (WASD + LCtrl):" << (kbdJoy1Enabled ? "ENABLED" : "DISABLED");
+    
+    if (libatari800_init(argBytes.size(), args)) {
+        qDebug() << "✓ Emulator initialized successfully with input settings";
+        m_targetFps = libatari800_get_fps();
+        m_frameTimeMs = 1000.0f / m_targetFps;
+        qDebug() << "Target FPS:" << m_targetFps << "Frame time:" << m_frameTimeMs << "ms";
+        
+        // Set up the disk activity callback for hardware-level monitoring
+        libatari800_set_disk_activity_callback(diskActivityCallback);
+        qDebug() << "✓ Disk activity callback registered with libatari800";
+        
+        // Initialize audio output if enabled
+        if (m_audioEnabled) {
+            setupAudio();
+        }
+        
+        // Start the frame timer
+        m_frameTimer->start(static_cast<int>(m_frameTimeMs));
+        return true;
+    }
+    
+    qDebug() << "✗ Failed to initialize emulator with input settings:" << argList.join(" ");
+    return false;
+}
+
 void AtariEmulator::shutdown()
 {
     m_frameTimer->stop();
@@ -256,6 +393,15 @@ void AtariEmulator::shutdown()
 
 void AtariEmulator::processFrame()
 {
+    // Debug joystick values being sent to libatari800
+    static int lastJoy0 = -1, lastJoy1 = -1;
+    if (m_currentInput.joy0 != lastJoy0 || m_currentInput.joy1 != lastJoy1) {
+        qDebug() << "*** SENDING TO LIBATARI800: Joy0=" << m_currentInput.joy0 << "Joy1=" << m_currentInput.joy1 
+                 << "Trig0=" << m_currentInput.trig0 << "Trig1=" << m_currentInput.trig1 << "***";
+        lastJoy0 = m_currentInput.joy0;
+        lastJoy1 = m_currentInput.joy1;
+    }
+    
     // Debug what we're sending to the emulator
     if (m_currentInput.keychar != 0) {
         // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)m_currentInput.keychar << "'" << QChar(m_currentInput.keychar) << "' ***";
@@ -395,6 +541,11 @@ QString AtariEmulator::getDiskImagePath(int driveNumber) const
 
 void AtariEmulator::handleKeyPress(QKeyEvent* event)
 {
+    // Check for joystick keyboard emulation first
+    if (handleJoystickKeyboardEmulation(event)) {
+        return; // Key was handled by joystick emulation, don't process as regular key
+    }
+    
     // Don't clear input here - let keys persist across frames until released
     
     int key = event->key();
@@ -627,9 +778,18 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
 
 void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 {
-    Q_UNUSED(event)
-    // Clear input when any key is released
+    // Check for joystick keyboard emulation first  
+    if (handleJoystickKeyboardEmulation(event)) {
+        return; // Key was handled by joystick emulation, don't clear all input
+    }
+    
+    // Clear input when any key is released (for regular keyboard input)
     libatari800_clear_input_array(&m_currentInput);
+    // Restore joystick center positions after clearing (using libatari800-compatible center)
+    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
     qDebug() << "Key released - clearing input";
 }
 
@@ -875,6 +1035,11 @@ void AtariEmulator::injectCharacter(char ch)
 {
     // Clear previous input
     libatari800_clear_input_array(&m_currentInput);
+    // Restore joystick center positions after clearing (using libatari800-compatible center)
+    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
     
     if (ch >= 'A' && ch <= 'Z') {
         // Uppercase letters - use keycode approach
@@ -964,6 +1129,11 @@ void AtariEmulator::injectCharacter(char ch)
 void AtariEmulator::clearInput()
 {
     libatari800_clear_input_array(&m_currentInput);
+    // Restore joystick center positions after clearing (using libatari800-compatible center)
+    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
 }
 
 void AtariEmulator::pauseEmulation()
@@ -1086,3 +1256,279 @@ void AtariEmulator::checkForDiskIO()
     wasInDiskRoutine = inDiskRoutine;
 }
 */
+
+bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
+{
+    int key = event->key();
+    Qt::KeyboardModifiers modifiers = event->modifiers();
+    bool isKeyPress = (event->type() == QEvent::KeyPress);
+    
+    qDebug() << "=== JOYSTICK KEY EVENT ===" << "Key:" << key << "Press:" << isKeyPress << "Modifiers:" << modifiers;
+    
+    // libatari800 XORs joystick values with 0xff, so we need to send inverted values
+    // Original INPUT_STICK_* constants XORed with 0xff:
+    const int INPUT_STICK_CENTRE = 0x0f ^ 0xff;   // Center: 0x0f -> 0xf0
+    const int INPUT_STICK_LEFT = 0x0b ^ 0xff;     // Left: 0x0b -> 0xf4
+    const int INPUT_STICK_RIGHT = 0x07 ^ 0xff;    // Right: 0x07 -> 0xf8
+    const int INPUT_STICK_FORWARD = 0x0e ^ 0xff;  // Up: 0x0e -> 0xf1
+    const int INPUT_STICK_BACK = 0x0d ^ 0xff;     // Down: 0x0d -> 0xf2
+    const int INPUT_STICK_UL = 0x0a ^ 0xff;       // Up+Left: 0x0a -> 0xf5
+    const int INPUT_STICK_UR = 0x06 ^ 0xff;       // Up+Right: 0x06 -> 0xf9
+    const int INPUT_STICK_LL = 0x09 ^ 0xff;       // Down+Left: 0x09 -> 0xf6
+    const int INPUT_STICK_LR = 0x05 ^ 0xff;       // Down+Right: 0x05 -> 0xfa
+    
+    // Track currently pressed directional keys for each joystick
+    static bool joy0_up = false, joy0_down = false, joy0_left = false, joy0_right = false;
+    static bool joy1_up = false, joy1_down = false, joy1_left = false, joy1_right = false;
+    static bool trig0State = false;
+    static bool trig1State = false;
+    static bool initialized = false;
+    
+    // Initialize trigger states on first call
+    // libatari800 inverts trigger values too: returns input->trig0 ? 0 : 1
+    // So we need to send inverted values: 0 = released, 1 = pressed
+    if (!initialized) {
+        m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+        m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+        m_currentInput.joy0 = INPUT_STICK_CENTRE;
+        m_currentInput.joy1 = INPUT_STICK_CENTRE;
+        initialized = true;
+    }
+    
+    // Determine target joysticks based on swap setting
+    int numpadTargetJoy = m_swapJoysticks ? 1 : 0;  // Default: numpad=Joy0, when swapped: numpad=Joy1
+    int wasdTargetJoy = m_swapJoysticks ? 0 : 1;    // Default: WASD=Joy1, when swapped: WASD=Joy0
+    
+    // Helper function to calculate joystick position based on directional key states
+    auto calculateJoystickValue = [&](bool up, bool down, bool left, bool right) -> int {
+        if (up && left) return INPUT_STICK_UL;      // Up+Left diagonal
+        if (up && right) return INPUT_STICK_UR;     // Up+Right diagonal
+        if (down && left) return INPUT_STICK_LL;    // Down+Left diagonal
+        if (down && right) return INPUT_STICK_LR;   // Down+Right diagonal
+        if (up) return INPUT_STICK_FORWARD;         // Up only
+        if (down) return INPUT_STICK_BACK;          // Down only
+        if (left) return INPUT_STICK_LEFT;          // Left only
+        if (right) return INPUT_STICK_RIGHT;        // Right only
+        return INPUT_STICK_CENTRE;                  // Center/no movement
+    };
+
+    // Check for Numpad/Arrow keys
+    if ((numpadTargetJoy == 0 && m_kbdJoy0Enabled) || (numpadTargetJoy == 1 && m_kbdJoy1Enabled)) {
+        switch (key) {
+            case Qt::Key_8:         // Numpad 8 - UP
+            case Qt::Key_Up:        // Arrow keys
+                if (modifiers & Qt::KeypadModifier || key == Qt::Key_Up) {
+                    if (numpadTargetJoy == 0) {
+                        joy0_up = isKeyPress;
+                        m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
+                        qDebug() << "*** JOYSTICK 0 UP" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy0:" << m_currentInput.joy0 << "***";
+                    } else {
+                        joy1_up = isKeyPress;
+                        m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
+                        qDebug() << "*** JOYSTICK 1 UP" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy1:" << m_currentInput.joy1 << "***";
+                    }
+                    return true;
+                }
+                break;
+                
+            case Qt::Key_2:         // Numpad 2 - DOWN
+            case Qt::Key_Down:      // Arrow keys
+                if (modifiers & Qt::KeypadModifier || key == Qt::Key_Down) {
+                    if (numpadTargetJoy == 0) {
+                        joy0_down = isKeyPress;
+                        m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
+                        qDebug() << "*** JOYSTICK 0 DOWN" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy0:" << m_currentInput.joy0 << "***";
+                    } else {
+                        joy1_down = isKeyPress;
+                        m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
+                        qDebug() << "*** JOYSTICK 1 DOWN" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy1:" << m_currentInput.joy1 << "***";
+                    }
+                    return true;
+                }
+                break;
+                
+            case Qt::Key_4:         // Numpad 4 - LEFT
+            case Qt::Key_Left:      // Arrow keys
+                if (modifiers & Qt::KeypadModifier || key == Qt::Key_Left) {
+                    if (numpadTargetJoy == 0) {
+                        joy0_left = isKeyPress;
+                        m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
+                        qDebug() << "*** JOYSTICK 0 LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy0:" << m_currentInput.joy0 << "***";
+                    } else {
+                        joy1_left = isKeyPress;
+                        m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
+                        qDebug() << "*** JOYSTICK 1 LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy1:" << m_currentInput.joy1 << "***";
+                    }
+                    return true;
+                }
+                break;
+                
+            case Qt::Key_6:         // Numpad 6 - RIGHT
+            case Qt::Key_Right:     // Arrow keys
+                if (modifiers & Qt::KeypadModifier || key == Qt::Key_Right) {
+                    if (numpadTargetJoy == 0) {
+                        joy0_right = isKeyPress;
+                        m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
+                        qDebug() << "*** JOYSTICK 0 RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy0:" << m_currentInput.joy0 << "***";
+                    } else {
+                        joy1_right = isKeyPress;
+                        m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
+                        qDebug() << "*** JOYSTICK 1 RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy1:" << m_currentInput.joy1 << "***";
+                    }
+                    return true;
+                }
+                break;
+        }
+        
+        // Handle trigger for numpad joystick
+        if (key == Qt::Key_Enter && (modifiers & Qt::KeypadModifier)) {
+            // Numpad Enter
+            // libatari800 inverts trigger values: returns input->trig0 ? 0 : 1
+            // So we send: 1 = pressed, 0 = released (inverted)
+            if (numpadTargetJoy == 0) {
+                if (isKeyPress) {
+                    trig0State = true;
+                    m_currentInput.trig0 = 1;  // 1 = pressed (inverted for libatari800)
+                    qDebug() << "*** JOYSTICK 0 FIRE PRESSED (Numpad Enter) ***";
+                } else {
+                    trig0State = false;
+                    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+                    qDebug() << "*** JOYSTICK 0 FIRE RELEASED (Numpad Enter) ***";
+                }
+            } else {
+                if (isKeyPress) {
+                    trig1State = true;
+                    m_currentInput.trig1 = 1;  // 1 = pressed (inverted for libatari800)
+                    qDebug() << "*** JOYSTICK 1 FIRE PRESSED (Numpad Enter) ***";
+                } else {
+                    trig1State = false;
+                    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+                    qDebug() << "*** JOYSTICK 1 FIRE RELEASED (Numpad Enter) ***";
+                }
+            }
+            return true;
+        }
+    }
+    
+    // Check for WASD keys
+    if ((wasdTargetJoy == 0 && m_kbdJoy0Enabled) || (wasdTargetJoy == 1 && m_kbdJoy1Enabled)) {
+        switch (key) {
+            case Qt::Key_W:         // W - UP
+                if (wasdTargetJoy == 0) {
+                    joy0_up = isKeyPress;
+                    m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
+                    qDebug() << "*** JOYSTICK 0 UP" << (isKeyPress ? "PRESSED" : "RELEASED") << "(W) - Joy0:" << m_currentInput.joy0 << "***";
+                } else {
+                    joy1_up = isKeyPress;
+                    m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
+                    qDebug() << "*** JOYSTICK 1 UP" << (isKeyPress ? "PRESSED" : "RELEASED") << "(W) - Joy1:" << m_currentInput.joy1 << "***";
+                }
+                return true;
+                
+            case Qt::Key_S:         // S - DOWN
+                if (wasdTargetJoy == 0) {
+                    joy0_down = isKeyPress;
+                    m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
+                    qDebug() << "*** JOYSTICK 0 DOWN" << (isKeyPress ? "PRESSED" : "RELEASED") << "(S) - Joy0:" << m_currentInput.joy0 << "***";
+                } else {
+                    joy1_down = isKeyPress;
+                    m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
+                    qDebug() << "*** JOYSTICK 1 DOWN" << (isKeyPress ? "PRESSED" : "RELEASED") << "(S) - Joy1:" << m_currentInput.joy1 << "***";
+                }
+                return true;
+                
+            case Qt::Key_A:         // A - LEFT
+                if (wasdTargetJoy == 0) {
+                    joy0_left = isKeyPress;
+                    m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
+                    qDebug() << "*** JOYSTICK 0 LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(A) - Joy0:" << m_currentInput.joy0 << "***";
+                } else {
+                    joy1_left = isKeyPress;
+                    m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
+                    qDebug() << "*** JOYSTICK 1 LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(A) - Joy1:" << m_currentInput.joy1 << "***";
+                }
+                return true;
+                
+            case Qt::Key_D:         // D - RIGHT
+                if (wasdTargetJoy == 0) {
+                    joy0_right = isKeyPress;
+                    m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
+                    qDebug() << "*** JOYSTICK 0 RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(D) - Joy0:" << m_currentInput.joy0 << "***";
+                } else {
+                    joy1_right = isKeyPress;
+                    m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
+                    qDebug() << "*** JOYSTICK 1 RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(D) - Joy1:" << m_currentInput.joy1 << "***";
+                }
+                return true;
+                
+            case Qt::Key_Space:     // Space - FIRE for WASD joystick
+                // libatari800 inverts trigger values: returns input->trig0 ? 0 : 1
+                // So we send: 1 = pressed, 0 = released (inverted)
+                if (wasdTargetJoy == 0) {
+                    if (isKeyPress) {
+                        trig0State = true;
+                        m_currentInput.trig0 = 1;  // 1 = pressed (inverted for libatari800)
+                        qDebug() << "*** JOYSTICK 0 FIRE PRESSED (Space) ***";
+                    } else {
+                        trig0State = false;
+                        m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+                        qDebug() << "*** JOYSTICK 0 FIRE RELEASED (Space) ***";
+                    }
+                } else {
+                    if (isKeyPress) {
+                        trig1State = true;
+                        m_currentInput.trig1 = 1;  // 1 = pressed (inverted for libatari800)
+                        qDebug() << "*** JOYSTICK 1 FIRE PRESSED (Space) ***";
+                    } else {
+                        trig1State = false;
+                        m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+                        qDebug() << "*** JOYSTICK 1 FIRE RELEASED (Space) ***";
+                    }
+                }
+                return true;
+                
+            // Diagonal keys for WASD joystick - using direct diagonal constants
+            case Qt::Key_Q:         // Q - UP+LEFT diagonal
+                if (wasdTargetJoy == 0) {
+                    m_currentInput.joy0 = isKeyPress ? INPUT_STICK_UL : INPUT_STICK_CENTRE;
+                    qDebug() << "*** JOYSTICK 0 UP+LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Q) - Joy0:" << m_currentInput.joy0 << "***";
+                } else {
+                    m_currentInput.joy1 = isKeyPress ? INPUT_STICK_UL : INPUT_STICK_CENTRE;
+                    qDebug() << "*** JOYSTICK 1 UP+LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Q) - Joy1:" << m_currentInput.joy1 << "***";
+                }
+                return true;
+                
+            case Qt::Key_E:         // E - UP+RIGHT diagonal
+                if (wasdTargetJoy == 0) {
+                    m_currentInput.joy0 = isKeyPress ? INPUT_STICK_UR : INPUT_STICK_CENTRE;
+                    qDebug() << "*** JOYSTICK 0 UP+RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(E) - Joy0:" << m_currentInput.joy0 << "***";
+                } else {
+                    m_currentInput.joy1 = isKeyPress ? INPUT_STICK_UR : INPUT_STICK_CENTRE;
+                    qDebug() << "*** JOYSTICK 1 UP+RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(E) - Joy1:" << m_currentInput.joy1 << "***";
+                }
+                return true;
+                
+            case Qt::Key_Z:         // Z - DOWN+LEFT diagonal
+                if (wasdTargetJoy == 0) {
+                    m_currentInput.joy0 = isKeyPress ? INPUT_STICK_LL : INPUT_STICK_CENTRE;
+                    qDebug() << "*** JOYSTICK 0 DOWN+LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Z) - Joy0:" << m_currentInput.joy0 << "***";
+                } else {
+                    m_currentInput.joy1 = isKeyPress ? INPUT_STICK_LL : INPUT_STICK_CENTRE;
+                    qDebug() << "*** JOYSTICK 1 DOWN+LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Z) - Joy1:" << m_currentInput.joy1 << "***";
+                }
+                return true;
+                
+            case Qt::Key_C:         // C - DOWN+RIGHT diagonal
+                if (wasdTargetJoy == 0) {
+                    m_currentInput.joy0 = isKeyPress ? INPUT_STICK_LR : INPUT_STICK_CENTRE;
+                    qDebug() << "*** JOYSTICK 0 DOWN+RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(C) - Joy0:" << m_currentInput.joy0 << "***";
+                } else {
+                    m_currentInput.joy1 = isKeyPress ? INPUT_STICK_LR : INPUT_STICK_CENTRE;
+                    qDebug() << "*** JOYSTICK 1 DOWN+RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(C) - Joy1:" << m_currentInput.joy1 << "***";
+                }
+                return true;
+        }
+    }
+    
+    return false; // Key not handled by joystick emulation
+}

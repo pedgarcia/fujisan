@@ -94,6 +94,10 @@ public:
     bool initializeWithDisplayConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
                                    const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
                                    const QString& fitScreen, bool show80Column, bool vSyncEnabled);
+    bool initializeWithInputConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
+                                 const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
+                                 const QString& fitScreen, bool show80Column, bool vSyncEnabled,
+                                 bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks);
     // Note: Display parameters are saved to profiles but not applied due to libatari800 limitations
     // FUTURE: Scanlines support (commented out - not working with current atari800 build)
     // bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode, int scanlinesPercentage, bool scanlinesInterpolation);
@@ -117,6 +121,7 @@ public:
     
     void handleKeyPress(QKeyEvent* event);
     void handleKeyRelease(QKeyEvent* event);
+    bool handleJoystickKeyboardEmulation(QKeyEvent* event);
     
     void coldBoot();
     void warmBoot();
@@ -138,6 +143,16 @@ public:
     
     QString getBasicRomPath() const { return m_basicRomPath; }
     void setBasicRomPath(const QString& path) { m_basicRomPath = path; }
+    
+    // Joystick keyboard emulation settings
+    bool isKbdJoy0Enabled() const { return m_kbdJoy0Enabled; }
+    void setKbdJoy0Enabled(bool enabled) { m_kbdJoy0Enabled = enabled; }
+    
+    bool isKbdJoy1Enabled() const { return m_kbdJoy1Enabled; }
+    void setKbdJoy1Enabled(bool enabled) { m_kbdJoy1Enabled = enabled; }
+    
+    bool isJoysticksSwapped() const { return m_swapJoysticks; }
+    void setJoysticksSwapped(bool swapped) { m_swapJoysticks = swapped; }
     
     float getTargetFPS() const { return m_targetFps; }
     float getFrameTimeMs() const { return m_frameTimeMs; }
@@ -184,6 +199,11 @@ private:
     QString m_videoSystem = "-pal";
     QString m_osRomPath;
     QString m_basicRomPath;
+    
+    // Joystick keyboard emulation settings
+    bool m_kbdJoy0Enabled = true;   // Default true to match SDL
+    bool m_kbdJoy1Enabled = false;  // Default false to match SDL
+    bool m_swapJoysticks = false;   // Default false: Joy0=Numpad, Joy1=WASD
     float m_targetFps = 59.92f;
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;

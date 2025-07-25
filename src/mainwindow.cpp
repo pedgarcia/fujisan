@@ -18,6 +18,9 @@
 #include <QPixmap>
 #include <QTimer>
 
+// Debug control - uncomment to enable verbose disk I/O logging
+// #define DEBUG_DISK_IO
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_emulator(new AtariEmulator(this))
@@ -82,7 +85,7 @@ void MainWindow::createMenus()
     // File menu
     QMenu* fileMenu = menuBar()->addMenu("&File");
     
-    m_loadRomAction = new QAction("&Load ROM...", this);
+    m_loadRomAction = new QAction("&Load File...", this);
     m_loadRomAction->setShortcut(QKeySequence::Open);
     connect(m_loadRomAction, &QAction::triggered, this, &MainWindow::loadRom);
     fileMenu->addAction(m_loadRomAction);
@@ -283,9 +286,9 @@ void MainWindow::loadRom()
 {
     QString fileName = QFileDialog::getOpenFileName(
         this,
-        "Load Atari ROM",
+        "Load Atari File",
         QString(),
-        "ROM Files (*.rom *.bin *.car *.atr);;All Files (*)"
+        "Atari Files (*.rom *.bin *.car *.atr *.xex *.exe *.com);;Cartridge ROMs (*.rom *.bin *.car);;Disk Images (*.atr);;Executables (*.xex *.exe *.com);;All Files (*)"
     );
     
     if (!fileName.isEmpty()) {
@@ -407,13 +410,21 @@ void MainWindow::restartEmulator()
              << "HShift:" << horizontalShift << "VShift:" << verticalShift 
              << "Fit:" << fitScreen << "80Col:" << show80Column << "VSync:" << vSyncEnabled;
     
-    if (m_emulator->initializeWithDisplayConfig(m_emulator->isBasicEnabled(), 
-                                              m_emulator->getMachineType(), 
-                                              m_emulator->getVideoSystem(),
-                                              artifactMode,
-                                              horizontalArea, verticalArea,
-                                              horizontalShift, verticalShift,
-                                              fitScreen, show80Column, vSyncEnabled)) {
+    // Load input settings for keyboard joystick emulation
+    bool kbdJoy0Enabled = settings.value("input/kbdJoy0Enabled", true).toBool();  // Default true to match SDL default
+    bool kbdJoy1Enabled = settings.value("input/kbdJoy1Enabled", false).toBool(); // Default false to match SDL default
+    bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();   // Default false: Joy0=Numpad, Joy1=WASD
+    
+    qDebug() << "Applying input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
+    
+    if (m_emulator->initializeWithInputConfig(m_emulator->isBasicEnabled(), 
+                                            m_emulator->getMachineType(), 
+                                            m_emulator->getVideoSystem(),
+                                            artifactMode,
+                                            horizontalArea, verticalArea,
+                                            horizontalShift, verticalShift,
+                                            fitScreen, show80Column, vSyncEnabled,
+                                            kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks)) {
         QString message = QString("Emulator restarted: %1 %2 with BASIC %3")
                          .arg(m_emulator->getMachineType())
                          .arg(m_emulator->getVideoSystem())
@@ -744,10 +755,14 @@ void MainWindow::createMediaPeripheralsDock()
     
     // Connect solid LED disk I/O monitoring
     connect(m_emulator, &AtariEmulator::diskIOStart, this, [this](int driveNumber, bool isWriting) {
+#ifdef DEBUG_DISK_IO
         qDebug() << "*** MainWindow received diskIOStart signal for D" << driveNumber << ":" << (isWriting ? "WRITE" : "READ") << "***";
+#endif
         // Turn LED ON on D1 (toolbar drive)
         if (driveNumber == 1 && m_diskDrive1) {
+#ifdef DEBUG_DISK_IO
             qDebug() << "*** Calling turnOn" << (isWriting ? "Write" : "Read") << "LED() for D1 ***";
+#endif
             if (isWriting) {
                 m_diskDrive1->turnOnWriteLED();
             } else {
@@ -756,10 +771,14 @@ void MainWindow::createMediaPeripheralsDock()
         }
         // Turn LED ON on D2-D8 (dock drives)
         else if (driveNumber >= 2 && driveNumber <= 8) {
+#ifdef DEBUG_DISK_IO
             qDebug() << "*** Looking for dock drive widget D" << driveNumber << "***";
+#endif
             DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
             if (driveWidget) {
+#ifdef DEBUG_DISK_IO
                 qDebug() << "*** Calling turnOn" << (isWriting ? "Write" : "Read") << "LED() for dock drive D" << driveNumber << "***";
+#endif
                 if (isWriting) {
                     driveWidget->turnOnWriteLED();
                 } else {
@@ -772,21 +791,31 @@ void MainWindow::createMediaPeripheralsDock()
     });
     
     connect(m_emulator, &AtariEmulator::diskIOEnd, this, [this](int driveNumber) {
+#ifdef DEBUG_DISK_IO
         qDebug() << "*** MainWindow received diskIOEnd signal for D" << driveNumber << ":" << "***";
+#endif
         // Turn LED OFF on D1 (toolbar drive)
         if (driveNumber == 1 && m_diskDrive1) {
+#ifdef DEBUG_DISK_IO
             qDebug() << "*** Calling turnOffActivityLED() for D1 ***";
+#endif
             m_diskDrive1->turnOffActivityLED();
         }
         // Turn LED OFF on D2-D8 (dock drives)
         else if (driveNumber >= 2 && driveNumber <= 8) {
+#ifdef DEBUG_DISK_IO
             qDebug() << "*** Looking for dock drive widget D" << driveNumber << "for LED OFF ***";
+#endif
             DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
             if (driveWidget) {
+#ifdef DEBUG_DISK_IO
                 qDebug() << "*** Calling turnOffActivityLED() for dock drive D" << driveNumber << "***";
+#endif
                 driveWidget->turnOffActivityLED();
             } else {
+#ifdef DEBUG_DISK_IO
                 qDebug() << "*** ERROR: Could not find dock drive widget for D" << driveNumber << "for LED OFF ***";
+#endif
             }
         }
     });
@@ -852,22 +881,54 @@ void MainWindow::createMediaPeripheralsDock()
     buttonsLayout->addWidget(m_optionButton);
     buttonsLayout->addWidget(m_breakButton);
     
-    // Connect console button signals
+    // Connect console button signals - send press event and delay release to allow one frame processing
     connect(m_startButton, &QPushButton::clicked, this, [this]() {
-        QKeyEvent event(QEvent::KeyPress, Qt::Key_F2, Qt::NoModifier);
-        m_emulator->handleKeyPress(&event);
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F2, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        qDebug() << "*** START button clicked - F2 pressed ***";
+        
+        // Delay release by one frame (about 16ms) to let emulator process it
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F2, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+            qDebug() << "*** START button F2 released ***";
+        });
     });
     connect(m_selectButton, &QPushButton::clicked, this, [this]() {
-        QKeyEvent event(QEvent::KeyPress, Qt::Key_F3, Qt::NoModifier);
-        m_emulator->handleKeyPress(&event);
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F3, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        qDebug() << "*** SELECT button clicked - F3 pressed ***";
+        
+        // Delay release by one frame
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F3, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+            qDebug() << "*** SELECT button F3 released ***";
+        });
     });
     connect(m_optionButton, &QPushButton::clicked, this, [this]() {
-        QKeyEvent event(QEvent::KeyPress, Qt::Key_F4, Qt::NoModifier);
-        m_emulator->handleKeyPress(&event);
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F4, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        qDebug() << "*** OPTION button clicked - F4 pressed ***";
+        
+        // Delay release by one frame
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F4, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+            qDebug() << "*** OPTION button F4 released ***";
+        });
     });
     connect(m_breakButton, &QPushButton::clicked, this, [this]() {
-        QKeyEvent event(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier);
-        m_emulator->handleKeyPress(&event);
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        qDebug() << "*** BREAK button clicked - F7 pressed ***";
+        
+        // Delay release by one frame
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F7, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+            qDebug() << "*** BREAK button F7 released ***";
+        });
     });
     
     // Create machine controls container (machine dropdown on top, toggles side by side below)
@@ -1098,10 +1159,18 @@ void MainWindow::loadInitialSettings()
     qDebug() << "Loading initial settings - Machine:" << machineType 
              << "Video:" << videoSystem << "BASIC:" << basicEnabled << "Artifacts:" << artifactMode;
     
-    // Initialize emulator with loaded settings including display options
-    if (!m_emulator->initializeWithDisplayConfig(basicEnabled, machineType, videoSystem, artifactMode,
-                                                horizontalArea, verticalArea, horizontalShift, verticalShift,
-                                                fitScreen, show80Column, vSyncEnabled)) {
+    // Load input settings for keyboard joystick emulation
+    bool kbdJoy0Enabled = settings.value("input/kbdJoy0Enabled", true).toBool();  // Default true to match SDL default
+    bool kbdJoy1Enabled = settings.value("input/kbdJoy1Enabled", false).toBool(); // Default false to match SDL default
+    bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();   // Default false: Joy0=Numpad, Joy1=WASD
+    
+    qDebug() << "Input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
+    
+    // Initialize emulator with loaded settings including display and input options
+    if (!m_emulator->initializeWithInputConfig(basicEnabled, machineType, videoSystem, artifactMode,
+                                              horizontalArea, verticalArea, horizontalShift, verticalShift,
+                                              fitScreen, show80Column, vSyncEnabled,
+                                              kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks)) {
         QMessageBox::critical(this, "Error", "Failed to initialize Atari800 emulator");
         QApplication::quit();
         return;
