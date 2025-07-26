@@ -172,7 +172,8 @@ void DiskDriveWidget::insertDisk(const QString& diskPath)
 void DiskDriveWidget::ejectDisk()
 {
     if (m_emulator && hasDisk()) {
-        // TODO: Add libatari800 unmount functionality when available
+        // Properly dismount disk from emulator
+        m_emulator->dismountDiskImage(m_driveNumber);
         m_diskPath.clear();
         setState(m_driveEnabled ? Empty : Off);
         updateTooltip();

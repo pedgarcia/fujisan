@@ -512,12 +512,12 @@ void MainWindow::createLogoSection()
     
     // Try to load Fujisan logo from multiple paths
     QStringList imagePaths = {
-        "/Users/pgarcia/Downloads/fujisanlogo.png",  // Same path as About dialog
-        "./images/fujisan-logo.png",
-        "../images/fujisan-logo.png",
-        QApplication::applicationDirPath() + "/images/fujisan-logo.png",
-        QApplication::applicationDirPath() + "/../images/fujisan-logo.png",
-        ":/images/fujisan-logo.png"
+        "./images/fujisanlogo.png",                 // Correct filename in images folder
+        "../images/fujisanlogo.png",
+        QApplication::applicationDirPath() + "/images/fujisanlogo.png",
+        QApplication::applicationDirPath() + "/../images/fujisanlogo.png",
+        "/Users/pgarcia/Downloads/fujisanlogo.png",  // Fallback to Downloads
+        ":/images/fujisanlogo.png"
     };
     
     QPixmap logoPixmap;

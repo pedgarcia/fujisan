@@ -254,6 +254,36 @@ void SettingsDialog::createHardwareTab()
     
     centerColumn->addWidget(memoryGroup);
     
+    // Special Devices Group
+    QGroupBox* specialGroup = new QGroupBox("Special Devices");
+    QVBoxLayout* specialLayout = new QVBoxLayout(specialGroup);
+    
+    QHBoxLayout* rDeviceLayout = new QHBoxLayout();
+    QLabel* rDeviceLabel = new QLabel("R: Device Configuration:");
+    rDeviceLayout->addWidget(rDeviceLabel);
+    
+    QLabel* rDeviceNameLabel = new QLabel("Device Name:");
+    rDeviceLayout->addWidget(rDeviceNameLabel);
+    m_rDeviceName = new QLineEdit();
+    m_rDeviceName->setPlaceholderText("R");
+    m_rDeviceName->setMaxLength(1);
+    m_rDeviceName->setMaximumWidth(30);
+    m_rDeviceName->setToolTip("Custom device name for R: device");
+    rDeviceLayout->addWidget(m_rDeviceName);
+    rDeviceLayout->addStretch();
+    
+    specialLayout->addLayout(rDeviceLayout);
+    
+    m_netSIOEnabled = new QCheckBox("Enable NetSIO (FujiNet-PC Support)");
+    m_netSIOEnabled->setToolTip("Enable NetSIO for FujiNet-PC network functionality");
+    specialLayout->addWidget(m_netSIOEnabled);
+    
+    m_rtimeEnabled = new QCheckBox("Enable R-Time 8 Real-Time Clock");
+    m_rtimeEnabled->setToolTip("Enable R-Time 8 cartridge emulation for real-time clock");
+    specialLayout->addWidget(m_rtimeEnabled);
+    
+    centerColumn->addWidget(specialGroup);
+    
     // Performance Group
     QGroupBox* performanceGroup = new QGroupBox("Performance");
     QVBoxLayout* performanceLayout = new QVBoxLayout(performanceGroup);
@@ -1548,36 +1578,6 @@ void SettingsDialog::createMediaConfigTab()
     
     hdLayout->addLayout(hdOptionsLayout);
     rightColumn->addWidget(hdGroup);
-    
-    // Special Devices Group
-    QGroupBox* specialGroup = new QGroupBox("Special Devices");
-    QVBoxLayout* specialLayout = new QVBoxLayout(specialGroup);
-    
-    QHBoxLayout* rDeviceLayout = new QHBoxLayout();
-    QLabel* rDeviceLabel = new QLabel("R: Device Configuration:");
-    rDeviceLayout->addWidget(rDeviceLabel);
-    
-    QLabel* rDeviceNameLabel = new QLabel("Device Name:");
-    rDeviceLayout->addWidget(rDeviceNameLabel);
-    m_rDeviceName = new QLineEdit();
-    m_rDeviceName->setPlaceholderText("R");
-    m_rDeviceName->setMaxLength(1);
-    m_rDeviceName->setMaximumWidth(30);
-    m_rDeviceName->setToolTip("Custom device name for R: device");
-    rDeviceLayout->addWidget(m_rDeviceName);
-    rDeviceLayout->addStretch();
-    
-    specialLayout->addLayout(rDeviceLayout);
-    
-    m_netSIOEnabled = new QCheckBox("Enable NetSIO (FujiNet-PC Support)");
-    m_netSIOEnabled->setToolTip("Enable NetSIO for FujiNet-PC network functionality");
-    specialLayout->addWidget(m_netSIOEnabled);
-    
-    m_rtimeEnabled = new QCheckBox("Enable R-Time 8 Real-Time Clock");
-    m_rtimeEnabled->setToolTip("Enable R-Time 8 cartridge emulation for real-time clock");
-    specialLayout->addWidget(m_rtimeEnabled);
-    
-    leftColumn->addWidget(specialGroup);
     leftColumn->addStretch();
     rightColumn->addStretch();
     
