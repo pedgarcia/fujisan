@@ -177,8 +177,8 @@ QRect EmulatorWidget::calculateDisplayRect() const
     const double scaleY = widgetHeight / correctedHeight;
     const double scale = qMin(scaleX, scaleY);
     
-    // Apply overscan factor for authentic CRT borders
-    const double overscanFactor = 0.90;
+    // Use more screen space while keeping small border for clean look
+    const double overscanFactor = 0.98;
     const double finalScale = scale * overscanFactor;
     
     // Calculate final display dimensions

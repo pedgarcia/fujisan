@@ -48,6 +48,9 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowFlags(windowFlags() & ~Qt::WindowFullscreenButtonHint);
 #endif
 
+    // Style dock areas to be black so they blend with emulator widget background
+    setStyleSheet("QMainWindow::separator { background: black; width: 0px; height: 0px; }");
+
     createMenus();
     createToolBar();
     createEmulatorWidget();
@@ -701,9 +704,9 @@ void MainWindow::restartEmulator()
     QSettings settings("8bitrelics", "Fujisan");
     QString artifactMode = settings.value("video/artifacting", "none").toString();
 
-    // Load display settings
-    QString horizontalArea = settings.value("video/horizontalArea", "tv").toString();
-    QString verticalArea = settings.value("video/verticalArea", "tv").toString();
+    // Load display settings - use "full" by default to avoid cropping
+    QString horizontalArea = settings.value("video/horizontalArea", "full").toString();
+    QString verticalArea = settings.value("video/verticalArea", "full").toString();
     int horizontalShift = settings.value("video/horizontalShift", 0).toInt();
     int verticalShift = settings.value("video/verticalShift", 0).toInt();
     QString fitScreen = settings.value("video/fitScreen", "both").toString();
@@ -1499,9 +1502,9 @@ void MainWindow::loadInitialSettings()
     bool audioEnabled = settings.value("audio/enabled", true).toBool();
     QString artifactMode = settings.value("video/artifacting", "none").toString();
 
-    // Load display settings for initial setup
-    QString horizontalArea = settings.value("video/horizontalArea", "tv").toString();
-    QString verticalArea = settings.value("video/verticalArea", "tv").toString();
+    // Load display settings for initial setup - use "full" by default to avoid cropping
+    QString horizontalArea = settings.value("video/horizontalArea", "full").toString();
+    QString verticalArea = settings.value("video/verticalArea", "full").toString();
     int horizontalShift = settings.value("video/horizontalShift", 0).toInt();
     int verticalShift = settings.value("video/verticalShift", 0).toInt();
     QString fitScreen = settings.value("video/fitScreen", "both").toString();

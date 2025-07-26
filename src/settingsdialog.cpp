@@ -1959,8 +1959,8 @@ void SettingsDialog::loadSettings()
     m_keepAspectRatio->setChecked(settings.value("video/keepAspectRatio", true).toBool());
     m_fullscreenMode->setChecked(settings.value("video/fullscreenMode", false).toBool());
     
-    // Load Screen Display Options
-    QString horizontalArea = settings.value("video/horizontalArea", "tv").toString();
+    // Load Screen Display Options - use "full" by default to avoid cropping
+    QString horizontalArea = settings.value("video/horizontalArea", "full").toString();
     for (int i = 0; i < m_horizontalArea->count(); ++i) {
         if (m_horizontalArea->itemData(i).toString() == horizontalArea) {
             m_horizontalArea->setCurrentIndex(i);
@@ -1968,7 +1968,7 @@ void SettingsDialog::loadSettings()
         }
     }
     
-    QString verticalArea = settings.value("video/verticalArea", "tv").toString();
+    QString verticalArea = settings.value("video/verticalArea", "full").toString();
     for (int i = 0; i < m_verticalArea->count(); ++i) {
         if (m_verticalArea->itemData(i).toString() == verticalArea) {
             m_verticalArea->setCurrentIndex(i);

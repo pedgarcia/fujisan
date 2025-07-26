@@ -51,13 +51,13 @@ private:
     QImage m_screenImage;
     bool m_needsUpdate;
     
-    // Screen buffer constants
+    // Screen buffer constants - show full screen without cropping
     static const int SCREEN_WIDTH = 384;
     static const int SCREEN_HEIGHT = 240;
-    static const int BORDER_LEFT = 24;
-    static const int BORDER_TOP = 24;
-    static const int DISPLAY_WIDTH = 336;
-    static const int DISPLAY_HEIGHT = 192;
+    static const int BORDER_LEFT = 0;   // No horizontal cropping
+    static const int BORDER_TOP = 0;    // No vertical cropping
+    static const int DISPLAY_WIDTH = 384;   // Full width
+    static const int DISPLAY_HEIGHT = 240;  // Full height
 };
 
 #endif // EMULATORWIDGET_H
