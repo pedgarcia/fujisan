@@ -722,16 +722,22 @@ void MainWindow::restartEmulator()
     bool kbdJoy1Enabled = settings.value("input/kbdJoy1Enabled", false).toBool(); // Default false to match SDL default
     bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();   // Default false: Joy0=Numpad, Joy1=WASD
 
-    qDebug() << "Applying input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
+    // Load special device settings
+    bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
+    bool rtimeEnabled = settings.value("media/rtimeEnabled", false).toBool();
 
-    if (m_emulator->initializeWithInputConfig(m_emulator->isBasicEnabled(),
-                                            m_emulator->getMachineType(),
-                                            m_emulator->getVideoSystem(),
-                                            artifactMode,
-                                            horizontalArea, verticalArea,
-                                            horizontalShift, verticalShift,
-                                            fitScreen, show80Column, vSyncEnabled,
-                                            kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks)) {
+    qDebug() << "Applying input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
+    qDebug() << "Special devices - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
+
+    if (m_emulator->initializeWithNetSIOConfig(m_emulator->isBasicEnabled(),
+                                             m_emulator->getMachineType(),
+                                             m_emulator->getVideoSystem(),
+                                             artifactMode,
+                                             horizontalArea, verticalArea,
+                                             horizontalShift, verticalShift,
+                                             fitScreen, show80Column, vSyncEnabled,
+                                             kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
+                                             netSIOEnabled, rtimeEnabled)) {
         QString message = QString("Emulator restarted: %1 %2 with BASIC %3")
                          .arg(m_emulator->getMachineType())
                          .arg(m_emulator->getVideoSystem())
@@ -1519,13 +1525,19 @@ void MainWindow::loadInitialSettings()
     bool kbdJoy1Enabled = settings.value("input/kbdJoy1Enabled", false).toBool(); // Default false to match SDL default
     bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();   // Default false: Joy0=Numpad, Joy1=WASD
 
+    // Load special device settings
+    bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
+    bool rtimeEnabled = settings.value("media/rtimeEnabled", false).toBool();
+
     qDebug() << "Input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
+    qDebug() << "Special devices - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
 
     // Initialize emulator with loaded settings including display and input options
-    if (!m_emulator->initializeWithInputConfig(basicEnabled, machineType, videoSystem, artifactMode,
-                                              horizontalArea, verticalArea, horizontalShift, verticalShift,
-                                              fitScreen, show80Column, vSyncEnabled,
-                                              kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks)) {
+    if (!m_emulator->initializeWithNetSIOConfig(basicEnabled, machineType, videoSystem, artifactMode,
+                                               horizontalArea, verticalArea, horizontalShift, verticalShift,
+                                               fitScreen, show80Column, vSyncEnabled,
+                                               kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
+                                               netSIOEnabled, rtimeEnabled)) {
         QMessageBox::critical(this, "Error", "Failed to initialize Atari800 emulator");
         QApplication::quit();
         return;

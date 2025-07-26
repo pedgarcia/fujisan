@@ -11,6 +11,13 @@
 #include <QMetaObject>
 #include <QTimer>
 
+extern "C" {
+#ifdef NETSIO
+#include "../src/netsio.h"
+#endif
+#include "../src/rtime.h"
+}
+
 // Static callback function for libatari800 disk activity
 static AtariEmulator* s_emulatorInstance = nullptr;
 static void diskActivityCallback(int drive, int operation) {
@@ -383,6 +390,46 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     
     qDebug() << "✗ Failed to initialize emulator with input settings:" << argList.join(" ");
     return false;
+}
+
+bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
+                                             const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
+                                             const QString& fitScreen, bool show80Column, bool vSyncEnabled,
+                                             bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks,
+                                             bool netSIOEnabled, bool rtimeEnabled)
+{
+    qDebug() << "Initializing emulator with NetSIO config - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
+    
+    // Start with basic initialization first
+    if (!initializeWithInputConfig(basicEnabled, machineType, videoSystem, artifactMode,
+                                 horizontalArea, verticalArea, horizontalShift, verticalShift,
+                                 fitScreen, show80Column, vSyncEnabled,
+                                 kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks)) {
+        return false;
+    }
+    
+    // Now enable NetSIO/FujiNet support if requested
+    if (netSIOEnabled) {
+        qDebug() << "Enabling NetSIO support...";
+#ifdef NETSIO
+        if (netsio_init(9997) < 0) {
+            qDebug() << "NetSIO initialization failed - continuing without NetSIO";
+        } else {
+            qDebug() << "NetSIO initialized successfully on port 9997";
+        }
+#else
+        qDebug() << "NetSIO support not compiled in - ignoring NetSIO setting";
+#endif
+    }
+    
+    // Enable R-Time 8 if requested
+    if (rtimeEnabled) {
+        qDebug() << "Enabling R-Time 8 real-time clock...";
+        extern int RTIME_enabled;
+        RTIME_enabled = 1;
+    }
+    
+    return true;
 }
 
 void AtariEmulator::shutdown()

@@ -98,6 +98,11 @@ public:
                                  const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
                                  const QString& fitScreen, bool show80Column, bool vSyncEnabled,
                                  bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks);
+    bool initializeWithNetSIOConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
+                                  const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
+                                  const QString& fitScreen, bool show80Column, bool vSyncEnabled,
+                                  bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks,
+                                  bool netSIOEnabled, bool rtimeEnabled);
     // Note: Display parameters are saved to profiles but not applied due to libatari800 limitations
     // FUTURE: Scanlines support (commented out - not working with current atari800 build)
     // bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode, int scanlinesPercentage, bool scanlinesInterpolation);
