@@ -1,6 +1,6 @@
 # Fujisan - Modern Atari Emulator
 
-![images/fujisanlogo.png](/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/images/fujisanlogo.png)
+![Fujisan Logo](images/fujisanlogo.png)
 
 A modern Qt5 frontend for the Atari800 emulator, providing a native desktop experience with full keyboard support, machine configuration, and authentic Atari behavior.
 
