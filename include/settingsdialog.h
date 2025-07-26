@@ -219,6 +219,7 @@ private:
     // Keyboard Joystick Emulation
     QCheckBox* m_kbdJoy0Enabled;
     QCheckBox* m_kbdJoy1Enabled;
+    QCheckBox* m_swapJoysticks;
     
     // Mouse Configuration
     QCheckBox* m_grabMouse;

@@ -90,6 +90,7 @@ struct ConfigurationProfile {
     bool joyDistinct = false;
     bool kbdJoy0Enabled = false;
     bool kbdJoy1Enabled = false;
+    bool swapJoysticks = false;
     bool grabMouse = false;
     QString mouseDevice;
     bool keyboardToggle = false;

@@ -1,7 +1,7 @@
 /*
  * Fujisan - Modern Atari Emulator
  * Copyright (c) 2025 Paulo Garcia (8bitrelics.com)
- * 
+ *
  * Licensed under the MIT License. See LICENSE file for details.
  */
 
@@ -32,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_pasteTimer(new QTimer(this))
     , m_pasteIndex(0)
     , m_originalEmulationSpeed(100)
+    , m_profileManager(new ConfigurationProfileManager(this))
     , m_pasteCharacterSent(false)
     , m_diskDrive1(nullptr)
     , m_mediaPeripheralsDock(nullptr)
@@ -41,35 +42,35 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle("Fujisan");
     setMinimumSize(800, 600);
     resize(1280, 960);
-    
+
 #ifdef Q_OS_MACOS
     // Disable automatic macOS fullscreen to prevent duplicate menu items
     setWindowFlags(windowFlags() & ~Qt::WindowFullscreenButtonHint);
 #endif
-    
+
     createMenus();
     createToolBar();
     createEmulatorWidget();
     createDebugger();
     createMediaPeripheralsDock();
-    
+
     // Enable hybrid disk activity system
     m_emulator->setDiskActivityCallback([](int driveNumber, bool isWriting) {
         // Activity callback handled via Qt signals
     });
-    
+
     // Setup paste timer
     m_pasteTimer->setSingleShot(false);
     m_pasteTimer->setInterval(75); // 75ms for character/clear cycle
     connect(m_pasteTimer, &QTimer::timeout, this, &MainWindow::sendNextCharacter);
-    
+
     // Load initial settings and initialize emulator with them
     loadInitialSettings();
     loadVideoSettings();
-    
+
     // Show initial status message
     statusBar()->showMessage("Fujisan ready", 3000);
-    
+
     qDebug() << "Fujisan initialized successfully";
 }
 
@@ -84,83 +85,83 @@ void MainWindow::createMenus()
 {
     // File menu
     QMenu* fileMenu = menuBar()->addMenu("&File");
-    
+
     m_loadRomAction = new QAction("&Load File...", this);
     m_loadRomAction->setShortcut(QKeySequence::Open);
     connect(m_loadRomAction, &QAction::triggered, this, &MainWindow::loadRom);
     fileMenu->addAction(m_loadRomAction);
-    
+
     fileMenu->addSeparator();
-    
+
     m_coldBootAction = new QAction("&Cold Reset", this);
     connect(m_coldBootAction, &QAction::triggered, this, &MainWindow::coldBoot);
     fileMenu->addAction(m_coldBootAction);
-    
+
     m_warmBootAction = new QAction("&Warm Reset", this);
     connect(m_warmBootAction, &QAction::triggered, this, &MainWindow::warmBoot);
     fileMenu->addAction(m_warmBootAction);
-    
+
     fileMenu->addSeparator();
-    
+
     m_exitAction = new QAction("E&xit", this);
     m_exitAction->setShortcut(QKeySequence::Quit);
     connect(m_exitAction, &QAction::triggered, this, &QWidget::close);
     fileMenu->addAction(m_exitAction);
-    
+
     // Edit menu
     QMenu* editMenu = menuBar()->addMenu("&Edit");
-    
+
     m_pasteAction = new QAction("&Paste Text", this);
     m_pasteAction->setShortcut(QKeySequence::Paste);
     m_pasteAction->setToolTip("Paste clipboard text into emulator (Ctrl+V)");
     connect(m_pasteAction, &QAction::triggered, this, &MainWindow::pasteText);
     editMenu->addAction(m_pasteAction);
-    
+
     // System menu
     QMenu* systemMenu = menuBar()->addMenu("&System");
-    
+
     m_basicAction = new QAction("Enable &BASIC", this);
     m_basicAction->setCheckable(true);
     m_basicAction->setChecked(m_emulator->isBasicEnabled());
     connect(m_basicAction, &QAction::toggled, this, &MainWindow::toggleBasic);
     systemMenu->addAction(m_basicAction);
-    
+
     m_altirraOSAction = new QAction("Use &Altirra OS", this);
     m_altirraOSAction->setCheckable(true);
     m_altirraOSAction->setChecked(m_emulator->isAltirraOSEnabled());
     connect(m_altirraOSAction, &QAction::toggled, this, &MainWindow::toggleAltirraOS);
     systemMenu->addAction(m_altirraOSAction);
-    
+
     systemMenu->addSeparator();
-    
+
     m_settingsAction = new QAction("&Settings...", this);
     m_settingsAction->setShortcut(QKeySequence::Preferences);
     connect(m_settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     systemMenu->addAction(m_settingsAction);
-    
+
     // Machine menu (now just for video system)
     QMenu* machineMenu = menuBar()->addMenu("&Machine");
-    
+
     m_videoNTSCAction = new QAction("&NTSC Video", this);
     m_videoNTSCAction->setCheckable(true);
-    connect(m_videoNTSCAction, &QAction::triggered, [this]() { 
+    connect(m_videoNTSCAction, &QAction::triggered, [this]() {
         m_videoToggle->setChecked(false); // NTSC = OFF position
-        onVideoSystemToggled(false); 
+        onVideoSystemToggled(false);
     });
     machineMenu->addAction(m_videoNTSCAction);
-    
+
     m_videoPALAction = new QAction("&PAL Video", this);
     m_videoPALAction->setCheckable(true);
     m_videoPALAction->setChecked(true); // Default
-    connect(m_videoPALAction, &QAction::triggered, [this]() { 
+    connect(m_videoPALAction, &QAction::triggered, [this]() {
         m_videoToggle->setChecked(true); // PAL = ON position
-        onVideoSystemToggled(true); 
+        onVideoSystemToggled(true);
     });
     machineMenu->addAction(m_videoPALAction);
-    
+
     // View menu
     QMenu* viewMenu = menuBar()->addMenu("&View");
-    
+
     m_fullscreenAction = new QAction("&Fullscreen", this);
 #ifdef Q_OS_MACOS
     m_fullscreenAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Return));
@@ -172,19 +173,19 @@ void MainWindow::createMenus()
     m_fullscreenAction->setCheckable(true);
     connect(m_fullscreenAction, &QAction::triggered, this, &MainWindow::toggleFullscreen);
     viewMenu->addAction(m_fullscreenAction);
-    
+
     viewMenu->addSeparator();
-    
+
     m_debuggerAction = new QAction("&Debugger", this);
     m_debuggerAction->setShortcut(QKeySequence(Qt::Key_F12));
     m_debuggerAction->setToolTip("Toggle debugger panel (F12)");
     m_debuggerAction->setCheckable(true);
     connect(m_debuggerAction, &QAction::triggered, this, &MainWindow::toggleDebugger);
     viewMenu->addAction(m_debuggerAction);
-    
+
     // Help menu
     QMenu* helpMenu = menuBar()->addMenu("&Help");
-    
+
     m_aboutAction = new QAction("&About", this);
     connect(m_aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
     helpMenu->addAction(m_aboutAction);
@@ -196,16 +197,47 @@ void MainWindow::createToolBar()
     m_toolBar->setMovable(false);
     m_toolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_toolBar->setIconSize(QSize(32, 32));
-    
+
+    // Set toolbar background color
+    m_toolBar->setStyleSheet("QToolBar { background-color: rgb(220, 216, 207); }");
+
     // Increase toolbar height to accommodate multiple controls
     m_toolBar->setMinimumHeight(70);
-    
-    // Add spacer to push cold reset button to the right
+
+    // Create joystick configuration section
+    createJoystickToolbarSection();
+
+    // Add separator between joystick and audio sections
+    QFrame* separator = new QFrame();
+    separator->setFrameShape(QFrame::VLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    separator->setStyleSheet("color: #999; margin: 2px;");
+    m_toolBar->addWidget(separator);
+
+    // Create audio configuration section
+    createAudioToolbarSection();
+
+    // Add divider
+    separator = new QFrame();
+    separator->setFrameShape(QFrame::VLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    m_toolBar->addWidget(separator);
+
+    // Create profile configuration section
+    createProfileToolbarSection();
+
+    // Add divider
+    separator = new QFrame();
+    separator->setFrameShape(QFrame::VLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    m_toolBar->addWidget(separator);
+
+    // Add spacer to push reset buttons to the right
     QWidget* spacer = new QWidget();
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_toolBar->addWidget(spacer);
-    
-    
+
+
     // Create reset icons
     QPixmap resetPixmap(32, 32);
     resetPixmap.fill(Qt::transparent);
@@ -215,7 +247,7 @@ void MainWindow::createToolBar()
     painter.setBrush(Qt::NoBrush);
     painter.drawEllipse(4, 4, 24, 24);
     painter.drawLine(16, 4, 16, 16);
-    
+
     QIcon resetIcon;
     if (QIcon::hasThemeIcon("system-reboot")) {
         resetIcon = QIcon::fromTheme("system-reboot");
@@ -224,19 +256,291 @@ void MainWindow::createToolBar()
     } else {
         resetIcon = QIcon(resetPixmap);
     }
-    
+
     // Add reset button (F5) and cold reset button
     QAction* resetAction = new QAction("Reset", this);
     resetAction->setToolTip("Reset the Atari system (F5)");
     resetAction->setIcon(resetIcon);
     connect(resetAction, &QAction::triggered, this, &MainWindow::warmBoot);
     m_toolBar->addAction(resetAction);
-    
+
     QAction* coldResetAction = new QAction("Cold Reset", this);
     coldResetAction->setToolTip("Perform a cold reset of the Atari system (Shift+F5)");
     coldResetAction->setIcon(resetIcon);
     connect(coldResetAction, &QAction::triggered, this, &MainWindow::coldBoot);
     m_toolBar->addAction(coldResetAction);
+
+    // Add divider before logo
+    QFrame* logoSeparator = new QFrame();
+    logoSeparator->setFrameShape(QFrame::VLine);
+    logoSeparator->setFrameShadow(QFrame::Sunken);
+    m_toolBar->addWidget(logoSeparator);
+
+    // Add spacer to push logo to the far right
+    QWidget* logoSpacer = new QWidget();
+    logoSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_toolBar->addWidget(logoSpacer);
+
+    // Add Fujisan logo
+    createLogoSection();
+}
+
+void MainWindow::createJoystickToolbarSection()
+{
+    // Create joystick configuration container
+    QWidget* joystickContainer = new QWidget(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(joystickContainer);
+    mainLayout->setContentsMargins(8, 0, 8, 2); // Reduced top margin from 2 to 0
+    mainLayout->setSpacing(3); // Increased spacing from 2 to 3
+
+    // Title label
+    QLabel* titleLabel = new QLabel("🕹️ Joystick");
+    titleLabel->setStyleSheet("font-weight: bold; font-size: 10px; color: #444;");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    mainLayout->addWidget(titleLabel);
+
+    // Controls container
+    QWidget* controlsWidget = new QWidget();
+    QHBoxLayout* controlsLayout = new QHBoxLayout(controlsWidget);
+    controlsLayout->setContentsMargins(0, 0, 0, 0);
+    controlsLayout->setSpacing(6);
+
+    // Left column: enable checkboxes
+    QWidget* leftColumn = new QWidget();
+    QVBoxLayout* leftLayout = new QVBoxLayout(leftColumn);
+    leftLayout->setContentsMargins(0, 0, 0, 0);
+    leftLayout->setSpacing(2); // Increased spacing from 1 to 2
+
+    m_joystickEnabledCheck = new QCheckBox("Enable");
+    m_joystickEnabledCheck->setStyleSheet("font-size: 10px;");
+    m_joystickEnabledCheck->setToolTip("Enable joystick support");
+    leftLayout->addWidget(m_joystickEnabledCheck);
+
+    m_kbdJoy0Check = new QCheckBox("Kbd J1");
+    m_kbdJoy0Check->setStyleSheet("font-size: 10px;");
+    m_kbdJoy0Check->setToolTip("Enable keyboard joystick 1 (Numpad)");
+    leftLayout->addWidget(m_kbdJoy0Check);
+
+    m_kbdJoy1Check = new QCheckBox("Kbd J2");
+    m_kbdJoy1Check->setStyleSheet("font-size: 10px;");
+    m_kbdJoy1Check->setToolTip("Enable keyboard joystick 2 (WASD)");
+    leftLayout->addWidget(m_kbdJoy1Check);
+
+    controlsLayout->addWidget(leftColumn);
+
+    // Vertical separator
+    QFrame* separator = new QFrame();
+    separator->setFrameShape(QFrame::VLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    separator->setStyleSheet("color: #ccc;");
+    controlsLayout->addWidget(separator);
+
+    // Right column: compact swap widget
+    m_joystickSwapWidget = new JoystickSwapWidget(this, true); // Compact mode
+    controlsLayout->addWidget(m_joystickSwapWidget);
+
+    mainLayout->addWidget(controlsWidget);
+
+    // Connect signals for immediate updates
+    connect(m_joystickEnabledCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        QSettings settings;
+        settings.setValue("input/joystickEnabled", checked);
+        qDebug() << "Joystick enabled changed to:" << checked;
+    });
+
+    connect(m_kbdJoy0Check, &QCheckBox::toggled, this, [this](bool checked) {
+        QSettings settings;
+        settings.setValue("input/kbdJoy0Enabled", checked);
+        if (m_emulator) {
+            m_emulator->setKbdJoy0Enabled(checked);
+        }
+        qDebug() << "Keyboard Joy0 changed to:" << checked;
+    });
+
+    connect(m_kbdJoy1Check, &QCheckBox::toggled, this, [this](bool checked) {
+        QSettings settings;
+        settings.setValue("input/kbdJoy1Enabled", checked);
+        if (m_emulator) {
+            m_emulator->setKbdJoy1Enabled(checked);
+        }
+        qDebug() << "Keyboard Joy1 changed to:" << checked;
+    });
+
+    connect(m_joystickSwapWidget, &JoystickSwapWidget::toggled, this, [this](bool swapped) {
+        QSettings settings;
+        settings.setValue("input/swapJoysticks", swapped);
+        if (m_emulator) {
+            m_emulator->setJoysticksSwapped(swapped);
+        }
+        qDebug() << "Joystick swap changed to:" << swapped;
+    });
+
+    // Add to toolbar
+    m_toolBar->addWidget(joystickContainer);
+
+    // Load initial settings
+    QSettings settings;
+    m_joystickEnabledCheck->setChecked(settings.value("input/joystickEnabled", true).toBool());
+    m_kbdJoy0Check->setChecked(settings.value("input/kbdJoy0Enabled", true).toBool());
+    m_kbdJoy1Check->setChecked(settings.value("input/kbdJoy1Enabled", false).toBool());
+    m_joystickSwapWidget->setSwapped(settings.value("input/swapJoysticks", false).toBool());
+}
+
+void MainWindow::createAudioToolbarSection()
+{
+    // Create audio configuration container
+    QWidget* audioContainer = new QWidget(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(audioContainer);
+    mainLayout->setContentsMargins(8, 2, 8, 2);
+    mainLayout->setSpacing(2);
+
+    // Title label
+    QLabel* titleLabel = new QLabel("🔊 Audio");
+    titleLabel->setStyleSheet("font-weight: bold; font-size: 10px; color: #444;");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    mainLayout->addWidget(titleLabel);
+
+    // Volume control container
+    QWidget* volumeWidget = new QWidget();
+    QVBoxLayout* volumeLayout = new QVBoxLayout(volumeWidget);
+    volumeLayout->setContentsMargins(0, 0, 0, 0);
+    volumeLayout->setSpacing(2);
+    volumeLayout->setAlignment(Qt::AlignCenter);
+
+    // Volume knob
+    m_volumeKnob = new VolumeKnob();
+    m_volumeKnob->setRange(0, 100);
+    m_volumeKnob->setValue(75);
+    volumeLayout->addWidget(m_volumeKnob, 0, Qt::AlignCenter);
+
+    // Volume percentage label
+    QLabel* volumePercentLabel = new QLabel("75%");
+    volumePercentLabel->setStyleSheet("font-size: 9px; color: #666; min-width: 25px;");
+    volumePercentLabel->setAlignment(Qt::AlignCenter);
+    volumeLayout->addWidget(volumePercentLabel);
+
+    mainLayout->addWidget(volumeWidget);
+
+    // Connect signals for immediate updates
+    connect(m_volumeKnob, &VolumeKnob::valueChanged, this, [this, volumePercentLabel](int value) {
+        QSettings settings;
+        settings.setValue("audio/volume", value);
+        if (m_emulator) {
+            m_emulator->setVolume(value / 100.0);
+        }
+        volumePercentLabel->setText(QString("%1%").arg(value));
+        qDebug() << "Volume changed to:" << value;
+    });
+
+    // Add to toolbar
+    m_toolBar->addWidget(audioContainer);
+
+    // Load initial settings
+    QSettings settings;
+    int volume = settings.value("audio/volume", 75).toInt();
+    m_volumeKnob->setValue(volume);
+    volumePercentLabel->setText(QString("%1%").arg(volume));
+
+    // Audio is always enabled when there's a volume knob
+    if (m_emulator) {
+        m_emulator->enableAudio(true);
+    }
+}
+
+void MainWindow::createProfileToolbarSection()
+{
+    // Create profile configuration container
+    QWidget* profileContainer = new QWidget(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(profileContainer);
+    mainLayout->setContentsMargins(8, 0, 8, 2);
+    mainLayout->setSpacing(1);
+
+    // Top row: Profile label and dropdown
+    QWidget* topRow = new QWidget();
+    QHBoxLayout* topLayout = new QHBoxLayout(topRow);
+    topLayout->setContentsMargins(0, 0, 0, 0);
+    topLayout->setSpacing(4);
+
+    QLabel* profileLabel = new QLabel("Profile:");
+    profileLabel->setStyleSheet("font-weight: bold; font-size: 10px; color: #444;");
+    topLayout->addWidget(profileLabel);
+
+    m_profileCombo = new QComboBox();
+    m_profileCombo->setStyleSheet("font-size: 10px;");
+    m_profileCombo->setToolTip("Select configuration profile");
+    m_profileCombo->setMinimumWidth(80);
+    topLayout->addWidget(m_profileCombo);
+
+    mainLayout->addWidget(topRow);
+
+    // Bottom row: Load button (centered)
+    QWidget* bottomRow = new QWidget();
+    QHBoxLayout* bottomLayout = new QHBoxLayout(bottomRow);
+    bottomLayout->setContentsMargins(0, 0, 0, 0);
+    bottomLayout->setSpacing(0);
+
+    bottomLayout->addStretch();
+    
+    m_loadProfileButton = new QPushButton("LOAD");
+    m_loadProfileButton->setStyleSheet("font-size: 10px; font-weight: bold;");
+    m_loadProfileButton->setToolTip("Load selected profile");
+    m_loadProfileButton->setMaximumHeight(20);
+    bottomLayout->addWidget(m_loadProfileButton);
+    
+    bottomLayout->addStretch();
+
+    mainLayout->addWidget(bottomRow);
+
+    // Initialize profile list
+    refreshProfileList();
+
+    // Connect signals
+    connect(m_loadProfileButton, &QPushButton::clicked, this, &MainWindow::onLoadProfile);
+    connect(m_profileManager, &ConfigurationProfileManager::profileListChanged,
+            this, &MainWindow::refreshProfileList);
+
+    m_toolBar->addWidget(profileContainer);
+}
+
+void MainWindow::createLogoSection()
+{
+    // Create logo label
+    QLabel* logoLabel = new QLabel();
+    
+    // Try to load Fujisan logo from multiple paths
+    QStringList imagePaths = {
+        "/Users/pgarcia/Downloads/fujisanlogo.png",  // Same path as About dialog
+        "./images/fujisan-logo.png",
+        "../images/fujisan-logo.png",
+        QApplication::applicationDirPath() + "/images/fujisan-logo.png",
+        QApplication::applicationDirPath() + "/../images/fujisan-logo.png",
+        ":/images/fujisan-logo.png"
+    };
+    
+    QPixmap logoPixmap;
+    bool logoLoaded = false;
+    
+    for (const QString& path : imagePaths) {
+        if (logoPixmap.load(path)) {
+            logoLoaded = true;
+            break;
+        }
+    }
+    
+    if (!logoLoaded) {
+        // Create a simple text-based logo as fallback
+        logoLabel->setText("FUJISAN");
+        logoLabel->setStyleSheet("font-weight: bold; font-size: 12px; color: #666; margin: 0 8px;");
+        logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
+    } else {
+        // Scale logo to appropriate toolbar size (max 40px height for better visibility)
+        QPixmap scaledLogo = logoPixmap.scaled(QSize(80, 40), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        logoLabel->setPixmap(scaledLogo);
+        logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
+        logoLabel->setContentsMargins(6, 2, 10, 2);
+    }
+    
+    m_toolBar->addWidget(logoLabel);
 }
 
 void MainWindow::createEmulatorWidget()
@@ -246,15 +550,15 @@ void MainWindow::createEmulatorWidget()
     QVBoxLayout* layout = new QVBoxLayout(centralWidget);
     layout->setContentsMargins(0, 0, 0, 0); // Remove margins
     layout->setSpacing(0); // Remove spacing
-    
+
     m_emulatorWidget = new EmulatorWidget(centralWidget);
     m_emulatorWidget->setEmulator(m_emulator);
-    
+
     // Make the emulator widget expand to fill all available space
     layout->addWidget(m_emulatorWidget);
-    
+
     setCentralWidget(centralWidget);
-    
+
     // Give the emulator widget focus by default
     m_emulatorWidget->setFocus();
 }
@@ -263,19 +567,19 @@ void MainWindow::createDebugger()
 {
     // Create debugger widget
     m_debuggerWidget = new DebuggerWidget(m_emulator, this);
-    
+
     // Create dock widget for debugger
     m_debuggerDock = new QDockWidget("Debugger", this);
     m_debuggerDock->setWidget(m_debuggerWidget);
     m_debuggerDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
     m_debuggerDock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable);
-    
+
     // Add dock widget to right side by default
     addDockWidget(Qt::RightDockWidgetArea, m_debuggerDock);
-    
+
     // Hide by default
     m_debuggerDock->hide();
-    
+
     // Connect dock visibility to menu action
     connect(m_debuggerDock, &QDockWidget::visibilityChanged, [this](bool visible) {
         m_debuggerAction->setChecked(visible);
@@ -290,7 +594,7 @@ void MainWindow::loadRom()
         QString(),
         "Atari Files (*.rom *.bin *.car *.atr *.xex *.exe *.com);;Cartridge ROMs (*.rom *.bin *.car);;Disk Images (*.atr);;Executables (*.xex *.exe *.com);;All Files (*)"
     );
-    
+
     if (!fileName.isEmpty()) {
         if (m_emulator->loadFile(fileName)) {
             qDebug() << "Successfully loaded:" << fileName;
@@ -319,10 +623,10 @@ void MainWindow::toggleBasic(bool enabled)
     m_emulator->setBasicEnabled(enabled);
     QString message = enabled ? "BASIC enabled - restarting..." : "BASIC disabled - restarting...";
     statusBar()->showMessage(message, 3000);
-    
+
     // Also update the menu checkbox to stay in sync
     m_basicAction->setChecked(enabled);
-    
+
     restartEmulator();
 }
 
@@ -338,7 +642,7 @@ void MainWindow::onMachineTypeChanged(int index)
 {
     QString machineType;
     QString message;
-    
+
     switch (index) {
         case 0: // Atari 400/800
             machineType = "-atari";
@@ -383,7 +687,7 @@ void MainWindow::onMachineTypeChanged(int index)
         default:
             return;
     }
-    
+
     m_emulator->setMachineType(machineType);
     statusBar()->showMessage(message, 3000);
     restartEmulator();
@@ -392,11 +696,11 @@ void MainWindow::onMachineTypeChanged(int index)
 void MainWindow::restartEmulator()
 {
     m_emulator->shutdown();
-    
+
     // Load display and artifact settings from preferences
     QSettings settings("8bitrelics", "Fujisan");
     QString artifactMode = settings.value("video/artifacting", "none").toString();
-    
+
     // Load display settings
     QString horizontalArea = settings.value("video/horizontalArea", "tv").toString();
     QString verticalArea = settings.value("video/verticalArea", "tv").toString();
@@ -405,20 +709,20 @@ void MainWindow::restartEmulator()
     QString fitScreen = settings.value("video/fitScreen", "both").toString();
     bool show80Column = settings.value("video/show80Column", false).toBool();
     bool vSyncEnabled = settings.value("video/vSyncEnabled", false).toBool();
-    
-    qDebug() << "Display settings - HArea:" << horizontalArea << "VArea:" << verticalArea 
-             << "HShift:" << horizontalShift << "VShift:" << verticalShift 
+
+    qDebug() << "Display settings - HArea:" << horizontalArea << "VArea:" << verticalArea
+             << "HShift:" << horizontalShift << "VShift:" << verticalShift
              << "Fit:" << fitScreen << "80Col:" << show80Column << "VSync:" << vSyncEnabled;
-    
+
     // Load input settings for keyboard joystick emulation
     bool kbdJoy0Enabled = settings.value("input/kbdJoy0Enabled", true).toBool();  // Default true to match SDL default
     bool kbdJoy1Enabled = settings.value("input/kbdJoy1Enabled", false).toBool(); // Default false to match SDL default
     bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();   // Default false: Joy0=Numpad, Joy1=WASD
-    
+
     qDebug() << "Applying input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
-    
-    if (m_emulator->initializeWithInputConfig(m_emulator->isBasicEnabled(), 
-                                            m_emulator->getMachineType(), 
+
+    if (m_emulator->initializeWithInputConfig(m_emulator->isBasicEnabled(),
+                                            m_emulator->getMachineType(),
                                             m_emulator->getVideoSystem(),
                                             artifactMode,
                                             horizontalArea, verticalArea,
@@ -446,7 +750,7 @@ void MainWindow::onVideoSystemToggled(bool isPAL)
         m_emulator->setVideoSystem("-pal");
         statusBar()->showMessage("Video system set to PAL (49.86 fps) - restarting...", 3000);
     } else {
-        // NTSC mode (toggle OFF) 
+        // NTSC mode (toggle OFF)
         m_videoPALAction->setChecked(false);
         m_videoNTSCAction->setChecked(true);
         m_emulator->setVideoSystem("-ntsc");
@@ -480,10 +784,10 @@ void MainWindow::onSettingsChanged()
     qDebug() << "Settings changed - updating toolbar and video settings";
     updateToolbarFromSettings();
     loadVideoSettings();
-    
+
     // Reload media settings to sync disk widgets with any changes made in settings dialog
     loadAndApplyMediaSettings();
-    
+
     statusBar()->showMessage("Settings applied and emulator restarted", 3000);
 }
 
@@ -502,46 +806,59 @@ void MainWindow::updateToolbarFromSettings()
     else if (machineType == "-1088xe") machineIndex = 7;
     else if (machineType == "-xegs") machineIndex = 8;
     else if (machineType == "-5200") machineIndex = 9;
-    
+
     m_machineCombo->blockSignals(true);
     m_machineCombo->setCurrentIndex(machineIndex);
     m_machineCombo->blockSignals(false);
-    
+
     // Update BASIC toggle
     m_basicToggle->blockSignals(true);
     m_basicToggle->setChecked(m_emulator->isBasicEnabled());
     m_basicToggle->blockSignals(false);
-    
+
     // Update video toggle (PAL = ON, NTSC = OFF)
     bool isPAL = (m_emulator->getVideoSystem() == "-pal");
     m_videoToggle->blockSignals(true);
     m_videoToggle->setChecked(isPAL);
     m_videoToggle->blockSignals(false);
-    
+
     // Update speed toggle (default to normal speed)
     m_speedToggle->blockSignals(true);
     m_speedToggle->setChecked(false); // Default to normal speed (100%)
     m_speedToggle->blockSignals(false);
-    
+
     // Update menu actions
     m_basicAction->blockSignals(true);
     m_basicAction->setChecked(m_emulator->isBasicEnabled());
     m_basicAction->blockSignals(false);
-    
+
     m_altirraOSAction->blockSignals(true);
     m_altirraOSAction->setChecked(m_emulator->isAltirraOSEnabled());
     m_altirraOSAction->blockSignals(false);
-    
+
     m_videoPALAction->blockSignals(true);
     m_videoPALAction->setChecked(isPAL);
     m_videoPALAction->blockSignals(false);
-    
+
     m_videoNTSCAction->blockSignals(true);
     m_videoNTSCAction->setChecked(!isPAL);
     m_videoNTSCAction->blockSignals(false);
-    
-    qDebug() << "Toolbar updated - Machine:" << machineType << "BASIC:" << m_emulator->isBasicEnabled() 
-             << "Video:" << m_emulator->getVideoSystem();
+
+    // Update audio settings from emulator state
+    QSettings settings;
+    int volume = settings.value("audio/volume", 75).toInt();
+
+    m_volumeKnob->blockSignals(true);
+    m_volumeKnob->setValue(volume);
+    m_volumeKnob->blockSignals(false);
+
+    // Audio is always enabled when there's a volume knob
+    if (m_emulator) {
+        m_emulator->enableAudio(true);
+    }
+
+    qDebug() << "Toolbar updated - Machine:" << machineType << "BASIC:" << m_emulator->isBasicEnabled()
+             << "Video:" << m_emulator->getVideoSystem() << "Volume:" << volume;
 }
 
 void MainWindow::toggleFullscreen()
@@ -558,34 +875,34 @@ void MainWindow::toggleFullscreen()
 void MainWindow::enterCustomFullscreen()
 {
     if (m_isInCustomFullscreen || !m_emulatorWidget) return;
-    
+
     // Create fullscreen widget
     m_fullscreenWidget = new QWidget(nullptr, Qt::Window | Qt::FramelessWindowHint);
     m_fullscreenWidget->setWindowTitle("Fujisan - Fullscreen");
     m_fullscreenWidget->setAttribute(Qt::WA_DeleteOnClose, false);
     m_fullscreenWidget->setStyleSheet("background-color: black;");
-    
+
     // Create layout for the fullscreen widget
     QVBoxLayout* layout = new QVBoxLayout(m_fullscreenWidget);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    
+
     // Create a new EmulatorWidget for fullscreen (don't move the original)
     EmulatorWidget* fullscreenEmulator = new EmulatorWidget(m_fullscreenWidget);
     fullscreenEmulator->setEmulator(m_emulator);
     layout->addWidget(fullscreenEmulator);
-    
+
     // Show fullscreen
     m_fullscreenWidget->showFullScreen();
     fullscreenEmulator->setFocus();
-    
+
     // Install event filter to handle key presses in fullscreen
     m_fullscreenWidget->installEventFilter(this);
-    
+
     // Update state
     m_isInCustomFullscreen = true;
     m_fullscreenAction->setChecked(true);
-    
+
 #ifdef Q_OS_MACOS
     statusBar()->showMessage("Fullscreen mode enabled - Press Cmd+Enter to exit", 3000);
 #else
@@ -596,22 +913,22 @@ void MainWindow::enterCustomFullscreen()
 void MainWindow::exitCustomFullscreen()
 {
     if (!m_isInCustomFullscreen || !m_fullscreenWidget) return;
-    
+
     // Remove event filter
     m_fullscreenWidget->removeEventFilter(this);
-    
+
     // Close and delete the fullscreen widget (this also deletes the fullscreen emulator widget)
     m_fullscreenWidget->close();
     delete m_fullscreenWidget;
     m_fullscreenWidget = nullptr;
-    
+
     // Update state
     m_isInCustomFullscreen = false;
     m_fullscreenAction->setChecked(false);
-    
+
     // Give focus back to the main emulator widget
     m_emulatorWidget->setFocus();
-    
+
     statusBar()->showMessage("Fullscreen mode disabled", 2000);
 }
 
@@ -628,11 +945,11 @@ void MainWindow::showAbout()
     aboutDialog.setWindowTitle("About Fujisan");
     aboutDialog.setFixedSize(500, 400);
     aboutDialog.setModal(true);
-    
+
     QVBoxLayout* layout = new QVBoxLayout(&aboutDialog);
     layout->setSpacing(15);
     layout->setContentsMargins(20, 20, 20, 20);
-    
+
     // Logo
     QLabel* logoLabel = new QLabel();
     QPixmap logo("/Users/pgarcia/Downloads/fujisanlogo.png");
@@ -650,7 +967,7 @@ void MainWindow::showAbout()
         logoLabel->setFont(logoFont);
     }
     layout->addWidget(logoLabel);
-    
+
     // Title and description
     QLabel* titleLabel = new QLabel("Modern Atari Emulator");
     titleLabel->setAlignment(Qt::AlignCenter);
@@ -659,13 +976,13 @@ void MainWindow::showAbout()
     titleFont.setBold(true);
     titleLabel->setFont(titleFont);
     layout->addWidget(titleLabel);
-    
+
     // Description
     QLabel* descriptionLabel = new QLabel("A modern Qt5 frontend for the Atari800 emulator.");
     descriptionLabel->setAlignment(Qt::AlignCenter);
     descriptionLabel->setWordWrap(true);
     layout->addWidget(descriptionLabel);
-    
+
     // Credits and copyright
     QLabel* creditsLabel = new QLabel(
         "Built on the Atari800 emulator project\n"
@@ -677,18 +994,18 @@ void MainWindow::showAbout()
     creditsLabel->setFont(creditsFont);
     creditsLabel->setStyleSheet("color: #666666;");
     layout->addWidget(creditsLabel);
-    
+
     // OK button
     QPushButton* okButton = new QPushButton("OK");
     okButton->setDefault(true);
     connect(okButton, &QPushButton::clicked, &aboutDialog, &QDialog::accept);
-    
+
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
     buttonLayout->addWidget(okButton);
     buttonLayout->addStretch();
     layout->addLayout(buttonLayout);
-    
+
     aboutDialog.exec();
 }
 
@@ -696,31 +1013,36 @@ void MainWindow::createMediaPeripheralsDock()
 {
     // Create D1 drive for toolbar first (so we can get its width)
     m_diskDrive1 = new DiskDriveWidget(1, m_emulator, this);
-    
+
+    // Create cartridge widget for toolbar
+    m_cartridgeWidget = new CartridgeWidget(m_emulator, this);
+
     // Create Media & Peripherals dock widget
     m_mediaPeripheralsDock = new MediaPeripheralsDock(m_emulator, this);
-    
+
     m_mediaPeripheralsDockWidget = new QDockWidget("", this);
     m_mediaPeripheralsDockWidget->setWidget(m_mediaPeripheralsDock);
     m_mediaPeripheralsDockWidget->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
     m_mediaPeripheralsDockWidget->setTitleBarWidget(new QWidget()); // Hide title bar completely
-    
-    // Set dock width to match dock drives width (94px) with extra padding for alignment  
-    // Note: dock drives are full size (94px) while D1 is 20% smaller (75px)
-    int dockWidth = 94 + 30; // Dock drive width plus extra padding for alignment
+
+    // Media dock background color removed - using default styling
+
+    // Set dock width back to original size
+    // Original: 94px + 30px padding = 124px, reduced by 10px
+    int dockWidth = 114;
     m_mediaPeripheralsDockWidget->setMinimumWidth(dockWidth);
     m_mediaPeripheralsDockWidget->setMaximumWidth(dockWidth);
-    m_mediaPeripheralsDockWidget->setFeatures(QDockWidget::DockWidgetMovable | 
-                                              QDockWidget::DockWidgetFloatable | 
+    m_mediaPeripheralsDockWidget->setFeatures(QDockWidget::DockWidgetMovable |
+                                              QDockWidget::DockWidgetFloatable |
                                               QDockWidget::DockWidgetClosable);
-    
-    // Add dock to left side 
+
+    // Add dock to left side
     addDockWidget(Qt::LeftDockWidgetArea, m_mediaPeripheralsDockWidget);
-    
+
     // Initially hidden
     m_mediaPeripheralsDockWidget->hide();
-    
-    // Create media dock toggle button  
+
+    // Create media dock toggle button
     int buttonWidth = m_diskDrive1->width(); // Matches D1 width (now 20% smaller)
     m_mediaToggleButton = new QPushButton("≡", this);
     m_mediaToggleButton->setToolTip("Show/Hide Media & Peripherals dock");
@@ -737,12 +1059,16 @@ void MainWindow::createMediaPeripheralsDock()
         "    border: 1px solid blue;"
         "}"
     );
-    
+
     // Connect signals
     connect(m_diskDrive1, &DiskDriveWidget::diskInserted, this, &MainWindow::onDiskInserted);
     connect(m_diskDrive1, &DiskDriveWidget::diskEjected, this, &MainWindow::onDiskEjected);
     connect(m_diskDrive1, &DiskDriveWidget::driveStateChanged, this, &MainWindow::onDriveStateChanged);
-    
+
+    // Connect cartridge widget signals
+    connect(m_cartridgeWidget, &CartridgeWidget::cartridgeInserted, this, &MainWindow::onCartridgeInserted);
+    connect(m_cartridgeWidget, &CartridgeWidget::cartridgeEjected, this, &MainWindow::onCartridgeEjected);
+
     // Connect media dock signals
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::diskInserted, this, &MainWindow::onDiskInserted);
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::diskEjected, this, &MainWindow::onDiskEjected);
@@ -750,9 +1076,8 @@ void MainWindow::createMediaPeripheralsDock()
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteInserted, this, &MainWindow::onCassetteInserted);
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteEjected, this, &MainWindow::onCassetteEjected);
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteStateChanged, this, &MainWindow::onCassetteStateChanged);
-    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cartridgeInserted, this, &MainWindow::onCartridgeInserted);
-    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cartridgeEjected, this, &MainWindow::onCartridgeEjected);
-    
+    // Note: Cartridge signals connected to toolbar cartridge widget above
+
     // Connect solid LED disk I/O monitoring
     connect(m_emulator, &AtariEmulator::diskIOStart, this, [this](int driveNumber, bool isWriting) {
 #ifdef DEBUG_DISK_IO
@@ -789,7 +1114,7 @@ void MainWindow::createMediaPeripheralsDock()
             }
         }
     });
-    
+
     connect(m_emulator, &AtariEmulator::diskIOEnd, this, [this](int driveNumber) {
 #ifdef DEBUG_DISK_IO
         qDebug() << "*** MainWindow received diskIOEnd signal for D" << driveNumber << ":" << "***";
@@ -819,34 +1144,57 @@ void MainWindow::createMediaPeripheralsDock()
             }
         }
     });
-    
+
     connect(m_mediaToggleButton, &QPushButton::clicked, this, &MainWindow::toggleMediaDock);
-    
-    // Add D1 and toggle button to toolbar
-    QWidget* diskContainer = new QWidget(this);
-    QVBoxLayout* mainLayout = new QVBoxLayout(diskContainer);
-    mainLayout->setContentsMargins(0, 2, 0, 2);
-    mainLayout->setSpacing(0);
-    
-    // Center the D1 drive horizontally in the container
-    mainLayout->addWidget(m_diskDrive1, 0, Qt::AlignCenter);
-    mainLayout->addSpacing(2);
-    mainLayout->addWidget(m_mediaToggleButton);
-    
+
+    // Create separate D1 container
+    QWidget* d1Container = new QWidget(this);
+    QVBoxLayout* d1MainLayout = new QVBoxLayout(d1Container);
+    d1MainLayout->setContentsMargins(0, 2, 0, 2);
+    d1MainLayout->setSpacing(2);
+    d1MainLayout->setAlignment(Qt::AlignCenter);
+
+    QWidget* d1Widget = new QWidget();
+    d1Widget->setFixedWidth(104);  // Reduced by 20px
+    QHBoxLayout* d1Layout = new QHBoxLayout(d1Widget);
+    d1Layout->setContentsMargins(0, 0, 0, 0);
+    d1Layout->addWidget(m_diskDrive1, 0, Qt::AlignCenter);
+
+    d1MainLayout->addWidget(d1Widget, 0, Qt::AlignCenter);
+
+    // Add media toggle button to D1 section with same width as section
+    m_mediaToggleButton->setFixedWidth(104);
+    d1MainLayout->addWidget(m_mediaToggleButton);
+
+    // Create separate cartridge container
+    QWidget* cartridgeContainer = new QWidget(this);
+    QVBoxLayout* cartridgeMainLayout = new QVBoxLayout(cartridgeContainer);
+    cartridgeMainLayout->setContentsMargins(0, 2, 0, 2);
+    cartridgeMainLayout->setSpacing(2);
+    cartridgeMainLayout->setAlignment(Qt::AlignCenter);
+
+    QWidget* cartridgeWidget = new QWidget();
+    cartridgeWidget->setFixedWidth(104);
+    QHBoxLayout* cartridgeLayout = new QHBoxLayout(cartridgeWidget);
+    cartridgeLayout->setContentsMargins(0, 0, 0, 0);
+    cartridgeLayout->addWidget(m_cartridgeWidget, 0, Qt::AlignCenter);
+
+    cartridgeMainLayout->addWidget(cartridgeWidget, 0, Qt::AlignCenter);
+
     // Create console buttons section
     QWidget* consoleButtonsContainer = new QWidget(this);
     QVBoxLayout* buttonsLayout = new QVBoxLayout(consoleButtonsContainer);
     buttonsLayout->setContentsMargins(2, 2, 2, 2);
     buttonsLayout->setSpacing(1);
-    
+
     // Create console buttons - wider than tall for compact stacking
     m_startButton = new QPushButton("START", this);
     m_selectButton = new QPushButton("SELECT", this);
     m_optionButton = new QPushButton("OPTION", this);
     m_breakButton = new QPushButton("BREAK", this);
-    
+
     // Style console buttons - wide and short
-    QString buttonStyle = 
+    QString buttonStyle =
         "QPushButton {"
         "    font-size: 9px;"
         "    font-weight: bold;"
@@ -863,30 +1211,30 @@ void MainWindow::createMediaPeripheralsDock()
         "    background-color: #d0d0d0;"
         "    border: 1px solid black;"
         "}";
-    
+
     m_startButton->setStyleSheet(buttonStyle);
     m_selectButton->setStyleSheet(buttonStyle);
     m_optionButton->setStyleSheet(buttonStyle);
     m_breakButton->setStyleSheet(buttonStyle);
-    
+
     // Add tooltips
     m_startButton->setToolTip("START button (F2)");
     m_selectButton->setToolTip("SELECT button (F3)");
     m_optionButton->setToolTip("OPTION button (F4)");
     m_breakButton->setToolTip("BREAK key (F7)");
-    
-    // Add buttons to layout
-    buttonsLayout->addWidget(m_startButton);
-    buttonsLayout->addWidget(m_selectButton);
+
+    // Add buttons to layout (reordered: option, select, start, break)
     buttonsLayout->addWidget(m_optionButton);
+    buttonsLayout->addWidget(m_selectButton);
+    buttonsLayout->addWidget(m_startButton);
     buttonsLayout->addWidget(m_breakButton);
-    
+
     // Connect console button signals - send press event and delay release to allow one frame processing
     connect(m_startButton, &QPushButton::clicked, this, [this]() {
         QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F2, Qt::NoModifier);
         m_emulator->handleKeyPress(&pressEvent);
         qDebug() << "*** START button clicked - F2 pressed ***";
-        
+
         // Delay release by one frame (about 16ms) to let emulator process it
         QTimer::singleShot(50, [this]() {
             QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F2, Qt::NoModifier);
@@ -898,7 +1246,7 @@ void MainWindow::createMediaPeripheralsDock()
         QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F3, Qt::NoModifier);
         m_emulator->handleKeyPress(&pressEvent);
         qDebug() << "*** SELECT button clicked - F3 pressed ***";
-        
+
         // Delay release by one frame
         QTimer::singleShot(50, [this]() {
             QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F3, Qt::NoModifier);
@@ -910,7 +1258,7 @@ void MainWindow::createMediaPeripheralsDock()
         QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F4, Qt::NoModifier);
         m_emulator->handleKeyPress(&pressEvent);
         qDebug() << "*** OPTION button clicked - F4 pressed ***";
-        
+
         // Delay release by one frame
         QTimer::singleShot(50, [this]() {
             QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F4, Qt::NoModifier);
@@ -922,7 +1270,7 @@ void MainWindow::createMediaPeripheralsDock()
         QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier);
         m_emulator->handleKeyPress(&pressEvent);
         qDebug() << "*** BREAK button clicked - F7 pressed ***";
-        
+
         // Delay release by one frame
         QTimer::singleShot(50, [this]() {
             QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F7, Qt::NoModifier);
@@ -930,38 +1278,38 @@ void MainWindow::createMediaPeripheralsDock()
             qDebug() << "*** BREAK button F7 released ***";
         });
     });
-    
+
     // Create machine controls container (machine dropdown on top, toggles side by side below)
     QWidget* machineControlsContainer = new QWidget(this);
     QVBoxLayout* machineControlsLayout = new QVBoxLayout(machineControlsContainer);
     machineControlsLayout->setContentsMargins(2, 2, 2, 2);
     machineControlsLayout->setSpacing(2);
-    
+
     // Machine selector on top
     m_machineCombo = new QComboBox();
     m_machineCombo->setIconSize(QSize(32, 20));
     m_machineCombo->setMinimumWidth(150);
-    
+
     // Create machine icons (same as original createToolBar)
     auto createMachineIcon = [](const QColor& baseColor, const QString& text) -> QIcon {
         QPixmap pixmap(32, 20);
         pixmap.fill(Qt::transparent);
         QPainter painter(&pixmap);
         painter.setRenderHint(QPainter::Antialiasing);
-        
+
         // Draw computer shape
         painter.setPen(QPen(baseColor.darker(150), 1));
         painter.setBrush(QBrush(baseColor));
         painter.drawRoundedRect(2, 2, 28, 16, 2, 2);
-        
+
         // Draw screen
         painter.setBrush(QBrush(Qt::black));
         painter.drawRect(4, 4, 12, 8);
-        
+
         // Draw keyboard area
         painter.setBrush(QBrush(baseColor.darker(120)));
         painter.drawRect(4, 13, 24, 4);
-        
+
         // Add text label
         painter.setPen(Qt::white);
         QFont font = painter.font();
@@ -969,10 +1317,10 @@ void MainWindow::createMediaPeripheralsDock()
         font.setBold(true);
         painter.setFont(font);
         painter.drawText(QRect(18, 4, 12, 8), Qt::AlignCenter, text);
-        
+
         return QIcon(pixmap);
     };
-    
+
     // Add machine items
     m_machineCombo->addItem(createMachineIcon(QColor(139, 69, 19), "400"), "Atari 400/800");
     m_machineCombo->addItem(createMachineIcon(QColor(169, 169, 169), "1200"), "Atari 1200XL");
@@ -984,41 +1332,41 @@ void MainWindow::createMediaPeripheralsDock()
     m_machineCombo->addItem(createMachineIcon(QColor(55, 55, 55), "1088"), "Atari 1088XE");
     m_machineCombo->addItem(createMachineIcon(QColor(128, 0, 128), "XEGS"), "Atari XEGS");
     m_machineCombo->addItem(createMachineIcon(QColor(70, 130, 180), "5200"), "Atari 5200");
-    
+
     m_machineCombo->setCurrentIndex(2); // Default to 800XL
-    connect(m_machineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
+    connect(m_machineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::onMachineTypeChanged);
-    
+
     machineControlsLayout->addWidget(m_machineCombo);
-    
+
     // Toggle switches container - BASIC, Video, and Speed side by side under machine selector
     QWidget* togglesContainer = new QWidget();
     QHBoxLayout* togglesLayout = new QHBoxLayout(togglesContainer);
     togglesLayout->setContentsMargins(0, 0, 0, 0);
     togglesLayout->setSpacing(6);
-    
+
     // Create BASIC toggle container
     QWidget* basicContainer = new QWidget();
     QHBoxLayout* basicLayout = new QHBoxLayout(basicContainer);
     basicLayout->setContentsMargins(0, 0, 0, 0);
     basicLayout->setSpacing(4);
-    
+
     QLabel* basicLabel = new QLabel("BASIC:");
     basicLabel->setMinimumWidth(35);
     m_basicToggle = new ToggleSwitch();
     m_basicToggle->setLabels("ON", "OFF");
     m_basicToggle->setChecked(m_emulator->isBasicEnabled());
     connect(m_basicToggle, &ToggleSwitch::toggled, this, &MainWindow::toggleBasic);
-    
+
     basicLayout->addWidget(basicLabel);
     basicLayout->addWidget(m_basicToggle);
-    
-    // Create video system toggle container  
+
+    // Create video system toggle container
     QWidget* videoContainer = new QWidget();
     QHBoxLayout* videoLayout = new QHBoxLayout(videoContainer);
     videoLayout->setContentsMargins(0, 0, 0, 0);
     videoLayout->setSpacing(4);
-    
+
     QLabel* videoLabel = new QLabel("Video:");
     videoLabel->setMinimumWidth(35);
     m_videoToggle = new ToggleSwitch();
@@ -1026,16 +1374,16 @@ void MainWindow::createMediaPeripheralsDock()
     m_videoToggle->setColors(QColor(70, 130, 180), QColor(70, 130, 180)); // Steel blue for both states
     m_videoToggle->setChecked(true); // Default to PAL (ON position)
     connect(m_videoToggle, &ToggleSwitch::toggled, this, &MainWindow::onVideoSystemToggled);
-    
+
     videoLayout->addWidget(videoLabel);
     videoLayout->addWidget(m_videoToggle);
-    
+
     // Create speed toggle container
     QWidget* speedContainer = new QWidget();
     QHBoxLayout* speedLayout = new QHBoxLayout(speedContainer);
     speedLayout->setContentsMargins(0, 0, 0, 0);
     speedLayout->setSpacing(4);
-    
+
     QLabel* speedLabel = new QLabel("Speed:");
     speedLabel->setMinimumWidth(35);
     m_speedToggle = new ToggleSwitch();
@@ -1043,22 +1391,26 @@ void MainWindow::createMediaPeripheralsDock()
     m_speedToggle->setColors(QColor(70, 130, 180), QColor(70, 130, 180)); // Steel blue for both states
     m_speedToggle->setChecked(false); // Default to Real speed (OFF position = authentic Atari speed)
     connect(m_speedToggle, &ToggleSwitch::toggled, this, &MainWindow::onSpeedToggled);
-    
+
     speedLayout->addWidget(speedLabel);
     speedLayout->addWidget(m_speedToggle);
-    
+
     // Add all three toggle switches to the container
     togglesLayout->addWidget(basicContainer);
     togglesLayout->addWidget(videoContainer);
     togglesLayout->addWidget(speedContainer);
-    
+
     machineControlsLayout->addWidget(togglesContainer);
-    
-    // Add to toolbar at the beginning (left side)
-    m_toolBar->insertWidget(m_toolBar->actions().first(), diskContainer);
-    m_toolBar->insertWidget(m_toolBar->actions().at(1), consoleButtonsContainer);
-    m_toolBar->insertWidget(m_toolBar->actions().at(2), machineControlsContainer);
+
+    // Add to toolbar with separators between each section
+    m_toolBar->insertWidget(m_toolBar->actions().first(), d1Container);
+    m_toolBar->insertSeparator(m_toolBar->actions().at(1));
+    m_toolBar->insertWidget(m_toolBar->actions().at(2), cartridgeContainer);
     m_toolBar->insertSeparator(m_toolBar->actions().at(3));
+    m_toolBar->insertWidget(m_toolBar->actions().at(4), consoleButtonsContainer);
+    m_toolBar->insertSeparator(m_toolBar->actions().at(5));
+    m_toolBar->insertWidget(m_toolBar->actions().at(6), machineControlsContainer);
+    m_toolBar->insertSeparator(m_toolBar->actions().at(7));
 }
 
 void MainWindow::toggleMediaDock()
@@ -1078,7 +1430,7 @@ void MainWindow::onDiskInserted(int driveNumber, const QString& diskPath)
     statusBar()->showMessage(QString("Disk mounted to D%1: %2 - Try typing DIR from BASIC")
                             .arg(driveNumber).arg(fileInfo.fileName()), 5000);
     qDebug() << "Disk inserted in drive" << driveNumber << ":" << diskPath;
-    
+
     // Save disk insertion to settings
     saveDiskToSettings(driveNumber, diskPath, false); // Assume not read-only for now
 }
@@ -1087,7 +1439,7 @@ void MainWindow::onDiskEjected(int driveNumber)
 {
     statusBar()->showMessage(QString("Disk ejected from D%1:").arg(driveNumber), 3000);
     qDebug() << "Disk ejected from drive" << driveNumber;
-    
+
     // Clear disk from settings
     clearDiskFromSettings(driveNumber);
 }
@@ -1097,7 +1449,7 @@ void MainWindow::onDriveStateChanged(int driveNumber, bool enabled)
     QString message = QString("Drive D%1: %2").arg(driveNumber).arg(enabled ? "On" : "Off");
     statusBar()->showMessage(message, 2000);
     qDebug() << "Drive" << driveNumber << "state changed to" << (enabled ? "on" : "off");
-    
+
     // Save drive state to settings
     saveDriveStateToSettings(driveNumber, enabled);
 }
@@ -1138,7 +1490,7 @@ void MainWindow::onCartridgeEjected()
 void MainWindow::loadInitialSettings()
 {
     QSettings settings("8bitrelics", "Fujisan");
-    
+
     // Load saved settings or use defaults
     QString machineType = settings.value("machine/type", "-xl").toString();
     QString videoSystem = settings.value("machine/videoSystem", "-pal").toString();
@@ -1146,7 +1498,7 @@ void MainWindow::loadInitialSettings()
     bool altirraOSEnabled = settings.value("machine/altirraOS", false).toBool();
     bool audioEnabled = settings.value("audio/enabled", true).toBool();
     QString artifactMode = settings.value("video/artifacting", "none").toString();
-    
+
     // Load display settings for initial setup
     QString horizontalArea = settings.value("video/horizontalArea", "tv").toString();
     QString verticalArea = settings.value("video/verticalArea", "tv").toString();
@@ -1155,17 +1507,17 @@ void MainWindow::loadInitialSettings()
     QString fitScreen = settings.value("video/fitScreen", "both").toString();
     bool show80Column = settings.value("video/show80Column", false).toBool();
     bool vSyncEnabled = settings.value("video/vSyncEnabled", false).toBool();
-    
-    qDebug() << "Loading initial settings - Machine:" << machineType 
+
+    qDebug() << "Loading initial settings - Machine:" << machineType
              << "Video:" << videoSystem << "BASIC:" << basicEnabled << "Artifacts:" << artifactMode;
-    
+
     // Load input settings for keyboard joystick emulation
     bool kbdJoy0Enabled = settings.value("input/kbdJoy0Enabled", true).toBool();  // Default true to match SDL default
     bool kbdJoy1Enabled = settings.value("input/kbdJoy1Enabled", false).toBool(); // Default false to match SDL default
     bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();   // Default false: Joy0=Numpad, Joy1=WASD
-    
+
     qDebug() << "Input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
-    
+
     // Initialize emulator with loaded settings including display and input options
     if (!m_emulator->initializeWithInputConfig(basicEnabled, machineType, videoSystem, artifactMode,
                                               horizontalArea, verticalArea, horizontalShift, verticalShift,
@@ -1175,24 +1527,24 @@ void MainWindow::loadInitialSettings()
         QApplication::quit();
         return;
     }
-    
+
     // Set additional settings
     m_emulator->setAltirraOSEnabled(altirraOSEnabled);
     m_emulator->enableAudio(audioEnabled);
-    
+
     // Load ROM paths
     QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
     QString osRomPath = settings.value(osRomKey, "").toString();
     QString basicRomPath = settings.value("machine/basicRom", "").toString();
-    
+
     m_emulator->setOSRomPath(osRomPath);
     m_emulator->setBasicRomPath(basicRomPath);
-    
+
     qDebug() << "ROM paths - OS:" << osRomPath << "BASIC:" << basicRomPath;
-    
+
     // Load and apply media settings (disk images, etc.)
     loadAndApplyMediaSettings();
-    
+
     // Update toolbar to reflect loaded settings
     updateToolbarFromSettings();
 }
@@ -1200,51 +1552,51 @@ void MainWindow::loadInitialSettings()
 void MainWindow::loadAndApplyMediaSettings()
 {
     QSettings settings("8bitrelics", "Fujisan");
-    
+
     qDebug() << "Loading and applying media settings...";
-    
+
     // Load and apply cartridge settings first (before disk images)
     bool cartridgeEnabled = settings.value("machine/cartridgeEnabled", false).toBool();
     QString cartridgePath = settings.value("machine/cartridgePath", "").toString();
-    
+
     if (cartridgeEnabled && !cartridgePath.isEmpty()) {
         qDebug() << "Auto-loading cartridge:" << cartridgePath;
-        
+
         if (m_emulator->loadFile(cartridgePath)) {
             qDebug() << "Successfully auto-loaded cartridge:" << cartridgePath;
         } else {
             qDebug() << "Failed to auto-load cartridge:" << cartridgePath;
         }
     }
-    
+
     // Load piggyback cartridge if enabled
     bool cartridge2Enabled = settings.value("machine/cartridge2Enabled", false).toBool();
     QString cartridge2Path = settings.value("machine/cartridge2Path", "").toString();
-    
+
     if (cartridge2Enabled && !cartridge2Path.isEmpty()) {
         qDebug() << "Auto-loading piggyback cartridge:" << cartridge2Path;
-        
+
         if (m_emulator->loadFile(cartridge2Path)) {
             qDebug() << "Successfully auto-loaded piggyback cartridge:" << cartridge2Path;
         } else {
             qDebug() << "Failed to auto-load piggyback cartridge:" << cartridge2Path;
         }
     }
-    
+
     // Load and mount disk images for D1-D8
     for (int i = 0; i < 8; i++) {
         QString diskKey = QString("media/disk%1").arg(i + 1);
         bool diskEnabled = settings.value(diskKey + "Enabled", false).toBool();
         QString diskPath = settings.value(diskKey + "Path", "").toString();
         bool diskReadOnly = settings.value(diskKey + "ReadOnly", false).toBool();
-        
+
         if (diskEnabled && !diskPath.isEmpty()) {
             qDebug() << QString("Auto-mounting D%1: %2 (read-only: %3)")
                         .arg(i + 1).arg(diskPath).arg(diskReadOnly);
-            
+
             if (m_emulator->mountDiskImage(i + 1, diskPath, diskReadOnly)) {
                 qDebug() << QString("Successfully auto-mounted D%1:").arg(i + 1);
-                
+
                 // Update the corresponding disk widget to reflect the mounted disk
                 if (i + 1 == 1 && m_diskDrive1) {
                     // D1 is on toolbar
@@ -1263,25 +1615,30 @@ void MainWindow::loadAndApplyMediaSettings()
             }
         }
     }
-    
+
+    // Update cartridge widget from emulator state
+    if (m_cartridgeWidget) {
+        m_cartridgeWidget->updateFromEmulator();
+    }
+
     // TODO: Load cassette settings
     bool cassetteEnabled = settings.value("media/cassetteEnabled", false).toBool();
     QString cassettePath = settings.value("media/cassettePath", "").toString();
     if (cassetteEnabled && !cassettePath.isEmpty()) {
         qDebug() << "Cassette auto-load not yet implemented";
     }
-    
-    // TODO: Load hard drive settings  
+
+    // TODO: Load hard drive settings
     for (int i = 0; i < 4; i++) {
         QString hdKey = QString("media/hd%1").arg(i + 1);
         bool hdEnabled = settings.value(hdKey + "Enabled", false).toBool();
         QString hdPath = settings.value(hdKey + "Path", "").toString();
-        
+
         if (hdEnabled && !hdPath.isEmpty()) {
             qDebug() << QString("H%1: hard drive auto-mount not yet implemented").arg(i + 1);
         }
     }
-    
+
     qDebug() << "Media settings loaded and applied";
 }
 
@@ -1289,12 +1646,12 @@ void MainWindow::saveDiskToSettings(int driveNumber, const QString& diskPath, bo
 {
     QSettings settings("8bitrelics", "Fujisan");
     QString diskKey = QString("media/disk%1").arg(driveNumber);
-    
+
     settings.setValue(diskKey + "Enabled", true);
     settings.setValue(diskKey + "Path", diskPath);
     settings.setValue(diskKey + "ReadOnly", readOnly);
     settings.sync();
-    
+
     qDebug() << QString("Saved D%1 to settings: %2 (read-only: %3)")
                 .arg(driveNumber).arg(diskPath).arg(readOnly);
 }
@@ -1303,12 +1660,12 @@ void MainWindow::clearDiskFromSettings(int driveNumber)
 {
     QSettings settings("8bitrelics", "Fujisan");
     QString diskKey = QString("media/disk%1").arg(driveNumber);
-    
+
     settings.setValue(diskKey + "Enabled", false);
     settings.setValue(diskKey + "Path", "");
     settings.setValue(diskKey + "ReadOnly", false);
     settings.sync();
-    
+
     qDebug() << QString("Cleared D%1 from settings").arg(driveNumber);
 }
 
@@ -1316,11 +1673,11 @@ void MainWindow::saveDriveStateToSettings(int driveNumber, bool enabled)
 {
     QSettings settings("8bitrelics", "Fujisan");
     QString diskKey = QString("media/disk%1").arg(driveNumber);
-    
+
     // Only update the enabled state, preserve existing path and read-only settings
     settings.setValue(diskKey + "Enabled", enabled);
     settings.sync();
-    
+
     qDebug() << QString("Saved D%1 state to settings: %2").arg(driveNumber).arg(enabled ? "enabled" : "disabled");
 }
 
@@ -1329,38 +1686,38 @@ void MainWindow::loadVideoSettings()
     QSettings settings("8bitrelics", "Fujisan");
     m_keepAspectRatio = settings.value("video/keepAspectRatio", true).toBool();
     m_startInFullscreen = settings.value("video/fullscreenMode", false).toBool();
-    
+
     // Apply fullscreen setting based on preference
     if (m_startInFullscreen && !m_isInCustomFullscreen) {
         enterCustomFullscreen();
     } else if (!m_startInFullscreen && m_isInCustomFullscreen) {
         exitCustomFullscreen();
     }
-    
-    qDebug() << "Video settings loaded - Keep aspect ratio:" << m_keepAspectRatio 
+
+    qDebug() << "Video settings loaded - Keep aspect ratio:" << m_keepAspectRatio
              << "Start fullscreen:" << m_startInFullscreen;
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
-    
+
     if (m_keepAspectRatio && m_emulatorWidget) {
         // Calculate the 4:3 aspect ratio constraints
         const double targetAspectRatio = 4.0 / 3.0;
-        
+
         // Get the current size of the central widget area (excluding toolbar/menubar)
         QSize currentSize = event->size();
         int toolbarHeight = m_toolBar->height();
         int menuHeight = menuBar()->height();
         int statusHeight = statusBar()->height();
-        
+
         int availableWidth = currentSize.width();
         int availableHeight = currentSize.height() - toolbarHeight - menuHeight - statusHeight;
-        
+
         // Calculate the optimal size maintaining 4:3 ratio
         int optimalWidth, optimalHeight;
-        
+
         if ((double)availableWidth / availableHeight > targetAspectRatio) {
             // Window is too wide, constrain by height
             optimalHeight = availableHeight;
@@ -1370,11 +1727,11 @@ void MainWindow::resizeEvent(QResizeEvent *event)
             optimalWidth = availableWidth;
             optimalHeight = (int)(optimalWidth / targetAspectRatio);
         }
-        
+
         // Calculate the total window size needed
         int totalWidth = optimalWidth;
         int totalHeight = optimalHeight + toolbarHeight + menuHeight + statusHeight;
-        
+
         // Only resize if the current size doesn't match our target
         QSize targetSize(totalWidth, totalHeight);
         if (event->size() != targetSize) {
@@ -1391,7 +1748,7 @@ bool MainWindow::eventFilter(QObject *object, QEvent *event)
 {
     if (object == m_fullscreenWidget && event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-        
+
         // Handle fullscreen toggle shortcut
 #ifdef Q_OS_MACOS
         if (keyEvent->modifiers() & Qt::ControlModifier && keyEvent->key() == Qt::Key_Return) {
@@ -1401,17 +1758,17 @@ bool MainWindow::eventFilter(QObject *object, QEvent *event)
             toggleFullscreen();
             return true;
         }
-        
+
         // Handle Escape key to exit fullscreen
         if (keyEvent->key() == Qt::Key_Escape) {
             exitCustomFullscreen();
             return true;
         }
-        
+
         // Let the fullscreen emulator widget handle all other keys normally
         // Don't intercept - let the event propagate naturally
     }
-    
+
     return QMainWindow::eventFilter(object, event);
 }
 
@@ -1431,15 +1788,15 @@ void MainWindow::pasteText()
     if (!m_emulator) {
         return;
     }
-    
+
     QClipboard* clipboard = QApplication::clipboard();
     QString text = clipboard->text();
-    
+
     if (text.isEmpty()) {
         qDebug() << "Clipboard is empty, nothing to paste";
         return;
     }
-    
+
     sendTextToEmulator(text);
 }
 
@@ -1448,26 +1805,26 @@ void MainWindow::sendTextToEmulator(const QString& text)
     if (!m_emulator || text.isEmpty()) {
         return;
     }
-    
+
     // Stop any existing paste operation
     if (m_pasteTimer->isActive()) {
         m_pasteTimer->stop();
         // Restore original speed if previous paste was interrupted
         m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
     }
-    
+
     // Store current emulation speed and boost it moderately for pasting
     m_originalEmulationSpeed = 100; // Assume 100% as default, could be made configurable
     m_emulator->setEmulationSpeed(200); // 2x speed for more reliable pasting
-    
+
     // Setup the paste buffer
     m_pasteBuffer = text;
     m_pasteIndex = 0;
     m_pasteCharacterSent = false;
-    
+
     // Start the timer to send characters
     m_pasteTimer->start();
-    
+
 }
 
 void MainWindow::sendNextCharacter()
@@ -1475,7 +1832,7 @@ void MainWindow::sendNextCharacter()
     if (!m_emulator) {
         return;
     }
-    
+
     if (!m_pasteCharacterSent) {
         // Check if we've finished all characters
         if (m_pasteIndex >= m_pasteBuffer.length()) {
@@ -1487,7 +1844,7 @@ void MainWindow::sendNextCharacter()
             m_pasteCharacterSent = false;
             return;
         }
-        
+
         // Send character
         QChar ch = m_pasteBuffer.at(m_pasteIndex);
         m_emulator->injectCharacter(ch.toLatin1());
@@ -1498,7 +1855,7 @@ void MainWindow::sendNextCharacter()
         m_pasteIndex++;
         m_pasteCharacterSent = false;
     }
-    
+
     // Allow some processing time
     QCoreApplication::processEvents();
 }
@@ -1509,7 +1866,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     if (m_isInCustomFullscreen) {
         exitCustomFullscreen();
     }
-    
+
     // Stop paste timer if running and restore speed
     if (m_pasteTimer && m_pasteTimer->isActive()) {
         m_pasteTimer->stop();
@@ -1517,9 +1874,83 @@ void MainWindow::closeEvent(QCloseEvent *event)
             m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
         }
     }
-    
+
     if (m_emulator) {
         m_emulator->shutdown();
     }
     event->accept();
+}
+
+void MainWindow::refreshProfileList()
+{
+    if (!m_profileCombo || !m_profileManager) return;
+
+    QString currentProfile = m_profileCombo->currentText();
+    m_profileCombo->clear();
+    
+    m_profileManager->refreshProfileList();
+    QStringList profiles = m_profileManager->getProfileNames();
+    m_profileCombo->addItems(profiles);
+    
+    // Restore selection if possible
+    if (!currentProfile.isEmpty()) {
+        int index = m_profileCombo->findText(currentProfile);
+        if (index >= 0) {
+            m_profileCombo->setCurrentIndex(index);
+        }
+    }
+    
+    // Select current profile if none selected
+    if (m_profileCombo->currentText().isEmpty()) {
+        QString currentProfileName = m_profileManager->getCurrentProfileName();
+        int index = m_profileCombo->findText(currentProfileName);
+        if (index >= 0) {
+            m_profileCombo->setCurrentIndex(index);
+        }
+    }
+}
+
+void MainWindow::onLoadProfile()
+{
+    if (!m_profileCombo || !m_profileManager) return;
+    
+    QString profileName = m_profileCombo->currentText();
+    if (profileName.isEmpty()) return;
+    
+    qDebug() << "Loading profile:" << profileName;
+    
+    ConfigurationProfile profile = m_profileManager->loadProfile(profileName);
+    if (profile.isValid()) {
+        // Apply profile to emulator
+        applyProfileToEmulator(profile);
+        
+        // Update current profile
+        m_profileManager->setCurrentProfileName(profileName);
+        
+        qDebug() << "Profile loaded successfully:" << profileName;
+    } else {
+        qWarning() << "Failed to load profile:" << profileName;
+    }
+}
+
+void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
+{
+    if (!m_emulator) return;
+    
+    // Apply machine configuration
+    m_emulator->setMachineType(profile.machineType);
+    m_emulator->setVideoSystem(profile.videoSystem);
+    m_emulator->setBasicEnabled(profile.basicEnabled);
+    
+    // Apply audio configuration
+    m_emulator->enableAudio(profile.audioEnabled);
+    m_emulator->setVolume(profile.audioVolume / 100.0);
+    
+    // Update UI to reflect changes
+    updateToolbarFromSettings();
+    
+    // Cold boot to apply machine configuration changes
+    coldBoot();
+    
+    qDebug() << "Applied profile to emulator and rebooted:" << profile.name;
 }

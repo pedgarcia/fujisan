@@ -1234,6 +1234,13 @@ void SettingsDialog::createInputConfigTab()
     m_kbdJoy1Enabled->setToolTip("Allow keyboard keys to emulate joystick 1");
     kbdJoyLayout->addWidget(m_kbdJoy1Enabled);
     
+    // Add some spacing
+    kbdJoyLayout->addSpacing(10);
+    
+    m_swapJoysticks = new QCheckBox("Swap joystick assignments (WASD becomes Joy0)");
+    m_swapJoysticks->setToolTip("When enabled: WASD controls Joy0, Numpad controls Joy1");
+    kbdJoyLayout->addWidget(m_swapJoysticks);
+    
     leftColumn->addWidget(kbdJoyGroup);
     leftColumn->addStretch();
     
@@ -2066,8 +2073,9 @@ void SettingsDialog::loadSettings()
     m_joystick2Hat->setChecked(settings.value("input/joystick2Hat", false).toBool());
     m_joystick3Hat->setChecked(settings.value("input/joystick3Hat", false).toBool());
     m_joyDistinct->setChecked(settings.value("input/joyDistinct", false).toBool());
-    m_kbdJoy0Enabled->setChecked(settings.value("input/kbdJoy0Enabled", false).toBool());
-    m_kbdJoy1Enabled->setChecked(settings.value("input/kbdJoy1Enabled", false).toBool());
+    m_kbdJoy0Enabled->setChecked(settings.value("input/kbdJoy0Enabled", true).toBool());  // Default true to match SDL default
+    m_kbdJoy1Enabled->setChecked(settings.value("input/kbdJoy1Enabled", false).toBool()); // Default false to match SDL default
+    m_swapJoysticks->setChecked(settings.value("input/swapJoysticks", false).toBool());   // Default false: Joy0=Numpad, Joy1=WASD
     m_grabMouse->setChecked(settings.value("input/grabMouse", false).toBool());
     m_mouseDevice->setText(settings.value("input/mouseDevice", "").toString());
     m_keyboardToggle->setChecked(settings.value("input/keyboardToggle", false).toBool());
@@ -2224,6 +2232,7 @@ void SettingsDialog::saveSettings()
     settings.setValue("input/joyDistinct", m_joyDistinct->isChecked());
     settings.setValue("input/kbdJoy0Enabled", m_kbdJoy0Enabled->isChecked());
     settings.setValue("input/kbdJoy1Enabled", m_kbdJoy1Enabled->isChecked());
+    settings.setValue("input/swapJoysticks", m_swapJoysticks->isChecked());
     settings.setValue("input/grabMouse", m_grabMouse->isChecked());
     settings.setValue("input/mouseDevice", m_mouseDevice->text());
     settings.setValue("input/keyboardToggle", m_keyboardToggle->isChecked());
@@ -2338,34 +2347,67 @@ void SettingsDialog::applyMediaSettings()
 
 void SettingsDialog::applySettings()
 {
+    // Check which settings require emulator restart vs live updates
+    bool needsRestart = false;
+    
+    // Check for changes that require emulator restart
+    if (m_machineTypeCombo->currentData().toString() != m_emulator->getMachineType() ||
+        m_videoSystemCombo->currentData().toString() != m_emulator->getVideoSystem() ||
+        m_basicEnabledCheck->isChecked() != m_emulator->isBasicEnabled() ||
+        m_altirraOSCheck->isChecked() != m_emulator->isAltirraOSEnabled()) {
+        needsRestart = true;
+    }
+    
+    // Apply joystick settings immediately (no restart needed)
+    if (m_emulator) {
+        bool joy0Enabled = m_kbdJoy0Enabled->isChecked();
+        bool joy1Enabled = m_kbdJoy1Enabled->isChecked();
+        bool swapped = m_swapJoysticks->isChecked();
+        
+        // Apply joystick settings directly for immediate effect
+        m_emulator->setKbdJoy0Enabled(joy0Enabled);
+        m_emulator->setKbdJoy1Enabled(joy1Enabled);
+        m_emulator->setJoysticksSwapped(swapped);
+        
+        qDebug() << "Applied joystick settings live - Joy0:" << joy0Enabled << "Joy1:" << joy1Enabled << "Swap:" << swapped;
+    }
+    
     saveSettings();
     
-    // Restart emulator with new settings
-    m_emulator->shutdown();
-    
-    // Get artifact settings from UI
-    QString artifactMode = m_artifactingMode->currentData().toString();
-    
-    if (m_emulator->initializeWithConfig(m_emulator->isBasicEnabled(), 
-                                       m_emulator->getMachineType(), 
-                                       m_emulator->getVideoSystem(),
-                                       artifactMode)) {
-        qDebug() << "Emulator restarted with new settings";
+    if (needsRestart) {
+        // Full restart needed for machine/video/OS settings
+        m_emulator->shutdown();
         
-        // Reapply media settings after restart
-        applyMediaSettings();
+        // Get artifact settings from UI
+        QString artifactMode = m_artifactingMode->currentData().toString();
         
-        // Apply speed setting
-        if (m_emulator) {
-            int speedIndex = m_speedSlider->value();
-            int percentage = (speedIndex == 0) ? 50 : speedIndex * 100; // 0.5x = 50%, others = index * 100
-            m_emulator->setEmulationSpeed(percentage);
+        if (m_emulator->initializeWithInputConfig(
+                m_emulator->isBasicEnabled(), 
+                m_emulator->getMachineType(), 
+                m_emulator->getVideoSystem(),
+                artifactMode,
+                "tv", "tv", 0, 0, "both", false, false,
+                m_kbdJoy0Enabled->isChecked(),
+                m_kbdJoy1Enabled->isChecked(),
+                m_swapJoysticks->isChecked())) {
+            qDebug() << "Emulator restarted with new settings";
+            
+            // Reapply media settings after restart
+            applyMediaSettings();
+        } else {
+            qDebug() << "Failed to restart emulator with new settings";
+            return;
         }
-        
-        emit settingsChanged();
-    } else {
-        qDebug() << "Failed to restart emulator with new settings";
     }
+    
+    // Apply speed setting (can be applied live)
+    if (m_emulator) {
+        int speedIndex = m_speedSlider->value();
+        int percentage = (speedIndex == 0) ? 50 : speedIndex * 100; // 0.5x = 50%, others = index * 100
+        m_emulator->setEmulationSpeed(percentage);
+    }
+    
+    emit settingsChanged();
 }
 
 void SettingsDialog::accept()
@@ -2504,8 +2546,9 @@ void SettingsDialog::restoreDefaults()
     m_joystick2Hat->setChecked(false);
     m_joystick3Hat->setChecked(false);
     m_joyDistinct->setChecked(false);
-    m_kbdJoy0Enabled->setChecked(false);
-    m_kbdJoy1Enabled->setChecked(false);
+    m_kbdJoy0Enabled->setChecked(true);  // Default true to match SDL default
+    m_kbdJoy1Enabled->setChecked(false); // Default false to match SDL default
+    m_swapJoysticks->setChecked(false);  // Default false: Joy0=Numpad, Joy1=WASD
     m_grabMouse->setChecked(false);
     m_mouseDevice->clear();
     m_keyboardToggle->setChecked(false);
@@ -2661,6 +2704,7 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.joyDistinct = m_joyDistinct->isChecked();
     profile.kbdJoy0Enabled = m_kbdJoy0Enabled->isChecked();
     profile.kbdJoy1Enabled = m_kbdJoy1Enabled->isChecked();
+    profile.swapJoysticks = m_swapJoysticks->isChecked();
     profile.grabMouse = m_grabMouse->isChecked();
     profile.mouseDevice = m_mouseDevice->text();
     profile.keyboardToggle = m_keyboardToggle->isChecked();
@@ -2878,6 +2922,7 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_joyDistinct->setChecked(profile.joyDistinct);
     m_kbdJoy0Enabled->setChecked(profile.kbdJoy0Enabled);
     m_kbdJoy1Enabled->setChecked(profile.kbdJoy1Enabled);
+    m_swapJoysticks->setChecked(profile.swapJoysticks);
     m_grabMouse->setChecked(profile.grabMouse);
     m_mouseDevice->setText(profile.mouseDevice);
     m_keyboardToggle->setChecked(profile.keyboardToggle);

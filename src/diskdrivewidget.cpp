@@ -1,7 +1,7 @@
 /*
  * Fujisan - Modern Atari Emulator
  * Copyright (c) 2025 Paulo Garcia (8bitrelics.com)
- * 
+ *
  * Licensed under the MIT License. See LICENSE file for details.
  */
 
@@ -39,19 +39,19 @@ DiskDriveWidget::DiskDriveWidget(int driveNumber, AtariEmulator* emulator, QWidg
     setupUI();
     loadImages();
     createContextMenu();
-    
+
     // Enable drag and drop
     setAcceptDrops(true);
-    
+
     // Setup blinking timer
     m_blinkTimer->setInterval(BLINK_INTERVAL);
     connect(m_blinkTimer, &QTimer::timeout, this, &DiskDriveWidget::onBlinkTimer);
-    
+
     // Setup LED debounce timer (750ms delay)
     m_ledDebounceTimer->setSingleShot(true);
     m_ledDebounceTimer->setInterval(750);
     connect(m_ledDebounceTimer, &QTimer::timeout, this, &DiskDriveWidget::onLedDebounceTimeout);
-    
+
     // Initial state - explicitly set drive as disabled (off) and force display update
     m_driveEnabled = false;
     setState(Off);
@@ -66,7 +66,7 @@ void DiskDriveWidget::setupUI()
     int margin;
     if (m_isDrawerDrive) {
         // Dock drives (D2-D8) - full size but slightly shorter
-        width = DISK_WIDTH;   
+        width = DISK_WIDTH * 0.85;
         height = DISK_HEIGHT * 0.84; // Dock drives slightly shorter
         margin = 0; // No extra margin for dock drives
     } else {
@@ -77,33 +77,33 @@ void DiskDriveWidget::setupUI()
         width = imageWidth + (margin * 2);    // 85px total width
         height = imageHeight + (margin * 2);  // 60px total height
     }
-    
+
     setFixedSize(width, height);
     setContextMenuPolicy(Qt::DefaultContextMenu);
-    
+
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->setContentsMargins(margin, margin, margin, margin);
     layout->setSpacing(0);
-    
+
     m_imageLabel = new QLabel(this);
     m_imageLabel->setAlignment(Qt::AlignCenter);
     m_imageLabel->setScaledContents(true);
     m_imageLabel->setContentsMargins(0, 0, 0, 0);  // No margins on the image label
     layout->addWidget(m_imageLabel);
-    
+
 }
 
 void DiskDriveWidget::loadImages()
 {
-    // Try multiple paths to find the images
+    // Try multiple relative paths to find the images
     QStringList imagePaths = {
-        "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/images/",
-        QApplication::applicationDirPath() + "/../fujisan/images/",
+        "./images/",
+        "../images/",
         QApplication::applicationDirPath() + "/images/",
-        ":/images/",
-        "./images/"
+        QApplication::applicationDirPath() + "/../images/",
+        ":/images/"
     };
-    
+
     for (const QString& path : imagePaths) {
         QString offPath = path + "atari810off.png";
         if (QFileInfo::exists(offPath)) {
@@ -113,15 +113,15 @@ void DiskDriveWidget::loadImages()
             success &= m_closedImage.load(path + "atari810closed.png");
             success &= m_readImage.load(path + "atari810read.png");
             success &= m_writeImage.load(path + "atari810write.png");
-            
+
             if (success) {
                 return;
             } else {
             }
         }
     }
-    
-    
+
+
     // Create fallback placeholder images if loading fails
     if (m_offImage.isNull()) {
         m_offImage = QPixmap(72, 48);
@@ -132,17 +132,17 @@ void DiskDriveWidget::loadImages()
 void DiskDriveWidget::createContextMenu()
 {
     m_contextMenu = new QMenu(this);
-    
+
     m_toggleAction = new QAction(this);
     connect(m_toggleAction, &QAction::triggered, this, &DiskDriveWidget::onToggleDrive);
     m_contextMenu->addAction(m_toggleAction);
-    
+
     m_contextMenu->addSeparator();
-    
+
     m_insertAction = new QAction("Insert Disk Image...", this);
     connect(m_insertAction, &QAction::triggered, this, &DiskDriveWidget::onInsertDisk);
     m_contextMenu->addAction(m_insertAction);
-    
+
     m_ejectAction = new QAction("Eject", this);
     connect(m_ejectAction, &QAction::triggered, this, &DiskDriveWidget::onEjectDisk);
     m_contextMenu->addAction(m_ejectAction);
@@ -184,14 +184,14 @@ void DiskDriveWidget::setDriveEnabled(bool enabled)
 {
     if (m_driveEnabled != enabled) {
         m_driveEnabled = enabled;
-        
+
         // Update state based on whether we have a disk or not
         if (enabled) {
             setState(hasDisk() ? Closed : Empty);
         } else {
             setState(Off);
         }
-        
+
         emit driveStateChanged(m_driveNumber, enabled);
     }
 }
@@ -215,7 +215,7 @@ void DiskDriveWidget::turnOnReadLED()
     if (m_currentState == Closed || m_currentState == Empty || m_currentState == Writing) {
         // Cancel any pending LED off timer
         m_ledDebounceTimer->stop();
-        
+
         stopBlinking();
         m_currentState = Reading;
         updateDisplay();
@@ -227,7 +227,7 @@ void DiskDriveWidget::turnOnWriteLED()
     if (m_currentState == Closed || m_currentState == Empty || m_currentState == Reading) {
         // Cancel any pending LED off timer
         m_ledDebounceTimer->stop();
-        
+
         stopBlinking();
         m_currentState = Writing;
         updateDisplay();
@@ -246,10 +246,10 @@ void DiskDriveWidget::turnOffActivityLED()
 void DiskDriveWidget::updateFromEmulator()
 {
     if (!m_emulator) return;
-    
+
     // Get current disk image path from emulator
     QString currentPath = m_emulator->getDiskImagePath(m_driveNumber);
-    
+
     if (!currentPath.isEmpty() && currentPath != m_diskPath) {
         m_diskPath = currentPath;
         if (m_driveEnabled) {
@@ -259,14 +259,14 @@ void DiskDriveWidget::updateFromEmulator()
         m_diskPath.clear();
         setState(m_driveEnabled ? Empty : Off);
     }
-    
+
     updateTooltip();
 }
 
 void DiskDriveWidget::updateDisplay()
 {
     if (!m_imageLabel) return;
-    
+
     QPixmap currentImage;
     QString imageName;
     switch (m_currentState) {
@@ -291,7 +291,7 @@ void DiskDriveWidget::updateDisplay()
             imageName = "atari810write.png";
             break;
     }
-    
+
     // Always display something, even if the image is null
     if (!currentImage.isNull()) {
         // Scale image to fit widget while maintaining aspect ratio
@@ -302,7 +302,7 @@ void DiskDriveWidget::updateDisplay()
                            (m_currentState == Empty) ? "EMPTY" :
                            (m_currentState == Closed) ? "CLOSED" :
                            (m_currentState == Reading) ? "READING" : "WRITING";
-        
+
     } else {
         // Create a placeholder if image is missing
         QPixmap placeholder(size());
@@ -310,9 +310,9 @@ void DiskDriveWidget::updateDisplay()
         QPainter painter(&placeholder);
         painter.setPen(Qt::black);
         painter.drawText(placeholder.rect(), Qt::AlignCenter, QString("D%1\n%2").arg(m_driveNumber).arg(
-            m_currentState == Off ? "OFF" : 
+            m_currentState == Off ? "OFF" :
             m_currentState == Empty ? "EMPTY" :
-            m_currentState == Closed ? "CLOSED" : 
+            m_currentState == Closed ? "CLOSED" :
             m_currentState == Reading ? "READ" : "WRITE"));
         m_imageLabel->setPixmap(placeholder);
     }
@@ -321,7 +321,7 @@ void DiskDriveWidget::updateDisplay()
 void DiskDriveWidget::updateTooltip()
 {
     QString tooltip = QString("Drive D%1:").arg(m_driveNumber);
-    
+
     switch (m_currentState) {
         case Off:
             tooltip += " Off";
@@ -340,7 +340,7 @@ void DiskDriveWidget::updateTooltip()
             }
             break;
     }
-    
+
     setToolTip(tooltip);
 }
 
@@ -380,10 +380,10 @@ void DiskDriveWidget::contextMenuEvent(QContextMenuEvent* event)
     } else {
         m_toggleAction->setText("Turn On");
     }
-    
+
     m_insertAction->setEnabled(m_driveEnabled);
     m_ejectAction->setEnabled(m_driveEnabled && hasDisk());
-    
+
     m_contextMenu->exec(event->globalPos());
 }
 
@@ -409,7 +409,7 @@ void DiskDriveWidget::dragEnterEvent(QDragEnterEvent* event)
         event->ignore();
         return;
     }
-    
+
     // Check if we have file URLs
     if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
@@ -432,7 +432,7 @@ void DiskDriveWidget::dragMoveEvent(QDragMoveEvent* event)
         event->ignore();
         return;
     }
-    
+
     if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
         if (urls.size() == 1) {
@@ -457,13 +457,13 @@ void DiskDriveWidget::dropEvent(QDropEvent* event)
 {
     // Clear visual feedback
     setStyleSheet("");
-    
+
     // Only accept if drive is enabled
     if (!m_driveEnabled) {
         event->ignore();
         return;
     }
-    
+
     if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
         if (urls.size() == 1) {
@@ -482,10 +482,10 @@ bool DiskDriveWidget::isValidDiskFile(const QString& fileName) const
 {
     QFileInfo fileInfo(fileName);
     QString extension = fileInfo.suffix().toLower();
-    
+
     // Valid Atari disk image extensions
     QStringList validExtensions = {"atr", "xfd", "dcm"};
-    
+
     return validExtensions.contains(extension);
 }
 
@@ -497,14 +497,14 @@ void DiskDriveWidget::onToggleDrive()
 void DiskDriveWidget::onInsertDisk()
 {
     if (!m_driveEnabled) return;
-    
+
     QString fileName = QFileDialog::getOpenFileName(
         this,
         QString("Select Disk Image for Drive D%1:").arg(m_driveNumber),
         QString(),
         "Atari Disk Images (*.atr *.ATR *.xfd *.XFD *.dcm *.DCM);;All Files (*)"
     );
-    
+
     if (!fileName.isEmpty()) {
         insertDisk(fileName);
     }
@@ -520,15 +520,15 @@ void DiskDriveWidget::onEjectDisk()
 void DiskDriveWidget::onBlinkTimer()
 {
     m_blinkVisible = !m_blinkVisible;
-    
+
     if (m_blinkVisible) {
         m_currentState = m_blinkState;
     } else {
         m_currentState = m_baseState;
     }
-    
+
     updateDisplay();
-    
+
     // Stop blinking after a reasonable time (2 seconds)
     static int blinkCount = 0;
     if (++blinkCount >= (2000 / BLINK_INTERVAL)) {

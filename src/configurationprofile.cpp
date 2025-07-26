@@ -105,6 +105,7 @@ QJsonObject ConfigurationProfile::toJson() const {
     inputConfig["joyDistinct"] = joyDistinct;
     inputConfig["kbdJoy0Enabled"] = kbdJoy0Enabled;
     inputConfig["kbdJoy1Enabled"] = kbdJoy1Enabled;
+    inputConfig["swapJoysticks"] = swapJoysticks;
     inputConfig["grabMouse"] = grabMouse;
     inputConfig["mouseDevice"] = mouseDevice;
     inputConfig["keyboardToggle"] = keyboardToggle;
@@ -281,6 +282,7 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
         joyDistinct = inputConfig["joyDistinct"].toBool(false);
         kbdJoy0Enabled = inputConfig["kbdJoy0Enabled"].toBool(false);
         kbdJoy1Enabled = inputConfig["kbdJoy1Enabled"].toBool(false);
+        swapJoysticks = inputConfig["swapJoysticks"].toBool(false);
         grabMouse = inputConfig["grabMouse"].toBool(false);
         mouseDevice = inputConfig["mouseDevice"].toString();
         keyboardToggle = inputConfig["keyboardToggle"].toBool(false);

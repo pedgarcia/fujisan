@@ -61,13 +61,13 @@ void CassetteWidget::setupUI()
 
 void CassetteWidget::loadImages()
 {
-    // Try multiple paths to find the images
+    // Try multiple relative paths to find the images
     QStringList imagePaths = {
-        "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/images/",
-        QApplication::applicationDirPath() + "/../fujisan/images/",
+        "./images/",
+        "../images/",
         QApplication::applicationDirPath() + "/images/",
-        ":/images/",
-        "./images/"
+        QApplication::applicationDirPath() + "/../images/",
+        ":/images/"
     };
     
     for (const QString& path : imagePaths) {

@@ -7,7 +7,8 @@
 
 #include "mediaperipheralsdock.h"
 #include "atariemulator.h"
-#include <QScrollArea>
+#include <QPushButton>
+#include <QStyle>
 
 MediaPeripheralsDock::MediaPeripheralsDock(AtariEmulator* emulator, QWidget* parent)
     : QWidget(parent)
@@ -17,8 +18,10 @@ MediaPeripheralsDock::MediaPeripheralsDock(AtariEmulator* emulator, QWidget* par
     , m_cassetteGroup(nullptr)
     , m_diskDrivesGroup(nullptr)
     , m_printerGroup(nullptr)
-    , m_driveScrollArea(nullptr)
-    , m_driveScrollWidget(nullptr)
+    , m_driveContainer(nullptr)
+    , m_driveButtonsLayout(nullptr)
+    , m_addDriveButton(nullptr)
+    , m_removeDriveButton(nullptr)
     , m_cartridgeWidget(nullptr)
     , m_cassetteWidget(nullptr)
     , m_printerWidget(nullptr)
@@ -27,6 +30,9 @@ MediaPeripheralsDock::MediaPeripheralsDock(AtariEmulator* emulator, QWidget* par
     for (int i = 0; i < 7; i++) {
         m_driveWidgets[i] = nullptr;
     }
+    
+    // Start with 3 visible drives (D2-D4)
+    m_visibleDrives = 3;
     
     setupUI();
     connectSignals();
@@ -39,9 +45,9 @@ void MediaPeripheralsDock::setupUI()
     m_mainLayout->setContentsMargins(4, 4, 4, 4);
     m_mainLayout->setSpacing(SECTION_SPACING);
     
-    // New order: Drives first, then Cartridge, then Cassette, then Printer
+    // New order: Drives first, then Cassette, then Printer (Cartridge moved to toolbar)
     createDiskDrivesSection();
-    createCartridgeSection();
+    // createCartridgeSection(); // Cartridge moved to main toolbar
     createCassetteSection();
     createPrinterSection();
     
@@ -51,14 +57,9 @@ void MediaPeripheralsDock::setupUI()
 
 void MediaPeripheralsDock::createCartridgeSection()
 {
-    m_cartridgeGroup = new QGroupBox("Cartridge", this);
-    QVBoxLayout* cartridgeLayout = new QVBoxLayout(m_cartridgeGroup);
-    cartridgeLayout->setContentsMargins(WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING);
-    
-    m_cartridgeWidget = new CartridgeWidget(m_emulator, this);
-    cartridgeLayout->addWidget(m_cartridgeWidget, 0, Qt::AlignCenter);
-    
-    m_mainLayout->addWidget(m_cartridgeGroup);
+    // Cartridge section moved to main toolbar
+    m_cartridgeWidget = nullptr; // Cartridge is now on main toolbar
+    m_cartridgeGroup = nullptr;  // No cartridge group in dock anymore
 }
 
 void MediaPeripheralsDock::createCassetteSection()
@@ -77,23 +78,16 @@ void MediaPeripheralsDock::createDiskDrivesSection()
 {
     m_diskDrivesGroup = new QGroupBox("Disk Drives", this);
     QVBoxLayout* diskGroupLayout = new QVBoxLayout(m_diskDrivesGroup);
-    diskGroupLayout->setContentsMargins(WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING);
-    diskGroupLayout->setSpacing(0);
+    diskGroupLayout->setContentsMargins(WIDGET_SPACING, 2, WIDGET_SPACING, WIDGET_SPACING); // Reduced top margin
+    diskGroupLayout->setSpacing(WIDGET_SPACING);
     
-    // Create scroll area for drives
-    m_driveScrollArea = new QScrollArea(m_diskDrivesGroup);
-    m_driveScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_driveScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    m_driveScrollArea->setWidgetResizable(true);
-    m_driveScrollArea->setFrameStyle(QFrame::NoFrame);
+    // Create container for drives
+    m_driveContainer = new QWidget();
+    QVBoxLayout* driveLayout = new QVBoxLayout(m_driveContainer);
+    driveLayout->setContentsMargins(0, 0, 0, 0);
+    driveLayout->setSpacing(WIDGET_SPACING);
     
-    // Create the scroll widget that will contain all drives
-    m_driveScrollWidget = new QWidget();
-    QVBoxLayout* scrollLayout = new QVBoxLayout(m_driveScrollWidget);
-    scrollLayout->setContentsMargins(0, 0, 0, 0);
-    scrollLayout->setSpacing(WIDGET_SPACING);
-    
-    // Create drives D2-D8 in the scrollable area
+    // Create all drives D2-D8
     for (int i = 0; i < 7; i++) {
         int driveNumber = i + 2; // D2-D8
         
@@ -105,19 +99,44 @@ void MediaPeripheralsDock::createDiskDrivesSection()
         driveContainerLayout->setContentsMargins(0, 0, 0, 0);
         driveContainerLayout->addWidget(m_driveWidgets[i], 0, Qt::AlignCenter);
         
-        scrollLayout->addWidget(driveContainer);
+        driveLayout->addWidget(driveContainer);
+        
+        // Initially hide drives D5-D8 (indices 3-6)
+        if (i >= 3) {
+            driveContainer->setVisible(false);
+        }
     }
     
-    // Set the scroll widget to the scroll area
-    m_driveScrollArea->setWidget(m_driveScrollWidget);
+    diskGroupLayout->addWidget(m_driveContainer);
     
-    // Calculate height for 4 drives (D2-D5 visible by default)
-    // Each drive is approximately 52 pixels (84% of original 62px height) + spacing
-    int singleDriveHeight = static_cast<int>(62 * 0.84) + WIDGET_SPACING;
-    int visibleDrivesHeight = 4 * singleDriveHeight + WIDGET_SPACING; // 4 drives + extra padding
-    m_driveScrollArea->setFixedHeight(visibleDrivesHeight);
+    // Create +/- buttons
+    QWidget* buttonContainer = new QWidget();
+    m_driveButtonsLayout = new QHBoxLayout(buttonContainer);
+    m_driveButtonsLayout->setContentsMargins(0, 0, 0, 0);
+    m_driveButtonsLayout->setSpacing(5);
     
-    diskGroupLayout->addWidget(m_driveScrollArea);
+    m_addDriveButton = new QPushButton("+", this);
+    m_addDriveButton->setFixedSize(32, 24);
+    m_addDriveButton->setStyleSheet("font-size: 14px; font-weight: bold;");
+    m_addDriveButton->setToolTip("Add drive");
+    
+    m_removeDriveButton = new QPushButton("−", this);
+    m_removeDriveButton->setFixedSize(32, 24);
+    m_removeDriveButton->setStyleSheet("font-size: 14px; font-weight: bold;");
+    m_removeDriveButton->setToolTip("Remove drive");
+    m_removeDriveButton->setEnabled(false); // Initially disabled
+    
+    m_driveButtonsLayout->addStretch();
+    m_driveButtonsLayout->addWidget(m_addDriveButton);
+    m_driveButtonsLayout->addWidget(m_removeDriveButton);
+    m_driveButtonsLayout->addStretch();
+    
+    diskGroupLayout->addWidget(buttonContainer);
+    
+    // Connect button signals
+    connect(m_addDriveButton, &QPushButton::clicked, this, &MediaPeripheralsDock::onAddDrive);
+    connect(m_removeDriveButton, &QPushButton::clicked, this, &MediaPeripheralsDock::onRemoveDrive);
+    
     m_mainLayout->addWidget(m_diskDrivesGroup);
 }
 
@@ -138,11 +157,11 @@ void MediaPeripheralsDock::createPrinterSection()
 
 void MediaPeripheralsDock::connectSignals()
 {
-    // Connect cartridge signals
-    connect(m_cartridgeWidget, &CartridgeWidget::cartridgeInserted,
-            this, &MediaPeripheralsDock::onCartridgeInserted);
-    connect(m_cartridgeWidget, &CartridgeWidget::cartridgeEjected,
-            this, &MediaPeripheralsDock::onCartridgeEjected);
+    // Cartridge signals now handled by main toolbar cartridge widget
+    // connect(m_cartridgeWidget, &CartridgeWidget::cartridgeInserted,
+    //         this, &MediaPeripheralsDock::onCartridgeInserted);
+    // connect(m_cartridgeWidget, &CartridgeWidget::cartridgeEjected,
+    //         this, &MediaPeripheralsDock::onCartridgeEjected);
     
     // Connect cassette signals
     connect(m_cassetteWidget, &CassetteWidget::cassetteInserted,
@@ -232,4 +251,37 @@ void MediaPeripheralsDock::onCartridgeInserted(const QString& cartridgePath)
 void MediaPeripheralsDock::onCartridgeEjected()
 {
     emit cartridgeEjected();
+}
+
+void MediaPeripheralsDock::onAddDrive()
+{
+    if (m_visibleDrives < 7) {
+        // Show the next drive (D5-D8)
+        int driveIndex = m_visibleDrives; // Current number of visible drives = index of next drive
+        if (m_driveWidgets[driveIndex]) {
+            m_driveWidgets[driveIndex]->parentWidget()->setVisible(true);
+            m_visibleDrives++;
+            updateDriveButtonStates();
+        }
+    }
+}
+
+void MediaPeripheralsDock::onRemoveDrive()
+{
+    if (m_visibleDrives > 3) {
+        // Hide the last drive (D8 down to D5)
+        int driveIndex = m_visibleDrives - 1; // Index of last visible drive
+        if (m_driveWidgets[driveIndex]) {
+            m_driveWidgets[driveIndex]->parentWidget()->setVisible(false);
+            m_visibleDrives--;
+            updateDriveButtonStates();
+        }
+    }
+}
+
+void MediaPeripheralsDock::updateDriveButtonStates()
+{
+    // Enable/disable buttons based on current state
+    m_addDriveButton->setEnabled(m_visibleDrives < 7);    // Can add if less than 7 drives visible
+    m_removeDriveButton->setEnabled(m_visibleDrives > 3); // Can remove if more than 3 drives visible
 }

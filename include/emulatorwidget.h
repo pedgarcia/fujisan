@@ -13,6 +13,10 @@
 #include <QKeyEvent>
 #include <QTimer>
 #include <QImage>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDragLeaveEvent>
+#include <QDropEvent>
 #include "atariemulator.h"
 
 class EmulatorWidget : public QWidget
@@ -30,6 +34,10 @@ protected:
     void keyReleaseEvent(QKeyEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
 private slots:
     void updateDisplay();
@@ -37,6 +45,7 @@ private slots:
 private:
     void updateScreenTexture();
     QRect calculateDisplayRect() const;
+    bool isValidExecutableFile(const QString& fileName) const;
     
     AtariEmulator* m_emulator;
     QImage m_screenImage;

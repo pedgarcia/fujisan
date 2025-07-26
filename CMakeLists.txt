@@ -49,6 +49,8 @@ set(SOURCES
     src/diskdrawerwidget.cpp
     src/cassettewidget.cpp
     src/cartridgewidget.cpp
+    src/joystickswapwidget.cpp
+    src/volumeknob.cpp
     src/mediaperipheralsdock.cpp
 )
 
@@ -66,6 +68,8 @@ set(HEADERS
     include/diskdrawerwidget.h
     include/cassettewidget.h
     include/cartridgewidget.h
+    include/joystickswapwidget.h
+    include/volumeknob.h
     include/mediaperipheralsdock.h
 )
 

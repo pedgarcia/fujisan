@@ -9,6 +9,13 @@
 #include <QPainter>
 #include <QDebug>
 #include <QMouseEvent>
+#include <QMimeData>
+#include <QUrl>
+#include <QFileInfo>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDragLeaveEvent>
+#include <QDropEvent>
 
 extern "C" {
     extern int Colours_table[256];
@@ -24,6 +31,9 @@ EmulatorWidget::EmulatorWidget(QWidget *parent)
     
     // Allow the widget to expand to fill all available space
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    
+    // Enable drag and drop for XEX files
+    setAcceptDrops(true);
     
     // Fill with black initially
     m_screenImage.fill(Qt::black);
@@ -180,4 +190,83 @@ QRect EmulatorWidget::calculateDisplayRect() const
     const int y = (widgetHeight - displayHeight) / 2;
     
     return QRect(x, y, displayWidth, displayHeight);
+}
+
+void EmulatorWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    // Check if we have file URLs
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidExecutableFile(fileName)) {
+                event->acceptProposedAction();
+                setStyleSheet("QWidget { border: 3px dashed #FFD700; background-color: rgba(255, 215, 0, 0.1); }");
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void EmulatorWidget::dragMoveEvent(QDragMoveEvent* event)
+{
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidExecutableFile(fileName)) {
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void EmulatorWidget::dragLeaveEvent(QDragLeaveEvent* event)
+{
+    // Clear visual feedback when drag leaves the widget
+    setStyleSheet("");
+    QWidget::dragLeaveEvent(event);
+}
+
+void EmulatorWidget::dropEvent(QDropEvent* event)
+{
+    // Clear visual feedback
+    setStyleSheet("");
+    
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString fileName = urls.first().toLocalFile();
+            if (isValidExecutableFile(fileName) && m_emulator) {
+                qDebug() << "Loading executable file:" << fileName;
+                bool success = m_emulator->loadFile(fileName);
+                if (success) {
+                    qDebug() << "Successfully loaded and executed:" << fileName;
+                    // Emit signal to parent window for status update
+                    QFileInfo fileInfo(fileName);
+                    // Note: We could emit a signal here if we want to show status in the main window
+                    // For now, the debug output and emulator state change is sufficient
+                } else {
+                    qDebug() << "Failed to load executable:" << fileName;
+                }
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+bool EmulatorWidget::isValidExecutableFile(const QString& fileName) const
+{
+    QFileInfo fileInfo(fileName);
+    QString extension = fileInfo.suffix().toLower();
+    
+    // Valid Atari executable extensions
+    QStringList validExtensions = {"xex", "exe", "com"};
+    
+    return validExtensions.contains(extension);
 }

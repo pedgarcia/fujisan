@@ -1,7 +1,7 @@
 /*
  * Fujisan - Modern Atari Emulator
  * Copyright (c) 2025 Paulo Garcia (8bitrelics.com)
- * 
+ *
  * Licensed under the MIT License. See LICENSE file for details.
  */
 
@@ -15,7 +15,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QFrame>
-#include <QScrollArea>
+#include <QPushButton>
 #include "diskdrivewidget.h"
 #include "cassettewidget.h"
 #include "cartridgewidget.h"
@@ -28,12 +28,12 @@ class MediaPeripheralsDock : public QWidget
 
 public:
     explicit MediaPeripheralsDock(AtariEmulator* emulator, QWidget* parent = nullptr);
-    
+
     // Get specific widgets
     DiskDriveWidget* getDriveWidget(int driveNumber);
     CassetteWidget* getCassetteWidget() { return m_cassetteWidget; }
     CartridgeWidget* getCartridgeWidget() { return m_cartridgeWidget; }
-    
+
     // Update all devices from emulator state
     void updateAllDevices();
 
@@ -56,6 +56,8 @@ private slots:
     void onCassetteStateChanged(bool enabled);
     void onCartridgeInserted(const QString& cartridgePath);
     void onCartridgeEjected();
+    void onAddDrive();
+    void onRemoveDrive();
 
 private:
     void setupUI();
@@ -64,28 +66,34 @@ private:
     void createDiskDrivesSection();
     void createPrinterSection();
     void connectSignals();
-    
+    void updateDriveButtonStates();
+
     AtariEmulator* m_emulator;
-    
+
     // Main layout
     QVBoxLayout* m_mainLayout;
-    
+
     // Device sections
     QGroupBox* m_cartridgeGroup;
     QGroupBox* m_cassetteGroup;
     QGroupBox* m_diskDrivesGroup;
     QGroupBox* m_printerGroup;
-    
-    // Scrollable drive section components
-    QScrollArea* m_driveScrollArea;
-    QWidget* m_driveScrollWidget;
-    
+
+    // Dynamic drive section components
+    QWidget* m_driveContainer;
+    QHBoxLayout* m_driveButtonsLayout;
+    QPushButton* m_addDriveButton;
+    QPushButton* m_removeDriveButton;
+
     // Device widgets
     CartridgeWidget* m_cartridgeWidget;
     CassetteWidget* m_cassetteWidget;
     DiskDriveWidget* m_driveWidgets[7]; // D2-D8 (index 0 = D2, index 6 = D8)
     QLabel* m_printerWidget; // Placeholder for now
     
+    // Drive visibility tracking
+    int m_visibleDrives; // Number of drives currently visible (3 = D2-D4, 7 = D2-D8)
+
     // Layout constants
     static const int SECTION_SPACING = 10;
     static const int WIDGET_SPACING = 5;

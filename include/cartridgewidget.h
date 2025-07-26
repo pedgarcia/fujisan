@@ -1,7 +1,7 @@
 /*
  * Fujisan - Modern Atari Emulator
  * Copyright (c) 2025 Paulo Garcia (8bitrelics.com)
- * 
+ *
  * Licensed under the MIT License. See LICENSE file for details.
  */
 
@@ -34,19 +34,19 @@ public:
     };
 
     explicit CartridgeWidget(AtariEmulator* emulator, QWidget *parent = nullptr);
-    
+
     // State management
     void setState(CartridgeState state);
     CartridgeState getState() const { return m_currentState; }
-    
+
     // Cartridge operations
     void loadCartridge(const QString& cartridgePath);
     void ejectCartridge();
-    
+
     // Cartridge info
     QString getCartridgePath() const { return m_cartridgePath; }
     bool hasCartridge() const { return !m_cartridgePath.isEmpty(); }
-    
+
     // Size management
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
@@ -65,11 +65,11 @@ protected:
     void dragMoveEvent(QDragMoveEvent* event) override;
     void dragLeaveEvent(QDragLeaveEvent* event) override;
     void dropEvent(QDropEvent* event) override;
-    
+
 private slots:
     void onInsertCartridge();
     void onEjectCartridge();
-    
+
 private:
     void setupUI();
     void loadImages();
@@ -77,25 +77,25 @@ private:
     void createContextMenu();
     void updateTooltip();
     bool isValidCartridgeFile(const QString& fileName) const;
-    
+
     // Properties
     AtariEmulator* m_emulator;
     CartridgeState m_currentState;
     QString m_cartridgePath;
-    
+
     // UI Components
     QLabel* m_imageLabel;
     QMenu* m_contextMenu;
     QAction* m_insertAction;
     QAction* m_ejectAction;
-    
+
     // Images for different states
     QPixmap m_offImage;
     QPixmap m_onImage;
-    
+
     // Constants
-    static const int CARTRIDGE_WIDTH = 80;   // Reduced from 100 for better dock fit
-    static const int CARTRIDGE_HEIGHT = 96;  // Reduced from 120 for better dock fit
+    static const int CARTRIDGE_WIDTH = 75;   // Reduced from 100 for better dock fit
+    static const int CARTRIDGE_HEIGHT = 30;  // Reduced from 120 for better dock fit
 };
 
 #endif // CARTRIDGEWIDGET_H
