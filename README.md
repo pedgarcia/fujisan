@@ -2,11 +2,13 @@
 
 A modern Qt5 frontend for the Atari800 emulator, providing a native desktop experience with full keyboard support, machine configuration, and authentic Atari behavior.
 
+![Fujisan Screenshot](images/screenshot1.png)
+
 ## Features
 
 ### Emulator Integration
 - **libatari800 Integration**: Uses the same proven emulator core
-- **Authentic Display**: 336x192 resolution with proper Atari colors
+- **Authentic Display**: 384x240 full screen resolution with proper Atari colors
 - **Pixel Perfect Scaling**: Integer scaling for crisp, retro graphics
 - **Real-time Performance**: Proper 49.86 FPS (PAL) / 59.92 FPS (NTSC) timing
 
@@ -252,10 +254,10 @@ fujisan.exe
 
 ### Display Pipeline
 1. libatari800 generates 384x240 screen buffer
-2. Extract 336x192 display area (skip 24px borders)
+2. Display full 384x240 area without cropping
 3. Convert color indices to RGB using Colours_table
 4. Update QImage with converted pixels
-5. Scale and display with QPainter
+5. Scale and display with QPainter using 98% of available space
 
 ### Timing
 - QTimer drives frame updates at proper Atari speed
