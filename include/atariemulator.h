@@ -97,7 +97,7 @@ public:
     bool initializeWithInputConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
                                  const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
                                  const QString& fitScreen, bool show80Column, bool vSyncEnabled,
-                                 bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks);
+                                 bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks, bool netSIOEnabled = false);
     bool initializeWithNetSIOConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
                                   const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
                                   const QString& fitScreen, bool show80Column, bool vSyncEnabled,
@@ -114,10 +114,17 @@ public:
     // Disk drive functions
     bool mountDiskImage(int driveNumber, const QString& filename, bool readOnly = false);
     void dismountDiskImage(int driveNumber);
+    void disableDrive(int driveNumber);
+    void coldRestart();
     QString getDiskImagePath(int driveNumber) const;
     
     // Disk I/O monitoring
     void setDiskActivityCallback(std::function<void(int, bool)> callback); // drive, isWriting
+    
+    // SIO patch control (disk speed)
+    bool getSIOPatchEnabled() const;
+    bool setSIOPatchEnabled(bool enabled);
+    void debugSIOPatchStatus() const;
     
     // Audio functions
     void enableAudio(bool enabled);
@@ -227,6 +234,10 @@ private:
     QAudioOutput* m_audioOutput;
     QIODevice* m_audioDevice;
     bool m_audioEnabled;
+    
+    // FujiNet delayed restart mechanism (matches Atari800MacX timing)
+    bool m_fujinet_restart_pending;
+    int m_fujinet_restart_delay;
 };
 
 #endif // ATARIEMULATOR_H

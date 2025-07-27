@@ -33,6 +33,10 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     m_originalSettings.basicEnabled = m_emulator->isBasicEnabled();
     m_originalSettings.altirraOSEnabled = m_emulator->isAltirraOSEnabled();
     
+    // Store original NetSIO state for restart detection
+    QSettings settings;
+    m_originalSettings.netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
+    
     // Create main layout
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     
@@ -275,8 +279,13 @@ void SettingsDialog::createHardwareTab()
     specialLayout->addLayout(rDeviceLayout);
     
     m_netSIOEnabled = new QCheckBox("Enable NetSIO (FujiNet-PC Support)");
-    m_netSIOEnabled->setToolTip("Enable NetSIO for FujiNet-PC network functionality");
+    m_netSIOEnabled->setToolTip("Enable NetSIO for FujiNet-PC network functionality\n\n"
+                               "IMPORTANT: FujiNet requires BASIC to be disabled to boot properly.\n"
+                               "BASIC will be automatically disabled when NetSIO is enabled.");
     specialLayout->addWidget(m_netSIOEnabled);
+    
+    // Connect NetSIO checkbox to update BASIC checkbox state
+    connect(m_netSIOEnabled, &QCheckBox::toggled, this, &SettingsDialog::onNetSIOToggled);
     
     m_rtimeEnabled = new QCheckBox("Enable R-Time 8 Real-Time Clock");
     m_rtimeEnabled->setToolTip("Enable R-Time 8 cartridge emulation for real-time clock");
@@ -1795,6 +1804,21 @@ void SettingsDialog::onAltirraOSChanged()
     m_basicRomBrowse->setEnabled(!altirraOSEnabled);
 }
 
+void SettingsDialog::onNetSIOToggled(bool enabled)
+{
+    if (enabled) {
+        // NetSIO/FujiNet requires BASIC to be disabled
+        m_basicEnabledCheck->setChecked(false);
+        m_basicEnabledCheck->setEnabled(false);
+        m_basicEnabledCheck->setToolTip("BASIC automatically disabled when NetSIO is enabled\n"
+                                       "FujiNet requires BASIC disabled to boot properly");
+    } else {
+        // Re-enable BASIC checkbox when NetSIO is disabled
+        m_basicEnabledCheck->setEnabled(true);
+        m_basicEnabledCheck->setToolTip("Enable or disable the Atari BASIC interpreter");
+    }
+}
+
 void SettingsDialog::setupFilePathTooltip(QLineEdit* lineEdit)
 {
     // Connect to textChanged signal to update tooltip with full path
@@ -2110,6 +2134,9 @@ void SettingsDialog::loadSettings()
     m_netSIOEnabled->setChecked(settings.value("media/netSIOEnabled", false).toBool());
     m_rtimeEnabled->setChecked(settings.value("media/rtimeEnabled", false).toBool());
     
+    // Update UI state based on NetSIO setting
+    onNetSIOToggled(m_netSIOEnabled->isChecked());
+    
     // Update PAL/NTSC dependent controls
     updateVideoSystemDependentControls();
     
@@ -2267,18 +2294,37 @@ void SettingsDialog::saveSettings()
     settings.setValue("media/netSIOEnabled", m_netSIOEnabled->isChecked());
     settings.setValue("media/rtimeEnabled", m_rtimeEnabled->isChecked());
     
+    // Check if NetSIO setting has changed (requires emulator restart)
+    bool currentNetSIOState = m_netSIOEnabled->isChecked();
+    bool netSIOStateChanged = (currentNetSIOState != m_originalSettings.netSIOEnabled);
+    
     qDebug() << "Settings saved to persistent storage - Machine:" << machineType 
              << "Video:" << videoSystem << "BASIC:" << basicEnabled;
+    qDebug() << "NetSIO state - Original:" << m_originalSettings.netSIOEnabled 
+             << "Current:" << currentNetSIOState << "Changed:" << netSIOStateChanged;
     
-    // Apply settings to emulator
-    m_emulator->setMachineType(machineType);
-    m_emulator->setVideoSystem(videoSystem);
-    m_emulator->setBasicEnabled(basicEnabled);
-    m_emulator->setAltirraOSEnabled(altirraOSEnabled);
-    m_emulator->enableAudio(m_soundEnabled->isChecked());
-    
-    // Apply media configuration to emulator
-    applyMediaSettings();
+    // Handle NetSIO state change - requires emulator restart for SIO patch update
+    if (netSIOStateChanged) {
+        qDebug() << "*** NetSIO setting changed - triggering emulator restart to update SIO patch ***";
+        qDebug() << "NetSIO" << (currentNetSIOState ? "ENABLED" : "DISABLED") 
+                 << "- Disk access will be" << (currentNetSIOState ? "REALISTIC (hardware timing)" : "FAST (emulated)");
+        
+        // Trigger immediate emulator reinitialization with new NetSIO setting
+        triggerNetSIORestart(currentNetSIOState);
+        
+        // Update original settings to prevent repeated restarts
+        m_originalSettings.netSIOEnabled = currentNetSIOState;
+    } else {
+        // No NetSIO change - apply settings normally
+        m_emulator->setMachineType(machineType);
+        m_emulator->setVideoSystem(videoSystem);
+        m_emulator->setBasicEnabled(basicEnabled);
+        m_emulator->setAltirraOSEnabled(altirraOSEnabled);
+        m_emulator->enableAudio(m_soundEnabled->isChecked());
+        
+        // Apply media configuration to emulator
+        applyMediaSettings();
+    }
 }
 
 void SettingsDialog::applyMediaSettings()
@@ -2421,6 +2467,57 @@ void SettingsDialog::reject()
     // Restore original settings without applying
     qDebug() << "Settings dialog cancelled - restoring original settings";
     QDialog::reject();
+}
+
+void SettingsDialog::triggerNetSIORestart(bool netSIOEnabled)
+{
+    qDebug() << "Triggering emulator restart for NetSIO state change...";
+    
+    if (!m_emulator) {
+        qDebug() << "Error: No emulator instance available for restart";
+        return;
+    }
+    
+    // Gather current settings for restart
+    QString machineType = m_machineTypeCombo->currentData().toString();
+    QString videoSystem = m_videoSystemCombo->currentData().toString();
+    bool basicEnabled = m_basicEnabledCheck->isChecked();
+    QString artifactMode = m_artifactingMode->currentData().toString();
+    QString horizontalArea = m_horizontalArea->currentData().toString();
+    QString verticalArea = m_verticalArea->currentData().toString();
+    int horizontalShift = m_horizontalShift->value();
+    int verticalShift = m_verticalShift->value();
+    QString fitScreen = m_fitScreen->currentData().toString();
+    bool show80Column = m_show80Column->isChecked();
+    bool vSyncEnabled = m_vSyncEnabled->isChecked();
+    bool kbdJoy0Enabled = m_emulator->isKbdJoy0Enabled();
+    bool kbdJoy1Enabled = m_emulator->isKbdJoy1Enabled();
+    bool swapJoysticks = m_emulator->isJoysticksSwapped();
+    bool rtimeEnabled = m_rtimeEnabled->isChecked();
+    
+    qDebug() << "Restarting emulator with NetSIO:" << netSIOEnabled 
+             << "RTime:" << rtimeEnabled << "Machine:" << machineType << "Video:" << videoSystem;
+    
+    // Reinitialize emulator with new NetSIO configuration
+    if (m_emulator->initializeWithNetSIOConfig(basicEnabled, machineType, videoSystem, artifactMode,
+                                             horizontalArea, verticalArea, horizontalShift, verticalShift,
+                                             fitScreen, show80Column, vSyncEnabled,
+                                             kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
+                                             netSIOEnabled, rtimeEnabled)) {
+        qDebug() << "✓ Emulator restarted successfully with NetSIO" << (netSIOEnabled ? "ENABLED" : "DISABLED");
+        qDebug() << "✓ SIO patch updated - Disk access is now" << (netSIOEnabled ? "REALISTIC" : "FAST");
+        
+        // Apply other settings that don't require restart
+        m_emulator->enableAudio(m_soundEnabled->isChecked());
+        
+        // Apply media settings (cartridges, disks, etc.)
+        applyMediaSettings();
+        
+        // Emit signal to update UI components
+        emit settingsChanged();
+    } else {
+        qDebug() << "✗ Failed to restart emulator with new NetSIO configuration";
+    }
 }
 
 void SettingsDialog::updateVideoSystemDependentControls()
@@ -2580,6 +2677,9 @@ void SettingsDialog::restoreDefaults()
     m_rDeviceName->setText("R");
     m_netSIOEnabled->setChecked(false);
     m_rtimeEnabled->setChecked(false);
+    
+    // Update UI state based on NetSIO setting
+    onNetSIOToggled(m_netSIOEnabled->isChecked());
     
     // Update PAL/NTSC dependent controls
     updateVideoSystemDependentControls();
@@ -2974,6 +3074,9 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_rDeviceName->setText(profile.rDeviceName);
     m_netSIOEnabled->setChecked(profile.netSIOEnabled);
     m_rtimeEnabled->setChecked(profile.rtimeEnabled);
+    
+    // Update UI state based on NetSIO setting
+    onNetSIOToggled(m_netSIOEnabled->isChecked());
     
     // Hardware Extensions
     m_xep80Enabled->setChecked(profile.xep80Enabled);

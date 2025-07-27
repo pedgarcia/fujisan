@@ -43,6 +43,12 @@ The objective is to always use libatari800 so there is never incompatibility bet
 - **Dynamic Restart**: Apply BASIC settings without restarting GUI
 - **ROM Loading**: Support for .rom, .bin, .car, .atr files
 
+### Network Features
+- **NetSIO/FujiNet Support**: Connect to FujiNet-PC for network-enabled Atari programs
+- **Automatic Configuration**: Auto-disable BASIC and local disks when NetSIO enabled
+- **Smart Restart**: Seamless NetSIO toggle without application restart
+- **Boot Priority**: FujiNet devices take precedence over local disk images
+
 ### Technical Features
 - **Color Accuracy**: Uses actual Atari color table from libatari800
 - **Memory Efficiency**: Direct screen buffer access
@@ -228,6 +234,13 @@ fujisan.exe
 - **File → Warm Boot**: Soft restart (preserves some state)
 - **System → Enable BASIC**: Toggle BASIC ROM loading
 - **System → Restart**: Apply BASIC setting changes
+
+### NetSIO/FujiNet Usage
+- **Settings → Hardware → NetSIO**: Enable network connectivity to FujiNet-PC
+- **Automatic Setup**: BASIC is auto-disabled when NetSIO enabled (required for FujiNet boot)
+- **Disk Priority**: Local disk images are auto-dismounted to ensure FujiNet boot priority
+- **FujiNet-PC**: Must be running on UDP port 9997 for connection
+- **Network Programs**: Access to online services, file sharing, and multiplayer games
 
 ### Keyboard Input
 - **Letters**: Automatically converted to uppercase (Atari standard)

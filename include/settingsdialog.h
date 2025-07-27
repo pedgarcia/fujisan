@@ -53,6 +53,7 @@ private slots:
     void browseCartridge2();
     void onMachineTypeChanged();
     void onAltirraOSChanged();
+    void onNetSIOToggled(bool enabled);
     
     // Profile management slots
     void onProfileChangeRequested(const QString& profileName);
@@ -69,6 +70,7 @@ private:
     void saveSettings();
     void applySettings();
     void applyMediaSettings();
+    void triggerNetSIORestart(bool netSIOEnabled);
     void updateVideoSystemDependentControls();
     void setupFilePathTooltip(QLineEdit* lineEdit);
     void populateCartridgeTypes(QComboBox* combo);
@@ -263,6 +265,7 @@ private:
         QString videoSystem;
         bool basicEnabled;
         bool altirraOSEnabled;
+        bool netSIOEnabled;  // Track NetSIO state for restart detection
     } m_originalSettings;
 };
 

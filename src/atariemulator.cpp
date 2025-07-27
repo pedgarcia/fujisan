@@ -44,6 +44,8 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_audioOutput(nullptr)
     , m_audioDevice(nullptr)
     , m_audioEnabled(true)
+    , m_fujinet_restart_pending(false)
+    , m_fujinet_restart_delay(0)
 {
     libatari800_clear_input_array(&m_currentInput);
     
@@ -247,6 +249,9 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         libatari800_set_disk_activity_callback(diskActivityCallback);
         qDebug() << "✓ Disk activity callback registered with libatari800";
         
+        // Debug SIO patch status to investigate disk speed changes
+        debugSIOPatchStatus();
+        
         // Initialize audio output if enabled
         if (m_audioEnabled) {
             setupAudio();
@@ -264,7 +269,7 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
 bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode,
                                             const QString& horizontalArea, const QString& verticalArea, int horizontalShift, int verticalShift,
                                             const QString& fitScreen, bool show80Column, bool vSyncEnabled,
-                                            bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks)
+                                            bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks, bool netSIOEnabled)
 {
     qDebug() << "Initializing emulator with input config - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
     
@@ -350,6 +355,12 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         }
     }
     
+    // Add NetSIO support if enabled
+    if (netSIOEnabled) {
+        argList << "-netsio";
+        qDebug() << "Adding NetSIO command line argument: -netsio";
+    }
+    
     // Convert QStringList to char* array
     QList<QByteArray> argBytes;
     for (const QString& arg : argList) {
@@ -400,25 +411,52 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
 {
     qDebug() << "Initializing emulator with NetSIO config - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
     
+    // CRITICAL: NetSIO/FujiNet requires BASIC to be disabled for proper booting
+    bool actualBasicEnabled = basicEnabled;
+    if (netSIOEnabled && basicEnabled) {
+        actualBasicEnabled = false;
+        // Update the emulator's internal BASIC state to reflect the auto-disable
+        setBasicEnabled(false);
+        qDebug() << "*** AUTOMATICALLY DISABLING BASIC FOR FUJINET ***";
+        qDebug() << "NetSIO/FujiNet requires BASIC disabled to boot from network devices";
+        qDebug() << "Original BASIC setting:" << basicEnabled << "-> Using:" << actualBasicEnabled;
+    } else {
+        // Ensure emulator's internal state matches the requested setting when NetSIO is disabled
+        setBasicEnabled(basicEnabled);
+    }
+    
     // Start with basic initialization first
-    if (!initializeWithInputConfig(basicEnabled, machineType, videoSystem, artifactMode,
+    if (!initializeWithInputConfig(actualBasicEnabled, machineType, videoSystem, artifactMode,
                                  horizontalArea, verticalArea, horizontalShift, verticalShift,
                                  fitScreen, show80Column, vSyncEnabled,
-                                 kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks)) {
+                                 kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks, netSIOEnabled)) {
         return false;
     }
     
-    // Now enable NetSIO/FujiNet support if requested
+    // Debug SIO patch status after initialization (for NetSIO investigation)
+    debugSIOPatchStatus();
+    
+    // NetSIO is now initialized by atari800 core via -netsio command line argument
     if (netSIOEnabled) {
-        qDebug() << "Enabling NetSIO support...";
-#ifdef NETSIO
-        if (netsio_init(9997) < 0) {
-            qDebug() << "NetSIO initialization failed - continuing without NetSIO";
-        } else {
-            qDebug() << "NetSIO initialized successfully on port 9997";
+        qDebug() << "NetSIO enabled via command line argument - setting up delayed restart mechanism";
+        
+        // CRITICAL: Dismount all local disks to give FujiNet boot priority
+        // When NetSIO is enabled, FujiNet devices should take precedence over local ATR files
+        qDebug() << "Dismounting local disks to give FujiNet boot priority";
+        for (int i = 1; i <= 8; i++) {
+            dismountDiskImage(i);
         }
-#else
-        qDebug() << "NetSIO support not compiled in - ignoring NetSIO setting";
+        
+        // Use delayed restart mechanism like Atari800MacX for proper FujiNet timing
+        m_fujinet_restart_pending = true;
+        m_fujinet_restart_delay = 60; // Wait 60 frames (~1 second) 
+        qDebug() << "FujiNet delayed restart set: 60 frames";
+        
+        // Send test command to verify NetSIO communication with FujiNet-PC
+#ifdef NETSIO
+        extern void netsio_test_cmd(void);
+        netsio_test_cmd();
+        qDebug() << "NetSIO test command sent to FujiNet-PC";
 #endif
     }
     
@@ -440,6 +478,21 @@ void AtariEmulator::shutdown()
 
 void AtariEmulator::processFrame()
 {
+    // Handle delayed FujiNet restart (critical for FujiNet timing)
+    if (m_fujinet_restart_pending && m_fujinet_restart_delay > 0) {
+        m_fujinet_restart_delay--;
+        if (m_fujinet_restart_delay == 10) { // Debug at 10 frames remaining
+            qDebug() << "FujiNet delayed restart countdown:" << m_fujinet_restart_delay << "frames remaining";
+        }
+        if (m_fujinet_restart_delay == 0) {
+            qDebug() << "Triggering delayed FujiNet machine initialization";
+            extern int Atari800_InitialiseMachine(void);
+            Atari800_InitialiseMachine();
+            m_fujinet_restart_pending = false;
+            qDebug() << "FujiNet delayed machine initialization completed";
+        }
+    }
+
     // Debug joystick values being sent to libatari800
     static int lastJoy0 = -1, lastJoy1 = -1;
     if (m_currentInput.joy0 != lastJoy0 || m_currentInput.joy1 != lastJoy1) {
@@ -571,9 +624,36 @@ void AtariEmulator::dismountDiskImage(int driveNumber)
         return;
     }
     
+    // Actually dismount from libatari800 core
+    libatari800_dismount_disk_image(driveNumber);
+    
+    // Clear Fujisan internal state
     m_diskImages[driveNumber - 1].clear();
     m_mountedDrives.remove(driveNumber);
-    qDebug() << "Dismounted drive D" << driveNumber << ":";
+    qDebug() << "Dismounted drive D" << driveNumber << ": - libatari800 core and Fujisan state cleared";
+}
+
+void AtariEmulator::disableDrive(int driveNumber)
+{
+    if (driveNumber < 1 || driveNumber > 8) {
+        qWarning() << "Invalid drive number for disable:" << driveNumber;
+        return;
+    }
+    
+    // Disable drive in libatari800 core (dismounts disk and sets status to OFF)
+    libatari800_disable_drive(driveNumber);
+    
+    // Clear Fujisan internal state
+    m_diskImages[driveNumber - 1].clear();
+    m_mountedDrives.remove(driveNumber);
+    qDebug() << "Disabled drive D" << driveNumber << ": - libatari800 core and Fujisan state cleared";
+}
+
+void AtariEmulator::coldRestart()
+{
+    // Trigger Atari800 cold start to refresh boot sequence
+    Atari800_Coldstart();
+    qDebug() << "Cold restart completed - boot sequence refreshed";
 }
 
 QString AtariEmulator::getDiskImagePath(int driveNumber) const
@@ -1578,4 +1658,45 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
     }
     
     return false; // Key not handled by joystick emulation
+}
+
+// SIO patch control functions for disk speed investigation
+bool AtariEmulator::getSIOPatchEnabled() const
+{
+    // Access libatari800 SIO patch status
+    extern int libatari800_get_sio_patch_enabled();
+    return libatari800_get_sio_patch_enabled() != 0;
+}
+
+bool AtariEmulator::setSIOPatchEnabled(bool enabled)
+{
+    // Control libatari800 SIO patch status
+    extern int libatari800_set_sio_patch_enabled(int enabled);
+    int previousState = libatari800_set_sio_patch_enabled(enabled ? 1 : 0);
+    
+    qDebug() << "SIO Patch state changed from" << (previousState ? "ENABLED" : "DISABLED") 
+             << "to" << (enabled ? "ENABLED" : "DISABLED");
+    qDebug() << "Disk access is now" << (enabled ? "FAST (bypasses realistic timing)" : "REALISTIC (hardware timing)");
+    
+    return previousState != 0;
+}
+
+void AtariEmulator::debugSIOPatchStatus() const
+{
+    bool isEnabled = getSIOPatchEnabled();
+    
+    qDebug() << "=== SIO PATCH STATUS DEBUG ===";
+    qDebug() << "SIO Patch (Fast Disk Access):" << (isEnabled ? "ENABLED" : "DISABLED");
+    qDebug() << "Disk Access Speed:" << (isEnabled ? "FAST (emulated)" : "REALISTIC (hardware timing)");
+    qDebug() << "Description:" << (isEnabled ? 
+        "Disk operations bypass sector delays for faster loading" :
+        "Disk operations use realistic timing delays (~3200 scanlines between sectors)");
+    qDebug() << "=====================================";
+    
+    // Also check compile-time settings
+    #ifdef NO_SECTOR_DELAY
+    qDebug() << "COMPILE FLAG: NO_SECTOR_DELAY is DEFINED (delays disabled at compile time)";
+    #else
+    qDebug() << "COMPILE FLAG: NO_SECTOR_DELAY is NOT DEFINED (delays available if SIO patch disabled)";
+    #endif
 }

@@ -744,6 +744,9 @@ void MainWindow::restartEmulator()
                          .arg(m_emulator->isBasicEnabled() ? "enabled" : "disabled");
         statusBar()->showMessage(message, 3000);
         qDebug() << message;
+        
+        // Update toolbar to reflect actual BASIC state (may have been auto-disabled for FujiNet)
+        updateToolbarFromSettings();
     } else {
         QMessageBox::critical(this, "Error", "Failed to restart emulator");
     }
@@ -1458,6 +1461,17 @@ void MainWindow::onDriveStateChanged(int driveNumber, bool enabled)
     QString message = QString("Drive D%1: %2").arg(driveNumber).arg(enabled ? "On" : "Off");
     statusBar()->showMessage(message, 2000);
     qDebug() << "Drive" << driveNumber << "state changed to" << (enabled ? "on" : "off");
+
+    // Handle drive state change in emulator core
+    if (!enabled) {
+        // Disable drive in libatari800 core (dismounts disk and sets status to OFF)
+        m_emulator->disableDrive(driveNumber);
+        qDebug() << "Drive D" << driveNumber << ": disabled in libatari800 core";
+        
+        // Trigger cold restart to refresh boot sequence
+        m_emulator->coldRestart();
+        qDebug() << "Cold restart triggered - boot sequence refreshed";
+    }
 
     // Save drive state to settings
     saveDriveStateToSettings(driveNumber, enabled);
