@@ -203,6 +203,10 @@ void EmulatorWidget::dragEnterEvent(QDragEnterEvent* event)
                 event->acceptProposedAction();
                 setStyleSheet("QWidget { border: 3px dashed #FFD700; background-color: rgba(255, 215, 0, 0.1); }");
                 return;
+            } else if (isValidDiskFile(fileName)) {
+                event->acceptProposedAction();
+                setStyleSheet("QWidget { border: 3px dashed #00BFFF; background-color: rgba(0, 191, 255, 0.1); }");
+                return;
             }
         }
     }
@@ -215,7 +219,7 @@ void EmulatorWidget::dragMoveEvent(QDragMoveEvent* event)
         QList<QUrl> urls = event->mimeData()->urls();
         if (urls.size() == 1) {
             QString fileName = urls.first().toLocalFile();
-            if (isValidExecutableFile(fileName)) {
+            if (isValidExecutableFile(fileName) || isValidDiskFile(fileName)) {
                 event->acceptProposedAction();
                 return;
             }
@@ -254,6 +258,12 @@ void EmulatorWidget::dropEvent(QDropEvent* event)
                 }
                 event->acceptProposedAction();
                 return;
+            } else if (isValidDiskFile(fileName)) {
+                qDebug() << "Disk image dropped on emulator screen:" << fileName;
+                // Emit signal to MainWindow to handle D1 mounting and reboot
+                emit diskDroppedOnEmulator(fileName);
+                event->acceptProposedAction();
+                return;
             }
         }
     }
@@ -267,6 +277,17 @@ bool EmulatorWidget::isValidExecutableFile(const QString& fileName) const
     
     // Valid Atari executable extensions
     QStringList validExtensions = {"xex", "exe", "com"};
+    
+    return validExtensions.contains(extension);
+}
+
+bool EmulatorWidget::isValidDiskFile(const QString& fileName) const
+{
+    QFileInfo fileInfo(fileName);
+    QString extension = fileInfo.suffix().toLower();
+    
+    // Valid Atari disk image extensions
+    QStringList validExtensions = {"atr", "xfd", "dcm"};
     
     return validExtensions.contains(extension);
 }

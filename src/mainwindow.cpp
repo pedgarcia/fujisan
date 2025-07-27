@@ -1100,6 +1100,9 @@ void MainWindow::createMediaPeripheralsDock()
     connect(m_cartridgeWidget, &CartridgeWidget::cartridgeInserted, this, &MainWindow::onCartridgeInserted);
     connect(m_cartridgeWidget, &CartridgeWidget::cartridgeEjected, this, &MainWindow::onCartridgeEjected);
 
+    // Connect emulator widget signals
+    connect(m_emulatorWidget, &EmulatorWidget::diskDroppedOnEmulator, this, &MainWindow::onDiskDroppedOnEmulator);
+
     // Connect media dock signals
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::diskInserted, this, &MainWindow::onDiskInserted);
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::diskEjected, this, &MainWindow::onDiskEjected);
@@ -2001,4 +2004,47 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
     coldBoot();
     
     qDebug() << "Applied profile to emulator and rebooted:" << profile.name;
+}
+
+void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
+{
+    if (!m_emulator || !m_diskDrive1) {
+        qWarning() << "Cannot mount disk - emulator or D1 drive not initialized";
+        return;
+    }
+    
+    QFileInfo fileInfo(filename);
+    qDebug() << "Mounting disk image dropped on emulator to D1:" << filename;
+    
+    // Enable D1 drive if it's currently disabled
+    if (!m_diskDrive1->isDriveEnabled()) {
+        qDebug() << "Enabling D1 drive for dropped disk";
+        m_diskDrive1->setDriveEnabled(true);
+        saveDriveStateToSettings(1, true);
+    }
+    
+    // Mount the disk image to D1
+    if (m_emulator->mountDiskImage(1, filename, false)) {
+        qDebug() << "Successfully mounted disk to D1:" << fileInfo.fileName();
+        
+        // Save disk to settings
+        saveDiskToSettings(1, filename, false);
+        
+        // Update D1 widget UI to reflect the new disk
+        if (m_diskDrive1) {
+            m_diskDrive1->updateFromEmulator();
+            qDebug() << "Updated D1 widget state to reflect mounted disk";
+        }
+        
+        // Show status message
+        statusBar()->showMessage(QString("Disk mounted to D1: %1 - Rebooting...").arg(fileInfo.fileName()), 3000);
+        
+        // Perform cold restart to boot from the new disk
+        m_emulator->coldRestart();
+        qDebug() << "Cold restart triggered after mounting disk to D1";
+        
+    } else {
+        qWarning() << "Failed to mount disk image to D1:" << filename;
+        statusBar()->showMessage(QString("Failed to mount disk: %1").arg(fileInfo.fileName()), 5000);
+    }
 }

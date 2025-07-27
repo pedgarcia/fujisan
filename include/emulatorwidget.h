@@ -28,6 +28,9 @@ public:
     
     void setEmulator(AtariEmulator* emulator);
 
+signals:
+    void diskDroppedOnEmulator(const QString& filename);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
@@ -46,6 +49,7 @@ private:
     void updateScreenTexture();
     QRect calculateDisplayRect() const;
     bool isValidExecutableFile(const QString& fileName) const;
+    bool isValidDiskFile(const QString& fileName) const;
     
     AtariEmulator* m_emulator;
     QImage m_screenImage;

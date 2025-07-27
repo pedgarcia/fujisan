@@ -10,12 +10,14 @@
 #include <QApplication>
 #include <QMetaObject>
 #include <QTimer>
+#include <QFileInfo>
 
 extern "C" {
 #ifdef NETSIO
 #include "../src/netsio.h"
 #endif
 #include "../src/rtime.h"
+#include "../src/binload.h"
 }
 
 // Static callback function for libatari800 disk activity
@@ -553,29 +555,49 @@ const unsigned char* AtariEmulator::getScreen()
 
 bool AtariEmulator::loadFile(const QString& filename)
 {
-    qDebug() << "Loading ROM/cartridge:" << filename;
+    // Determine file type by extension
+    QFileInfo fileInfo(filename);
+    QString extension = fileInfo.suffix().toLower();
     
-    // First, explicitly remove any existing cartridge with reboot
-    // This ensures a clean slate before loading the new cartridge
-    CARTRIDGE_RemoveAutoReboot();
-    qDebug() << "Removed existing cartridge";
-    
-    // Now insert the new cartridge with auto-reboot
-    // This provides a complete system reset with the new cartridge
-    int result = CARTRIDGE_InsertAutoReboot(filename.toUtf8().constData());
-    
-    if (result) {
-        qDebug() << "Successfully loaded cartridge:" << filename;
-        return true;
-    } else {
-        qDebug() << "Failed to load cartridge:" << filename;
-        // Fall back to the original method for non-cartridge files
-        qDebug() << "Trying fallback method with libatari800_reboot_with_file";
-        bool fallback_result = libatari800_reboot_with_file(filename.toUtf8().constData());
-        if (fallback_result) {
-            qDebug() << "Fallback method succeeded for:" << filename;
+    if (extension == "xex" || extension == "exe" || extension == "com") {
+        // Load XEX/EXE/COM files as executables using BINLOAD
+        qDebug() << "Loading executable file:" << filename;
+        
+        int result = BINLOAD_Loader(filename.toUtf8().constData());
+        
+        if (result) {
+            qDebug() << "Successfully loaded and executed:" << filename;
+            return true;
+        } else {
+            qDebug() << "Failed to load executable:" << filename;
+            return false;
         }
-        return fallback_result;
+    } else {
+        // Load other files (CAR, ROM, etc.) as cartridges
+        qDebug() << "Loading ROM/cartridge:" << filename;
+        
+        // First, explicitly remove any existing cartridge with reboot
+        // This ensures a clean slate before loading the new cartridge
+        CARTRIDGE_RemoveAutoReboot();
+        qDebug() << "Removed existing cartridge";
+        
+        // Now insert the new cartridge with auto-reboot
+        // This provides a complete system reset with the new cartridge
+        int result = CARTRIDGE_InsertAutoReboot(filename.toUtf8().constData());
+        
+        if (result) {
+            qDebug() << "Successfully loaded cartridge:" << filename;
+            return true;
+        } else {
+            qDebug() << "Failed to load cartridge:" << filename;
+            // Fall back to the original method for non-cartridge files
+            qDebug() << "Trying fallback method with libatari800_reboot_with_file";
+            bool fallback_result = libatari800_reboot_with_file(filename.toUtf8().constData());
+            if (fallback_result) {
+                qDebug() << "Fallback method succeeded for:" << filename;
+            }
+            return fallback_result;
+        }
     }
 }
 

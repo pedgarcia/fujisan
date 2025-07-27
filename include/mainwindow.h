@@ -69,6 +69,7 @@ private slots:
     void toggleMediaDock();
     void onDiskInserted(int driveNumber, const QString& diskPath);
     void onDiskEjected(int driveNumber);
+    void onDiskDroppedOnEmulator(const QString& filename);
     void onDriveStateChanged(int driveNumber, bool enabled);
     void onCassetteInserted(const QString& cassettePath);
     void onCassetteEjected();

@@ -405,12 +405,6 @@ void DiskDriveWidget::paintEvent(QPaintEvent* event)
 
 void DiskDriveWidget::dragEnterEvent(QDragEnterEvent* event)
 {
-    // Only accept file drops if drive is enabled
-    if (!m_driveEnabled) {
-        event->ignore();
-        return;
-    }
-
     // Check if we have file URLs
     if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
@@ -428,12 +422,6 @@ void DiskDriveWidget::dragEnterEvent(QDragEnterEvent* event)
 
 void DiskDriveWidget::dragMoveEvent(QDragMoveEvent* event)
 {
-    // Only accept if drive is enabled and file is valid
-    if (!m_driveEnabled) {
-        event->ignore();
-        return;
-    }
-
     if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
         if (urls.size() == 1) {
@@ -459,17 +447,16 @@ void DiskDriveWidget::dropEvent(QDropEvent* event)
     // Clear visual feedback
     setStyleSheet("");
 
-    // Only accept if drive is enabled
-    if (!m_driveEnabled) {
-        event->ignore();
-        return;
-    }
-
     if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
         if (urls.size() == 1) {
             QString fileName = urls.first().toLocalFile();
             if (isValidDiskFile(fileName)) {
+                // Auto-enable drive if disabled when dropping a disk
+                if (!m_driveEnabled) {
+                    qDebug() << "Auto-enabling drive" << m_driveNumber << "for dropped disk:" << fileName;
+                    setDriveEnabled(true);
+                }
                 insertDisk(fileName);
                 event->acceptProposedAction();
                 return;
