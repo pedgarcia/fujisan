@@ -869,8 +869,28 @@ void MainWindow::updateToolbarFromSettings()
         m_emulator->enableAudio(true);
     }
 
+    // Update joystick settings from emulator state
+    if (m_emulator && m_joystickEnabledCheck && m_kbdJoy0Check && m_kbdJoy1Check && m_joystickSwapWidget) {
+        m_joystickEnabledCheck->blockSignals(true);
+        m_joystickEnabledCheck->setChecked(settings.value("input/joystickEnabled", true).toBool());
+        m_joystickEnabledCheck->blockSignals(false);
+
+        m_kbdJoy0Check->blockSignals(true);
+        m_kbdJoy0Check->setChecked(m_emulator->isKbdJoy0Enabled());
+        m_kbdJoy0Check->blockSignals(false);
+
+        m_kbdJoy1Check->blockSignals(true);
+        m_kbdJoy1Check->setChecked(m_emulator->isKbdJoy1Enabled());
+        m_kbdJoy1Check->blockSignals(false);
+
+        m_joystickSwapWidget->setSwapped(m_emulator->isJoysticksSwapped());
+    }
+
     qDebug() << "Toolbar updated - Machine:" << machineType << "BASIC:" << m_emulator->isBasicEnabled()
-             << "Video:" << m_emulator->getVideoSystem() << "Volume:" << volume;
+             << "Video:" << m_emulator->getVideoSystem() << "Volume:" << volume
+             << "Joy0:" << (m_emulator ? m_emulator->isKbdJoy0Enabled() : false)
+             << "Joy1:" << (m_emulator ? m_emulator->isKbdJoy1Enabled() : false) 
+             << "Swapped:" << (m_emulator ? m_emulator->isJoysticksSwapped() : false);
 }
 
 void MainWindow::toggleFullscreen()
