@@ -964,8 +964,27 @@ void MainWindow::showAbout()
 
     // Logo
     QLabel* logoLabel = new QLabel();
-    QPixmap logo("/Users/pgarcia/Downloads/fujisanlogo.png");
-    if (!logo.isNull()) {
+    
+    // Try to load Fujisan logo from multiple paths (same as toolbar)
+    QStringList imagePaths = {
+        "./images/fujisanlogo.png",
+        "../images/fujisanlogo.png",
+        QApplication::applicationDirPath() + "/images/fujisanlogo.png",
+        QApplication::applicationDirPath() + "/../images/fujisanlogo.png",
+        ":/images/fujisanlogo.png"
+    };
+    
+    QPixmap logo;
+    bool logoLoaded = false;
+    
+    for (const QString& path : imagePaths) {
+        if (logo.load(path)) {
+            logoLoaded = true;
+            break;
+        }
+    }
+    
+    if (logoLoaded) {
         // Scale logo to fit nicely in the dialog
         QPixmap scaledLogo = logo.scaled(300, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         logoLabel->setPixmap(scaledLogo);
