@@ -55,6 +55,14 @@ The objective is to always use libatari800 so there is never incompatibility bet
 - **Implementation Ready**: Full printer UI and backend code implemented but commented out
 - **Future Support**: Will be re-enabled when P: device emulation is fixed in atari800 core
 
+### Debugging & Development
+- **Integrated Debugger**: Comprehensive 6502 debugging with breakpoints, stepping, and memory inspection
+- **Breakpoint System**: Set/remove breakpoints with automatic execution pause and visual indicators
+- **CPU State Monitoring**: Real-time register display (A, X, Y, PC, SP, P) in hex format
+- **Memory Viewer**: Hex dump with ASCII display for full 64KB address space analysis
+- **Disassembly Engine**: Full 6502 instruction set with proper mnemonics and addressing modes
+- **Execution Control**: Step Into (F11), Step Over (F10), Run (F5), and Pause capabilities
+
 ### Technical Features
 - **Color Accuracy**: Uses actual Atari color table from libatari800
 - **Memory Efficiency**: Direct screen buffer access
@@ -259,12 +267,151 @@ fujisan.exe
 ### Known Limitations
 - **Printer Support**: P: device (printer) functionality is currently disabled due to Error 138 (Device Timeout) issues in the atari800 core. Commands like `LPRINT` and `LIST "P:"` will not work. This limitation also affects the official atari800 emulator and is not specific to Fujisan.
 
+## Debugging
+
+Fujisan includes a comprehensive debugger for analyzing and debugging Atari 8-bit programs. Access it via **Tools → Debug Window** in the menu bar.
+
+### Debugger Features
+
+#### **CPU State Monitoring**
+- **Registers**: Real-time display of A, X, Y, PC, SP, and P registers
+- **Hex Format**: All values shown in standard 6502 hex notation ($xx/$xxxx)
+- **Live Updates**: Registers update automatically during emulation
+
+#### **Execution Control**
+- **Step Into** (`F11`): Execute one instruction at current PC
+- **Step Over** (`F10`): Step over subroutine calls (JSR instructions)
+- **Run** (`F5`): Continue execution from current state
+- **Pause**: Stop execution and examine current state
+
+#### **Breakpoint System**
+- **Set Breakpoints**: Enter any address ($0000-$FFFF) and click "Add"
+- **Visual Indicators**: Breakpoints marked with `B` in disassembly view
+- **Automatic Pause**: Execution stops when PC reaches breakpoint address
+- **Management**: Add, remove, or clear all breakpoints
+- **Persistence**: Breakpoints saved between sessions
+- **Keyboard Shortcut**: `Ctrl+B` to add breakpoint at current address
+
+#### **Disassembly View**
+- **Current Instruction**: Highlighted display of instruction at PC
+- **Instruction Window**: Scrollable view of surrounding code
+- **Proper Mnemonics**: Full 6502 instruction set with operands
+- **Address Modes**: Correct display of immediate (#$xx), absolute ($xxxx), indexed, etc.
+- **Visual Markers**: 
+  - `->` marks current PC location
+  - `B` marks breakpoint addresses
+- **Auto-Centering**: Current PC automatically centered when paused
+
+#### **Memory Viewer**
+- **Hex Dump**: Traditional hex editor style display
+- **ASCII Column**: Printable characters shown alongside hex values
+- **Address Navigation**: Jump to any memory location ($0000-$FFFF)
+- **Live Display**: Memory contents update in real-time
+- **Scrollable**: View any portion of 64KB address space
+
+### Debugging Workflow
+
+#### **Setting Up Debug Session**
+1. **Open Debugger**: Tools → Debug Window
+2. **Set Breakpoints**: Enter addresses where you want execution to pause
+3. **Start Program**: Load ROM/disk and run normally
+4. **Pause Execution**: Use Pause button or wait for breakpoint
+
+#### **Typical Debug Workflow**
+```
+1. Set breakpoint at program entry point (e.g., $2000)
+2. Press Run to start execution
+3. Emulator pauses at breakpoint automatically
+4. Examine CPU registers and memory state
+5. Step through code with F11 (Step Into) or F10 (Step Over)
+6. Set additional breakpoints as needed
+7. Continue with F5 (Run) to next breakpoint
+```
+
+#### **Breakpoint Management**
+- **Add**: Enter address and click "Add" or press `Ctrl+B`
+- **Remove**: Select breakpoint in list and click "Remove"
+- **Clear All**: Remove all breakpoints at once
+- **Visual**: Breakpoints shown with `B` marker in disassembly
+
+#### **Memory Analysis**
+- **Jump to Address**: Change memory viewer address to examine specific locations
+- **Watch Variables**: Monitor memory locations for data changes
+- **Stack Analysis**: Check stack pointer (SP) and stack contents
+- **Zero Page**: Examine zero page variables ($00-$FF)
+
+#### **Code Analysis**
+- **Subroutine Calls**: Use Step Over (F10) to skip JSR instructions
+- **Instruction Flow**: Use Step Into (F11) to trace exact execution path
+- **Branch Analysis**: See branch targets and conditional execution
+- **Address Modes**: Understand how instructions access memory
+
+### Debug Information Display
+
+#### **CPU Registers Format**
+```
+A: $FF  X: $00  Y: $00
+PC: $2000  SP: $FF  P: $34
+```
+
+#### **Disassembly Format**
+```
+   $1FFE: 20 00 20  JSR $2000
+B  $2001: A9 FF     LDA #$FF      <- Breakpoint
+-> $2003: 85 10     STA $10       <- Current PC
+   $2005: 60        RTS
+```
+
+#### **Memory Dump Format**
+```
+0800: 20 00 E4 20 5C E4 A2 00 A0 02 20 5A E4 06 07 A5 |  .ä \ä¢ ¥ Zä..¥
+0810: 07 D0 FB A6 07 A4 08 20 A5 E4 A9 9B 20 D2 FF A9 |.ÐûÞ¤. ¥ä© ÒÿÞ
+```
+
+### Debugging Tips
+
+#### **Common Breakpoint Locations**
+- **Program Start**: Main program entry point
+- **Interrupt Vectors**: IRQ/NMI handlers ($FFFE, $FFFA)
+- **System Calls**: OS ROM routines
+- **Critical Loops**: Main game/program loops
+- **Error Conditions**: Error handling code
+
+#### **Performance Considerations**
+- **Minimize Breakpoints**: Too many can slow execution
+- **Use Step Over**: For subroutines you don't need to trace
+- **Pause When Needed**: Continuous debugging updates use CPU cycles
+
+#### **Memory Regions of Interest**
+- **Zero Page** ($00-$FF): Fast access variables
+- **Page 2** ($200-$2FF): System stack
+- **Page 6** ($600-$6FF): Common program area
+- **System Variables** ($00-$7F): OS variables
+
+### Advanced Debugging
+
+#### **Instruction Set Knowledge**
+Understanding 6502 assembly helps with debugging:
+- **Branch Instructions**: BEQ, BNE, BCC, BCS affect program flow
+- **Subroutine Calls**: JSR pushes return address to stack
+- **Stack Operations**: PHA/PLA, PHP/PLP for register save/restore
+- **Addressing Modes**: Zero page vs absolute addressing
+
+#### **Atari-Specific Debugging**
+- **ANTIC/GTIA**: Graphics chips affect display
+- **POKEY**: Sound and I/O operations
+- **PIA**: Joystick and keyboard input
+- **Device Handlers**: Disk, cassette, printer operations
+
+The debugger provides powerful tools for understanding and debugging Atari 8-bit programs, from simple BASIC programs to complex assembly language applications.
+
 ## Architecture
 
 ### Components
 - **AtariEmulator**: Core emulator integration and input handling
 - **EmulatorWidget**: Qt widget for display and input capture
 - **MainWindow**: Application window with menus and layout
+- **DebuggerWidget**: Comprehensive debugging interface with breakpoints and execution control
 - **main.cpp**: Application entry point and initialization
 
 ### Design Principles
@@ -279,6 +426,7 @@ fujisan.exe
 - `AtariEmulator`: Manages libatari800 lifecycle and input
 - `EmulatorWidget`: Handles display rendering and keyboard events
 - `MainWindow`: Provides menus and application structure
+- `DebuggerWidget`: Provides debugging capabilities with breakpoint management and 6502 analysis
 
 ### Input Handling
 - Qt key events converted to Atari key codes
