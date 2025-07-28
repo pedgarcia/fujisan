@@ -49,6 +49,12 @@ The objective is to always use libatari800 so there is never incompatibility bet
 - **Smart Restart**: Seamless NetSIO toggle without application restart
 - **Boot Priority**: FujiNet devices take precedence over local disk images
 
+### Printer Support
+- **P: Device Status**: Currently disabled due to limitations in atari800 core P: device emulation
+- **Error 138 Issue**: LPRINT and LIST "P:" commands result in device timeout errors
+- **Implementation Ready**: Full printer UI and backend code implemented but commented out
+- **Future Support**: Will be re-enabled when P: device emulation is fixed in atari800 core
+
 ### Technical Features
 - **Color Accuracy**: Uses actual Atari color table from libatari800
 - **Memory Efficiency**: Direct screen buffer access
@@ -249,6 +255,9 @@ fujisan.exe
 - **F1-F4**: Function keys (context-dependent)
 - **Ctrl+C**: Break/interrupt running programs
 - **Shift+Numbers**: Access symbols `!@#$%^&*()`
+
+### Known Limitations
+- **Printer Support**: P: device (printer) functionality is currently disabled due to Error 138 (Device Timeout) issues in the atari800 core. Commands like `LPRINT` and `LIST "P:"` will not work. This limitation also affects the official atari800 emulator and is not specific to Fujisan.
 
 ## Architecture
 

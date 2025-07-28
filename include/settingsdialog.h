@@ -34,9 +34,13 @@ class SettingsDialog : public QDialog
 
 public:
     explicit SettingsDialog(AtariEmulator* emulator, QWidget *parent = nullptr);
+    
+    // Public methods for external synchronization
+    void loadSettings();
 
 signals:
     void settingsChanged();
+    void syncPrinterStateRequested();
 
 private slots:
     void accept() override;
@@ -66,7 +70,6 @@ private:
     void createVideoDisplayTab();
     void createInputConfigTab();
     void createMediaConfigTab();
-    void loadSettings();
     void saveSettings();
     void applySettings();
     void applyMediaSettings();
@@ -259,6 +262,11 @@ private:
     QCheckBox* m_netSIOEnabled;
     QCheckBox* m_rtimeEnabled;
     
+    // Printer Configuration
+    QCheckBox* m_printerEnabled;
+    QComboBox* m_printerOutputFormat;
+    QComboBox* m_printerType;
+    
     // Store original settings for cancel functionality
     struct OriginalSettings {
         QString machineType;
@@ -266,6 +274,7 @@ private:
         bool basicEnabled;
         bool altirraOSEnabled;
         bool netSIOEnabled;  // Track NetSIO state for restart detection
+        bool printerEnabled; // Track printer state for restart detection
     } m_originalSettings;
 };
 

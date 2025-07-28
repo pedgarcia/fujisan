@@ -11,6 +11,7 @@
 #include <QMetaObject>
 #include <QTimer>
 #include <QFileInfo>
+#include <QSettings>
 
 extern "C" {
 #ifdef NETSIO
@@ -18,6 +19,9 @@ extern "C" {
 #endif
 #include "../src/rtime.h"
 #include "../src/binload.h"
+// Printer support functions
+void ESC_PatchOS(void);
+void Devices_UpdatePatches(void);
 }
 
 // Static callback function for libatari800 disk activity
@@ -46,6 +50,7 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_audioOutput(nullptr)
     , m_audioDevice(nullptr)
     , m_audioEnabled(true)
+    , m_printerEnabled(false)
     , m_fujinet_restart_pending(false)
     , m_fujinet_restart_delay(0)
 {
@@ -363,6 +368,24 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         qDebug() << "Adding NetSIO command line argument: -netsio";
     }
     
+    // Initialize printer support - DISABLED (P: device not working in atari800 core)
+    // TODO: Re-enable when P: device emulation is fixed
+    /*
+    QSettings settings;
+    bool printerEnabled = settings.value("printer/enabled", false).toBool();
+    if (printerEnabled) {
+        // Enable P: device before atari800 core initialization
+        extern int Devices_enable_p_patch;
+        Devices_enable_p_patch = 1;
+        qDebug() << "Printer enabled - setting Devices_enable_p_patch = 1 before core initialization";
+    }
+    */
+    bool printerEnabled = false; // Force disabled
+    
+    // Add device debugging to help troubleshoot P: device issues
+    argList << "-devbug";
+    qDebug() << "Adding device debugging: -devbug";
+    
     // Convert QStringList to char* array
     QList<QByteArray> argBytes;
     for (const QString& arg : argList) {
@@ -390,6 +413,21 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         // Set up the disk activity callback for hardware-level monitoring
         libatari800_set_disk_activity_callback(diskActivityCallback);
         qDebug() << "✓ Disk activity callback registered with libatari800";
+        
+        // Set up printer if enabled - DISABLED
+        /*
+        if (printerEnabled) {
+            // Use a command that copies the spool file to a visible location
+            // This ensures we can see the printer output and avoid timeout
+            QString fujisanPrintCommand = QString("cp %s /tmp/atari_printer_output.txt && echo 'Printer output saved to /tmp/atari_printer_output.txt'");
+            Devices_SetPrintCommand(fujisanPrintCommand.toUtf8().constData());
+            
+            // Explicitly patch the OS to install P: device handlers
+            qDebug() << "Installing P: device handlers via ESC_PatchOS()...";
+            ESC_PatchOS();
+            qDebug() << "✓ Printer callback configured and P: device handlers installed";
+        }
+        */
         
         // Initialize audio output if enabled
         if (m_audioEnabled) {
@@ -495,14 +533,7 @@ void AtariEmulator::processFrame()
         }
     }
 
-    // Debug joystick values being sent to libatari800
-    static int lastJoy0 = -1, lastJoy1 = -1;
-    if (m_currentInput.joy0 != lastJoy0 || m_currentInput.joy1 != lastJoy1) {
-        qDebug() << "*** SENDING TO LIBATARI800: Joy0=" << m_currentInput.joy0 << "Joy1=" << m_currentInput.joy1 
-                 << "Trig0=" << m_currentInput.trig0 << "Trig1=" << m_currentInput.trig1 << "***";
-        lastJoy0 = m_currentInput.joy0;
-        lastJoy1 = m_currentInput.joy1;
-    }
+    // Send joystick values to libatari800
     
     // Debug what we're sending to the emulator
     if (m_currentInput.keychar != 0) {
@@ -706,9 +737,7 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
     // On macOS, support both Ctrl and Cmd keys for control codes
     bool controlKeyPressed = ctrlPressed || metaPressed;
     
-    qDebug() << "Key pressed:" << key << "modifiers:" << modifiers 
-             << "Ctrl:" << ctrlPressed << "Shift:" << shiftPressed
-             << "Meta:" << metaPressed << "ControlKey:" << controlKeyPressed;
+    // Process key input
     
     // Handle Control key combinations using proper AKEY codes  
     // Build modifier bits like atari800 SDL does
@@ -746,7 +775,7 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
             // Normal letter handling using keycode
             unsigned char baseKey = convertQtKeyToAtari(key, Qt::NoModifier);
             m_currentInput.keycode = baseKey;
-            qDebug() << "Setting keycode to:" << (int)baseKey << "(letter - emulator handles case) Qt key:" << key << "=" << QChar(key);
+            // Letter key
         }
     } else if (key >= Qt::Key_0 && key <= Qt::Key_9) {
         if (shiftPressed) {
@@ -755,19 +784,19 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
             int index = key - Qt::Key_0;
             if (index < shiftedSymbols.length()) {
                 m_currentInput.keychar = shiftedSymbols[index].toLatin1();
-                qDebug() << "*** SHIFTED NUMBER DETECTED! Key:" << key << "Index:" << index << "Setting keychar to:" << QChar(m_currentInput.keychar) << "(shifted) ***";
+                // Shifted number
             }
         } else {
             m_currentInput.keychar = key - Qt::Key_0 + '0';
-            qDebug() << "Setting keychar to:" << QChar(m_currentInput.keychar);
+            // Numeric character
         }
     } else if (key == Qt::Key_Space) {
         m_currentInput.keychar = ' ';
-        qDebug() << "Setting keychar to: SPACE";
+        // Space character
     } else if (key == Qt::Key_Return || key == Qt::Key_Enter) {
         // Use keycode approach for RETURN key
         m_currentInput.keycode = AKEY_RETURN; // Atari RETURN key code
-        qDebug() << "*** ENTER KEY DETECTED! Setting keycode=" << (int)AKEY_RETURN << " ***";
+        // Enter key
     } else if (key == Qt::Key_F2) {
         // F2 = Start
         m_currentInput.start = 1;
@@ -798,40 +827,40 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
         qDebug() << "*** BREAK KEY DETECTED! F7/Pause pressed - setting special to" << (int)m_currentInput.special << " ***";
     } else if (key == Qt::Key_Exclam) {
         m_currentInput.keychar = '!';
-        qDebug() << "*** EXCLAMATION DETECTED! Setting keychar to: ! ***";
+        // Special character: !
     } else if (key == Qt::Key_At) {
         m_currentInput.keychar = '@';
-        qDebug() << "*** AT SYMBOL DETECTED! Setting keychar to: @ ***";
+        // Special character: @
     } else if (key == Qt::Key_NumberSign) {
         m_currentInput.keychar = '#';
-        qDebug() << "*** HASH DETECTED! Setting keychar to: # ***";
+        // Special character: #
     } else if (key == Qt::Key_Dollar) {
         m_currentInput.keychar = '$';
-        qDebug() << "*** DOLLAR DETECTED! Setting keychar to: $ ***";
+        // Special character: $
     } else if (key == Qt::Key_Percent) {
         m_currentInput.keychar = '%';
-        qDebug() << "*** PERCENT DETECTED! Setting keychar to: % ***";
+        // Special character: %
     } else if (key == Qt::Key_AsciiCircum) {
         m_currentInput.keychar = '^';
-        qDebug() << "*** CARET DETECTED! Setting keychar to: ^ ***";
+        // Special character: ^
     } else if (key == Qt::Key_Ampersand) {
         m_currentInput.keychar = '&';
-        qDebug() << "*** AMPERSAND DETECTED! Setting keychar to: & ***";
+        // Special character: &
     } else if (key == Qt::Key_Asterisk) {
         m_currentInput.keychar = '*';
-        qDebug() << "*** ASTERISK DETECTED! Setting keychar to: * ***";
+        // Special character: *
     } else if (key == Qt::Key_ParenLeft) {
         m_currentInput.keychar = '(';
-        qDebug() << "*** PAREN LEFT DETECTED! Setting keychar to: ( ***";
+        // Special character: (
     } else if (key == Qt::Key_ParenRight) {
         m_currentInput.keychar = ')';
-        qDebug() << "*** PAREN RIGHT DETECTED! Setting keychar to: ) ***";
+        // Special character: )
     } else if (key == Qt::Key_Question) {
         m_currentInput.keychar = '?';
-        qDebug() << "*** QUESTION MARK DETECTED! Setting keychar to: ? ***";
+        // Special character: ?
     } else if (key == Qt::Key_Colon) {
         m_currentInput.keychar = ':';
-        qDebug() << "*** COLON DETECTED! Setting keychar to: : ***";
+        // Special character: :
     } else if (key == Qt::Key_Plus) {
         m_currentInput.keychar = '+';
         qDebug() << "*** PLUS DETECTED! Setting keychar to: + ***";
@@ -864,33 +893,33 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
         char symbol = getShiftedSymbol(key, shiftPressed);
         if (symbol != 0) {
             m_currentInput.keychar = symbol;
-            qDebug() << "Setting keychar to:" << QChar(symbol);
+            // Symbol character
         } else {
             // Handle regular punctuation and special keys
             switch (key) {
                 case Qt::Key_Semicolon:
                     m_currentInput.keychar = ';';
-                    qDebug() << "Setting keychar to: ;";
+                    // Semicolon
                     break;
                 case Qt::Key_Equal:
                     m_currentInput.keychar = '=';
-                    qDebug() << "Setting keychar to: =";
+                    // Equals
                     break;
                 case Qt::Key_Comma:
                     m_currentInput.keychar = ',';
-                    qDebug() << "Setting keychar to: ,";
+                    // Comma
                     break;
                 case Qt::Key_Minus:
                     m_currentInput.keychar = '-';
-                    qDebug() << "Setting keychar to: -";
+                    // Minus
                     break;
                 case Qt::Key_Period:
                     m_currentInput.keychar = '.';
-                    qDebug() << "Setting keychar to: .";
+                    // Period
                     break;
                 case Qt::Key_Slash:
                     m_currentInput.keychar = '/';
-                    qDebug() << "Setting keychar to: /";
+                    // Slash
                     break;
                 case Qt::Key_Apostrophe:
                     m_currentInput.keychar = '\'';
@@ -917,7 +946,7 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
                     unsigned char atariKey = convertQtKeyToAtari(key, modifiers);
                     if (atariKey != 0) {
                         m_currentInput.keycode = atariKey;
-                        qDebug() << "Setting keycode to:" << (int)atariKey;
+                        // Function key
                     }
                     break;
             }
@@ -939,7 +968,7 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
     m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
     m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
     m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
-    qDebug() << "Key released - clearing input";
+    // Clear keyboard input on key release
 }
 
 void AtariEmulator::coldBoot()
@@ -1412,7 +1441,7 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
     Qt::KeyboardModifiers modifiers = event->modifiers();
     bool isKeyPress = (event->type() == QEvent::KeyPress);
     
-    qDebug() << "=== JOYSTICK KEY EVENT ===" << "Key:" << key << "Press:" << isKeyPress << "Modifiers:" << modifiers;
+    // Joystick key event processing
     
     // libatari800 XORs joystick values with 0xff, so we need to send inverted values
     // Original INPUT_STICK_* constants XORed with 0xff:
@@ -1721,4 +1750,35 @@ void AtariEmulator::debugSIOPatchStatus() const
     #else
     qDebug() << "COMPILE FLAG: NO_SECTOR_DELAY is NOT DEFINED (delays available if SIO patch disabled)";
     #endif
+}
+
+// Printer support functions
+void AtariEmulator::setPrinterEnabled(bool enabled)
+{
+    if (m_printerEnabled != enabled) {
+        m_printerEnabled = enabled;
+        
+        // Note: P: device setup is now handled during emulator initialization
+        // Printer enable/disable changes trigger a full emulator restart via SettingsDialog
+        qDebug() << "Printer state changed to:" << (enabled ? "ENABLED" : "DISABLED");
+        qDebug() << "P: device will be" << (enabled ? "installed" : "removed") << "on next emulator restart";
+    }
+}
+
+bool AtariEmulator::isPrinterEnabled() const
+{
+    return m_printerEnabled;
+}
+
+void AtariEmulator::setPrinterOutputCallback(std::function<void(const QString&)> callback)
+{
+    m_printerOutputCallback = callback;
+}
+
+void AtariEmulator::setPrintCommand(const QString& command)
+{
+    if (!command.isEmpty()) {
+        Devices_SetPrintCommand(command.toUtf8().constData());
+        qDebug() << "Print command set to:" << command;
+    }
 }

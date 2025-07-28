@@ -168,6 +168,13 @@ QJsonObject ConfigurationProfile::toJson() const {
     mediaConfig["netSIOEnabled"] = netSIOEnabled;
     mediaConfig["rtimeEnabled"] = rtimeEnabled;
     
+    // Printer Configuration
+    QJsonObject printerConfig;
+    printerConfig["enabled"] = printer.enabled;
+    printerConfig["outputFormat"] = printer.outputFormat;
+    printerConfig["printerType"] = printer.printerType;
+    mediaConfig["printer"] = printerConfig;
+    
     json["mediaConfig"] = mediaConfig;
     
     // Hardware Extensions
@@ -349,6 +356,19 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
         rDeviceName = mediaConfig["rDeviceName"].toString("R");
         netSIOEnabled = mediaConfig["netSIOEnabled"].toBool(false);
         rtimeEnabled = mediaConfig["rtimeEnabled"].toBool(false);
+        
+        // Printer Configuration
+        if (mediaConfig.contains("printer") && mediaConfig["printer"].isObject()) {
+            QJsonObject printerConfig = mediaConfig["printer"].toObject();
+            printer.enabled = printerConfig["enabled"].toBool(false);
+            printer.outputFormat = printerConfig["outputFormat"].toString("Text");
+            printer.printerType = printerConfig["printerType"].toString("Generic");
+        } else {
+            // Default values for backward compatibility
+            printer.enabled = false;
+            printer.outputFormat = "Text";
+            printer.printerType = "Generic";
+        }
     }
     
     // Hardware Extensions

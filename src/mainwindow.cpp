@@ -788,6 +788,30 @@ void MainWindow::showSettings()
 {
     SettingsDialog dialog(m_emulator, this);
     connect(&dialog, &SettingsDialog::settingsChanged, this, &MainWindow::onSettingsChanged);
+    
+    // Connect signal to sync printer state when profile is being saved
+    connect(&dialog, &SettingsDialog::syncPrinterStateRequested, this, [this, &dialog]() {
+        if (m_mediaPeripheralsDock && m_mediaPeripheralsDock->getPrinterWidget()) {
+            auto* printerWidget = m_mediaPeripheralsDock->getPrinterWidget();
+            printerWidget->saveSettings();
+            dialog.loadSettings();
+            qDebug() << "Synced PrinterWidget state for profile saving";
+        }
+    });
+    
+    // Sync current PrinterWidget state to Settings Dialog before showing
+    if (m_mediaPeripheralsDock && m_mediaPeripheralsDock->getPrinterWidget()) {
+        auto* printerWidget = m_mediaPeripheralsDock->getPrinterWidget();
+        
+        // Make sure PrinterWidget saves its current state to QSettings
+        printerWidget->saveSettings();
+        
+        // Force the dialog to reload settings to get the latest values
+        dialog.loadSettings();
+        
+        qDebug() << "Synced PrinterWidget state to Settings Dialog";
+    }
+    
     dialog.exec();
 }
 
@@ -799,6 +823,22 @@ void MainWindow::onSettingsChanged()
 
     // Reload media settings to sync disk widgets with any changes made in settings dialog
     loadAndApplyMediaSettings();
+    
+    // Sync printer settings from QSettings to PrinterWidget
+    if (m_mediaPeripheralsDock && m_mediaPeripheralsDock->getPrinterWidget()) {
+        QSettings settings;
+        bool printerEnabled = settings.value("printer/enabled", false).toBool();
+        QString outputFormat = settings.value("printer/outputFormat", "Text").toString();
+        QString printerType = settings.value("printer/type", "Generic").toString();
+        
+        qDebug() << "Syncing printer settings to widget - Enabled:" << printerEnabled 
+                 << "Format:" << outputFormat << "Type:" << printerType;
+        
+        auto* printerWidget = m_mediaPeripheralsDock->getPrinterWidget();
+        printerWidget->setPrinterEnabled(printerEnabled);
+        printerWidget->setOutputFormat(outputFormat);
+        printerWidget->setPrinterType(printerType);
+    }
 
     statusBar()->showMessage("Settings applied and emulator restarted", 3000);
 }
@@ -1130,6 +1170,9 @@ void MainWindow::createMediaPeripheralsDock()
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteInserted, this, &MainWindow::onCassetteInserted);
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteEjected, this, &MainWindow::onCassetteEjected);
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::cassetteStateChanged, this, &MainWindow::onCassetteStateChanged);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::printerEnabledChanged, this, &MainWindow::onPrinterEnabledChanged);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::printerOutputFormatChanged, this, &MainWindow::onPrinterOutputFormatChanged);
+    connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::printerTypeChanged, this, &MainWindow::onPrinterTypeChanged);
     // Note: Cartridge signals connected to toolbar cartridge widget above
 
     // Connect solid LED disk I/O monitoring
@@ -2067,4 +2110,42 @@ void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
         qWarning() << "Failed to mount disk image to D1:" << filename;
         statusBar()->showMessage(QString("Failed to mount disk: %1").arg(fileInfo.fileName()), 5000);
     }
+}
+
+void MainWindow::onPrinterEnabledChanged(bool enabled)
+{
+    if (m_emulator) {
+        m_emulator->setPrinterEnabled(enabled);
+        
+        if (enabled) {
+            // Set up the printer output callback to capture text
+            PrinterWidget* printerWidget = m_mediaPeripheralsDock->getPrinterWidget();
+            if (printerWidget) {
+                m_emulator->setPrinterOutputCallback([printerWidget](const QString& text) {
+                    printerWidget->appendText(text);
+                });
+            }
+            
+            statusBar()->showMessage("Printer enabled - P: device ready", 2000);
+            qDebug() << "Printer enabled via MainWindow";
+        } else {
+            // Clear the callback
+            m_emulator->setPrinterOutputCallback(nullptr);
+            statusBar()->showMessage("Printer disabled", 2000);
+            qDebug() << "Printer disabled via MainWindow";
+        }
+    }
+}
+
+void MainWindow::onPrinterOutputFormatChanged(const QString& format)
+{
+    qDebug() << "Printer output format changed to:" << format;
+    // Format changes are handled internally by PrinterWidget
+}
+
+void MainWindow::onPrinterTypeChanged(const QString& type)
+{
+    qDebug() << "Printer type changed to:" << type;
+    // Printer type changes are handled internally by PrinterWidget for now
+    // Future: could configure emulator for specific printer characteristics
 }

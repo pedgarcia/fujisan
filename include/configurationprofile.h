@@ -136,6 +136,13 @@ struct ConfigurationProfile {
     bool netSIOEnabled = false;
     bool rtimeEnabled = false;
     
+    // Printer Configuration
+    struct PrinterConfig {
+        bool enabled = false;
+        QString outputFormat = "Text";
+        QString printerType = "Generic";
+    } printer;
+    
     // Hardware Extensions
     bool xep80Enabled = false;
     bool af80Enabled = false;

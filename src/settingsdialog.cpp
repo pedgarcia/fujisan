@@ -37,6 +37,9 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     QSettings settings;
     m_originalSettings.netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
     
+    // Store original printer state for restart detection
+    m_originalSettings.printerEnabled = settings.value("printer/enabled", false).toBool();
+    
     // Create main layout
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     
@@ -290,6 +293,47 @@ void SettingsDialog::createHardwareTab()
     m_rtimeEnabled = new QCheckBox("Enable R-Time 8 Real-Time Clock");
     m_rtimeEnabled->setToolTip("Enable R-Time 8 cartridge emulation for real-time clock");
     specialLayout->addWidget(m_rtimeEnabled);
+    
+    // Printer Configuration
+    specialLayout->addSpacing(8);
+    QLabel* printerSectionLabel = new QLabel("P: Device Configuration:");
+    printerSectionLabel->setStyleSheet("font-weight: bold;");
+    specialLayout->addWidget(printerSectionLabel);
+    
+    m_printerEnabled = new QCheckBox("Enable Printer Emulation");
+    m_printerEnabled->setToolTip("Enable P: device for printer emulation (LPRINT support)");
+    specialLayout->addWidget(m_printerEnabled);
+    
+    // Output Format selection
+    QHBoxLayout* printerFormatLayout = new QHBoxLayout();
+    QLabel* formatLabel = new QLabel("Output Format:");
+    printerFormatLayout->addWidget(formatLabel);
+    
+    m_printerOutputFormat = new QComboBox();
+    m_printerOutputFormat->addItem("Text");
+    m_printerOutputFormat->addItem("Raw");
+    m_printerOutputFormat->setToolTip("Text format processes ATASCII characters, Raw format outputs bytes directly");
+    printerFormatLayout->addWidget(m_printerOutputFormat);
+    printerFormatLayout->addStretch();
+    
+    specialLayout->addLayout(printerFormatLayout);
+    
+    // Printer Type selection
+    QHBoxLayout* printerTypeLayout = new QHBoxLayout();
+    QLabel* typeLabel = new QLabel("Printer Type:");
+    printerTypeLayout->addWidget(typeLabel);
+    
+    m_printerType = new QComboBox();
+    m_printerType->addItem("Generic");
+    m_printerType->addItem("Atari 825");
+    m_printerType->addItem("Atari 820");
+    m_printerType->addItem("Atari 1020");
+    m_printerType->addItem("Atari 1025");
+    m_printerType->setToolTip("Select printer type for accurate emulation (affects output formatting)");
+    printerTypeLayout->addWidget(m_printerType);
+    printerTypeLayout->addStretch();
+    
+    specialLayout->addLayout(printerTypeLayout);
     
     centerColumn->addWidget(specialGroup);
     
@@ -1842,6 +1886,12 @@ void SettingsDialog::loadSettings()
 {
     QSettings settings("8bitrelics", "Fujisan");
     
+    // Update original settings for restart detection each time dialog is opened
+    m_originalSettings.netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
+    m_originalSettings.printerEnabled = settings.value("printer/enabled", false).toBool();
+    qDebug() << "*** ORIGINAL SETTINGS CAPTURED *** - NetSIO:" << m_originalSettings.netSIOEnabled 
+             << "Printer:" << m_originalSettings.printerEnabled;
+    
     // Load Machine Configuration
     QString machineType = settings.value("machine/type", "-xl").toString();
     for (int i = 0; i < m_machineTypeCombo->count(); ++i) {
@@ -2134,6 +2184,11 @@ void SettingsDialog::loadSettings()
     m_netSIOEnabled->setChecked(settings.value("media/netSIOEnabled", false).toBool());
     m_rtimeEnabled->setChecked(settings.value("media/rtimeEnabled", false).toBool());
     
+    // Printer Configuration
+    m_printerEnabled->setChecked(settings.value("printer/enabled", false).toBool());
+    m_printerOutputFormat->setCurrentText(settings.value("printer/outputFormat", "Text").toString());
+    m_printerType->setCurrentText(settings.value("printer/type", "Generic").toString());
+    
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
     
@@ -2294,26 +2349,46 @@ void SettingsDialog::saveSettings()
     settings.setValue("media/netSIOEnabled", m_netSIOEnabled->isChecked());
     settings.setValue("media/rtimeEnabled", m_rtimeEnabled->isChecked());
     
+    // Printer Configuration
+    settings.setValue("printer/enabled", m_printerEnabled->isChecked());
+    settings.setValue("printer/outputFormat", m_printerOutputFormat->currentText());
+    settings.setValue("printer/type", m_printerType->currentText());
+    
     // Check if NetSIO setting has changed (requires emulator restart)
     bool currentNetSIOState = m_netSIOEnabled->isChecked();
     bool netSIOStateChanged = (currentNetSIOState != m_originalSettings.netSIOEnabled);
+    
+    // Check if Printer setting has changed (requires emulator restart)
+    bool currentPrinterState = m_printerEnabled->isChecked();
+    bool printerStateChanged = (currentPrinterState != m_originalSettings.printerEnabled);
     
     qDebug() << "Settings saved to persistent storage - Machine:" << machineType 
              << "Video:" << videoSystem << "BASIC:" << basicEnabled;
     qDebug() << "NetSIO state - Original:" << m_originalSettings.netSIOEnabled 
              << "Current:" << currentNetSIOState << "Changed:" << netSIOStateChanged;
+    qDebug() << "Printer state - Original:" << m_originalSettings.printerEnabled 
+             << "Current:" << currentPrinterState << "Changed:" << printerStateChanged;
     
-    // Handle NetSIO state change - requires emulator restart for SIO patch update
-    if (netSIOStateChanged) {
-        qDebug() << "*** NetSIO setting changed - triggering emulator restart to update SIO patch ***";
-        qDebug() << "NetSIO" << (currentNetSIOState ? "ENABLED" : "DISABLED") 
-                 << "- Disk access will be" << (currentNetSIOState ? "REALISTIC (hardware timing)" : "FAST (emulated)");
+    // Handle NetSIO or Printer state changes - both require emulator restart
+    if (netSIOStateChanged || printerStateChanged) {
+        if (netSIOStateChanged) {
+            qDebug() << "*** NetSIO setting changed - triggering emulator restart to update SIO patch ***";
+            qDebug() << "NetSIO" << (currentNetSIOState ? "ENABLED" : "DISABLED") 
+                     << "- Disk access will be" << (currentNetSIOState ? "REALISTIC (hardware timing)" : "FAST (emulated)");
+        }
         
-        // Trigger immediate emulator reinitialization with new NetSIO setting
+        if (printerStateChanged) {
+            qDebug() << "*** Printer setting changed - triggering emulator restart to install P: device ***";
+            qDebug() << "Printer" << (currentPrinterState ? "ENABLED" : "DISABLED") 
+                     << "- P: device will be" << (currentPrinterState ? "AVAILABLE" : "UNAVAILABLE");
+        }
+        
+        // Trigger immediate emulator reinitialization with new settings
         triggerNetSIORestart(currentNetSIOState);
         
         // Update original settings to prevent repeated restarts
         m_originalSettings.netSIOEnabled = currentNetSIOState;
+        m_originalSettings.printerEnabled = currentPrinterState;
     } else {
         // No NetSIO change - apply settings normally
         m_emulator->setMachineType(machineType);
@@ -2386,6 +2461,16 @@ void SettingsDialog::applyMediaSettings()
         if (m_hdEnabled[i]->isChecked() && !m_hdPath[i]->text().isEmpty()) {
             qDebug() << QString("H%1: hard drive support not yet implemented").arg(i + 1);
         }
+    }
+    
+    // Apply printer settings
+    if (m_emulator) {
+        qDebug() << "Applying printer settings - Enabled:" << m_printerEnabled->isChecked()
+                 << "Format:" << m_printerOutputFormat->currentText()
+                 << "Type:" << m_printerType->currentText();
+        
+        m_emulator->setPrinterEnabled(m_printerEnabled->isChecked());
+        // Note: Output format and type will be communicated to PrinterWidget via settingsChanged signal
     }
     
     qDebug() << "Media settings applied";
@@ -2678,6 +2763,11 @@ void SettingsDialog::restoreDefaults()
     m_netSIOEnabled->setChecked(false);
     m_rtimeEnabled->setChecked(false);
     
+    // Printer Configuration - all defaults
+    m_printerEnabled->setChecked(false);
+    m_printerOutputFormat->setCurrentText("Text");
+    m_printerType->setCurrentText("Generic");
+    
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
     
@@ -2708,6 +2798,10 @@ void SettingsDialog::onProfileChangeRequested(const QString& profileName)
 
 void SettingsDialog::onSaveCurrentProfile(const QString& profileName)
 {
+    // Ensure we capture the current PrinterWidget state before saving profile
+    // This is important if user modified printer settings but Settings Dialog wasn't refreshed
+    emit syncPrinterStateRequested();
+    
     ConfigurationProfile profile = getCurrentUIState();
     profile.name = profileName;
     profile.description = QString("Saved on %1").arg(QDateTime::currentDateTime().toString("MMM dd, yyyy"));
@@ -2844,6 +2938,11 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.rDeviceName = m_rDeviceName->text();
     profile.netSIOEnabled = m_netSIOEnabled->isChecked();
     profile.rtimeEnabled = m_rtimeEnabled->isChecked();
+    
+    // Printer Configuration
+    profile.printer.enabled = m_printerEnabled->isChecked();
+    profile.printer.outputFormat = m_printerOutputFormat->currentText();
+    profile.printer.printerType = m_printerType->currentText();
     
     // Hardware Extensions
     profile.xep80Enabled = m_xep80Enabled->isChecked();
@@ -3074,6 +3173,11 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_rDeviceName->setText(profile.rDeviceName);
     m_netSIOEnabled->setChecked(profile.netSIOEnabled);
     m_rtimeEnabled->setChecked(profile.rtimeEnabled);
+    
+    // Printer Configuration
+    m_printerEnabled->setChecked(profile.printer.enabled);
+    m_printerOutputFormat->setCurrentText(profile.printer.outputFormat);
+    m_printerType->setCurrentText(profile.printer.printerType);
     
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());

@@ -76,6 +76,9 @@ private slots:
     void onCassetteStateChanged(bool enabled);
     void onCartridgeInserted(const QString& cartridgePath);
     void onCartridgeEjected();
+    void onPrinterEnabledChanged(bool enabled);
+    void onPrinterOutputFormatChanged(const QString& format);
+    void onPrinterTypeChanged(const QString& type);
     void onLoadProfile();
 
 private:

@@ -142,17 +142,19 @@ void MediaPeripheralsDock::createDiskDrivesSection()
 
 void MediaPeripheralsDock::createPrinterSection()
 {
-    m_printerGroup = new QGroupBox("Printer", this);
+    // Printer widget - DISABLED (P: device not working in atari800 core)
+    // TODO: Re-enable when P: device emulation is fixed
+    /*
+    m_printerGroup = new QGroupBox("Printer (P:)", this);
     QVBoxLayout* printerLayout = new QVBoxLayout(m_printerGroup);
-    printerLayout->setContentsMargins(WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING, WIDGET_SPACING);
+    printerLayout->setContentsMargins(2, WIDGET_SPACING, 2, WIDGET_SPACING); // Reduced left/right margins
     
-    // Placeholder for printer widget
-    m_printerWidget = new QLabel("Printer: Not Implemented", this);
-    m_printerWidget->setAlignment(Qt::AlignCenter);
-    m_printerWidget->setStyleSheet("color: gray; font-style: italic;");
+    // Create printer widget
+    m_printerWidget = new PrinterWidget(this);
     printerLayout->addWidget(m_printerWidget);
     
     m_mainLayout->addWidget(m_printerGroup);
+    */
 }
 
 void MediaPeripheralsDock::connectSignals()
@@ -170,6 +172,16 @@ void MediaPeripheralsDock::connectSignals()
             this, &MediaPeripheralsDock::onCassetteEjected);
     connect(m_cassetteWidget, &CassetteWidget::cassetteStateChanged,
             this, &MediaPeripheralsDock::onCassetteStateChanged);
+    
+    // Connect printer signals - DISABLED
+    /*
+    connect(m_printerWidget, &PrinterWidget::printerEnabledChanged,
+            this, &MediaPeripheralsDock::onPrinterEnabledChanged);
+    connect(m_printerWidget, &PrinterWidget::outputFormatChanged,
+            this, &MediaPeripheralsDock::onPrinterOutputFormatChanged);
+    connect(m_printerWidget, &PrinterWidget::printerTypeChanged,
+            this, &MediaPeripheralsDock::onPrinterTypeChanged);
+    */
     
     // Connect disk drive signals
     for (int i = 0; i < 7; i++) {
@@ -204,6 +216,13 @@ void MediaPeripheralsDock::updateAllDevices()
     if (m_cassetteWidget) {
         m_cassetteWidget->updateFromEmulator();
     }
+    
+    // Update printer - DISABLED
+    /*
+    if (m_printerWidget) {
+        m_printerWidget->loadSettings();
+    }
+    */
     
     // Update disk drives
     for (int i = 0; i < 7; i++) {
@@ -251,6 +270,21 @@ void MediaPeripheralsDock::onCartridgeInserted(const QString& cartridgePath)
 void MediaPeripheralsDock::onCartridgeEjected()
 {
     emit cartridgeEjected();
+}
+
+void MediaPeripheralsDock::onPrinterEnabledChanged(bool enabled)
+{
+    emit printerEnabledChanged(enabled);
+}
+
+void MediaPeripheralsDock::onPrinterOutputFormatChanged(const QString& format)
+{
+    emit printerOutputFormatChanged(format);
+}
+
+void MediaPeripheralsDock::onPrinterTypeChanged(const QString& type)
+{
+    emit printerTypeChanged(type);
 }
 
 void MediaPeripheralsDock::onAddDrive()

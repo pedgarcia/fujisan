@@ -77,6 +77,10 @@ extern "C" {
     extern unsigned char CPU_regS;
     extern unsigned char CPU_regP;
     // AKEY constants are already included via akey.h
+    // Printer/Device functions
+    #include "devices.h"
+    extern char Devices_print_command[256];
+    extern int Devices_SetPrintCommand(const char *command);
 }
 
 class AtariEmulator : public QObject
@@ -117,6 +121,12 @@ public:
     void disableDrive(int driveNumber);
     void coldRestart();
     QString getDiskImagePath(int driveNumber) const;
+    
+    // Printer functions
+    void setPrinterEnabled(bool enabled);
+    bool isPrinterEnabled() const;
+    void setPrinterOutputCallback(std::function<void(const QString&)> callback);
+    void setPrintCommand(const QString& command);
     
     // Disk I/O monitoring
     void setDiskActivityCallback(std::function<void(int, bool)> callback); // drive, isWriting
@@ -234,6 +244,10 @@ private:
     QAudioOutput* m_audioOutput;
     QIODevice* m_audioDevice;
     bool m_audioEnabled;
+    
+    // Printer components
+    bool m_printerEnabled;
+    std::function<void(const QString&)> m_printerOutputCallback;
     
     // FujiNet delayed restart mechanism (matches Atari800MacX timing)
     bool m_fujinet_restart_pending;

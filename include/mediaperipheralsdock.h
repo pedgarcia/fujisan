@@ -19,6 +19,7 @@
 #include "diskdrivewidget.h"
 #include "cassettewidget.h"
 #include "cartridgewidget.h"
+#include "printerwidget.h"
 
 class AtariEmulator;
 
@@ -33,6 +34,7 @@ public:
     DiskDriveWidget* getDriveWidget(int driveNumber);
     CassetteWidget* getCassetteWidget() { return m_cassetteWidget; }
     CartridgeWidget* getCartridgeWidget() { return m_cartridgeWidget; }
+    PrinterWidget* getPrinterWidget() { return m_printerWidget; }
 
     // Update all devices from emulator state
     void updateAllDevices();
@@ -46,6 +48,9 @@ signals:
     void cassetteStateChanged(bool enabled);
     void cartridgeInserted(const QString& cartridgePath);
     void cartridgeEjected();
+    void printerEnabledChanged(bool enabled);
+    void printerOutputFormatChanged(const QString& format);
+    void printerTypeChanged(const QString& type);
 
 private slots:
     void onDiskInserted(int driveNumber, const QString& diskPath);
@@ -56,6 +61,9 @@ private slots:
     void onCassetteStateChanged(bool enabled);
     void onCartridgeInserted(const QString& cartridgePath);
     void onCartridgeEjected();
+    void onPrinterEnabledChanged(bool enabled);
+    void onPrinterOutputFormatChanged(const QString& format);
+    void onPrinterTypeChanged(const QString& type);
     void onAddDrive();
     void onRemoveDrive();
 
@@ -89,7 +97,7 @@ private:
     CartridgeWidget* m_cartridgeWidget;
     CassetteWidget* m_cassetteWidget;
     DiskDriveWidget* m_driveWidgets[7]; // D2-D8 (index 0 = D2, index 6 = D8)
-    QLabel* m_printerWidget; // Placeholder for now
+    PrinterWidget* m_printerWidget;
     
     // Drive visibility tracking
     int m_visibleDrives; // Number of drives currently visible (3 = D2-D4, 7 = D2-D8)
