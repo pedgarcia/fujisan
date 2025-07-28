@@ -12,6 +12,8 @@
 #include <QScrollBar>
 #include <QCoreApplication>
 #include <QFontMetrics>
+#include <QSettings>
+#include <algorithm>
 
 extern "C" {
     // Access to CPU registers
@@ -31,6 +33,7 @@ DebuggerWidget::DebuggerWidget(AtariEmulator* emulator, QWidget *parent)
     , m_refreshTimer(new QTimer(this))
     , m_isRunning(true)  // Start in running state to match emulator
     , m_currentMemoryAddress(0x0000)
+    , m_lastPC(0x0000)
 {
     setupUI();
     connectSignals();
@@ -47,6 +50,9 @@ DebuggerWidget::DebuggerWidget(AtariEmulator* emulator, QWidget *parent)
         m_pauseButton->setEnabled(true);
         m_refreshTimer->start();
     }
+    
+    // Load saved breakpoints
+    loadBreakpoints();
     
     // Initial update
     updateCPUState();
@@ -138,6 +144,52 @@ void DebuggerWidget::setupUI()
     
     mainLayout->addWidget(m_controlGroup);
     
+    // Breakpoint Management Group
+    m_breakpointGroup = new QGroupBox("Breakpoints");
+    QVBoxLayout* breakpointLayout = new QVBoxLayout(m_breakpointGroup);
+    
+    // Breakpoint address input and add/remove buttons
+    QHBoxLayout* breakpointControlLayout = new QHBoxLayout();
+    breakpointControlLayout->addWidget(new QLabel("Address:"));
+    
+    m_breakpointAddressSpinBox = new QSpinBox();
+    m_breakpointAddressSpinBox->setRange(0x0000, 0xFFFF);
+    m_breakpointAddressSpinBox->setDisplayIntegerBase(16);
+    m_breakpointAddressSpinBox->setPrefix("$");
+    m_breakpointAddressSpinBox->setValue(0x0000);
+    m_breakpointAddressSpinBox->setMinimumWidth(80);
+    m_breakpointAddressSpinBox->setFont(QFont("Courier", 10));
+    m_breakpointAddressSpinBox->setToolTip("Enter address for new breakpoint");
+    breakpointControlLayout->addWidget(m_breakpointAddressSpinBox);
+    
+    m_addBreakpointButton = new QPushButton("Add");
+    m_addBreakpointButton->setToolTip("Add breakpoint at specified address (Ctrl+B)");
+    m_addBreakpointButton->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_B));
+    m_addBreakpointButton->setMaximumWidth(60);
+    breakpointControlLayout->addWidget(m_addBreakpointButton);
+    
+    m_removeBreakpointButton = new QPushButton("Remove");
+    m_removeBreakpointButton->setToolTip("Remove selected breakpoint");
+    m_removeBreakpointButton->setMaximumWidth(70);
+    m_removeBreakpointButton->setEnabled(false);
+    breakpointControlLayout->addWidget(m_removeBreakpointButton);
+    
+    m_clearBreakpointsButton = new QPushButton("Clear All");
+    m_clearBreakpointsButton->setToolTip("Remove all breakpoints");
+    m_clearBreakpointsButton->setMaximumWidth(80);
+    breakpointControlLayout->addWidget(m_clearBreakpointsButton);
+    
+    breakpointLayout->addLayout(breakpointControlLayout);
+    
+    // Breakpoint list
+    m_breakpointListWidget = new QListWidget();
+    m_breakpointListWidget->setFont(QFont("Courier", 9));
+    m_breakpointListWidget->setMaximumHeight(120);
+    m_breakpointListWidget->setToolTip("Active breakpoints - execution will pause when PC reaches these addresses");
+    breakpointLayout->addWidget(m_breakpointListWidget);
+    
+    mainLayout->addWidget(m_breakpointGroup);
+    
     // Disassembly Group
     m_disassemblyGroup = new QGroupBox("Disassembly");
     QVBoxLayout* disassemblyLayout = new QVBoxLayout(m_disassemblyGroup);
@@ -203,6 +255,12 @@ void DebuggerWidget::connectSignals()
     
     connect(m_memoryAddressSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &DebuggerWidget::onMemoryAddressChanged);
+    
+    // Breakpoint controls
+    connect(m_addBreakpointButton, &QPushButton::clicked, this, &DebuggerWidget::onAddBreakpointClicked);
+    connect(m_removeBreakpointButton, &QPushButton::clicked, this, &DebuggerWidget::onRemoveBreakpointClicked);
+    connect(m_clearBreakpointsButton, &QPushButton::clicked, this, &DebuggerWidget::clearAllBreakpoints);
+    connect(m_breakpointListWidget, &QListWidget::itemSelectionChanged, this, &DebuggerWidget::onBreakpointSelectionChanged);
 }
 
 void DebuggerWidget::updateCPUState()
@@ -634,8 +692,15 @@ QString DebuggerWidget::formatInstructionLine(unsigned short pc, bool isCurrent)
         }
     }
     
-    // Format the line with prominent arrow for current PC
-    QString prefix = isCurrent ? "-> " : "   ";  // More prominent arrow with space
+    // Format the line with prominent arrow for current PC and breakpoint indicator
+    QString prefix;
+    if (isCurrent) {
+        prefix = "-> ";  // Current PC
+    } else if (hasBreakpoint(pc)) {
+        prefix = "B  ";  // Breakpoint marker
+    } else {
+        prefix = "   ";  // Normal line
+    }
     QString line = QString("%1%2: %3 %4%5")
         .arg(prefix)
         .arg(pc, 4, 16, QChar('0')).toUpper()
@@ -797,6 +862,11 @@ void DebuggerWidget::onMemoryAddressChanged()
 
 void DebuggerWidget::refreshDebugInfo()
 {
+    // Check breakpoints first (only when running)
+    if (m_isRunning) {
+        checkBreakpoints();
+    }
+    
     updateCPUState();
     updateMemoryView();
     updateDisassemblyView();
@@ -873,5 +943,155 @@ void DebuggerWidget::stepOverSubroutine()
     } else {
         // Not a subroutine call, just step one instruction
         stepSingleInstruction();
+    }
+}
+
+// Breakpoint Management Functions
+
+void DebuggerWidget::onAddBreakpointClicked()
+{
+    unsigned short address = m_breakpointAddressSpinBox->value();
+    addBreakpoint(address);
+}
+
+void DebuggerWidget::onRemoveBreakpointClicked()
+{
+    QListWidgetItem* selectedItem = m_breakpointListWidget->currentItem();
+    if (selectedItem) {
+        QString text = selectedItem->text();
+        // Extract address from text (format: "$1234")
+        bool ok;
+        unsigned short address = text.mid(1).toUShort(&ok, 16);
+        if (ok) {
+            removeBreakpoint(address);
+        }
+    }
+}
+
+void DebuggerWidget::onBreakpointSelectionChanged()
+{
+    bool hasSelection = m_breakpointListWidget->currentItem() != nullptr;
+    m_removeBreakpointButton->setEnabled(hasSelection);
+}
+
+void DebuggerWidget::addBreakpoint(unsigned short address)
+{
+    if (m_breakpoints.contains(address)) {
+        qDebug() << QString("Breakpoint already exists at $%1").arg(address, 4, 16, QChar('0')).toUpper();
+        return;
+    }
+    
+    m_breakpoints.insert(address);
+    updateBreakpointList();
+    saveBreakpoints();
+    
+    qDebug() << QString("Added breakpoint at $%1").arg(address, 4, 16, QChar('0')).toUpper();
+}
+
+void DebuggerWidget::removeBreakpoint(unsigned short address)
+{
+    if (!m_breakpoints.contains(address)) {
+        return;
+    }
+    
+    m_breakpoints.remove(address);
+    updateBreakpointList();
+    saveBreakpoints();
+    
+    qDebug() << QString("Removed breakpoint at $%1").arg(address, 4, 16, QChar('0')).toUpper();
+}
+
+void DebuggerWidget::clearAllBreakpoints()
+{
+    if (m_breakpoints.isEmpty()) {
+        return;
+    }
+    
+    m_breakpoints.clear();
+    updateBreakpointList();
+    saveBreakpoints();
+    
+    qDebug() << "Cleared all breakpoints";
+}
+
+bool DebuggerWidget::hasBreakpoint(unsigned short address) const
+{
+    return m_breakpoints.contains(address);
+}
+
+void DebuggerWidget::updateBreakpointList()
+{
+    m_breakpointListWidget->clear();
+    
+    // Convert set to sorted list for display
+    QList<unsigned short> sortedBreakpoints = m_breakpoints.values();
+    std::sort(sortedBreakpoints.begin(), sortedBreakpoints.end());
+    
+    for (unsigned short address : sortedBreakpoints) {
+        QString item = QString("$%1").arg(address, 4, 16, QChar('0')).toUpper();
+        m_breakpointListWidget->addItem(item);
+    }
+    
+    // Update remove button state
+    m_removeBreakpointButton->setEnabled(false);
+}
+
+void DebuggerWidget::saveBreakpoints()
+{
+    QSettings settings;
+    settings.beginGroup("debugger");
+    
+    // Convert breakpoints to string list
+    QStringList breakpointList;
+    for (unsigned short address : m_breakpoints) {
+        breakpointList.append(QString::number(address));
+    }
+    
+    settings.setValue("breakpoints", breakpointList);
+    settings.endGroup();
+}
+
+void DebuggerWidget::loadBreakpoints()
+{
+    QSettings settings;
+    settings.beginGroup("debugger");
+    
+    QStringList breakpointList = settings.value("breakpoints").toStringList();
+    
+    m_breakpoints.clear();
+    for (const QString& addressStr : breakpointList) {
+        bool ok;
+        unsigned short address = addressStr.toUShort(&ok);
+        if (ok) {
+            m_breakpoints.insert(address);
+        }
+    }
+    
+    updateBreakpointList();
+    settings.endGroup();
+    
+    if (!m_breakpoints.isEmpty()) {
+        qDebug() << QString("Loaded %1 breakpoints from settings").arg(m_breakpoints.size());
+    }
+}
+
+void DebuggerWidget::checkBreakpoints()
+{
+    if (m_breakpoints.isEmpty() || !m_emulator) {
+        return;
+    }
+    
+    unsigned short currentPC = CPU_regPC;
+    
+    // Only check if PC has changed to avoid repeated breaks
+    if (currentPC != m_lastPC) {
+        m_lastPC = currentPC;
+        
+        if (m_breakpoints.contains(currentPC)) {
+            qDebug() << QString("BREAKPOINT HIT at $%1 - pausing execution").arg(currentPC, 4, 16, QChar('0')).toUpper();
+            
+            // Pause execution
+            onPauseClicked();
+        }
     }
 }

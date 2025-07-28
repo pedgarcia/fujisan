@@ -19,6 +19,8 @@
 #include <QFont>
 #include <QTimer>
 #include <QSpinBox>
+#include <QListWidget>
+#include <QSet>
 #include "atariemulator.h"
 
 class DebuggerWidget : public QWidget
@@ -38,6 +40,9 @@ public slots:
     void onRunClicked();
     void onPauseClicked();
     void onMemoryAddressChanged();
+    void onAddBreakpointClicked();
+    void onRemoveBreakpointClicked();
+    void onBreakpointSelectionChanged();
 
 private slots:
     void refreshDebugInfo();
@@ -57,6 +62,16 @@ private:
     bool isSubroutineCall(unsigned char opcode);
     void stepSingleInstruction();
     void stepOverSubroutine();
+    
+    // Breakpoint management
+    void addBreakpoint(unsigned short address);
+    void removeBreakpoint(unsigned short address);
+    void clearAllBreakpoints();
+    bool hasBreakpoint(unsigned short address) const;
+    void updateBreakpointList();
+    void saveBreakpoints();
+    void loadBreakpoints();
+    void checkBreakpoints();
     
     AtariEmulator* m_emulator;
     QTimer* m_refreshTimer;
@@ -87,10 +102,22 @@ private:
     QLabel* m_currentInstructionLabel;
     QTextEdit* m_disassemblyTextEdit;
     
+    // Breakpoint UI
+    QGroupBox* m_breakpointGroup;
+    QSpinBox* m_breakpointAddressSpinBox;
+    QPushButton* m_addBreakpointButton;
+    QPushButton* m_removeBreakpointButton;
+    QPushButton* m_clearBreakpointsButton;
+    QListWidget* m_breakpointListWidget;
+    
     // State tracking
     bool m_isRunning;
     int m_currentMemoryAddress;
     unsigned short m_stepOverBreakPC;  // PC to break at for step over
+    
+    // Breakpoint data
+    QSet<unsigned short> m_breakpoints;
+    unsigned short m_lastPC;  // Track PC changes for breakpoint detection
     
     static const int MEMORY_DISPLAY_ROWS = 20;  // Increased to 20 for more memory context
     static const int MEMORY_DISPLAY_COLS = 16;
