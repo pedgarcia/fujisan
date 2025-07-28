@@ -294,7 +294,9 @@ void SettingsDialog::createHardwareTab()
     m_rtimeEnabled->setToolTip("Enable R-Time 8 cartridge emulation for real-time clock");
     specialLayout->addWidget(m_rtimeEnabled);
     
-    // Printer Configuration
+    // Printer Configuration - DISABLED (P: device not working in atari800 core)
+    // TODO: Re-enable when P: device emulation is fixed
+    /*
     specialLayout->addSpacing(8);
     QLabel* printerSectionLabel = new QLabel("P: Device Configuration:");
     printerSectionLabel->setStyleSheet("font-weight: bold;");
@@ -334,6 +336,7 @@ void SettingsDialog::createHardwareTab()
     printerTypeLayout->addStretch();
     
     specialLayout->addLayout(printerTypeLayout);
+    */
     
     centerColumn->addWidget(specialGroup);
     
@@ -2184,10 +2187,12 @@ void SettingsDialog::loadSettings()
     m_netSIOEnabled->setChecked(settings.value("media/netSIOEnabled", false).toBool());
     m_rtimeEnabled->setChecked(settings.value("media/rtimeEnabled", false).toBool());
     
-    // Printer Configuration
+    // Printer Configuration - DISABLED
+    /*
     m_printerEnabled->setChecked(settings.value("printer/enabled", false).toBool());
     m_printerOutputFormat->setCurrentText(settings.value("printer/outputFormat", "Text").toString());
     m_printerType->setCurrentText(settings.value("printer/type", "Generic").toString());
+    */
     
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
@@ -2349,18 +2354,26 @@ void SettingsDialog::saveSettings()
     settings.setValue("media/netSIOEnabled", m_netSIOEnabled->isChecked());
     settings.setValue("media/rtimeEnabled", m_rtimeEnabled->isChecked());
     
-    // Printer Configuration
+    // Printer Configuration - DISABLED
+    /*
     settings.setValue("printer/enabled", m_printerEnabled->isChecked());
     settings.setValue("printer/outputFormat", m_printerOutputFormat->currentText());
     settings.setValue("printer/type", m_printerType->currentText());
+    */
+    // Force printer disabled
+    settings.setValue("printer/enabled", false);
     
     // Check if NetSIO setting has changed (requires emulator restart)
     bool currentNetSIOState = m_netSIOEnabled->isChecked();
     bool netSIOStateChanged = (currentNetSIOState != m_originalSettings.netSIOEnabled);
     
-    // Check if Printer setting has changed (requires emulator restart)
+    // Check if Printer setting has changed (requires emulator restart) - DISABLED
+    /*
     bool currentPrinterState = m_printerEnabled->isChecked();
     bool printerStateChanged = (currentPrinterState != m_originalSettings.printerEnabled);
+    */
+    bool currentPrinterState = false; // Force disabled
+    bool printerStateChanged = false; // No state changes when disabled
     
     qDebug() << "Settings saved to persistent storage - Machine:" << machineType 
              << "Video:" << videoSystem << "BASIC:" << basicEnabled;
@@ -2463,7 +2476,8 @@ void SettingsDialog::applyMediaSettings()
         }
     }
     
-    // Apply printer settings
+    // Apply printer settings - DISABLED
+    /*
     if (m_emulator) {
         qDebug() << "Applying printer settings - Enabled:" << m_printerEnabled->isChecked()
                  << "Format:" << m_printerOutputFormat->currentText()
@@ -2471,6 +2485,11 @@ void SettingsDialog::applyMediaSettings()
         
         m_emulator->setPrinterEnabled(m_printerEnabled->isChecked());
         // Note: Output format and type will be communicated to PrinterWidget via settingsChanged signal
+    }
+    */
+    // Force printer disabled
+    if (m_emulator) {
+        m_emulator->setPrinterEnabled(false);
     }
     
     qDebug() << "Media settings applied";
@@ -2763,10 +2782,12 @@ void SettingsDialog::restoreDefaults()
     m_netSIOEnabled->setChecked(false);
     m_rtimeEnabled->setChecked(false);
     
-    // Printer Configuration - all defaults
+    // Printer Configuration - all defaults - DISABLED
+    /*
     m_printerEnabled->setChecked(false);
     m_printerOutputFormat->setCurrentText("Text");
     m_printerType->setCurrentText("Generic");
+    */
     
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
@@ -2939,10 +2960,16 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.netSIOEnabled = m_netSIOEnabled->isChecked();
     profile.rtimeEnabled = m_rtimeEnabled->isChecked();
     
-    // Printer Configuration
+    // Printer Configuration - DISABLED
+    /*
     profile.printer.enabled = m_printerEnabled->isChecked();
     profile.printer.outputFormat = m_printerOutputFormat->currentText();
     profile.printer.printerType = m_printerType->currentText();
+    */
+    // Force printer disabled in profiles
+    profile.printer.enabled = false;
+    profile.printer.outputFormat = "Text";
+    profile.printer.printerType = "Generic";
     
     // Hardware Extensions
     profile.xep80Enabled = m_xep80Enabled->isChecked();
@@ -3174,10 +3201,12 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_netSIOEnabled->setChecked(profile.netSIOEnabled);
     m_rtimeEnabled->setChecked(profile.rtimeEnabled);
     
-    // Printer Configuration
+    // Printer Configuration - DISABLED
+    /*
     m_printerEnabled->setChecked(profile.printer.enabled);
     m_printerOutputFormat->setCurrentText(profile.printer.outputFormat);
     m_printerType->setCurrentText(profile.printer.printerType);
+    */
     
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
