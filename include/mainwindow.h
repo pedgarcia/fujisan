@@ -36,6 +36,7 @@
 #include "cartridgewidget.h"
 #include "mediaperipheralsdock.h"
 #include "configurationprofilemanager.h"
+#include "tcpserver.h"
 
 class MainWindow : public QMainWindow
 {
@@ -64,6 +65,7 @@ private slots:
     void toggleFullscreen();
     void showAbout();
     void toggleDebugger();
+    void toggleTCPServer();
     void pasteText();
     void sendNextCharacter();
     void toggleMediaDock();
@@ -80,6 +82,10 @@ private slots:
     void onPrinterOutputFormatChanged(const QString& format);
     void onPrinterTypeChanged(const QString& type);
     void onLoadProfile();
+
+public:
+    // Public method for TCP server to request proper emulator restart
+    void requestEmulatorRestart();
 
 private:
     void createMenus();
@@ -108,6 +114,9 @@ private:
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
     QToolBar* m_toolBar;
+    
+    // TCP Server for remote control
+    TCPServer* m_tcpServer;
 
     // Debugger
     DebuggerWidget* m_debuggerWidget;
@@ -168,6 +177,9 @@ private:
     // View menu actions
     QAction* m_fullscreenAction;
     QAction* m_debuggerAction;
+    
+    // TCP Server actions
+    QAction* m_tcpServerAction;
 
     // Fullscreen state
     bool m_isInCustomFullscreen;

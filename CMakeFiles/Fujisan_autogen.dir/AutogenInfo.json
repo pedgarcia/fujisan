@@ -97,7 +97,9 @@
 		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Multimedia/Qt5Multimedia_AVFServicePlugin.cmake",
 		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Multimedia/Qt5Multimedia_AudioCaptureServicePlugin.cmake",
 		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Multimedia/Qt5Multimedia_CoreAudioPlugin.cmake",
-		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Multimedia/Qt5Multimedia_QM3uPlaylistPlugin.cmake"
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Multimedia/Qt5Multimedia_QM3uPlaylistPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Network/Qt5NetworkConfigVersion.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Network/Qt5NetworkConfig.cmake"
 	],
 	"CMAKE_SOURCE_DIR" : "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan",
 	"CROSS_CONFIG" : false,
@@ -160,6 +162,12 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/joystickswapwidget.h",
+			"Mu",
+			"6YEA5652QU/moc_joystickswapwidget.cpp",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mainwindow.h",
 			"Mu",
 			"6YEA5652QU/moc_mainwindow.cpp",
@@ -169,6 +177,12 @@
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mediaperipheralsdock.h",
 			"Mu",
 			"6YEA5652QU/moc_mediaperipheralsdock.cpp",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/printerwidget.h",
+			"Mu",
+			"6YEA5652QU/moc_printerwidget.cpp",
 			null
 		],
 		[
@@ -184,9 +198,21 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/tcpserver.h",
+			"Mu",
+			"6YEA5652QU/moc_tcpserver.cpp",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/toggleswitch.h",
 			"Mu",
 			"6YEA5652QU/moc_toggleswitch.cpp",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/volumeknob.h",
+			"Mu",
+			"6YEA5652QU/moc_volumeknob.cpp",
 			null
 		]
 	],
@@ -303,6 +329,11 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/joystickswapwidget.cpp",
+			"Mu",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/main.cpp",
 			"Mu",
 			null
@@ -318,6 +349,11 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/printerwidget.cpp",
+			"Mu",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/profileselectionwidget.cpp",
 			"Mu",
 			null
@@ -328,7 +364,17 @@
 			null
 		],
 		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/tcpserver.cpp",
+			"Mu",
+			null
+		],
+		[
 			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/toggleswitch.cpp",
+			"Mu",
+			null
+		],
+		[
+			"/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/volumeknob.cpp",
 			"Mu",
 			null
 		]

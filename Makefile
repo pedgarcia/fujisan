@@ -440,6 +440,30 @@ src/emulatorwidget.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/emulatorwidget.cpp.s
 .PHONY : src/emulatorwidget.cpp.s
 
+src/joystickswapwidget.o: src/joystickswapwidget.cpp.o
+.PHONY : src/joystickswapwidget.o
+
+# target to build an object file
+src/joystickswapwidget.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/joystickswapwidget.cpp.o
+.PHONY : src/joystickswapwidget.cpp.o
+
+src/joystickswapwidget.i: src/joystickswapwidget.cpp.i
+.PHONY : src/joystickswapwidget.i
+
+# target to preprocess a source file
+src/joystickswapwidget.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/joystickswapwidget.cpp.i
+.PHONY : src/joystickswapwidget.cpp.i
+
+src/joystickswapwidget.s: src/joystickswapwidget.cpp.s
+.PHONY : src/joystickswapwidget.s
+
+# target to generate assembly for a file
+src/joystickswapwidget.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/joystickswapwidget.cpp.s
+.PHONY : src/joystickswapwidget.cpp.s
+
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
 
@@ -512,6 +536,30 @@ src/mediaperipheralsdock.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.s
 .PHONY : src/mediaperipheralsdock.cpp.s
 
+src/printerwidget.o: src/printerwidget.cpp.o
+.PHONY : src/printerwidget.o
+
+# target to build an object file
+src/printerwidget.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/printerwidget.cpp.o
+.PHONY : src/printerwidget.cpp.o
+
+src/printerwidget.i: src/printerwidget.cpp.i
+.PHONY : src/printerwidget.i
+
+# target to preprocess a source file
+src/printerwidget.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/printerwidget.cpp.i
+.PHONY : src/printerwidget.cpp.i
+
+src/printerwidget.s: src/printerwidget.cpp.s
+.PHONY : src/printerwidget.s
+
+# target to generate assembly for a file
+src/printerwidget.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/printerwidget.cpp.s
+.PHONY : src/printerwidget.cpp.s
+
 src/profileselectionwidget.o: src/profileselectionwidget.cpp.o
 .PHONY : src/profileselectionwidget.o
 
@@ -560,6 +608,30 @@ src/settingsdialog.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/settingsdialog.cpp.s
 .PHONY : src/settingsdialog.cpp.s
 
+src/tcpserver.o: src/tcpserver.cpp.o
+.PHONY : src/tcpserver.o
+
+# target to build an object file
+src/tcpserver.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/tcpserver.cpp.o
+.PHONY : src/tcpserver.cpp.o
+
+src/tcpserver.i: src/tcpserver.cpp.i
+.PHONY : src/tcpserver.i
+
+# target to preprocess a source file
+src/tcpserver.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/tcpserver.cpp.i
+.PHONY : src/tcpserver.cpp.i
+
+src/tcpserver.s: src/tcpserver.cpp.s
+.PHONY : src/tcpserver.s
+
+# target to generate assembly for a file
+src/tcpserver.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/tcpserver.cpp.s
+.PHONY : src/tcpserver.cpp.s
+
 src/toggleswitch.o: src/toggleswitch.cpp.o
 .PHONY : src/toggleswitch.o
 
@@ -583,6 +655,30 @@ src/toggleswitch.s: src/toggleswitch.cpp.s
 src/toggleswitch.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/toggleswitch.cpp.s
 .PHONY : src/toggleswitch.cpp.s
+
+src/volumeknob.o: src/volumeknob.cpp.o
+.PHONY : src/volumeknob.o
+
+# target to build an object file
+src/volumeknob.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/volumeknob.cpp.o
+.PHONY : src/volumeknob.cpp.o
+
+src/volumeknob.i: src/volumeknob.cpp.i
+.PHONY : src/volumeknob.i
+
+# target to preprocess a source file
+src/volumeknob.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/volumeknob.cpp.i
+.PHONY : src/volumeknob.cpp.i
+
+src/volumeknob.s: src/volumeknob.cpp.s
+.PHONY : src/volumeknob.s
+
+# target to generate assembly for a file
+src/volumeknob.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Fujisan.dir/build.make CMakeFiles/Fujisan.dir/src/volumeknob.cpp.s
+.PHONY : src/volumeknob.cpp.s
 
 # Help Target
 help:
@@ -629,6 +725,9 @@ help:
 	@echo "... src/emulatorwidget.o"
 	@echo "... src/emulatorwidget.i"
 	@echo "... src/emulatorwidget.s"
+	@echo "... src/joystickswapwidget.o"
+	@echo "... src/joystickswapwidget.i"
+	@echo "... src/joystickswapwidget.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
@@ -638,15 +737,24 @@ help:
 	@echo "... src/mediaperipheralsdock.o"
 	@echo "... src/mediaperipheralsdock.i"
 	@echo "... src/mediaperipheralsdock.s"
+	@echo "... src/printerwidget.o"
+	@echo "... src/printerwidget.i"
+	@echo "... src/printerwidget.s"
 	@echo "... src/profileselectionwidget.o"
 	@echo "... src/profileselectionwidget.i"
 	@echo "... src/profileselectionwidget.s"
 	@echo "... src/settingsdialog.o"
 	@echo "... src/settingsdialog.i"
 	@echo "... src/settingsdialog.s"
+	@echo "... src/tcpserver.o"
+	@echo "... src/tcpserver.i"
+	@echo "... src/tcpserver.s"
 	@echo "... src/toggleswitch.o"
 	@echo "... src/toggleswitch.i"
 	@echo "... src/toggleswitch.s"
+	@echo "... src/volumeknob.o"
+	@echo "... src/volumeknob.i"
+	@echo "... src/volumeknob.s"
 .PHONY : help
 
 

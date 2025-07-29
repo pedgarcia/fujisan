@@ -900,6 +900,8 @@ CMakeFiles/Fujisan.dir/src/atariemulator.cpp.o: \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours_external.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/artifact.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/config.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/devices.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/atari.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDebug \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdebug.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtextstream.h \
@@ -916,4 +918,12 @@ CMakeFiles/Fujisan.dir/src/atariemulator.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qcursor.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qguiapplication.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qinputmethod.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QMetaObject
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QMetaObject \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFileInfo \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfileinfo.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSettings \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsettings.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/../src/netsio.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/../src/rtime.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/../src/atari.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/../src/binload.h

@@ -25,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_emulator(new AtariEmulator(this))
     , m_emulatorWidget(nullptr)
+    , m_tcpServer(new TCPServer(m_emulator, this, this))
     , m_keepAspectRatio(true)
     , m_startInFullscreen(false)
     , m_isInCustomFullscreen(false)
@@ -73,6 +74,18 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Show initial status message
     statusBar()->showMessage("Fujisan ready", 3000);
+
+    // Auto-start TCP Server on port 8080 by default for development
+    if (m_tcpServer && !m_tcpServer->isRunning()) {
+        bool success = m_tcpServer->startServer(8080);
+        if (success) {
+            m_tcpServerAction->setChecked(true);
+            m_tcpServerAction->setText("&TCP Server (Running)");
+            qDebug() << "TCP Server auto-started on localhost:8080";
+        } else {
+            qDebug() << "Failed to auto-start TCP Server";
+        }
+    }
 
     qDebug() << "Fujisan initialized successfully";
 }
@@ -185,6 +198,15 @@ void MainWindow::createMenus()
     m_debuggerAction->setCheckable(true);
     connect(m_debuggerAction, &QAction::triggered, this, &MainWindow::toggleDebugger);
     viewMenu->addAction(m_debuggerAction);
+
+    // Tools menu
+    QMenu* toolsMenu = menuBar()->addMenu("&Tools");
+    
+    m_tcpServerAction = new QAction("&TCP Server", this);
+    m_tcpServerAction->setToolTip("Start/stop TCP server for remote control (localhost:8080)");
+    m_tcpServerAction->setCheckable(true);
+    connect(m_tcpServerAction, &QAction::triggered, this, &MainWindow::toggleTCPServer);
+    toolsMenu->addAction(m_tcpServerAction);
 
     // Help menu
     QMenu* helpMenu = menuBar()->addMenu("&Help");
@@ -570,6 +592,9 @@ void MainWindow::createDebugger()
 {
     // Create debugger widget
     m_debuggerWidget = new DebuggerWidget(m_emulator, this);
+    
+    // Connect debugger to TCP server for remote debugging
+    m_tcpServer->setDebuggerWidget(m_debuggerWidget);
 
     // Create dock widget for debugger
     m_debuggerDock = new QDockWidget("Debugger", this);
@@ -2148,4 +2173,43 @@ void MainWindow::onPrinterTypeChanged(const QString& type)
     qDebug() << "Printer type changed to:" << type;
     // Printer type changes are handled internally by PrinterWidget for now
     // Future: could configure emulator for specific printer characteristics
+}
+
+void MainWindow::toggleTCPServer()
+{
+    if (m_tcpServer->isRunning()) {
+        // Stop the TCP server
+        m_tcpServer->stopServer();
+        m_tcpServerAction->setChecked(false);
+        m_tcpServerAction->setText("&TCP Server");
+        m_tcpServerAction->setToolTip("Start TCP server for remote control");
+        
+        statusBar()->showMessage("TCP Server stopped", 3000);
+        qDebug() << "TCP Server stopped by user";
+    } else {
+        // Start the TCP server
+        bool success = m_tcpServer->startServer(8080);
+        if (success) {
+            m_tcpServerAction->setChecked(true);
+            m_tcpServerAction->setText("&TCP Server (Running)");
+            m_tcpServerAction->setToolTip("Stop TCP server (currently running on localhost:8080)");
+            
+            statusBar()->showMessage("TCP Server started on localhost:8080", 5000);
+            qDebug() << "TCP Server started successfully on port 8080";
+        } else {
+            m_tcpServerAction->setChecked(false);
+            statusBar()->showMessage("Failed to start TCP Server on port 8080", 5000);
+            qDebug() << "Failed to start TCP Server";
+        }
+    }
+}
+
+void MainWindow::requestEmulatorRestart()
+{
+    // This is called by the TCP server to perform a proper restart with new configuration
+    qDebug() << "TCP Server requested emulator restart with configuration changes";
+    qDebug() << "Current BASIC setting before restart:" << m_emulator->isBasicEnabled();
+    qDebug() << "Current machine type:" << m_emulator->getMachineType();
+    qDebug() << "Current video system:" << m_emulator->getVideoSystem();
+    restartEmulator();
 }

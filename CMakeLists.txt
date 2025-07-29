@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/qt@5/lib/cmake")
 
 # Find Qt5
-find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
 # Find libatari800 in parent directory
 set(ATARI800_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -51,7 +51,9 @@ set(SOURCES
     src/cartridgewidget.cpp
     src/joystickswapwidget.cpp
     src/volumeknob.cpp
+    src/printerwidget.cpp
     src/mediaperipheralsdock.cpp
+    src/tcpserver.cpp
 )
 
 set(HEADERS
@@ -70,7 +72,9 @@ set(HEADERS
     include/cartridgewidget.h
     include/joystickswapwidget.h
     include/volumeknob.h
+    include/printerwidget.h
     include/mediaperipheralsdock.h
+    include/tcpserver.h
 )
 
 # Create executable
@@ -83,6 +87,7 @@ target_link_libraries(${PROJECT_NAME}
     Qt5::Widgets
     Qt5::Gui
     Qt5::Multimedia
+    Qt5::Network
     -lm
 )
 

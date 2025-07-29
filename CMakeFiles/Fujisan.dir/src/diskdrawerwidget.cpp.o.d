@@ -924,6 +924,10 @@ CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qvector2d.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtouchdevice.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QContextMenuEvent \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QDragEnterEvent \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QDragMoveEvent \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QDragLeaveEvent \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QDropEvent \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QString \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/atariemulator.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
@@ -948,6 +952,8 @@ CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o: \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours_external.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/artifact.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/config.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/devices.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/atari.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QVBoxLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QApplication \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qapplication.h \

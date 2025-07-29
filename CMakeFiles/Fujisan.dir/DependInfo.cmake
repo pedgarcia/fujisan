@@ -19,12 +19,16 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrawerwidget.cpp" "CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/diskdrawerwidget.cpp.o.d"
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrivewidget.cpp" "CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/diskdrivewidget.cpp.o.d"
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/emulatorwidget.cpp" "CMakeFiles/Fujisan.dir/src/emulatorwidget.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/emulatorwidget.cpp.o.d"
+  "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/joystickswapwidget.cpp" "CMakeFiles/Fujisan.dir/src/joystickswapwidget.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/joystickswapwidget.cpp.o.d"
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/main.cpp" "CMakeFiles/Fujisan.dir/src/main.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/main.cpp.o.d"
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mainwindow.cpp" "CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/mainwindow.cpp.o.d"
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mediaperipheralsdock.cpp" "CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/mediaperipheralsdock.cpp.o.d"
+  "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/printerwidget.cpp" "CMakeFiles/Fujisan.dir/src/printerwidget.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/printerwidget.cpp.o.d"
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/profileselectionwidget.cpp" "CMakeFiles/Fujisan.dir/src/profileselectionwidget.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/profileselectionwidget.cpp.o.d"
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/settingsdialog.cpp" "CMakeFiles/Fujisan.dir/src/settingsdialog.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/settingsdialog.cpp.o.d"
+  "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/tcpserver.cpp" "CMakeFiles/Fujisan.dir/src/tcpserver.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/tcpserver.cpp.o.d"
   "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/toggleswitch.cpp" "CMakeFiles/Fujisan.dir/src/toggleswitch.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/toggleswitch.cpp.o.d"
+  "/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/volumeknob.cpp" "CMakeFiles/Fujisan.dir/src/volumeknob.cpp.o" "gcc" "CMakeFiles/Fujisan.dir/src/volumeknob.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

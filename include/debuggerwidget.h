@@ -34,6 +34,11 @@ public:
     void updateMemoryView();
     void updateDisassemblyView();
     
+    // Public breakpoint management for TCP server
+    void addBreakpoint(unsigned short address);
+    void removeBreakpoint(unsigned short address);
+    void clearAllBreakpoints();
+    
 public slots:
     void onStepIntoClicked();
     void onStepOverClicked(); 
@@ -64,9 +69,6 @@ private:
     void stepOverSubroutine();
     
     // Breakpoint management
-    void addBreakpoint(unsigned short address);
-    void removeBreakpoint(unsigned short address);
-    void clearAllBreakpoints();
     bool hasBreakpoint(unsigned short address) const;
     void updateBreakpointList();
     void saveBreakpoints();

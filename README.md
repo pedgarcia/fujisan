@@ -62,6 +62,8 @@ The objective is to always use libatari800 so there is never incompatibility bet
 - **Memory Viewer**: Hex dump with ASCII display for full 64KB address space analysis
 - **Disassembly Engine**: Full 6502 instruction set with proper mnemonics and addressing modes
 - **Execution Control**: Step Into (F11), Step Over (F10), Run (F5), and Pause capabilities
+- **TCP Server API**: Remote control via JSON commands for IDE integration and automated testing
+- **Multi-client Support**: Event broadcasting and simultaneous connections for development workflows
 
 ### Technical Features
 - **Color Accuracy**: Uses actual Atari color table from libatari800
@@ -266,6 +268,36 @@ fujisan.exe
 
 ### Known Limitations
 - **Printer Support**: P: device (printer) functionality is currently disabled due to Error 138 (Device Timeout) issues in the atari800 core. Commands like `LPRINT` and `LIST "P:"` will not work. This limitation also affects the official atari800 emulator and is not specific to Fujisan.
+
+## TCP Server API
+
+Fujisan includes a powerful TCP server for remote control and automation. This enables IDE integration, automated testing, and programmatic control of all emulator features.
+
+### Enabling the Server
+1. Go to **Tools → TCP Server** in the menu
+2. Server starts on `localhost:8080`
+3. Multiple clients can connect simultaneously
+
+### Key Features
+- **JSON Protocol**: Simple command/response format
+- **Complete Control**: Media, system, input, debug, and configuration commands
+- **Event Broadcasting**: Real-time notifications to all connected clients
+- **Security**: Localhost-only binding for safety
+
+### Quick Example
+```bash
+# Get emulator state
+echo '{"command": "status.get_state"}' | nc localhost 8080
+
+# Load a disk
+echo '{"command": "media.insert_disk", "params": {"drive": 1, "path": "/path/to/disk.atr"}}' | nc localhost 8080
+
+# Send text to emulator
+echo '{"command": "input.send_text", "params": {"text": "LOAD \"D:*\"\n"}}' | nc localhost 8080
+```
+
+### Complete Documentation
+See **[TCP_SERVER_API.md](TCP_SERVER_API.md)** for comprehensive API documentation with examples for all 34+ available commands covering media control, debugging, configuration, and automation.
 
 ## Debugging
 

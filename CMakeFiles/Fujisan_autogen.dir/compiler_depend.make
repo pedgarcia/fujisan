@@ -712,11 +712,15 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   include/diskdrawerwidget.h \
   include/diskdrivewidget.h \
   include/emulatorwidget.h \
+  include/joystickswapwidget.h \
   include/mainwindow.h \
   include/mediaperipheralsdock.h \
+  include/printerwidget.h \
   include/profileselectionwidget.h \
   include/settingsdialog.h \
+  include/tcpserver.h \
   include/toggleswitch.h \
+  include/volumeknob.h \
   src/atariemulator.cpp \
   src/cartridgewidget.cpp \
   src/cassettewidget.cpp \
@@ -726,24 +730,34 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   src/diskdrawerwidget.cpp \
   src/diskdrivewidget.cpp \
   src/emulatorwidget.cpp \
+  src/joystickswapwidget.cpp \
   src/main.cpp \
   src/mainwindow.cpp \
   src/mediaperipheralsdock.cpp \
+  src/printerwidget.cpp \
   src/profileselectionwidget.cpp \
   src/settingsdialog.cpp \
+  src/tcpserver.cpp \
   src/toggleswitch.cpp \
+  src/volumeknob.cpp \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/akey.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/artifact.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/atari.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/colours.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/colours_external.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/config.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/devices.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/libatari800/libatari800.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QBuffer \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QDateTime \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QIODevice \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonDocument \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonObject \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonValue \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QList \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QMap \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QObject \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QPoint \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QPropertyAnimation \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QSet \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QSettings \
@@ -783,6 +797,7 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qhash.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qhashfunctions.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qiodevice.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qitemselectionmodel.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qiterator.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qjsondocument.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qjsonobject.h \
@@ -837,36 +852,49 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qversiontagging.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QClipboard \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QContextMenuEvent \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragEnterEvent \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragLeaveEvent \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragMoveEvent \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDropEvent \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QFont \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QFontMetrics \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QImage \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QKeyEvent \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QMouseEvent \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPaintEvent \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPainter \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPixmap \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QWheelEvent \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qabstracttextdocumentlayout.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qbrush.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qclipboard.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qcolor.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qcursor.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qevent.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfont.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfontdatabase.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfontinfo.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfontmetrics.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qglyphrun.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qicon.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qimage.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qkeysequence.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qmatrix.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpaintdevice.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpainter.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpalette.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpen.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpixelformat.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpixmap.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpolygon.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qrawfont.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qregion.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qrgb.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qrgba64.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextcursor.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextdocument.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextformat.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextlayout.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextoption.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtgui-config.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtguiglobal.h \
@@ -885,6 +913,14 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtMultimedia.framework/Versions/5/Headers/qmultimedia.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtMultimedia.framework/Versions/5/Headers/qtmultimedia-config.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtMultimedia.framework/Versions/5/Headers/qtmultimediaglobal.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/QTcpServer \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/QTcpSocket \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qabstractsocket.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qhostaddress.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtcpserver.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtcpsocket.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtnetwork-config.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtnetworkglobal.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QAction \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QCheckBox \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QComboBox \
@@ -902,12 +938,14 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLabel \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLayout \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLineEdit \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QListWidget \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMainWindow \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenu \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenuBar \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMessageBox \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPlainTextEdit \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPushButton \
-  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollArea \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollBar \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSlider \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSpinBox \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QTabWidget \
@@ -917,6 +955,7 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QWidget \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractbutton.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractitemdelegate.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractitemview.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractscrollarea.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractslider.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractspinbox.h \
@@ -938,13 +977,16 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlayout.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlayoutitem.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlineedit.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlistview.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlistwidget.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmainwindow.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmenu.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmenubar.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmessagebox.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qplaintextedit.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qpushbutton.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qrubberband.h \
-  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollarea.h \
+  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollbar.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qsizepolicy.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qslider.h \
   /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qspinbox.h \
@@ -1079,8 +1121,6 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 
 /opt/homebrew/opt/qt@5/lib/cmake/Qt5Multimedia/Qt5MultimediaConfigVersion.cmake:
 
-/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QWebGLIntegrationPlugin.cmake:
-
 /opt/homebrew/opt/qt@5/lib/cmake/Qt5Multimedia/Qt5Multimedia_CoreAudioPlugin.cmake:
 
 /opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QVirtualKeyboardPlugin.cmake:
@@ -1173,6 +1213,8 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractslider.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractitemview.h:
+
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractitemdelegate.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QWidget:
@@ -1185,13 +1227,15 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSpinBox:
 
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollArea:
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollBar:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPushButton:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenuBar:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMainWindow:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QListWidget:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLayout:
 
@@ -1212,6 +1256,14 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QCheckBox:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QAction:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtnetworkglobal.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qhostaddress.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/QTcpSocket:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/QTcpServer:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtMultimedia.framework/Versions/5/Headers/qtmultimediaglobal.h:
 
@@ -1239,15 +1291,23 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextcursor.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qrawfont.h:
+
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpixmap.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpen.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpainter.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlayout.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qimage.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qicon.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qglyphrun.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfontdatabase.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qdialogbuttonbox.h:
 
@@ -1261,11 +1321,21 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qbrush.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qabstracttextdocumentlayout.h:
+
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPaintEvent:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QMouseEvent:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QImage:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDropEvent:
+
+/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QWebGLIntegrationPlugin.cmake:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragMoveEvent:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragLeaveEvent:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QClipboard:
 
@@ -1280,6 +1350,8 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qurl.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qtextstream.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollbar.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qtcore-config.h:
 
@@ -1327,13 +1399,15 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qobject.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qnumeric.h:
+
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qnamespace.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qmutex.h:
 
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_allocator.h:
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenu:
 
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qmargins.h:
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qmap.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qlocale.h:
 
@@ -1341,13 +1415,11 @@ Fujisan_autogen/timestamp: /Applications/Xcode.app/Contents/Developer/Platforms/
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qline.h:
 
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/assert.h:
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qjsonvalue.h:
 
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qjsonobject.h:
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qiterator.h:
 
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/reverse_copy.h:
-
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qhash.h:
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qitemselectionmodel.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qfileinfo.h:
 
@@ -1381,6 +1453,10 @@ include/configurationprofile.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QSet:
 
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__config:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QList:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__math/remainder.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonObject:
@@ -1398,6 +1474,12 @@ include/configurationprofile.h:
 /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/config.h:
 
 src/toggleswitch.cpp:
+
+/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake:
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_trivially_destructible.h:
+
+src/tcpserver.cpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/partition.h:
 
@@ -1423,7 +1505,19 @@ src/configurationprofile.cpp:
 
 src/cassettewidget.cpp:
 
+include/volumeknob.h:
+
 include/toggleswitch.h:
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/reverse_copy.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qhash.h:
+
+include/printerwidget.h:
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/list:
+
+include/joystickswapwidget.h:
 
 include/emulatorwidget.h:
 
@@ -1468,6 +1562,8 @@ CMakeFiles/4.0.1/CMakeCCompiler.cmake:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/types.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_uintptr_t.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlistview.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_uid_t.h:
 
@@ -1587,6 +1683,8 @@ src/atariemulator.cpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/__endian.h:
 
+include/tcpserver.h:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/pthread/sched.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_copy.h:
@@ -1608,6 +1706,8 @@ src/atariemulator.cpp:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/version:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/vector:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlistwidget.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/tuple:
 
@@ -1827,10 +1927,6 @@ include/profileselectionwidget.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_trivially_lexicographically_comparable.h:
 
-/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake:
-
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_trivially_destructible.h:
-
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_trivially_assignable.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_in_addr_t.h:
@@ -1842,6 +1938,8 @@ include/profileselectionwidget.h:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/make_projected.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QIODevice:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPainter:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__string/char_traits.h:
 
@@ -1957,6 +2055,10 @@ include/profileselectionwidget.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_always_bitcastable.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qmargins.h:
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_allocator.h:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_abstract.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/integral_constant.h:
@@ -2025,6 +2127,8 @@ src/emulatorwidget.cpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__tuple/tuple_like_no_subrange.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextlayout.h:
+
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qglobalstatic.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__tuple/tuple_indices.h:
@@ -2066,6 +2170,8 @@ include/diskdrawerwidget.h:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/unicode.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__string/constexpr_c_functions.h:
+
+src/joystickswapwidget.cpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/math.h:
 
@@ -2162,6 +2268,8 @@ include/diskdrawerwidget.h:
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qabstractanimation.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/align.h:
+
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/devices.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/addressof.h:
 
@@ -2311,6 +2419,8 @@ src/main.cpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/adjacent_difference.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qabstractsocket.h:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/add_volatile.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/string.h:
@@ -2369,7 +2479,11 @@ include/cassettewidget.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/fstream.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qplaintextedit.h:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/ranges_construct_at.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragEnterEvent:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/rotate.h:
 
@@ -2378,8 +2492,6 @@ include/cassettewidget.h:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/array.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/weak_result_type.h:
-
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qnumeric.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLabel:
 
@@ -2426,6 +2538,8 @@ include/cassettewidget.h:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/sort.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/parser_std_format_spec.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonValue:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/data.h:
 
@@ -2499,8 +2613,6 @@ include/cassettewidget.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__cstddef/ptrdiff_t.h:
 
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qiterator.h:
-
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__cstddef/max_align_t.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__configuration/language.h:
@@ -2508,6 +2620,8 @@ include/cassettewidget.h:
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qmetatype.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__concepts/same_as.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtcpserver.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/maybe_const.h:
 
@@ -2558,6 +2672,8 @@ include/cassettewidget.h:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/system_clock.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/partition_copy.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtcpsocket.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/format_parse_context.h:
 
@@ -2659,6 +2775,12 @@ src/configurationprofilemanager.cpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/format_arg.h:
 
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/stable_sort.h:
+
+src/printerwidget.cpp:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QWheelEvent:
+
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QString:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__atomic/kill_dependency.h:
@@ -2670,10 +2792,6 @@ CMakeFiles/4.0.1/CMakeSystem.cmake:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/AvailabilityInternal.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/inplace_merge.h:
-
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenu:
-
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qmap.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/push_heap.h:
 
@@ -2719,13 +2837,9 @@ CMakeFiles/4.0.1/CMakeSystem.cmake:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_ino_t.h:
 
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/list:
-
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/common_type.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__atomic/aliases.h:
-
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qjsonvalue.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/pointer_to_unary_function.h:
 
@@ -2759,6 +2873,10 @@ CMakeFiles/4.0.1/CMakeSystem.cmake:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/swap_ranges.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qjsonobject.h:
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/assert.h:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cerrno:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/buffer.h:
@@ -2782,6 +2900,8 @@ CMakeFiles/4.0.1/CMakeSystem.cmake:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/execution:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__system_error/error_category.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPlainTextEdit:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/adjacent_find.h:
 
@@ -2871,6 +2991,8 @@ include/settingsdialog.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/ios:
 
+/Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/atari.h:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__configuration/platform.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/make_unsigned.h:
@@ -2889,6 +3011,10 @@ include/settingsdialog.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/none_of.h:
 
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_mb_cur_max.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QPoint:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/enable_borrowed_range.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/format_to_n_result.h:
@@ -2897,9 +3023,11 @@ include/settingsdialog.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/piecewise_construct.h:
 
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/size.h:
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/uninitialized_algorithms.h:
 
-/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollarea.h:
+src/volumeknob.cpp:
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/size.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/copy_move_common.h:
 
@@ -2943,15 +3071,11 @@ include/diskdrivewidget.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/is_sorted_until.h:
 
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/uninitialized_algorithms.h:
-
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qdebug.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_mode_t.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/prev.h:
-
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_mb_cur_max.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/common_reference.h:
 
@@ -2983,13 +3107,13 @@ include/diskdrivewidget.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/partial_sort_copy.h:
 
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/stable_sort.h:
-
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/subrange.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/generate.h:
 
 /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/__stdarg___gnuc_va_list.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QFontMetrics:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/copy_n.h:
 
@@ -3023,6 +3147,8 @@ include/diskdrivewidget.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_bounds.h:
 
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QMap:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/aliasing_iterator.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/count.h:
@@ -3036,6 +3162,8 @@ include/diskdrivewidget.h:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__compare/compare_three_way.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/find_if_not.h:
+
+/opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtnetwork-config.h:
 
 /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qtimer.h:
 
@@ -3054,8 +3182,6 @@ include/diskdrivewidget.h:
 /opt/homebrew/share/cmake/Modules/Platform/Linker/Apple-AppleClang.cmake:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/invoke.h:
-
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__config:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__math/hypot.h:
 

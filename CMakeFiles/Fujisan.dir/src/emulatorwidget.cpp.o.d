@@ -905,6 +905,10 @@ CMakeFiles/Fujisan.dir/src/emulatorwidget.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtimer.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qbasictimer.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QImage \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QDragEnterEvent \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QDragMoveEvent \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QDragLeaveEvent \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QDropEvent \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/atariemulator.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
   /opt/homebrew/opt/qt@5/lib/QtMultimedia.framework/Headers/QAudioOutput \
@@ -927,6 +931,8 @@ CMakeFiles/Fujisan.dir/src/emulatorwidget.cpp.o: \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours_external.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/artifact.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/config.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/devices.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/atari.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QPainter \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpainter.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtextoption.h \
@@ -936,4 +942,9 @@ CMakeFiles/Fujisan.dir/src/emulatorwidget.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtextstream.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlocale.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcontiguouscache.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QMouseEvent
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QMouseEvent \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QMimeData \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qmimedata.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QUrl \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFileInfo \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfileinfo.h

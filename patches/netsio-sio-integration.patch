@@ -1,0 +1,128 @@
+--- src/sio.c.original	2025-07-26 16:39:35.832221326 -0400
++++ src/sio.c	2025-07-26 16:39:40.920046420 -0400
+@@ -55,9 +55,6 @@
+ #undef DEBUG_PRO
+ #undef DEBUG_VAPI
+ 
+-/* External callback for disk activity notifications (from libatari800) */
+-extern void (*disk_activity_callback)(int drive, int operation);
+-
+ /* If ATR image is in double density (256 bytes per sector),
+    then the boot sectors (sectors 1-3) can be:
+    - logical (as seen by Atari) - 128 bytes in each sector
+@@ -668,11 +665,6 @@
+ 	SIO_last_op = SIO_LAST_READ;
+ 	SIO_last_op_time = 1;
+ 	SIO_last_drive = unit + 1;
+-	
+-	/* Call libatari800 disk activity callback if set */
+-	if (disk_activity_callback) {
+-		disk_activity_callback(unit + 1, SIO_LAST_READ);
+-	}
+ 	/* FIXME: what sector size did the user expect? */
+ 	size = SeekSector(unit, sector);
+ 	if (image_type[unit] == IMAGE_TYPE_PRO) {
+@@ -850,11 +842,6 @@
+ 	SIO_last_op = SIO_LAST_WRITE;
+ 	SIO_last_op_time = 1;
+ 	SIO_last_drive = unit + 1;
+-	
+-	/* Call libatari800 disk activity callback if set */
+-	if (disk_activity_callback) {
+-		disk_activity_callback(unit + 1, SIO_LAST_WRITE);
+-	}
+ #ifdef VAPI_WRITE_ENABLE 	
+  	if (image_type[unit] == IMAGE_TYPE_VAPI) {
+ 		vapi_additional_info_t *info;
+@@ -1415,11 +1402,6 @@
+ 		SIO_last_op = SIO_LAST_WRITE;
+ 		SIO_last_op_time = 10;
+ 		SIO_last_drive = unit + 1;
+-		
+-		/* Call libatari800 disk activity callback if set */
+-		if (disk_activity_callback) {
+-			disk_activity_callback(unit + 1, SIO_LAST_WRITE);
+-		}
+ 		return 'A';
+ 	case 0x52:				/* Read */
+ 	case 0xD2:				/* xf551 hispeed */
+@@ -1457,11 +1439,6 @@
+ 		SIO_last_op = SIO_LAST_READ;
+ 		SIO_last_op_time = 10;
+ 		SIO_last_drive = unit + 1;
+-		
+-		/* Call libatari800 disk activity callback if set */
+-		if (disk_activity_callback) {
+-			disk_activity_callback(unit + 1, SIO_LAST_READ);
+-		}
+ 		return 'A';
+ 	case 0x53:				/* Status */
+ 	case 0xD3:				/* xf551 hispeed */
+@@ -1668,8 +1645,37 @@
+ #ifdef NETSIO
+ 	if (netsio_enabled)
+ 	{
+-		NetSIO_PutByte(byte);
+-		return;
++		/* For disk devices D1:-D8:, check if local disk should take priority */
++		int use_local = 0;
++		
++		/* Check device ID from command frame */
++		if (TransferStatus == SIO_CommandFrame && CommandIndex == 0) {
++			/* First byte is device ID */
++			if (byte >= 0x31 && byte <= 0x38) {
++				int drive = byte - 0x31;
++				if (drive >= 0 && drive < SIO_MAX_DRIVES && 
++				    SIO_drive_status[drive] != SIO_OFF && 
++				    SIO_drive_status[drive] != SIO_NO_DISK) {
++					/* Local disk is mounted and ready */
++					use_local = 1;
++				}
++			}
++		} else if (CommandIndex > 0 && CommandFrame[0] >= 0x31 && CommandFrame[0] <= 0x38) {
++			/* Subsequent bytes - check saved device ID */
++			int drive = CommandFrame[0] - 0x31;
++			if (drive >= 0 && drive < SIO_MAX_DRIVES && 
++			    SIO_drive_status[drive] != SIO_OFF && 
++			    SIO_drive_status[drive] != SIO_NO_DISK) {
++				/* Local disk is mounted and ready */
++				use_local = 1;
++			}
++		}
++		
++		if (!use_local) {
++			NetSIO_PutByte(byte);
++			return;
++		}
++		/* Otherwise continue with local SIO processing */
+ 	}
+ #endif /* NETSIO */
+ 	switch (TransferStatus) {
+@@ -1827,7 +1833,26 @@
+ 
+ #ifdef NETSIO
+ 	if (netsio_enabled)
+-		return NetSIO_GetByte();
++	{
++		/* For disk devices D1:-D8:, check if local disk should take priority */
++		int use_local = 0;
++		
++		/* Check if we have a valid command for a disk device */
++		if (CommandFrame[0] >= 0x31 && CommandFrame[0] <= 0x38) {
++			int drive = CommandFrame[0] - 0x31;
++			if (drive >= 0 && drive < SIO_MAX_DRIVES && 
++			    SIO_drive_status[drive] != SIO_OFF && 
++			    SIO_drive_status[drive] != SIO_NO_DISK) {
++				/* Local disk is mounted and ready */
++				use_local = 1;
++			}
++		}
++		
++		if (!use_local) {
++			return NetSIO_GetByte();
++		}
++		/* Otherwise continue with local SIO processing */
++	}
+ #endif /* NETSIO */
+ 
+ 	switch (TransferStatus) {

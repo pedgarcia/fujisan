@@ -927,12 +927,27 @@ CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qvalidator.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qregularexpression.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qlocale.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QListWidget \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlistwidget.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlistview.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractitemview.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractitemmodel.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qitemselectionmodel.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qset.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractitemdelegate.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qstyleoption.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qslider.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractslider.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qstyle.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabbar.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabwidget.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSet \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/atariemulator.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QKeyEvent \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qevent.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreevent.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qset.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfile.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfiledevice.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qvector2d.h \
@@ -950,13 +965,14 @@ CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QIODevice \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QBuffer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qbuffer.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSet \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/libatari800/libatari800.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/akey.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours_external.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/artifact.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/config.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/devices.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/atari.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDebug \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdebug.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtextstream.h \
@@ -967,8 +983,9 @@ CMakeFiles/Fujisan.dir/src/debuggerwidget.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollBar \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollbar.h \
-  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractslider.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QCoreApplication \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreapplication.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeventloop.h \
-  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QFontMetrics
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QFontMetrics \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSettings \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsettings.h

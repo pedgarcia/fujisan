@@ -1234,7 +1234,7 @@ void AtariEmulator::injectCharacter(char ch)
             case 'I': atariKey = AKEY_i; break;
             case 'J': atariKey = AKEY_j; break;
             case 'K': atariKey = AKEY_k; break;
-            case 'L': m_currentInput.keychar = 'l'; return;
+            case 'L': m_currentInput.keychar = 'l'; break;
             case 'M': atariKey = AKEY_m; break;
             case 'N': atariKey = AKEY_n; break;
             case 'O': atariKey = AKEY_o; break;
@@ -1268,7 +1268,7 @@ void AtariEmulator::injectCharacter(char ch)
             case 'i': atariKey = AKEY_i; break;
             case 'j': atariKey = AKEY_j; break;
             case 'k': atariKey = AKEY_k; break;
-            case 'l': m_currentInput.keychar = 'l'; return;
+            case 'l': m_currentInput.keychar = 'l'; break;
             case 'm': atariKey = AKEY_m; break;
             case 'n': atariKey = AKEY_n; break;
             case 'o': atariKey = AKEY_o; break;
@@ -1299,9 +1299,74 @@ void AtariEmulator::injectCharacter(char ch)
     } else if (ch == '"') {
         // Quote - use keychar
         m_currentInput.keychar = '"';
+    } else if (ch == '=') {
+        // Equals sign
+        m_currentInput.keychar = '=';
+    } else if (ch == '+') {
+        // Plus sign
+        m_currentInput.keychar = '+';
+    } else if (ch == '-') {
+        // Minus sign
+        m_currentInput.keychar = '-';
+    } else if (ch == '*') {
+        // Asterisk
+        m_currentInput.keychar = '*';
+    } else if (ch == '/') {
+        // Slash
+        m_currentInput.keychar = '/';
+    } else if (ch == '(') {
+        // Left parenthesis
+        m_currentInput.keychar = '(';
+    } else if (ch == ')') {
+        // Right parenthesis
+        m_currentInput.keychar = ')';
+    } else if (ch == ',') {
+        // Comma
+        m_currentInput.keychar = ',';
+    } else if (ch == ';') {
+        // Semicolon
+        m_currentInput.keychar = ';';
+    } else if (ch == ':') {
+        // Colon
+        m_currentInput.keychar = ':';
+    } else if (ch == '.') {
+        // Period
+        m_currentInput.keychar = '.';
+    } else if (ch == '?') {
+        // Question mark
+        m_currentInput.keychar = '?';
+    } else if (ch == '!') {
+        // Exclamation mark
+        m_currentInput.keychar = '!';
+    } else if (ch == '<') {
+        // Less than
+        m_currentInput.keychar = '<';
+    } else if (ch == '>') {
+        // Greater than
+        m_currentInput.keychar = '>';
+    } else if (ch == '\'') {
+        // Apostrophe
+        m_currentInput.keychar = '\'';
     } else {
         return;
     }
+    
+    // IMPROVED FIX: Let the input persist for multiple frames to ensure proper processing
+    // The main emulation loop will process this input over several frames
+    // Don't clear immediately - let the regular frame processing handle it
+    
+    // Process a few frames to ensure the character is registered
+    for (int i = 0; i < 3; i++) {
+        libatari800_next_frame(&m_currentInput);
+    }
+    
+    // Now clear the input after multiple frame processing
+    libatari800_clear_input_array(&m_currentInput);
+    // Restore joystick center positions after clearing
+    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
 }
 
 void AtariEmulator::clearInput()

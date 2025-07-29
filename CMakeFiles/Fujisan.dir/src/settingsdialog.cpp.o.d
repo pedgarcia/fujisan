@@ -976,6 +976,8 @@ CMakeFiles/Fujisan.dir/src/settingsdialog.cpp.o: \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/colours_external.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/artifact.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/config.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/devices.h \
+  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/../src/atari.h \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/configurationprofilemanager.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QStringList \
   /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/configurationprofile.h \

@@ -713,11 +713,15 @@
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrawerwidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/diskdrivewidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/emulatorwidget.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/joystickswapwidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mainwindow.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/mediaperipheralsdock.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/printerwidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/profileselectionwidget.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/settingsdialog.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/tcpserver.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/toggleswitch.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/include/volumeknob.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/atariemulator.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cartridgewidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/cassettewidget.cpp
@@ -727,24 +731,34 @@
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrawerwidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/diskdrivewidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/emulatorwidget.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/joystickswapwidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/main.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mainwindow.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/mediaperipheralsdock.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/printerwidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/profileselectionwidget.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/settingsdialog.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/tcpserver.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/toggleswitch.cpp
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/fujisan/src/volumeknob.cpp
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/akey.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/artifact.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/atari.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/colours.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/colours_external.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/config.h
+ /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/devices.h
  /Users/pgarcia/Documents/_priv/dev/atari/atari800-src/src/libatari800/libatari800.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QBuffer
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QDateTime
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QIODevice
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonDocument
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonObject
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QJsonValue
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QList
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QMap
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QObject
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QPoint
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QPropertyAnimation
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QSet
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/QSettings
@@ -784,6 +798,7 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qhash.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qhashfunctions.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qiodevice.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qitemselectionmodel.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qiterator.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qjsondocument.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qjsonobject.h
@@ -838,36 +853,49 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtCore.framework/Versions/5/Headers/qversiontagging.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QClipboard
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QContextMenuEvent
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragEnterEvent
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragLeaveEvent
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDragMoveEvent
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QDropEvent
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QFont
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QFontMetrics
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QImage
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QKeyEvent
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QMouseEvent
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPaintEvent
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPainter
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QPixmap
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/QWheelEvent
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qabstracttextdocumentlayout.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qbrush.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qclipboard.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qcolor.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qcursor.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qevent.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfont.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfontdatabase.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfontinfo.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qfontmetrics.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qglyphrun.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qicon.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qimage.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qkeysequence.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qmatrix.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpaintdevice.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpainter.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpalette.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpen.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpixelformat.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpixmap.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qpolygon.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qrawfont.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qregion.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qrgb.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qrgba64.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextcursor.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextdocument.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextformat.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextlayout.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtextoption.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtgui-config.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtGui.framework/Versions/5/Headers/qtguiglobal.h
@@ -886,6 +914,14 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtMultimedia.framework/Versions/5/Headers/qmultimedia.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtMultimedia.framework/Versions/5/Headers/qtmultimedia-config.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtMultimedia.framework/Versions/5/Headers/qtmultimediaglobal.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/QTcpServer
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/QTcpSocket
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qabstractsocket.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qhostaddress.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtcpserver.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtcpsocket.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtnetwork-config.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtNetwork.framework/Versions/5/Headers/qtnetworkglobal.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QAction
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QCheckBox
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QComboBox
@@ -903,12 +939,14 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLabel
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLayout
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QLineEdit
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QListWidget
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMainWindow
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenu
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMenuBar
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QMessageBox
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPlainTextEdit
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QPushButton
- /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollArea
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QScrollBar
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSlider
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QSpinBox
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QTabWidget
@@ -918,6 +956,7 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/QWidget
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractbutton.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractitemdelegate.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractitemview.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractscrollarea.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractslider.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qabstractspinbox.h
@@ -939,13 +978,16 @@
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlayout.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlayoutitem.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlineedit.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlistview.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qlistwidget.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmainwindow.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmenu.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmenubar.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qmessagebox.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qplaintextedit.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qpushbutton.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qrubberband.h
- /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollarea.h
+ /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qscrollbar.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qsizepolicy.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qslider.h
  /opt/homebrew/Cellar/qt@5/5.15.16_2/lib/QtWidgets.framework/Versions/5/Headers/qspinbox.h
