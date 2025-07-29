@@ -371,17 +371,17 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
         QString validatedPath = path; // Temporarily skip validation
         qDebug() << "TCP Server: Using path directly:" << validatedPath;
         
-        qDebug() << "TCP Server: Attempting to mount disk image:" << validatedPath;
+        qDebug() << "TCP Server: Attempting to insert disk via MainWindow:" << validatedPath;
         
-        // Use the emulator's disk mounting method with simplified error handling
+        // Use MainWindow's insertDiskViaTCP method to properly enable drive and update GUI
         bool success = false;
         try {
-            success = m_emulator->mountDiskImage(drive, validatedPath);
-            qDebug() << "TCP Server: mountDiskImage returned:" << success;
+            success = m_mainWindow->insertDiskViaTCP(drive, validatedPath);
+            qDebug() << "TCP Server: insertDiskViaTCP returned:" << success;
         } catch (...) {
-            qDebug() << "TCP Server: Exception in mountDiskImage";
+            qDebug() << "TCP Server: Exception in insertDiskViaTCP";
             sendResponse(client, requestId, false, QJsonValue(), 
-                        "Exception occurred while mounting disk image");
+                        "Exception occurred while inserting disk");
             return;
         }
         
@@ -397,6 +397,8 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
             eventData["drive"] = drive;
             eventData["path"] = validatedPath;
             sendEventToAllClients("disk_inserted", eventData);
+            
+            // Note: GUI signal emission handled automatically by DiskDriveWidget::insertDisk()
         } else {
             qDebug() << "TCP Server: mountDiskImage failed for:" << validatedPath;
             sendResponse(client, requestId, false, QJsonValue(), 
@@ -413,7 +415,7 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
             return;
         }
         
-        m_emulator->dismountDiskImage(drive);
+        bool success = m_mainWindow->ejectDiskViaTCP(drive);
         
         QJsonObject result;
         result["drive"] = drive;
@@ -424,6 +426,8 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
         QJsonObject eventData;
         eventData["drive"] = drive;
         sendEventToAllClients("disk_ejected", eventData);
+        
+        // Note: GUI signal emission handled automatically by DiskDriveWidget::ejectDisk()
         
     } else if (subCommand == "insert_cartridge") {
         // Insert cartridge
@@ -436,8 +440,8 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
             return;
         }
         
-        // Use the generic loadFile method for cartridges
-        bool success = m_emulator->loadFile(validatedPath);
+        // Use MainWindow's insertCartridgeViaTCP method to properly update GUI
+        bool success = m_mainWindow->insertCartridgeViaTCP(validatedPath);
         
         if (success) {
             QJsonObject result;
@@ -449,16 +453,31 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
             QJsonObject eventData;
             eventData["path"] = validatedPath;
             sendEventToAllClients("cartridge_inserted", eventData);
+            
+            // Note: GUI signal emission handled automatically by CartridgeWidget::loadCartridge()
         } else {
             sendResponse(client, requestId, false, QJsonValue(), 
                         "Failed to load cartridge: " + validatedPath);
         }
         
     } else if (subCommand == "eject_cartridge") {
-        // For now, cartridge ejection might require a restart or specific handling
-        // This is a placeholder - actual implementation depends on available methods
-        sendResponse(client, requestId, false, QJsonValue(), 
-                    "Cartridge ejection not yet implemented - restart emulator to remove cartridge");
+        // Eject cartridge using CartridgeWidget
+        bool success = m_mainWindow->ejectCartridgeViaTCP();
+        
+        if (success) {
+            QJsonObject result;
+            result["ejected"] = true;
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            sendEventToAllClients("cartridge_ejected", eventData);
+            
+            // Note: GUI signal emission handled automatically by CartridgeWidget::ejectCartridge()
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Failed to eject cartridge");
+        }
         
     } else if (subCommand == "load_xex") {
         // Load XEX executable file
@@ -488,6 +507,52 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
             sendResponse(client, requestId, false, QJsonValue(), 
                         "Failed to load XEX file: " + validatedPath);
         }
+        
+    } else if (subCommand == "enable_drive") {
+        // Enable specified drive
+        int drive = params["drive"].toInt();
+        
+        if (drive < 1 || drive > 8) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Invalid drive number. Must be 1-8");
+            return;
+        }
+        
+        bool success = m_mainWindow->enableDriveViaTCP(drive, true);
+        
+        QJsonObject result;
+        result["drive"] = drive;
+        result["enabled"] = true;
+        sendResponse(client, requestId, true, result);
+        
+        // Send event to all clients
+        QJsonObject eventData;
+        eventData["drive"] = drive;
+        eventData["enabled"] = true;
+        sendEventToAllClients("drive_state_changed", eventData);
+        
+    } else if (subCommand == "disable_drive") {
+        // Disable specified drive
+        int drive = params["drive"].toInt();
+        
+        if (drive < 1 || drive > 8) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Invalid drive number. Must be 1-8");
+            return;
+        }
+        
+        bool success = m_mainWindow->enableDriveViaTCP(drive, false);
+        
+        QJsonObject result;
+        result["drive"] = drive;
+        result["enabled"] = false;
+        sendResponse(client, requestId, true, result);
+        
+        // Send event to all clients
+        QJsonObject eventData;
+        eventData["drive"] = drive;
+        eventData["enabled"] = false;
+        sendEventToAllClients("drive_state_changed", eventData);
         
     } else {
         sendResponse(client, requestId, false, QJsonValue(), 

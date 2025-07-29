@@ -122,9 +122,49 @@ Eject disk from specified drive.
 echo '{"command": "media.eject_disk", "params": {"drive": 1}}' | nc localhost 8080
 ```
 
+#### `media.enable_drive`
+
+Enable a disk drive (turn on).
+
+```bash
+echo '{"command": "media.enable_drive", "params": {"drive": 1}}' | nc localhost 8080
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "drive": 1,
+    "enabled": true
+  }
+}
+```
+
+#### `media.disable_drive`
+
+Disable a disk drive (turn off).
+
+```bash
+echo '{"command": "media.disable_drive", "params": {"drive": 1}}' | nc localhost 8080
+```
+
+**Response:**
+```json
+{
+  "type": "response", 
+  "status": "success",
+  "result": {
+    "drive": 1,
+    "enabled": false
+  }
+}
+```
+
 #### `media.insert_cartridge`
 
-Insert a cartridge file.
+Insert a cartridge file (.car format). Updates GUI cartridge widget visual state.
 
 ```bash
 echo '{
@@ -133,16 +173,61 @@ echo '{
 }' | nc localhost 8080
 ```
 
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success", 
+  "result": {
+    "path": "/path/to/cartridge.car",
+    "loaded": true
+  }
+}
+```
+
+#### `media.eject_cartridge`
+
+Eject the currently inserted cartridge. Updates GUI cartridge widget visual state.
+
+```bash
+echo '{"command": "media.eject_cartridge"}' | nc localhost 8080
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "ejected": true
+  }
+}
+```
+
 #### `media.load_xex`
 
-Load an Atari executable file.
+Load and execute an Atari executable file (.xex format). Program starts running immediately.
 
 ```bash
 echo '{
-  "command": "media.load_xex",
+  "command": "media.load_xex", 
   "params": {"path": "/path/to/program.xex"}
 }' | nc localhost 8080
 ```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "path": "/path/to/program.xex", 
+    "loaded": true
+  }
+}
+```
+
+**Note:** To clear XEX programs from memory, use `system.cold_boot`.
 
 ### System Commands
 
@@ -577,6 +662,50 @@ echo '{"command": "media.insert_disk", "params": {"drive": 1, "path": "/dev/disk
 echo '{"command": "input.send_text", "params": {"text": "LOAD \"D:PROGRAM.BAS\"\n"}}' | nc localhost 8080
 echo '{"command": "input.send_text", "params": {"text": "RUN\n"}}' | nc localhost 8080
 ```
+
+---
+
+## Common Workflows
+
+### Complete Drive Control Workflow
+
+```bash
+# Enable drive, insert disk, eject disk, disable drive
+echo '{"command": "media.enable_drive", "params": {"drive": 1}}' | nc localhost 8080
+echo '{"command": "media.insert_disk", "params": {"drive": 1, "path": "/path/to/disk.atr"}}' | nc localhost 8080
+echo '{"command": "media.eject_disk", "params": {"drive": 1}}' | nc localhost 8080  
+echo '{"command": "media.disable_drive", "params": {"drive": 1}}' | nc localhost 8080
+```
+
+### Cartridge Swapping Workflow
+
+```bash
+# Load cartridge, test, eject, load different cartridge
+echo '{"command": "media.insert_cartridge", "params": {"path": "/path/to/action.car"}}' | nc localhost 8080
+# Test cartridge...
+echo '{"command": "media.eject_cartridge"}' | nc localhost 8080
+echo '{"command": "media.insert_cartridge", "params": {"path": "/path/to/basic.car"}}' | nc localhost 8080
+```
+
+### XEX Program Testing Workflow
+
+```bash
+# Load and test multiple programs with cleanup
+echo '{"command": "media.load_xex", "params": {"path": "/path/to/game1.xex"}}' | nc localhost 8080
+# Program runs automatically...
+echo '{"command": "system.cold_boot"}' | nc localhost 8080
+echo '{"command": "media.load_xex", "params": {"path": "/path/to/game2.xex"}}' | nc localhost 8080
+# Program runs automatically...
+echo '{"command": "system.cold_boot"}' | nc localhost 8080
+```
+
+### Visual Feedback Features
+
+All media commands provide visual feedback in the GUI:
+- **Drive Commands**: Enable/disable updates drive LEDs (off ↔ empty ↔ closed)
+- **Disk Commands**: Insert/eject updates drive widgets and shows disk activity
+- **Cartridge Commands**: Insert/eject updates cartridge widget (off ↔ on)
+- **Status Messages**: All operations show status bar messages
 
 ---
 

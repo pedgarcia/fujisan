@@ -41,6 +41,13 @@ public:
     int connectedClientCount() const;
     void setDebuggerWidget(DebuggerWidget* debugger);
 
+signals:
+    // Signals for GUI integration
+    void diskInserted(int driveNumber, const QString& diskPath);
+    void diskEjected(int driveNumber);
+    void cartridgeInserted(const QString& cartridgePath);
+    void cartridgeEjected();
+
 public slots:
     void sendEventToAllClients(const QString& eventType, const QJsonObject& data);
 

@@ -86,6 +86,15 @@ private slots:
 public:
     // Public method for TCP server to request proper emulator restart
     void requestEmulatorRestart();
+    
+    // Public methods for TCP server to control disk drives properly
+    bool insertDiskViaTCP(int driveNumber, const QString& diskPath);
+    bool ejectDiskViaTCP(int driveNumber);
+    bool enableDriveViaTCP(int driveNumber, bool enabled);
+    
+    // Public methods for TCP server to control cartridge properly
+    bool insertCartridgeViaTCP(const QString& cartridgePath);
+    bool ejectCartridgeViaTCP();
 
 private:
     void createMenus();

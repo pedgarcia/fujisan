@@ -1199,6 +1199,10 @@ void MainWindow::createMediaPeripheralsDock()
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::printerOutputFormatChanged, this, &MainWindow::onPrinterOutputFormatChanged);
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::printerTypeChanged, this, &MainWindow::onPrinterTypeChanged);
     // Note: Cartridge signals connected to toolbar cartridge widget above
+    
+    // Connect TCP server signals for GUI integration
+    connect(m_tcpServer, &TCPServer::diskInserted, this, &MainWindow::onDiskInserted);
+    connect(m_tcpServer, &TCPServer::diskEjected, this, &MainWindow::onDiskEjected);
 
     // Connect solid LED disk I/O monitoring
     connect(m_emulator, &AtariEmulator::diskIOStart, this, [this](int driveNumber, bool isWriting) {
@@ -2212,4 +2216,87 @@ void MainWindow::requestEmulatorRestart()
     qDebug() << "Current machine type:" << m_emulator->getMachineType();
     qDebug() << "Current video system:" << m_emulator->getVideoSystem();
     restartEmulator();
+}
+
+bool MainWindow::insertDiskViaTCP(int driveNumber, const QString& diskPath)
+{
+    qDebug() << "MainWindow::insertDiskViaTCP called for drive" << driveNumber << "path:" << diskPath;
+    
+    if (driveNumber == 1 && m_diskDrive1) {
+        // For D1, use the toolbar disk drive widget
+        m_diskDrive1->setDriveEnabled(true);  // Enable the drive first
+        m_diskDrive1->insertDisk(diskPath);   // Insert the disk
+        return true;
+    } else if (driveNumber >= 2 && driveNumber <= 8) {
+        // For D2-D8, fall back to direct emulator call for now
+        // TODO: Implement proper GUI integration for D2-D8
+        return m_emulator->mountDiskImage(driveNumber, diskPath, false);
+    }
+    
+    qDebug() << "MainWindow::insertDiskViaTCP failed - invalid drive or widget not available";
+    return false;
+}
+
+bool MainWindow::ejectDiskViaTCP(int driveNumber)
+{
+    qDebug() << "MainWindow::ejectDiskViaTCP called for drive" << driveNumber;
+    
+    if (driveNumber == 1 && m_diskDrive1) {
+        // For D1, use the toolbar disk drive widget
+        m_diskDrive1->ejectDisk();
+        return true;
+    } else if (driveNumber >= 2 && driveNumber <= 8) {
+        // For D2-D8, fall back to direct emulator call for now
+        // TODO: Implement proper GUI integration for D2-D8
+        m_emulator->dismountDiskImage(driveNumber);
+        return true;
+    }
+    
+    qDebug() << "MainWindow::ejectDiskViaTCP failed - invalid drive or widget not available";
+    return false;
+}
+
+bool MainWindow::enableDriveViaTCP(int driveNumber, bool enabled)
+{
+    qDebug() << "MainWindow::enableDriveViaTCP called for drive" << driveNumber << "enabled:" << enabled;
+    
+    if (driveNumber == 1 && m_diskDrive1) {
+        // For D1, use the toolbar disk drive widget
+        m_diskDrive1->setDriveEnabled(enabled);
+        return true;
+    } else if (driveNumber >= 2 && driveNumber <= 8 && m_mediaPeripheralsDock) {
+        // For D2-D8, would need to access media dock drives
+        // TODO: Implement proper GUI integration for D2-D8 drive enable/disable
+        qDebug() << "MainWindow::enableDriveViaTCP - D2-D8 not yet implemented";
+        return false;
+    }
+    
+    qDebug() << "MainWindow::enableDriveViaTCP failed - invalid drive or widget not available";
+    return false;
+}
+
+bool MainWindow::insertCartridgeViaTCP(const QString& cartridgePath)
+{
+    qDebug() << "MainWindow::insertCartridgeViaTCP called with path:" << cartridgePath;
+    
+    if (m_cartridgeWidget) {
+        m_cartridgeWidget->loadCartridge(cartridgePath);
+        return true;
+    }
+    
+    qDebug() << "MainWindow::insertCartridgeViaTCP failed - cartridge widget not available";
+    return false;
+}
+
+bool MainWindow::ejectCartridgeViaTCP()
+{
+    qDebug() << "MainWindow::ejectCartridgeViaTCP called";
+    
+    if (m_cartridgeWidget) {
+        m_cartridgeWidget->ejectCartridge();
+        return true;
+    }
+    
+    qDebug() << "MainWindow::ejectCartridgeViaTCP failed - cartridge widget not available";
+    return false;
 }
