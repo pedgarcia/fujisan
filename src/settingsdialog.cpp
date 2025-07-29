@@ -40,6 +40,10 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     // Store original printer state for restart detection
     m_originalSettings.printerEnabled = settings.value("printer/enabled", false).toBool();
     
+    // Store original TCP server settings
+    m_originalSettings.tcpServerEnabled = settings.value("emulator/tcpServerEnabled", true).toBool();
+    m_originalSettings.tcpServerPort = settings.value("emulator/tcpServerPort", 6502).toInt();
+    
     // Create main layout
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     
@@ -60,6 +64,7 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     createVideoDisplayTab();
     createInputConfigTab();
     createMediaConfigTab();
+    createEmulatorTab();
     
     // Create button box with custom buttons
     m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -1642,6 +1647,44 @@ void SettingsDialog::createMediaConfigTab()
     mainLayout->addLayout(rightColumn, 1);
 }
 
+void SettingsDialog::createEmulatorTab()
+{
+    m_emulatorTab = new QWidget();
+    m_tabWidget->addTab(m_emulatorTab, "Emulator");
+    
+    QVBoxLayout* mainLayout = new QVBoxLayout(m_emulatorTab);
+    mainLayout->setSpacing(20);
+    
+    // TCP Server Configuration
+    QGroupBox* tcpServerGroup = new QGroupBox("TCP Server");
+    QFormLayout* tcpServerLayout = new QFormLayout(tcpServerGroup);
+    
+    // TCP Server Enabled checkbox
+    m_tcpServerEnabled = new QCheckBox("Enable TCP Server");
+    m_tcpServerEnabled->setToolTip("Enable TCP server for remote control and automation");
+    tcpServerLayout->addRow(m_tcpServerEnabled);
+    
+    // TCP Server Port
+    m_tcpServerPort = new QSpinBox();
+    m_tcpServerPort->setRange(1024, 65535);
+    m_tcpServerPort->setValue(6502); // Default to 6502 (6502 processor reference)
+    m_tcpServerPort->setToolTip("Port number for TCP server (default: 6502)");
+    tcpServerLayout->addRow("Port:", m_tcpServerPort);
+    
+    // Add description
+    QLabel* tcpDescription = new QLabel(
+        "The TCP server provides remote control capabilities for automation and integration.\n"
+        "When enabled, external tools can connect to control media, input, and system functions.\n"
+        "Default port 6502 references the Atari's 6502 processor."
+    );
+    tcpDescription->setWordWrap(true);
+    tcpDescription->setStyleSheet("color: #666; font-size: 11px; margin-top: 10px;");
+    tcpServerLayout->addRow(tcpDescription);
+    
+    mainLayout->addWidget(tcpServerGroup);
+    mainLayout->addStretch();
+}
+
 void SettingsDialog::browseDiskImage(int diskNumber)
 {
     QString fileName = QFileDialog::getOpenFileName(
@@ -2194,6 +2237,10 @@ void SettingsDialog::loadSettings()
     m_printerType->setCurrentText(settings.value("printer/type", "Generic").toString());
     */
     
+    // TCP Server Configuration
+    m_tcpServerEnabled->setChecked(settings.value("emulator/tcpServerEnabled", true).toBool());
+    m_tcpServerPort->setValue(settings.value("emulator/tcpServerPort", 6502).toInt());
+    
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
     
@@ -2362,6 +2409,10 @@ void SettingsDialog::saveSettings()
     */
     // Force printer disabled
     settings.setValue("printer/enabled", false);
+    
+    // TCP Server Configuration
+    settings.setValue("emulator/tcpServerEnabled", m_tcpServerEnabled->isChecked());
+    settings.setValue("emulator/tcpServerPort", m_tcpServerPort->value());
     
     // Check if NetSIO setting has changed (requires emulator restart)
     bool currentNetSIOState = m_netSIOEnabled->isChecked();

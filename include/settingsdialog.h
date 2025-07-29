@@ -70,6 +70,7 @@ private:
     void createVideoDisplayTab();
     void createInputConfigTab();
     void createMediaConfigTab();
+    void createEmulatorTab();
     void saveSettings();
     void applySettings();
     void applyMediaSettings();
@@ -267,6 +268,11 @@ private:
     QComboBox* m_printerOutputFormat;
     QComboBox* m_printerType;
     
+    // Emulator Configuration controls
+    QWidget* m_emulatorTab;
+    QCheckBox* m_tcpServerEnabled;
+    QSpinBox* m_tcpServerPort;
+    
     // Store original settings for cancel functionality
     struct OriginalSettings {
         QString machineType;
@@ -275,6 +281,8 @@ private:
         bool altirraOSEnabled;
         bool netSIOEnabled;  // Track NetSIO state for restart detection
         bool printerEnabled; // Track printer state for restart detection
+        bool tcpServerEnabled; // Track TCP server state
+        int tcpServerPort;   // Track TCP server port
     } m_originalSettings;
 };
 

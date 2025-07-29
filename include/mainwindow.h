@@ -175,10 +175,6 @@ private:
     QAction* m_aboutAction;
     QAction* m_pasteAction;
 
-    // Video system actions
-    QAction* m_videoNTSCAction;
-    QAction* m_videoPALAction;
-
     // Video settings
     bool m_keepAspectRatio;
     bool m_startInFullscreen;

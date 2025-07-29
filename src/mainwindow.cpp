@@ -75,15 +75,19 @@ MainWindow::MainWindow(QWidget *parent)
     // Show initial status message
     statusBar()->showMessage("Fujisan ready", 3000);
 
-    // Auto-start TCP Server on port 8080 by default for development
-    if (m_tcpServer && !m_tcpServer->isRunning()) {
-        bool success = m_tcpServer->startServer(8080);
+    // Auto-start TCP Server if enabled in settings
+    QSettings settings;
+    bool tcpEnabled = settings.value("emulator/tcpServerEnabled", true).toBool();
+    int tcpPort = settings.value("emulator/tcpServerPort", 6502).toInt();
+    
+    if (tcpEnabled && m_tcpServer && !m_tcpServer->isRunning()) {
+        bool success = m_tcpServer->startServer(tcpPort);
         if (success) {
             m_tcpServerAction->setChecked(true);
             m_tcpServerAction->setText("&TCP Server (Running)");
-            qDebug() << "TCP Server auto-started on localhost:8080";
+            qDebug() << "TCP Server auto-started on localhost:" << tcpPort;
         } else {
-            qDebug() << "Failed to auto-start TCP Server";
+            qDebug() << "Failed to auto-start TCP Server on port" << tcpPort;
         }
     }
 
@@ -155,26 +159,6 @@ void MainWindow::createMenus()
     connect(m_settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     systemMenu->addAction(m_settingsAction);
 
-    // Machine menu (now just for video system)
-    QMenu* machineMenu = menuBar()->addMenu("&Machine");
-
-    m_videoNTSCAction = new QAction("&NTSC Video", this);
-    m_videoNTSCAction->setCheckable(true);
-    connect(m_videoNTSCAction, &QAction::triggered, [this]() {
-        m_videoToggle->setChecked(false); // NTSC = OFF position
-        onVideoSystemToggled(false);
-    });
-    machineMenu->addAction(m_videoNTSCAction);
-
-    m_videoPALAction = new QAction("&PAL Video", this);
-    m_videoPALAction->setCheckable(true);
-    m_videoPALAction->setChecked(true); // Default
-    connect(m_videoPALAction, &QAction::triggered, [this]() {
-        m_videoToggle->setChecked(true); // PAL = ON position
-        onVideoSystemToggled(true);
-    });
-    machineMenu->addAction(m_videoPALAction);
-
     // View menu
     QMenu* viewMenu = menuBar()->addMenu("&View");
 
@@ -203,7 +187,7 @@ void MainWindow::createMenus()
     QMenu* toolsMenu = menuBar()->addMenu("&Tools");
     
     m_tcpServerAction = new QAction("&TCP Server", this);
-    m_tcpServerAction->setToolTip("Start/stop TCP server for remote control (localhost:8080)");
+    m_tcpServerAction->setToolTip("Start/stop TCP server for remote control (port configurable in settings)");
     m_tcpServerAction->setCheckable(true);
     connect(m_tcpServerAction, &QAction::triggered, this, &MainWindow::toggleTCPServer);
     toolsMenu->addAction(m_tcpServerAction);
@@ -782,14 +766,10 @@ void MainWindow::onVideoSystemToggled(bool isPAL)
 {
     if (isPAL) {
         // PAL mode (toggle ON)
-        m_videoPALAction->setChecked(true);
-        m_videoNTSCAction->setChecked(false);
         m_emulator->setVideoSystem("-pal");
         statusBar()->showMessage("Video system set to PAL (49.86 fps) - restarting...", 3000);
     } else {
         // NTSC mode (toggle OFF)
-        m_videoPALAction->setChecked(false);
-        m_videoNTSCAction->setChecked(true);
         m_emulator->setVideoSystem("-ntsc");
         statusBar()->showMessage("Video system set to NTSC (59.92 fps) - restarting...", 3000);
     }
@@ -913,13 +893,7 @@ void MainWindow::updateToolbarFromSettings()
     m_altirraOSAction->setChecked(m_emulator->isAltirraOSEnabled());
     m_altirraOSAction->blockSignals(false);
 
-    m_videoPALAction->blockSignals(true);
-    m_videoPALAction->setChecked(isPAL);
-    m_videoPALAction->blockSignals(false);
-
-    m_videoNTSCAction->blockSignals(true);
-    m_videoNTSCAction->setChecked(!isPAL);
-    m_videoNTSCAction->blockSignals(false);
+    // Video system state is now managed by the toolbar toggle widget only
 
     // Update audio settings from emulator state
     QSettings settings;
@@ -2192,18 +2166,21 @@ void MainWindow::toggleTCPServer()
         qDebug() << "TCP Server stopped by user";
     } else {
         // Start the TCP server
-        bool success = m_tcpServer->startServer(8080);
+        QSettings settings;
+        int tcpPort = settings.value("emulator/tcpServerPort", 6502).toInt();
+        
+        bool success = m_tcpServer->startServer(tcpPort);
         if (success) {
             m_tcpServerAction->setChecked(true);
             m_tcpServerAction->setText("&TCP Server (Running)");
-            m_tcpServerAction->setToolTip("Stop TCP server (currently running on localhost:8080)");
+            m_tcpServerAction->setToolTip(QString("Stop TCP server (currently running on localhost:%1)").arg(tcpPort));
             
-            statusBar()->showMessage("TCP Server started on localhost:8080", 5000);
-            qDebug() << "TCP Server started successfully on port 8080";
+            statusBar()->showMessage(QString("TCP Server started on localhost:%1").arg(tcpPort), 5000);
+            qDebug() << "TCP Server started successfully on port" << tcpPort;
         } else {
             m_tcpServerAction->setChecked(false);
-            statusBar()->showMessage("Failed to start TCP Server on port 8080", 5000);
-            qDebug() << "Failed to start TCP Server";
+            statusBar()->showMessage(QString("Failed to start TCP Server on port %1").arg(tcpPort), 5000);
+            qDebug() << "Failed to start TCP Server on port" << tcpPort;
         }
     }
 }
