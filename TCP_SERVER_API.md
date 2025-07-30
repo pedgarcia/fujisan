@@ -608,6 +608,92 @@ Apply configuration changes that require restart.
 echo '{"command": "config.apply_restart"}' | nc localhost 6502
 ```
 
+#### `config.get_profiles`
+
+Get list of available configuration profiles and current profile.
+
+```bash
+echo '{"command": "config.get_profiles"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "profiles": ["Default", "Development", "Gaming", "FujiNet"],
+    "current": "Default"
+  },
+  "status": "ok"
+}
+```
+
+#### `config.get_current_profile`
+
+Get the currently active profile name.
+
+```bash
+echo '{"command": "config.get_current_profile"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "profile": "Default"
+  },
+  "status": "ok"
+}
+```
+
+#### `config.load_profile`
+
+Load a configuration profile by name.
+
+```bash
+echo '{
+  "command": "config.load_profile",
+  "params": {"profile_name": "Development"}
+}' | nc localhost 6502
+```
+
+**Note:** Loading a profile applies all its settings immediately and may trigger an emulator restart if required.
+
+### Screen Commands
+
+Capture and access screen data.
+
+#### `screen.capture`
+
+Save a screenshot of the current screen to a file.
+
+```bash
+# Save screenshot with default filename
+echo '{"command": "screen.capture"}' | nc localhost 6502
+
+# Save with specific filename (automatically converts to PCX format)
+echo '{
+  "command": "screen.capture",
+  "params": {"filename": "my_screenshot.png"}
+}' | nc localhost 6502
+
+# Save interlaced screenshot
+echo '{
+  "command": "screen.capture",
+  "params": {
+    "filename": "interlaced.pcx",
+    "interlaced": true
+  }
+}' | nc localhost 6502
+```
+
+**Note**: Screenshots are saved in PCX format. If you specify a different extension (e.g., .png), it will be automatically changed to .pcx.
+
+**Response includes:**
+- `filename` - Full path to saved screenshot
+- `interlaced` - Whether interlaced mode was used
+- `timestamp` - When screenshot was taken
+- `size_bytes` - File size in bytes
+
 ### Status Commands
 
 Get emulator state and server information.

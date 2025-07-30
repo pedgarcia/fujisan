@@ -2277,3 +2277,27 @@ bool MainWindow::ejectCartridgeViaTCP()
     qDebug() << "MainWindow::ejectCartridgeViaTCP failed - cartridge widget not available";
     return false;
 }
+
+void MainWindow::applyProfileViaTCP(const ConfigurationProfile& profile)
+{
+    qDebug() << "MainWindow::applyProfileViaTCP called for profile:" << profile.name;
+    
+    // Apply the profile using the existing private method
+    applyProfileToEmulator(profile);
+    
+    // Update current profile name in the manager
+    if (m_profileManager) {
+        m_profileManager->setCurrentProfileName(profile.name);
+    }
+    
+    // Update the profile combo box to reflect the change
+    if (m_profileCombo) {
+        int index = m_profileCombo->findText(profile.name);
+        if (index >= 0) {
+            m_profileCombo->setCurrentIndex(index);
+            qDebug() << "Updated profile combo box to:" << profile.name;
+        } else {
+            qWarning() << "Profile not found in combo box:" << profile.name;
+        }
+    }
+}

@@ -2305,6 +2305,13 @@ void SettingsDialog::loadSettings()
                  << "Video:" << currentVideoSystem << "BASIC:" << m_emulator->isBasicEnabled()
                  << "Speed:" << currentSpeed << "%";
     }
+    
+    // Update profile widget to show current profile
+    if (m_profileWidget && m_profileManager) {
+        QString currentProfile = m_profileManager->getCurrentProfileName();
+        m_profileWidget->setCurrentProfileName(currentProfile);
+        qDebug() << "Profile widget updated with current profile:" << currentProfile;
+    }
 }
 
 void SettingsDialog::saveSettings()

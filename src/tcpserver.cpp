@@ -9,6 +9,8 @@
 #include "atariemulator.h"
 #include "debuggerwidget.h"
 #include "mainwindow.h"
+#include "configurationprofile.h"
+#include "configurationprofilemanager.h"
 #include <QDebug>
 #include <QJsonArray>
 #include <QJsonParseError>
@@ -1414,6 +1416,71 @@ void TCPServer::handleConfigCommand(QTcpSocket* client, const QJsonObject& reque
         eventData["reason"] = "configuration_changes";
         sendEventToAllClients("emulator_restarted", eventData);
         
+    } else if (subCommand == "get_profiles") {
+        // Get list of available configuration profiles
+        if (m_mainWindow && m_mainWindow->getProfileManager()) {
+            QJsonObject result;
+            QJsonArray profileArray;
+            
+            QStringList profiles = m_mainWindow->getProfileManager()->getProfileNames();
+            for (const QString& profile : profiles) {
+                profileArray.append(profile);
+            }
+            
+            result["profiles"] = profileArray;
+            result["current_profile"] = m_mainWindow->getProfileManager()->getCurrentProfileName();
+            sendResponse(client, requestId, true, result);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Profile manager not available");
+        }
+        
+    } else if (subCommand == "get_current_profile") {
+        // Get current profile name
+        if (m_mainWindow && m_mainWindow->getProfileManager()) {
+            QJsonObject result;
+            result["current_profile"] = m_mainWindow->getProfileManager()->getCurrentProfileName();
+            sendResponse(client, requestId, true, result);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Profile manager not available");
+        }
+        
+    } else if (subCommand == "load_profile") {
+        // Load a configuration profile
+        QString profileName = params["profile_name"].toString();
+        
+        if (profileName.isEmpty()) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Profile name is required");
+            return;
+        }
+        
+        if (m_mainWindow && m_mainWindow->getProfileManager()) {
+            ConfigurationProfile profile = m_mainWindow->getProfileManager()->loadProfile(profileName);
+            if (profile.isValid()) {
+                // Apply profile through MainWindow
+                m_mainWindow->applyProfileViaTCP(profile);
+                m_mainWindow->getProfileManager()->setCurrentProfileName(profileName);
+                
+                QJsonObject result;
+                result["profile_loaded"] = profileName;
+                result["restart_required"] = true;
+                sendResponse(client, requestId, true, result);
+                
+                // Send event to all clients
+                QJsonObject eventData;
+                eventData["profile_name"] = profileName;
+                sendEventToAllClients("profile_loaded", eventData);
+            } else {
+                sendResponse(client, requestId, false, QJsonValue(), 
+                            "Failed to load profile: " + profileName);
+            }
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Profile manager not available");
+        }
+        
     } else {
         sendResponse(client, requestId, false, QJsonValue(), 
                     "Unknown config command: " + subCommand);
@@ -1454,7 +1521,19 @@ void TCPServer::handleScreenCommand(QTcpSocket* client, const QJsonObject& reque
         
         if (filename.isEmpty()) {
             // Generate default filename if not provided
-            filename = QString("screenshot_%1.png").arg(QDateTime::currentMSecsSinceEpoch());
+            filename = QString("screenshot_%1.pcx").arg(QDateTime::currentMSecsSinceEpoch());
+        }
+        
+        // Ensure PCX extension since PNG might not be compiled in
+        if (!filename.endsWith(".pcx", Qt::CaseInsensitive)) {
+            // Change extension to .pcx
+            int lastDot = filename.lastIndexOf('.');
+            if (lastDot != -1) {
+                filename = filename.left(lastDot) + ".pcx";
+            } else {
+                filename += ".pcx";
+            }
+            qDebug() << "TCP Server: Changed filename extension to PCX:" << filename;
         }
         
         // Use absolute path in current directory

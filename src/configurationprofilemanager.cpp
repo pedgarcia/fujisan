@@ -8,11 +8,16 @@
 #include "configurationprofilemanager.h"
 #include <QDebug>
 #include <QDateTime>
+#include <QSettings>
 
 ConfigurationProfileManager::ConfigurationProfileManager(QObject *parent)
     : QObject(parent)
     , m_currentProfileName("Default")
 {
+    // Load the current profile from settings
+    QSettings settings("8bitrelics", "Fujisan");
+    m_currentProfileName = settings.value("profile/current", "Default").toString();
+    
     updateProfileCache();
     createDefaultProfilesIfNeeded();
 }
@@ -185,6 +190,12 @@ void ConfigurationProfileManager::setCurrentProfileName(const QString& name)
 {
     if (m_currentProfileName != name) {
         m_currentProfileName = name;
+        
+        // Save to settings
+        QSettings settings("8bitrelics", "Fujisan");
+        settings.setValue("profile/current", name);
+        settings.sync();
+        
         emit profileChanged(name);
         qDebug() << "Current profile changed to:" << name;
     }

@@ -95,6 +95,12 @@ public:
     // Public methods for TCP server to control cartridge properly
     bool insertCartridgeViaTCP(const QString& cartridgePath);
     bool ejectCartridgeViaTCP();
+    
+    // Public method for TCP server to access profile manager
+    ConfigurationProfileManager* getProfileManager() const { return m_profileManager; }
+    
+    // Public method for TCP server to apply a profile
+    void applyProfileViaTCP(const ConfigurationProfile& profile);
 
 private:
     void createMenus();
