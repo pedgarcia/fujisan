@@ -1058,8 +1058,8 @@ void MainWindow::showAbout()
     }
     layout->addWidget(logoLabel);
 
-    // Title and description
-    QLabel* titleLabel = new QLabel("Modern Atari Emulator");
+    // Title and version
+    QLabel* titleLabel = new QLabel("Fujisan v1.0.0");
     titleLabel->setAlignment(Qt::AlignCenter);
     QFont titleFont = titleLabel->font();
     titleFont.setPointSize(14);
@@ -1068,7 +1068,7 @@ void MainWindow::showAbout()
     layout->addWidget(titleLabel);
 
     // Description
-    QLabel* descriptionLabel = new QLabel("A modern Qt5 frontend for the Atari800 emulator.");
+    QLabel* descriptionLabel = new QLabel("A modern frontend for the Atari800 emulator");
     descriptionLabel->setAlignment(Qt::AlignCenter);
     descriptionLabel->setWordWrap(true);
     layout->addWidget(descriptionLabel);
