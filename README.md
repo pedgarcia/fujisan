@@ -77,7 +77,8 @@ The objective is to always use libatari800 so there is never incompatibility bet
 - **Qt5** (Core, Widgets, Gui modules)
 - **CMake 3.16+**
 - **C++17 compatible compiler**
-- **libatari800** (built in parent atari800 source directory)
+- **Atari800 source code** (download from https://github.com/atari800/atari800)
+- **Environment variable**: `export ATARI800_SRC_PATH=/path/to/atari800-src`
 
 ### Platform-Specific Setup
 
@@ -121,35 +122,35 @@ sudo dnf install qt5-qtbase-devel cmake gcc-c++
 
 ### Build Steps
 
-#### **Step 1: Build libatari800** (Required)
+#### **Step 1: Set Environment Variable**
 ```bash
-# Navigate to atari800 source root
-cd /path/to/atari800-src
-
-# Configure for library target
-./configure --target=libatari800
-
-# Build the library
-make
-
-# Verify libatari800.a exists
-ls -la src/libatari800.a
+export ATARI800_SRC_PATH=/path/to/atari800-src
 ```
 
-#### **Step 2: Build Fujisan**
+#### **Step 2: Apply Fujisan Patches to Atari800**
+```bash
+cd fujisan/patches
+./apply-patches.sh
+```
+
+#### **Step 3: Build libatari800**
+```bash
+cd $ATARI800_SRC_PATH
+./configure --target=libatari800
+make
+```
+
+#### **Step 4: Build Fujisan**
 
 **macOS/Linux:**
 ```bash
 # Navigate to Fujisan directory
-cd fujisan
+cd /path/to/fujisan
 
-# Create and enter build directory
-mkdir -p build && cd build
-
-# Configure with CMake (macOS may need Qt5 path)
-CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake ..
-# OR for Linux typically just:
-# cmake ..
+# Configure with CMake
+cmake .
+# OR for macOS with Homebrew Qt5:
+# CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake .
 
 # Build
 make

@@ -14,8 +14,14 @@ set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/qt@5/lib/cmake")
 # Find Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
-# Find libatari800 in parent directory
-set(ATARI800_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
+# Find libatari800 using environment variable
+if(NOT DEFINED ENV{ATARI800_SRC_PATH})
+    message(FATAL_ERROR "ATARI800_SRC_PATH environment variable not set. Please set it to the atari800 source directory.")
+endif()
+
+set(ATARI800_ROOT $ENV{ATARI800_SRC_PATH})
+message(STATUS "Using Atari800 source from: ${ATARI800_ROOT}")
+
 find_library(ATARI800_LIBRARY 
     NAMES libatari800.a atari800
     PATHS ${ATARI800_ROOT}/src
@@ -23,7 +29,7 @@ find_library(ATARI800_LIBRARY
 )
 
 if(NOT ATARI800_LIBRARY)
-    message(FATAL_ERROR "libatari800 not found. Please build it first with: cd .. && ./configure --target=libatari800 && make")
+    message(FATAL_ERROR "libatari800 not found at ${ATARI800_ROOT}/src. Please build it first with: cd ${ATARI800_ROOT} && ./configure --target=libatari800 && make")
 endif()
 
 # Include directories
@@ -79,6 +85,9 @@ set(HEADERS
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+
+# Add compile definitions
+target_compile_definitions(${PROJECT_NAME} PRIVATE SCREENSHOTS)
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME}
