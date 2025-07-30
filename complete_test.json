@@ -1,8 +1,0 @@
-{"command": "config.set_basic_enabled", "params": {"enabled": true}}
-{"command": "config.apply_restart"}
-{"command": "system.wait", "params": {"milliseconds": 1000}}
-{"command": "input.send_text", "params": {"text": "10 FOR I=1 TO 10\n"}}
-{"command": "input.send_text", "params": {"text": "20 PRINT I\n"}}
-{"command": "input.send_text", "params": {"text": "30 NEXT I\n"}}
-{"command": "input.send_text", "params": {"text": "RUN\n"}}
-EOF < /dev/null

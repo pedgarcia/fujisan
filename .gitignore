@@ -54,3 +54,21 @@ Desktop.ini
 *.bak
 *.tmp
 *.temp
+
+# Test and development files
+*.log
+test_*.json
+test_*.sh
+debug*.log
+*.atr
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+Fujisan_autogen/
+
+# Executable (case variations)
+Fujisan
+fujisan
