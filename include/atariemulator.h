@@ -159,6 +159,7 @@ public:
     
     QString getVideoSystem() const { return m_videoSystem; }
     void setVideoSystem(const QString& videoSystem) { m_videoSystem = videoSystem; }
+    int getCurrentEmulationSpeed() const;
     
     QString getOSRomPath() const { return m_osRomPath; }
     void setOSRomPath(const QString& path) { m_osRomPath = path; }

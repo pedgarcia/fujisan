@@ -1209,6 +1209,12 @@ void AtariEmulator::setEmulationSpeed(int percentage)
     qDebug() << "Emulation speed set to:" << percentage << "% (turbo=" << Atari800_turbo << ")";
 }
 
+int AtariEmulator::getCurrentEmulationSpeed() const
+{
+    // Return the current emulation speed percentage
+    return Atari800_turbo_speed;
+}
+
 void AtariEmulator::injectCharacter(char ch)
 {
     // Clear previous input

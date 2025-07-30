@@ -2249,6 +2249,62 @@ void SettingsDialog::loadSettings()
     
     qDebug() << "Settings loaded from persistent storage - Machine:" << machineType 
              << "Video:" << videoSystem << "BASIC:" << m_basicEnabledCheck->isChecked();
+    
+    // Sync with current emulator runtime state (overrides saved settings)
+    if (m_emulator) {
+        qDebug() << "Syncing with current emulator runtime state...";
+        
+        // Update machine type combo to match current runtime state
+        QString currentMachineType = m_emulator->getMachineType();
+        for (int i = 0; i < m_machineTypeCombo->count(); ++i) {
+            if (m_machineTypeCombo->itemData(i).toString() == currentMachineType) {
+                m_machineTypeCombo->setCurrentIndex(i);
+                break;
+            }
+        }
+        
+        // Update video system combo to match current runtime state
+        QString currentVideoSystem = m_emulator->getVideoSystem();
+        for (int i = 0; i < m_videoSystemCombo->count(); ++i) {
+            if (m_videoSystemCombo->itemData(i).toString() == currentVideoSystem) {
+                m_videoSystemCombo->setCurrentIndex(i);
+                break;
+            }
+        }
+        
+        // Update PAL/NTSC dependent controls after changing video system
+        updateVideoSystemDependentControls();
+        
+        // Update BASIC enabled to match current runtime state
+        m_basicEnabledCheck->setChecked(m_emulator->isBasicEnabled());
+        
+        // Update Altirra OS enabled to match current runtime state
+        m_altirraOSCheck->setChecked(m_emulator->isAltirraOSEnabled());
+        
+        // Update speed settings based on current emulation speed
+        int currentSpeed = m_emulator->getCurrentEmulationSpeed();
+        qDebug() << "Current emulation speed:" << currentSpeed << "%";
+        
+        if (currentSpeed == 1000) {
+            // Full speed mode (toolbar shows "Full")
+            m_turboModeCheck->setChecked(true);
+            m_speedSlider->setValue(10); // 10x speed
+        } else if (currentSpeed == 100) {
+            // Real speed mode (toolbar shows "Real")
+            m_turboModeCheck->setChecked(false);
+            m_speedSlider->setValue(1); // 1x speed
+        } else {
+            // Other speed values
+            m_turboModeCheck->setChecked(false);
+            // Convert percentage to slider index
+            int sliderIndex = (currentSpeed == 50) ? 0 : (currentSpeed / 100);
+            m_speedSlider->setValue(sliderIndex);
+        }
+        
+        qDebug() << "Runtime state synced - Machine:" << currentMachineType 
+                 << "Video:" << currentVideoSystem << "BASIC:" << m_emulator->isBasicEnabled()
+                 << "Speed:" << currentSpeed << "%";
+    }
 }
 
 void SettingsDialog::saveSettings()
