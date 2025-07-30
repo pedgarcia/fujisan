@@ -192,6 +192,7 @@ public:
     
     // Direct input injection for paste functionality
     void injectCharacter(char ch);
+    void injectAKey(int akeyCode);  // For raw AKEY code injection
     void clearInput();
     
     // Debug/execution control

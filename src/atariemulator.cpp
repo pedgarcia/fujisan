@@ -1369,6 +1369,33 @@ void AtariEmulator::injectCharacter(char ch)
     m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
 }
 
+void AtariEmulator::injectAKey(int akeyCode)
+{
+    // Clear previous input
+    libatari800_clear_input_array(&m_currentInput);
+    // Restore joystick center positions after clearing (using libatari800-compatible center)
+    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+    
+    // Directly set the raw AKEY code
+    m_currentInput.keycode = akeyCode;
+    
+    qDebug() << "Injected AKEY code:" << akeyCode << "(" << Qt::hex << akeyCode << ")";
+    
+    // Schedule key release after a short delay (one frame)
+    QTimer::singleShot(50, this, [this]() {
+        libatari800_clear_input_array(&m_currentInput);
+        // Restore joystick center positions after clearing
+        m_currentInput.joy0 = 0x0f ^ 0xff;
+        m_currentInput.joy1 = 0x0f ^ 0xff;
+        m_currentInput.trig0 = 0;
+        m_currentInput.trig1 = 0;
+        qDebug() << "Key released";
+    });
+}
+
 void AtariEmulator::clearInput()
 {
     libatari800_clear_input_array(&m_currentInput);

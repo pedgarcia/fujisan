@@ -695,34 +695,100 @@ void TCPServer::handleInputCommand(QTcpSocket* client, const QJsonObject& reques
         sendResponse(client, requestId, true, result);
         
     } else if (subCommand == "send_key") {
-        // Send specific key to emulator
-        QString keyName = params["key"].toString().toUpper();
+        // Send specific key to emulator with full AKEY support
+        QString keyName = params["key"].toString(); // Don't convert to uppercase - preserve case!
+        QJsonArray modifiers = params["modifiers"].toArray();
         
-        // Map key names to characters or special handling
-        char keyChar = 0;
-        if (keyName == "RETURN" || keyName == "ENTER") {
-            keyChar = '\n';
-        } else if (keyName == "SPACE") {
-            keyChar = ' ';
-        } else if (keyName == "TAB") {
-            keyChar = '\t';
-        } else if (keyName == "ESC" || keyName == "ESCAPE") {
-            keyChar = 27; // ESC character
-        } else if (keyName == "BACKSPACE") {
-            keyChar = 8; // Backspace character
+        int akeyCode = AKEY_NONE;
+        
+        // Handle special keys first (case-insensitive)
+        QString upperKeyName = keyName.toUpper();
+        if (upperKeyName == "RETURN" || upperKeyName == "ENTER") {
+            akeyCode = AKEY_RETURN;
+        } else if (upperKeyName == "SPACE") {
+            akeyCode = AKEY_SPACE;
+        } else if (upperKeyName == "TAB") {
+            akeyCode = AKEY_TAB;
+        } else if (upperKeyName == "ESC" || upperKeyName == "ESCAPE") {
+            akeyCode = AKEY_ESCAPE;
+        } else if (upperKeyName == "BACKSPACE") {
+            akeyCode = AKEY_BACKSPACE;
+        } else if (upperKeyName == "DELETE") {
+            akeyCode = AKEY_DELETE_CHAR;
+        } else if (upperKeyName == "UP") {
+            akeyCode = AKEY_UP;
+        } else if (upperKeyName == "DOWN") {
+            akeyCode = AKEY_DOWN;
+        } else if (upperKeyName == "LEFT") {
+            akeyCode = AKEY_LEFT;
+        } else if (upperKeyName == "RIGHT") {
+            akeyCode = AKEY_RIGHT;
+        } else if (upperKeyName == "HELP") {
+            akeyCode = AKEY_HELP;
+        } else if (upperKeyName == "ATARI") {
+            akeyCode = AKEY_ATARI;
         } else if (keyName.length() == 1) {
-            // Single character key
-            keyChar = keyName.at(0).toLatin1();
+            // Single character key - map to proper AKEY
+            QChar ch = keyName.at(0);
+            
+            if (ch >= 'A' && ch <= 'Z') {
+                // Uppercase letters - get base AKEY and add SHIFT
+                char lowerCh = ch.toLatin1() + ('a' - 'A'); // Convert to lowercase
+                
+                // Map lowercase letter to AKEY value
+                int akey_letters[] = {
+                    AKEY_a, AKEY_b, AKEY_c, AKEY_d, AKEY_e, AKEY_f, AKEY_g, AKEY_h,
+                    AKEY_i, AKEY_j, AKEY_k, AKEY_l, AKEY_m, AKEY_n, AKEY_o, AKEY_p,
+                    AKEY_q, AKEY_r, AKEY_s, AKEY_t, AKEY_u, AKEY_v, AKEY_w, AKEY_x,
+                    AKEY_y, AKEY_z
+                };
+                akeyCode = akey_letters[lowerCh - 'a'];
+                // Uppercase is achieved with SHIFT modifier
+                akeyCode |= AKEY_SHFT;
+            } else if (ch >= 'a' && ch <= 'z') {
+                // Lowercase letters - use lookup table
+                int akey_letters[] = {
+                    AKEY_a, AKEY_b, AKEY_c, AKEY_d, AKEY_e, AKEY_f, AKEY_g, AKEY_h,
+                    AKEY_i, AKEY_j, AKEY_k, AKEY_l, AKEY_m, AKEY_n, AKEY_o, AKEY_p,
+                    AKEY_q, AKEY_r, AKEY_s, AKEY_t, AKEY_u, AKEY_v, AKEY_w, AKEY_x,
+                    AKEY_y, AKEY_z
+                };
+                akeyCode = akey_letters[ch.toLatin1() - 'a'];
+            } else if (ch >= '0' && ch <= '9') {
+                // Numbers
+                int digit = ch.toLatin1() - '0';
+                int akey_numbers[] = {AKEY_0, AKEY_1, AKEY_2, AKEY_3, AKEY_4, 
+                                    AKEY_5, AKEY_6, AKEY_7, AKEY_8, AKEY_9};
+                akeyCode = akey_numbers[digit];
+            } else {
+                sendResponse(client, requestId, false, QJsonValue(), 
+                            "Unsupported character: " + keyName);
+                return;
+            }
         } else {
             sendResponse(client, requestId, false, QJsonValue(), 
                         "Unknown key name: " + keyName);
             return;
         }
         
-        m_emulator->injectCharacter(keyChar);
+        // Apply modifiers
+        for (const QJsonValue& mod : modifiers) {
+            QString modifier = mod.toString().toUpper();
+            if (modifier == "CTRL") {
+                akeyCode |= AKEY_CTRL;
+            } else if (modifier == "SHIFT") {
+                akeyCode |= AKEY_SHFT;
+            } else if (modifier == "SHIFTCTRL" || modifier == "CTRLSHIFT") {
+                akeyCode |= AKEY_SHFTCTRL;
+            }
+        }
+        
+        m_emulator->injectAKey(akeyCode);
         
         QJsonObject result;
         result["key"] = keyName;
+        result["modifiers"] = modifiers;
+        result["akey_code"] = akeyCode;
         sendResponse(client, requestId, true, result);
         
     } else if (subCommand == "console_key") {
@@ -802,6 +868,33 @@ void TCPServer::handleInputCommand(QTcpSocket* client, const QJsonObject& reques
         // The actual implementation would need to interface with the joystick input system
         sendResponse(client, requestId, false, QJsonValue(), 
                     "Joystick control not yet implemented - requires joystick input system integration");
+        
+    } else if (subCommand == "caps_lock") {
+        // Toggle caps lock or set specific state
+        QString action = params["action"].toString().toLower();
+        
+        int akeyCode = AKEY_NONE;
+        if (action == "toggle" || action.isEmpty()) {
+            // Toggle caps lock state
+            akeyCode = AKEY_CAPSTOGGLE;
+        } else if (action == "on") {
+            // Turn caps lock on
+            akeyCode = AKEY_CAPSLOCK;
+        } else if (action == "off") {
+            // Turn caps lock off (send caps lock again if it's on)
+            akeyCode = AKEY_CAPSLOCK;
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Invalid caps lock action. Use 'toggle', 'on', or 'off'");
+            return;
+        }
+        
+        m_emulator->injectCharacter(akeyCode);
+        
+        QJsonObject result;
+        result["caps_lock_action"] = action.isEmpty() ? "toggle" : action;
+        result["akey_code"] = akeyCode;
+        sendResponse(client, requestId, true, result);
         
     } else {
         sendResponse(client, requestId, false, QJsonValue(), 

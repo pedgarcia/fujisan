@@ -23,24 +23,24 @@ The Fujisan TCP Server provides a comprehensive JSON-based API for remote contro
 
 1. Launch Fujisan
 2. Go to **Tools** → **TCP Server** (or press the menu item)
-3. Server starts on `localhost:8080` by default
+3. Server starts on `localhost:6502` by default
 4. Server status appears in the status bar
 
 ### Quick Test
 
 ```bash
 # Test connection - should return welcome message
-nc localhost 8080
+nc localhost 6502
 
 # Test with curl (using HTTP-like syntax but it's raw TCP)
-echo '{"command": "status.get_state"}' | nc localhost 8080
+echo '{"command": "status.get_state"}' | nc localhost 6502
 ```
 
 ## Connection & Protocol
 
 ### Protocol Details
 
-- **Transport**: Raw TCP on localhost:8080
+- **Transport**: Raw TCP on localhost:6502
 - **Format**: Newline-delimited JSON messages
 - **Security**: Localhost-only for security
 - **Multi-client**: Supports multiple simultaneous connections
@@ -90,7 +90,7 @@ Control disk drives, cartridges, and executable loading.
 Insert a disk image into a drive (D1: through D8:).
 
 ```bash
-curl -X POST localhost:8080 --data-raw '{
+curl -X POST localhost:6502 --data-raw '{
   "command": "media.insert_disk",
   "id": "insert-1",
   "params": {
@@ -119,7 +119,7 @@ curl -X POST localhost:8080 --data-raw '{
 Eject disk from specified drive.
 
 ```bash
-echo '{"command": "media.eject_disk", "params": {"drive": 1}}' | nc localhost 8080
+echo '{"command": "media.eject_disk", "params": {"drive": 1}}' | nc localhost 6502
 ```
 
 #### `media.enable_drive`
@@ -127,7 +127,7 @@ echo '{"command": "media.eject_disk", "params": {"drive": 1}}' | nc localhost 80
 Enable a disk drive (turn on).
 
 ```bash
-echo '{"command": "media.enable_drive", "params": {"drive": 1}}' | nc localhost 8080
+echo '{"command": "media.enable_drive", "params": {"drive": 1}}' | nc localhost 6502
 ```
 
 **Response:**
@@ -147,7 +147,7 @@ echo '{"command": "media.enable_drive", "params": {"drive": 1}}' | nc localhost 
 Disable a disk drive (turn off).
 
 ```bash
-echo '{"command": "media.disable_drive", "params": {"drive": 1}}' | nc localhost 8080
+echo '{"command": "media.disable_drive", "params": {"drive": 1}}' | nc localhost 6502
 ```
 
 **Response:**
@@ -170,7 +170,7 @@ Insert a cartridge file (.car format). Updates GUI cartridge widget visual state
 echo '{
   "command": "media.insert_cartridge",
   "params": {"path": "/path/to/cartridge.car"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 **Response:**
@@ -190,7 +190,7 @@ echo '{
 Eject the currently inserted cartridge. Updates GUI cartridge widget visual state.
 
 ```bash
-echo '{"command": "media.eject_cartridge"}' | nc localhost 8080
+echo '{"command": "media.eject_cartridge"}' | nc localhost 6502
 ```
 
 **Response:**
@@ -212,7 +212,7 @@ Load and execute an Atari executable file (.xex format). Program starts running 
 echo '{
   "command": "media.load_xex", 
   "params": {"path": "/path/to/program.xex"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 **Response:**
@@ -238,7 +238,7 @@ Control emulator execution and system state.
 Perform cold boot (complete system restart).
 
 ```bash
-echo '{"command": "system.cold_boot"}' | nc localhost 8080
+echo '{"command": "system.cold_boot"}' | nc localhost 6502
 ```
 
 #### `system.warm_boot`
@@ -246,7 +246,7 @@ echo '{"command": "system.cold_boot"}' | nc localhost 8080
 Perform warm boot (soft restart).
 
 ```bash
-echo '{"command": "system.warm_boot"}' | nc localhost 8080
+echo '{"command": "system.warm_boot"}' | nc localhost 6502
 ```
 
 #### `system.pause` / `system.resume`
@@ -255,10 +255,10 @@ Pause or resume emulation.
 
 ```bash
 # Pause
-echo '{"command": "system.pause"}' | nc localhost 8080
+echo '{"command": "system.pause"}' | nc localhost 6502
 
 # Resume
-echo '{"command": "system.resume"}' | nc localhost 8080
+echo '{"command": "system.resume"}' | nc localhost 6502
 ```
 
 #### `system.set_speed`
@@ -269,7 +269,7 @@ Set emulation speed (10-1000%).
 echo '{
   "command": "system.set_speed",
   "params": {"percentage": 200}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 ### Input Commands
@@ -284,28 +284,70 @@ Send a text string to the emulator.
 echo '{
   "command": "input.send_text",
   "params": {"text": "LOAD \"D:HELLO.BAS\"\nRUN\n"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 #### `input.send_key`
 
-Send individual keys.
+Send individual keys with optional modifiers (CTRL, SHIFT, CTRL+SHIFT).
 
 ```bash
 # Send Enter key
 echo '{
   "command": "input.send_key",
   "params": {"key": "RETURN"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 
 # Send Escape
 echo '{
   "command": "input.send_key",
   "params": {"key": "ESC"}
-}' | nc localhost 8080
+}' | nc localhost 6502
+
+# Send CTRL+C (break)
+echo '{
+  "command": "input.send_key",
+  "params": {"key": "c", "modifiers": ["CTRL"]}
+}' | nc localhost 6502
+
+# Send CTRL+S (save)
+echo '{
+  "command": "input.send_key",
+  "params": {"key": "s", "modifiers": ["CTRL"]}
+}' | nc localhost 6502
+
+# Send SHIFT+A (uppercase A)
+echo '{
+  "command": "input.send_key",
+  "params": {"key": "a", "modifiers": ["SHIFT"]}
+}' | nc localhost 6502
+
+# Send CTRL+SHIFT+A
+echo '{
+  "command": "input.send_key",
+  "params": {"key": "a", "modifiers": ["CTRL", "SHIFT"]}
+}' | nc localhost 6502
+
+# Send arrow keys
+echo '{
+  "command": "input.send_key",
+  "params": {"key": "UP"}
+}' | nc localhost 6502
 ```
 
-**Supported keys:** `RETURN`, `ENTER`, `SPACE`, `TAB`, `ESC`, `ESCAPE`, `BACKSPACE`, or any single character.
+**Supported keys:** 
+- **Letters**: `a`-`z` (case-insensitive)
+- **Numbers**: `0`-`9`  
+- **Special keys**: `RETURN`, `ENTER`, `SPACE`, `TAB`, `ESC`, `ESCAPE`, `BACKSPACE`
+- **Arrow keys**: `UP`, `DOWN`, `LEFT`, `RIGHT`
+- **Function keys**: `F1`, `F2`, `F3`, `F4`
+- **Other keys**: `DELETE`, `INSERT`, `HELP`, `CLEAR`
+- **Punctuation**: All standard ASCII punctuation characters
+
+**Supported modifiers:**
+- `CTRL` - Control key modifier
+- `SHIFT` - Shift key modifier  
+- Both can be combined: `["CTRL", "SHIFT"]`
 
 #### `input.console_key`
 
@@ -316,13 +358,13 @@ Send Atari console keys.
 echo '{
   "command": "input.console_key",
   "params": {"key": "START"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 
 # Press SELECT
 echo '{
   "command": "input.console_key",
   "params": {"key": "SELECT"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 **Supported console keys:** `START`, `SELECT`, `OPTION`, `RESET`
@@ -335,7 +377,7 @@ Send function keys F1-F4.
 echo '{
   "command": "input.function_key",
   "params": {"key": "F1"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 #### `input.break`
@@ -343,8 +385,37 @@ echo '{
 Send break signal (Ctrl+C equivalent).
 
 ```bash
-echo '{"command": "input.break"}' | nc localhost 8080
+echo '{"command": "input.break"}' | nc localhost 6502
 ```
+
+#### `input.caps_lock`
+
+Control caps lock state with toggle, on, or off actions.
+
+```bash
+# Toggle caps lock state
+echo '{
+  "command": "input.caps_lock",
+  "params": {"action": "toggle"}
+}' | nc localhost 6502
+
+# Turn caps lock on
+echo '{
+  "command": "input.caps_lock", 
+  "params": {"action": "on"}
+}' | nc localhost 6502
+
+# Turn caps lock off
+echo '{
+  "command": "input.caps_lock",
+  "params": {"action": "off"}
+}' | nc localhost 6502
+```
+
+**Supported actions:**
+- `toggle` - Toggle current caps lock state
+- `on` - Turn caps lock on (enable)
+- `off` - Turn caps lock off (disable)
 
 ### Debug Commands
 
@@ -355,7 +426,7 @@ Control debugging features, breakpoints, and memory access.
 Get current CPU register values.
 
 ```bash
-echo '{"command": "debug.get_registers"}' | nc localhost 8080
+echo '{"command": "debug.get_registers"}' | nc localhost 6502
 ```
 
 **Response:**
@@ -382,7 +453,7 @@ Read memory from specified address.
 echo '{
   "command": "debug.read_memory",
   "params": {"address": 1536, "length": 16}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 **Response:**
@@ -404,7 +475,7 @@ Write value to memory address.
 echo '{
   "command": "debug.write_memory",
   "params": {"address": 1536, "value": 255}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 #### `debug.add_breakpoint`
@@ -415,7 +486,7 @@ Add breakpoint at address.
 echo '{
   "command": "debug.add_breakpoint",
   "params": {"address": 1536}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 #### `debug.remove_breakpoint`
@@ -426,7 +497,7 @@ Remove breakpoint from address.
 echo '{
   "command": "debug.remove_breakpoint",
   "params": {"address": 1536}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 #### `debug.clear_breakpoints`
@@ -434,7 +505,7 @@ echo '{
 Remove all breakpoints.
 
 ```bash
-echo '{"command": "debug.clear_breakpoints"}' | nc localhost 8080
+echo '{"command": "debug.clear_breakpoints"}' | nc localhost 6502
 ```
 
 #### `debug.step`
@@ -442,7 +513,7 @@ echo '{"command": "debug.clear_breakpoints"}' | nc localhost 8080
 Single-step execution (one frame).
 
 ```bash
-echo '{"command": "debug.step"}' | nc localhost 8080
+echo '{"command": "debug.step"}' | nc localhost 6502
 ```
 
 #### `debug.disassemble`
@@ -453,7 +524,7 @@ Disassemble memory at address.
 echo '{
   "command": "debug.disassemble",
   "params": {"address": 1536, "lines": 10}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 ### Config Commands
@@ -466,13 +537,13 @@ Get or set machine type.
 
 ```bash
 # Get current machine type
-echo '{"command": "config.get_machine_type"}' | nc localhost 8080
+echo '{"command": "config.get_machine_type"}' | nc localhost 6502
 
 # Set to Atari 800XL
 echo '{
   "command": "config.set_machine_type",
   "params": {"machine_type": "-xl"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 **Valid machine types:** `-400`, `-800`, `-xl`, `-xe`, `-xegs`, `-5200`
@@ -486,7 +557,7 @@ Get or set video system.
 echo '{
   "command": "config.set_video_system",
   "params": {"video_system": "-pal"}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 **Valid video systems:** `-ntsc`, `-pal`
@@ -500,7 +571,7 @@ Control BASIC ROM.
 echo '{
   "command": "config.set_basic_enabled",
   "params": {"enabled": true}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 #### `config.get_joystick_config` / `config.set_joystick_config`
@@ -515,7 +586,7 @@ echo '{
     "kbd_joy1_enabled": false,
     "joysticks_swapped": false
   }
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 #### `config.set_volume`
@@ -526,7 +597,7 @@ Set audio volume (0.0 to 1.0).
 echo '{
   "command": "config.set_volume",
   "params": {"volume": 0.7}
-}' | nc localhost 8080
+}' | nc localhost 6502
 ```
 
 #### `config.apply_restart`
@@ -534,7 +605,7 @@ echo '{
 Apply configuration changes that require restart.
 
 ```bash
-echo '{"command": "config.apply_restart"}' | nc localhost 8080
+echo '{"command": "config.apply_restart"}' | nc localhost 6502
 ```
 
 ### Status Commands
@@ -546,7 +617,7 @@ Get emulator state and server information.
 Get current emulator state.
 
 ```bash
-echo '{"command": "status.get_state"}' | nc localhost 8080
+echo '{"command": "status.get_state"}' | nc localhost 6502
 ```
 
 **Response:**
@@ -555,7 +626,7 @@ echo '{"command": "status.get_state"}' | nc localhost 8080
   "result": {
     "running": true,
     "connected_clients": 2,
-    "server_port": 8080,
+    "server_port": 6502,
     "pc": "$E477",
     "a": "$00"
   }
@@ -617,7 +688,7 @@ The server broadcasts events to all connected clients when state changes occur.
 # Example: Load and run a program
 
 PROGRAM_PATH="/path/to/program.xex"
-SERVER="localhost:8080"
+SERVER="localhost:6502"
 
 # Load program
 echo "{\"command\": \"media.load_xex\", \"params\": {\"path\": \"$PROGRAM_PATH\"}}" | nc $SERVER
@@ -636,17 +707,17 @@ echo '{"command": "system.resume"}' | nc $SERVER
 # Automated test runner
 
 # Set up test environment
-echo '{"command": "config.set_basic_enabled", "params": {"enabled": false}}' | nc localhost 8080
-echo '{"command": "config.apply_restart"}' | nc localhost 8080
+echo '{"command": "config.set_basic_enabled", "params": {"enabled": false}}' | nc localhost 6502
+echo '{"command": "config.apply_restart"}' | nc localhost 6502
 
 # Load test program
-echo '{"command": "media.load_xex", "params": {"path": "/tests/test.xex"}}' | nc localhost 8080
+echo '{"command": "media.load_xex", "params": {"path": "/tests/test.xex"}}' | nc localhost 6502
 
 # Set breakpoint at test completion address
-echo '{"command": "debug.add_breakpoint", "params": {"address": 1536}}' | nc localhost 8080
+echo '{"command": "debug.add_breakpoint", "params": {"address": 1536}}' | nc localhost 6502
 
 # Run test
-echo '{"command": "system.resume"}' | nc localhost 8080
+echo '{"command": "system.resume"}' | nc localhost 6502
 
 # Monitor for breakpoint hit...
 ```
@@ -655,12 +726,12 @@ echo '{"command": "system.resume"}' | nc localhost 8080
 
 ```bash
 # Start emulator in development mode
-echo '{"command": "config.set_basic_enabled", "params": {"enabled": true}}' | nc localhost 8080
-echo '{"command": "media.insert_disk", "params": {"drive": 1, "path": "/dev/disk.atr"}}' | nc localhost 8080
+echo '{"command": "config.set_basic_enabled", "params": {"enabled": true}}' | nc localhost 6502
+echo '{"command": "media.insert_disk", "params": {"drive": 1, "path": "/dev/disk.atr"}}' | nc localhost 6502
 
 # Send development commands
-echo '{"command": "input.send_text", "params": {"text": "LOAD \"D:PROGRAM.BAS\"\n"}}' | nc localhost 8080
-echo '{"command": "input.send_text", "params": {"text": "RUN\n"}}' | nc localhost 8080
+echo '{"command": "input.send_text", "params": {"text": "LOAD \"D:PROGRAM.BAS\"\n"}}' | nc localhost 6502
+echo '{"command": "input.send_text", "params": {"text": "RUN\n"}}' | nc localhost 6502
 ```
 
 ---
@@ -671,32 +742,32 @@ echo '{"command": "input.send_text", "params": {"text": "RUN\n"}}' | nc localhos
 
 ```bash
 # Enable drive, insert disk, eject disk, disable drive
-echo '{"command": "media.enable_drive", "params": {"drive": 1}}' | nc localhost 8080
-echo '{"command": "media.insert_disk", "params": {"drive": 1, "path": "/path/to/disk.atr"}}' | nc localhost 8080
-echo '{"command": "media.eject_disk", "params": {"drive": 1}}' | nc localhost 8080  
-echo '{"command": "media.disable_drive", "params": {"drive": 1}}' | nc localhost 8080
+echo '{"command": "media.enable_drive", "params": {"drive": 1}}' | nc localhost 6502
+echo '{"command": "media.insert_disk", "params": {"drive": 1, "path": "/path/to/disk.atr"}}' | nc localhost 6502
+echo '{"command": "media.eject_disk", "params": {"drive": 1}}' | nc localhost 6502  
+echo '{"command": "media.disable_drive", "params": {"drive": 1}}' | nc localhost 6502
 ```
 
 ### Cartridge Swapping Workflow
 
 ```bash
 # Load cartridge, test, eject, load different cartridge
-echo '{"command": "media.insert_cartridge", "params": {"path": "/path/to/action.car"}}' | nc localhost 8080
+echo '{"command": "media.insert_cartridge", "params": {"path": "/path/to/action.car"}}' | nc localhost 6502
 # Test cartridge...
-echo '{"command": "media.eject_cartridge"}' | nc localhost 8080
-echo '{"command": "media.insert_cartridge", "params": {"path": "/path/to/basic.car"}}' | nc localhost 8080
+echo '{"command": "media.eject_cartridge"}' | nc localhost 6502
+echo '{"command": "media.insert_cartridge", "params": {"path": "/path/to/basic.car"}}' | nc localhost 6502
 ```
 
 ### XEX Program Testing Workflow
 
 ```bash
 # Load and test multiple programs with cleanup
-echo '{"command": "media.load_xex", "params": {"path": "/path/to/game1.xex"}}' | nc localhost 8080
+echo '{"command": "media.load_xex", "params": {"path": "/path/to/game1.xex"}}' | nc localhost 6502
 # Program runs automatically...
-echo '{"command": "system.cold_boot"}' | nc localhost 8080
-echo '{"command": "media.load_xex", "params": {"path": "/path/to/game2.xex"}}' | nc localhost 8080
+echo '{"command": "system.cold_boot"}' | nc localhost 6502
+echo '{"command": "media.load_xex", "params": {"path": "/path/to/game2.xex"}}' | nc localhost 6502
 # Program runs automatically...
-echo '{"command": "system.cold_boot"}' | nc localhost 8080
+echo '{"command": "system.cold_boot"}' | nc localhost 6502
 ```
 
 ### Visual Feedback Features
