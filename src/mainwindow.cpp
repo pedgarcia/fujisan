@@ -17,6 +17,8 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QTimer>
+#include <QFileDialog>
+#include <QFileInfo>
 
 // Debug control - uncomment to enable verbose disk I/O logging
 // #define DEBUG_DISK_IO
@@ -153,6 +155,33 @@ void MainWindow::createMenus()
     systemMenu->addAction(m_altirraOSAction);
 
     systemMenu->addSeparator();
+    
+    // State save/load actions
+    m_quickSaveStateAction = new QAction("&Quick Save State", this);
+    m_quickSaveStateAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
+    m_quickSaveStateAction->setToolTip("Quick save current state (Shift+F5)");
+    connect(m_quickSaveStateAction, &QAction::triggered, this, &MainWindow::quickSaveState);
+    systemMenu->addAction(m_quickSaveStateAction);
+    
+    m_quickLoadStateAction = new QAction("Quick &Load State", this);
+    m_quickLoadStateAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F9));
+    m_quickLoadStateAction->setToolTip("Quick load saved state (Shift+F9)");
+    connect(m_quickLoadStateAction, &QAction::triggered, this, &MainWindow::quickLoadState);
+    systemMenu->addAction(m_quickLoadStateAction);
+    
+    systemMenu->addSeparator();
+    
+    m_saveStateAction = new QAction("Save State...", this);
+    m_saveStateAction->setToolTip("Save current state to file");
+    connect(m_saveStateAction, &QAction::triggered, this, &MainWindow::saveState);
+    systemMenu->addAction(m_saveStateAction);
+    
+    m_loadStateAction = new QAction("Load State...", this);
+    m_loadStateAction->setToolTip("Load state from file");
+    connect(m_loadStateAction, &QAction::triggered, this, &MainWindow::loadState);
+    systemMenu->addAction(m_loadStateAction);
+    
+    systemMenu->addSeparator();
 
     m_settingsAction = new QAction("&Settings...", this);
     m_settingsAction->setShortcut(QKeySequence::Preferences);
@@ -241,54 +270,18 @@ void MainWindow::createToolBar()
     separator->setFrameShadow(QFrame::Sunken);
     m_toolBar->addWidget(separator);
 
-    // Add spacer to push reset buttons to the right
+    // Add spacer to push buttons to the right
     QWidget* spacer = new QWidget();
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_toolBar->addWidget(spacer);
 
-
-    // Create reset icons
-    QPixmap resetPixmap(32, 32);
-    resetPixmap.fill(Qt::transparent);
-    QPainter painter(&resetPixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(Qt::darkBlue, 1.5));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawEllipse(4, 4, 24, 24);
-    painter.drawLine(16, 4, 16, 16);
-
-    QIcon resetIcon;
-    if (QIcon::hasThemeIcon("system-reboot")) {
-        resetIcon = QIcon::fromTheme("system-reboot");
-    } else if (QIcon::hasThemeIcon("view-refresh")) {
-        resetIcon = QIcon::fromTheme("view-refresh");
-    } else {
-        resetIcon = QIcon(resetPixmap);
-    }
-
-    // Add reset button (F5) and cold reset button
-    QAction* resetAction = new QAction("Reset", this);
-    resetAction->setToolTip("Reset the Atari system (F5)");
-    resetAction->setIcon(resetIcon);
-    connect(resetAction, &QAction::triggered, this, &MainWindow::warmBoot);
-    m_toolBar->addAction(resetAction);
-
-    QAction* coldResetAction = new QAction("Cold Reset", this);
-    coldResetAction->setToolTip("Perform a cold reset of the Atari system (Shift+F5)");
-    coldResetAction->setIcon(resetIcon);
-    connect(coldResetAction, &QAction::triggered, this, &MainWindow::coldBoot);
-    m_toolBar->addAction(coldResetAction);
-
+    // Reset icons removed - functionality moved to console-style buttons
+    
     // Add divider before logo
     QFrame* logoSeparator = new QFrame();
     logoSeparator->setFrameShape(QFrame::VLine);
     logoSeparator->setFrameShadow(QFrame::Sunken);
     m_toolBar->addWidget(logoSeparator);
-
-    // Add spacer to push logo to the far right
-    QWidget* logoSpacer = new QWidget();
-    logoSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    m_toolBar->addWidget(logoSpacer);
 
     // Add Fujisan logo
     createLogoSection();
@@ -462,41 +455,70 @@ void MainWindow::createProfileToolbarSection()
     QWidget* profileContainer = new QWidget(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(profileContainer);
     mainLayout->setContentsMargins(8, 0, 8, 2);
-    mainLayout->setSpacing(1);
+    mainLayout->setSpacing(0);  // Reduce spacing between label and controls
 
-    // Top row: Profile label and dropdown
+    // Add centered label at the top
+    QLabel* profileLabel = new QLabel("Profile/State");
+    profileLabel->setAlignment(Qt::AlignCenter);
+    profileLabel->setStyleSheet("font-weight: bold; font-size: 11px; color: #333;");
+    mainLayout->addWidget(profileLabel);
+
+    // Top row: Profile dropdown and load button
     QWidget* topRow = new QWidget();
     QHBoxLayout* topLayout = new QHBoxLayout(topRow);
-    topLayout->setContentsMargins(0, 0, 0, 0);
+    topLayout->setContentsMargins(0, 0, 0, 2);  // Add small bottom margin
     topLayout->setSpacing(4);
-
-    QLabel* profileLabel = new QLabel("Profile:");
-    profileLabel->setStyleSheet("font-weight: bold; font-size: 10px; color: #444;");
-    topLayout->addWidget(profileLabel);
+    topLayout->setAlignment(Qt::AlignVCenter);  // Vertically center align
 
     m_profileCombo = new QComboBox();
     m_profileCombo->setStyleSheet("font-size: 10px;");
     m_profileCombo->setToolTip("Select configuration profile");
-    m_profileCombo->setMinimumWidth(80);
-    topLayout->addWidget(m_profileCombo);
+    m_profileCombo->setMinimumWidth(120);  // Wider combo box
+    m_profileCombo->setFixedHeight(20);  // Fixed height for consistent alignment
+    topLayout->addWidget(m_profileCombo, 0, Qt::AlignVCenter);
+
+    // Add load button to the same row as the profile dropdown
+    m_loadProfileButton = new QPushButton("LOAD");
+    // Apply console button style (wider for state buttons)
+    QString profileButtonStyle =
+        "QPushButton {"
+        "    font-size: 9px;"
+        "    font-weight: bold;"
+        "    padding: 1px 4px;"
+        "    margin: 0px;"
+        "    border: 1px solid gray;"
+        "    background-color: #f0f0f0;"
+        "    min-width: 50px;"
+        "    max-width: 80px;"  // Increased for longer text
+        "    min-height: 10px;"
+        "    max-height: 12px;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: #d0d0d0;"
+        "    border: 1px solid black;"
+        "}";
+    m_loadProfileButton->setStyleSheet(profileButtonStyle);
+    m_loadProfileButton->setToolTip("Load selected profile");
+    topLayout->addWidget(m_loadProfileButton, 0, Qt::AlignVCenter);
 
     mainLayout->addWidget(topRow);
 
-    // Bottom row: Load button (centered)
+    // Bottom row: State quick buttons
     QWidget* bottomRow = new QWidget();
     QHBoxLayout* bottomLayout = new QHBoxLayout(bottomRow);
     bottomLayout->setContentsMargins(0, 0, 0, 0);
-    bottomLayout->setSpacing(0);
-
-    bottomLayout->addStretch();
+    bottomLayout->setSpacing(2);
     
-    m_loadProfileButton = new QPushButton("LOAD");
-    m_loadProfileButton->setStyleSheet("font-size: 10px; font-weight: bold;");
-    m_loadProfileButton->setToolTip("Load selected profile");
-    m_loadProfileButton->setMaximumHeight(20);
-    bottomLayout->addWidget(m_loadProfileButton);
+    // Add quick save/load buttons
+    m_quickSaveButton = new QPushButton("STATE SAVE");
+    m_quickSaveButton->setStyleSheet(profileButtonStyle);  // Use same style
+    m_quickSaveButton->setToolTip("Quick Save State (Shift+F5)");
+    bottomLayout->addWidget(m_quickSaveButton);
     
-    bottomLayout->addStretch();
+    m_quickLoadButton = new QPushButton("STATE LOAD");
+    m_quickLoadButton->setStyleSheet(profileButtonStyle);  // Use same style
+    m_quickLoadButton->setToolTip("Quick Load State (Shift+F9)");
+    bottomLayout->addWidget(m_quickLoadButton);
 
     mainLayout->addWidget(bottomRow);
 
@@ -505,6 +527,8 @@ void MainWindow::createProfileToolbarSection()
 
     // Connect signals
     connect(m_loadProfileButton, &QPushButton::clicked, this, &MainWindow::onLoadProfile);
+    connect(m_quickSaveButton, &QPushButton::clicked, this, &MainWindow::quickSaveState);
+    connect(m_quickLoadButton, &QPushButton::clicked, this, &MainWindow::quickLoadState);
     connect(m_profileManager, &ConfigurationProfileManager::profileListChanged,
             this, &MainWindow::refreshProfileList);
 
@@ -1292,6 +1316,17 @@ void MainWindow::createMediaPeripheralsDock()
     m_selectButton = new QPushButton("SELECT", this);
     m_optionButton = new QPushButton("OPTION", this);
     m_breakButton = new QPushButton("BREAK", this);
+    
+    // Create reset/system buttons section
+    QWidget* systemButtonsContainer = new QWidget(this);
+    QVBoxLayout* systemButtonsLayout = new QVBoxLayout(systemButtonsContainer);
+    systemButtonsLayout->setContentsMargins(2, 2, 2, 2);
+    systemButtonsLayout->setSpacing(1);
+    
+    // Create system buttons - same style as console buttons
+    QPushButton* coldBootButton = new QPushButton("COLD", this);
+    QPushButton* warmBootButton = new QPushButton("WARM", this);
+    QPushButton* inverseButton = new QPushButton("INVERSE", this);
 
     // Style console buttons - wide and short
     QString buttonStyle =
@@ -1316,18 +1351,33 @@ void MainWindow::createMediaPeripheralsDock()
     m_selectButton->setStyleSheet(buttonStyle);
     m_optionButton->setStyleSheet(buttonStyle);
     m_breakButton->setStyleSheet(buttonStyle);
+    
+    // Apply same style to system buttons
+    coldBootButton->setStyleSheet(buttonStyle);
+    warmBootButton->setStyleSheet(buttonStyle);
+    inverseButton->setStyleSheet(buttonStyle);
 
     // Add tooltips
     m_startButton->setToolTip("START button (F2)");
     m_selectButton->setToolTip("SELECT button (F3)");
     m_optionButton->setToolTip("OPTION button (F4)");
     m_breakButton->setToolTip("BREAK key (F7)");
+    
+    // Add tooltips for system buttons
+    coldBootButton->setToolTip("Cold boot (complete restart)");
+    warmBootButton->setToolTip("Warm boot (soft reset)");
+    inverseButton->setToolTip("INVERSE key (video inverse)");
 
     // Add buttons to layout (reordered: option, select, start, break)
     buttonsLayout->addWidget(m_optionButton);
     buttonsLayout->addWidget(m_selectButton);
     buttonsLayout->addWidget(m_startButton);
     buttonsLayout->addWidget(m_breakButton);
+    
+    // Add system buttons to layout
+    systemButtonsLayout->addWidget(coldBootButton);
+    systemButtonsLayout->addWidget(warmBootButton);
+    systemButtonsLayout->addWidget(inverseButton);
 
     // Connect console button signals - send press event and delay release to allow one frame processing
     connect(m_startButton, &QPushButton::clicked, this, [this]() {
@@ -1378,6 +1428,25 @@ void MainWindow::createMediaPeripheralsDock()
             qDebug() << "*** BREAK button F7 released ***";
         });
     });
+    
+    // Connect system button signals
+    connect(coldBootButton, &QPushButton::clicked, this, &MainWindow::coldBoot);
+    connect(warmBootButton, &QPushButton::clicked, this, &MainWindow::warmBoot);
+    
+    // Connect inverse key - Atari 800 uses Ctrl+Shift+A for inverse video
+    connect(inverseButton, &QPushButton::clicked, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_A, Qt::ControlModifier | Qt::ShiftModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        qDebug() << "*** INVERSE button clicked - Ctrl+Shift+A pressed ***";
+        
+        // Delay release by one frame
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_A, Qt::ControlModifier | Qt::ShiftModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+            qDebug() << "*** INVERSE button Ctrl+Shift+A released ***";
+        });
+    });
+    
 
     // Create machine controls container (machine dropdown on top, toggles side by side below)
     QWidget* machineControlsContainer = new QWidget(this);
@@ -1503,14 +1572,26 @@ void MainWindow::createMediaPeripheralsDock()
     machineControlsLayout->addWidget(togglesContainer);
 
     // Add to toolbar with separators between each section
+    // Order: D1, Cartridge, Machine controls (inserted at beginning)
     m_toolBar->insertWidget(m_toolBar->actions().first(), d1Container);
     m_toolBar->insertSeparator(m_toolBar->actions().at(1));
     m_toolBar->insertWidget(m_toolBar->actions().at(2), cartridgeContainer);
     m_toolBar->insertSeparator(m_toolBar->actions().at(3));
-    m_toolBar->insertWidget(m_toolBar->actions().at(4), consoleButtonsContainer);
+    m_toolBar->insertWidget(m_toolBar->actions().at(4), machineControlsContainer);
     m_toolBar->insertSeparator(m_toolBar->actions().at(5));
-    m_toolBar->insertWidget(m_toolBar->actions().at(6), machineControlsContainer);
-    m_toolBar->insertSeparator(m_toolBar->actions().at(7));
+    
+    // Find the spacer widget index (it's after joystick, audio, profile sections)
+    // Count widgets: joystick(1) + sep(1) + audio(1) + sep(1) + profile(1) + sep(1) + spacer(1) = 7
+    // Plus the ones we just inserted: d1(1) + sep(1) + cart(1) + sep(1) + machine(1) + sep(1) = 6
+    // Total before spacer = 6, so spacer is at index 6+6 = 12
+    
+    // Insert console and system buttons after the spacer but before the logo separator
+    // The spacer is followed by logo separator and logo, so we insert at index 13
+    int insertIndex = 13;
+    
+    m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex), consoleButtonsContainer);
+    m_toolBar->insertSeparator(m_toolBar->actions().at(insertIndex + 1));
+    m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex + 2), systemButtonsContainer);
 }
 
 void MainWindow::toggleMediaDock()
@@ -1897,6 +1978,91 @@ void MainWindow::toggleDebugger()
         m_debuggerDock->show();
         m_debuggerWidget->updateCPUState();
         m_debuggerWidget->updateMemoryView();
+    }
+}
+
+void MainWindow::quickSaveState()
+{
+    // Update emulator with current profile name
+    QString profileName = m_profileCombo->currentText();
+    m_emulator->setCurrentProfileName(profileName);
+    
+    if (m_emulator->quickSaveState()) {
+        statusBar()->showMessage("Quick state saved", 2000);
+    } else {
+        QMessageBox::warning(this, "Quick Save Failed", "Failed to save state");
+    }
+}
+
+void MainWindow::quickLoadState()
+{
+    if (m_emulator->quickLoadState()) {
+        // Get the profile name from the loaded state
+        QString profileName = m_emulator->getCurrentProfileName();
+        
+        // Try to select the profile in the combo box
+        int index = m_profileCombo->findText(profileName);
+        if (index >= 0) {
+            m_profileCombo->setCurrentIndex(index);
+        } else if (!profileName.isEmpty() && profileName != "Default") {
+            statusBar()->showMessage(QString("Profile '%1' not found, using current").arg(profileName), 3000);
+        }
+        
+        statusBar()->showMessage("Quick state loaded", 2000);
+    } else {
+        QMessageBox::warning(this, "Quick Load Failed", "No quick save state found");
+    }
+}
+
+void MainWindow::saveState()
+{
+    QString filename = QFileDialog::getSaveFileName(this, 
+        "Save State", 
+        QDir::homePath(), 
+        "Atari State Files (*.a8s);;All Files (*)");
+    
+    if (!filename.isEmpty()) {
+        // Ensure .a8s extension
+        if (!filename.endsWith(".a8s", Qt::CaseInsensitive)) {
+            filename += ".a8s";
+        }
+        
+        // Update emulator with current profile name
+        QString profileName = m_profileCombo->currentText();
+        m_emulator->setCurrentProfileName(profileName);
+        
+        if (m_emulator->saveState(filename)) {
+            statusBar()->showMessage(QString("State saved to %1").arg(QFileInfo(filename).fileName()), 3000);
+        } else {
+            QMessageBox::warning(this, "Save Failed", "Failed to save state");
+        }
+    }
+}
+
+void MainWindow::loadState()
+{
+    QString filename = QFileDialog::getOpenFileName(this, 
+        "Load State", 
+        QDir::homePath(), 
+        "Atari State Files (*.a8s);;All Files (*)");
+    
+    if (!filename.isEmpty()) {
+        if (m_emulator->loadState(filename)) {
+            // Get the profile name from the loaded state
+            QString profileName = m_emulator->getCurrentProfileName();
+            
+            // Try to select the profile in the combo box
+            int index = m_profileCombo->findText(profileName);
+            if (index >= 0) {
+                m_profileCombo->setCurrentIndex(index);
+            } else if (!profileName.isEmpty() && profileName != "Default") {
+                statusBar()->showMessage(QString("Profile '%1' not found, using current").arg(profileName), 3000);
+            }
+            
+            statusBar()->showMessage(QString("State loaded from %1").arg(QFileInfo(filename).fileName()), 3000);
+        } else {
+            QMessageBox::warning(this, "Load Failed", "Failed to load state");
+        }
     }
 }
 

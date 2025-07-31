@@ -12,6 +12,11 @@
 #include <QTimer>
 #include <QFileInfo>
 #include <QSettings>
+#include <QStandardPaths>
+#include <QDir>
+#include <QDateTime>
+#include <QFile>
+#include <cstring>  // for memset
 
 extern "C" {
 #ifdef NETSIO
@@ -2004,4 +2009,164 @@ QJsonObject AtariEmulator::getAllJoystickStates() const
     result["swapped"] = m_swapJoysticks;
     
     return result;
+}
+
+bool AtariEmulator::saveState(const QString& filename)
+{
+    // Pause emulation during save
+    bool wasPaused = m_emulationPaused;
+    if (!wasPaused) {
+        pauseEmulation();
+    }
+    
+    // When using libatari800, state saves work with memory buffers
+    // Allocate buffer for state data (STATESAV_MAX_SIZE is defined in libatari800.h)
+    UBYTE* stateBuffer = new UBYTE[STATESAV_MAX_SIZE];
+    
+    // Set up the global buffer pointer that libatari800 expects
+    extern UBYTE* LIBATARI800_StateSav_buffer;
+    extern statesav_tags_t* LIBATARI800_StateSav_tags;
+    LIBATARI800_StateSav_buffer = stateBuffer;
+    
+    // Create tags structure
+    statesav_tags_t tags;
+    memset(&tags, 0, sizeof(tags));
+    LIBATARI800_StateSav_tags = &tags;
+    
+    // Save state to buffer
+    extern void LIBATARI800_StateSave(UBYTE *buffer, statesav_tags_t *tags);
+    LIBATARI800_StateSave(stateBuffer, &tags);
+    
+    // Get actual size of saved data
+    int stateSize = tags.size;
+    if (stateSize == 0) {
+        // Fall back to max size if size tag wasn't set
+        stateSize = STATESAV_MAX_SIZE;
+    }
+    
+    // Write buffer to file
+    QFile file(filename);
+    bool success = false;
+    if (file.open(QIODevice::WriteOnly)) {
+        qint64 written = file.write(reinterpret_cast<const char*>(stateBuffer), stateSize);
+        success = (written == stateSize);
+        file.close();
+    }
+    
+    // Clean up
+    delete[] stateBuffer;
+    LIBATARI800_StateSav_buffer = nullptr;
+    LIBATARI800_StateSav_tags = nullptr;
+    
+    // Resume if we weren't paused before
+    if (!wasPaused) {
+        resumeEmulation();
+    }
+    
+    if (success) {
+        // Save metadata
+        QSettings stateSettings(filename + ".meta", QSettings::IniFormat);
+        stateSettings.setValue("profile", m_currentProfileName);
+        stateSettings.setValue("timestamp", QDateTime::currentDateTime());
+        
+        qDebug() << "State saved successfully to:" << filename << "Size:" << stateSize;
+        return true;
+    } else {
+        qWarning() << "Failed to save state to:" << filename;
+        return false;
+    }
+}
+
+bool AtariEmulator::loadState(const QString& filename)
+{
+    // Check if state file exists
+    QFileInfo stateFile(filename);
+    if (!stateFile.exists()) {
+        qWarning() << "State file does not exist:" << filename;
+        return false;
+    }
+    
+    // Pause emulation during load
+    bool wasPaused = m_emulationPaused;
+    if (!wasPaused) {
+        pauseEmulation();
+    }
+    
+    // Read state file into buffer
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "Failed to open state file:" << filename;
+        if (!wasPaused) {
+            resumeEmulation();
+        }
+        return false;
+    }
+    
+    QByteArray fileData = file.readAll();
+    file.close();
+    
+    if (fileData.isEmpty()) {
+        qWarning() << "State file is empty:" << filename;
+        if (!wasPaused) {
+            resumeEmulation();
+        }
+        return false;
+    }
+    
+    // Set up the global buffer pointer that libatari800 expects
+    extern UBYTE* LIBATARI800_StateSav_buffer;
+    LIBATARI800_StateSav_buffer = reinterpret_cast<UBYTE*>(fileData.data());
+    
+    // Load state from buffer
+    extern void LIBATARI800_StateLoad(UBYTE *buffer);
+    LIBATARI800_StateLoad(reinterpret_cast<UBYTE*>(fileData.data()));
+    
+    // Clean up
+    LIBATARI800_StateSav_buffer = nullptr;
+    
+    // Resume if we weren't paused before
+    if (!wasPaused) {
+        resumeEmulation();
+    }
+    
+    // Load the profile name from meta file if it exists
+    QString metaFile = filename + ".meta";
+    if (QFileInfo::exists(metaFile)) {
+        QSettings stateSettings(metaFile, QSettings::IniFormat);
+        QString profileName = stateSettings.value("profile").toString();
+        if (!profileName.isEmpty()) {
+            m_currentProfileName = profileName;
+            qDebug() << "State was saved with profile:" << profileName;
+        }
+    }
+    
+    qDebug() << "State loaded successfully from:" << filename << "Size:" << fileData.size();
+    return true;
+}
+
+bool AtariEmulator::quickSaveState()
+{
+    QString quickSavePath = getQuickSaveStatePath();
+    return saveState(quickSavePath);
+}
+
+bool AtariEmulator::quickLoadState()
+{
+    QString quickSavePath = getQuickSaveStatePath();
+    if (!QFileInfo::exists(quickSavePath)) {
+        qWarning() << "Quick save state does not exist";
+        return false;
+    }
+    return loadState(quickSavePath);
+}
+
+QString AtariEmulator::getQuickSaveStatePath() const
+{
+    // Use the application's data directory for quick saves
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir dir(dataPath);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    return dir.filePath("quicksave.a8s");
 }

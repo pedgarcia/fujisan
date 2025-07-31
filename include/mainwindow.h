@@ -69,6 +69,12 @@ private slots:
     void pasteText();
     void sendNextCharacter();
     void toggleMediaDock();
+    
+    // State save/load slots
+    void quickSaveState();
+    void quickLoadState();
+    void saveState();
+    void loadState();
     void onDiskInserted(int driveNumber, const QString& diskPath);
     void onDiskEjected(int driveNumber);
     void onDiskDroppedOnEmulator(const QString& filename);
@@ -168,6 +174,8 @@ private:
     // Profile toolbar section
     QComboBox* m_profileCombo;
     QPushButton* m_loadProfileButton;
+    QPushButton* m_quickSaveButton;
+    QPushButton* m_quickLoadButton;
     ConfigurationProfileManager* m_profileManager;
 
     // Menu actions
@@ -180,6 +188,12 @@ private:
     QAction* m_exitAction;
     QAction* m_aboutAction;
     QAction* m_pasteAction;
+    
+    // State save/load actions
+    QAction* m_quickSaveStateAction;
+    QAction* m_quickLoadStateAction;
+    QAction* m_saveStateAction;
+    QAction* m_loadStateAction;
 
     // Video settings
     bool m_keepAspectRatio;

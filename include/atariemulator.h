@@ -82,6 +82,8 @@ extern "C" {
     #include "devices.h"
     extern char Devices_print_command[256];
     extern int Devices_SetPrintCommand(const char *command);
+    // State save functions
+    #include "statesav.h"
 }
 
 class AtariEmulator : public QObject
@@ -190,6 +192,15 @@ public:
     bool getJoystickFire(int player) const;
     QJsonObject getAllJoystickStates() const;
     
+    // State save/load methods
+    bool saveState(const QString& filename);
+    bool loadState(const QString& filename);
+    bool quickSaveState();
+    bool quickLoadState();
+    QString getQuickSaveStatePath() const;
+    void setCurrentProfileName(const QString& profileName) { m_currentProfileName = profileName; }
+    QString getCurrentProfileName() const { return m_currentProfileName; }
+    
     // Color adjustment methods
     void updateColorSettings(bool isPal, double saturation, double contrast, double brightness, double gamma, double hue);
     void updatePalColorSettings(double saturation, double contrast, double brightness, double gamma, double hue);
@@ -264,6 +275,9 @@ private:
     // FujiNet delayed restart mechanism (matches Atari800MacX timing)
     bool m_fujinet_restart_pending;
     int m_fujinet_restart_delay;
+    
+    // Current profile name for state saves
+    QString m_currentProfileName;
 };
 
 #endif // ATARIEMULATOR_H

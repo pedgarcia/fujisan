@@ -272,6 +272,52 @@ echo '{
 }' | nc localhost 6502
 ```
 
+#### `system.quick_save_state`
+
+Quick save the current emulator state.
+
+```bash
+echo '{"command": "system.quick_save_state"}' | nc localhost 6502
+```
+
+Returns the quick save file path and broadcasts a `state_saved` event.
+
+#### `system.quick_load_state`
+
+Quick load the previously saved state.
+
+```bash
+echo '{"command": "system.quick_load_state"}' | nc localhost 6502
+```
+
+Returns the loaded profile name and broadcasts a `state_loaded` event.
+
+#### `system.save_state`
+
+Save the current emulator state to a specified file.
+
+```bash
+echo '{
+  "command": "system.save_state",
+  "params": {"filename": "/path/to/state.a8s"}
+}' | nc localhost 6502
+```
+
+The `.a8s` extension is added automatically if not present.
+
+#### `system.load_state`
+
+Load emulator state from a specified file.
+
+```bash
+echo '{
+  "command": "system.load_state",
+  "params": {"filename": "/path/to/state.a8s"}
+}' | nc localhost 6502
+```
+
+Returns the profile name that was saved with the state.
+
 ### Input Commands
 
 Send keyboard input and control keys to the emulator.

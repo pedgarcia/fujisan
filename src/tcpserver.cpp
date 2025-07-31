@@ -676,6 +676,127 @@ void TCPServer::handleSystemCommand(QTcpSocket* client, const QJsonObject& reque
         eventData["speed_percentage"] = percentage;
         sendEventToAllClients("speed_changed", eventData);
         
+    } else if (subCommand == "quick_save_state") {
+        // Quick save state
+        // First set the current profile name from main window if available
+        if (m_mainWindow) {
+            QString profileName = m_mainWindow->getProfileManager()->getCurrentProfileName();
+            m_emulator->setCurrentProfileName(profileName);
+        }
+        
+        bool success = m_emulator->quickSaveState();
+        
+        QJsonObject result;
+        result["saved"] = success;
+        result["quick_save_path"] = m_emulator->getQuickSaveStatePath();
+        
+        if (success) {
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["type"] = "quick";
+            eventData["path"] = m_emulator->getQuickSaveStatePath();
+            sendEventToAllClients("state_saved", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Failed to save quick state");
+        }
+        
+    } else if (subCommand == "quick_load_state") {
+        // Quick load state
+        bool success = m_emulator->quickLoadState();
+        
+        QJsonObject result;
+        result["loaded"] = success;
+        result["quick_save_path"] = m_emulator->getQuickSaveStatePath();
+        
+        if (success) {
+            result["profile"] = m_emulator->getCurrentProfileName();
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["type"] = "quick";
+            eventData["path"] = m_emulator->getQuickSaveStatePath();
+            eventData["profile"] = m_emulator->getCurrentProfileName();
+            sendEventToAllClients("state_loaded", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Failed to load quick state or no quick save found");
+        }
+        
+    } else if (subCommand == "save_state") {
+        // Save state to specified file
+        QString filename = params["filename"].toString();
+        
+        if (filename.isEmpty()) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Filename parameter is required");
+            return;
+        }
+        
+        // Ensure .a8s extension
+        if (!filename.endsWith(".a8s", Qt::CaseInsensitive)) {
+            filename += ".a8s";
+        }
+        
+        // Set the current profile name from main window if available
+        if (m_mainWindow) {
+            QString profileName = m_mainWindow->getProfileManager()->getCurrentProfileName();
+            m_emulator->setCurrentProfileName(profileName);
+        }
+        
+        bool success = m_emulator->saveState(filename);
+        
+        QJsonObject result;
+        result["saved"] = success;
+        result["filename"] = filename;
+        
+        if (success) {
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["type"] = "file";
+            eventData["filename"] = filename;
+            sendEventToAllClients("state_saved", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Failed to save state to file");
+        }
+        
+    } else if (subCommand == "load_state") {
+        // Load state from specified file
+        QString filename = params["filename"].toString();
+        
+        if (filename.isEmpty()) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Filename parameter is required");
+            return;
+        }
+        
+        bool success = m_emulator->loadState(filename);
+        
+        QJsonObject result;
+        result["loaded"] = success;
+        result["filename"] = filename;
+        
+        if (success) {
+            result["profile"] = m_emulator->getCurrentProfileName();
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["type"] = "file";
+            eventData["filename"] = filename;
+            eventData["profile"] = m_emulator->getCurrentProfileName();
+            sendEventToAllClients("state_loaded", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Failed to load state from file");
+        }
+        
     } else {
         sendResponse(client, requestId, false, QJsonValue(), 
                     "Unknown system command: " + subCommand);
