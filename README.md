@@ -136,6 +136,7 @@ cd fujisan/patches
 #### **Step 3: Build libatari800**
 ```bash
 cd $ATARI800_SRC_PATH
+./autogen.sh              # Generate configure script
 ./configure --target=libatari800
 make
 ```
@@ -217,6 +218,17 @@ FATAL_ERROR: libatari800 not found
 cd /path/to/atari800-src
 ./configure --target=libatari800
 make
+```
+
+#### **"configure: No such file" Error**
+```
+bash: ./configure: No such file or directory
+```
+**Solution**: Generate the configure script first:
+```bash
+cd $ATARI800_SRC_PATH
+./autogen.sh
+./configure --target=libatari800
 ```
 
 #### **Missing Build Tools**
