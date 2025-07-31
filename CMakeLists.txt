@@ -47,6 +47,7 @@ set(SOURCES
     src/atariemulator.cpp
     src/toggleswitch.cpp
     src/settingsdialog.cpp
+    src/disasm6502.cpp
     src/configurationprofile.cpp
     src/configurationprofilemanager.cpp
     src/profileselectionwidget.cpp

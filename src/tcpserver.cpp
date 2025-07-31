@@ -11,6 +11,7 @@
 #include "mainwindow.h"
 #include "configurationprofile.h"
 #include "configurationprofilemanager.h"
+#include "disasm6502.h"
 #include <QDebug>
 #include <QJsonArray>
 #include <QJsonParseError>
@@ -1312,24 +1313,39 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
         result["address"] = QString("$%1").arg(address, 4, 16, QChar('0')).toUpper();
         result["lines"] = lines;
         
-        // Note: Full disassembly would require integrating with a 6502 disassembler
-        // For now, we'll provide hex dump format
+        // Use the proper 6502 disassembler
         QJsonArray disassembly;
-        for (int i = 0; i < lines && (address + i * 3) < 65536; i++) {
-            int addr = address + (i * 3);
+        unsigned short currentAddr = (unsigned short)address;
+        
+        for (int i = 0; i < lines && currentAddr <= 65535; i++) {
+            DisassembledInstruction inst = disassemble6502(MEMORY_mem, currentAddr);
+            
             QJsonObject line;
-            line["address"] = QString("$%1").arg(addr, 4, 16, QChar('0')).toUpper();
+            line["address"] = QString("$%1").arg(currentAddr, 4, 16, QChar('0')).toUpper();
             
+            // Build hex bytes string
             QString hexBytes;
-            QString instruction = "???"; // Placeholder - would need real disassembler
-            
-            for (int j = 0; j < 3 && (addr + j) < 65536; j++) {
-                hexBytes += QString("%1 ").arg(MEMORY_mem[addr + j], 2, 16, QChar('0')).toUpper();
+            for (int j = 0; j < inst.bytes && (currentAddr + j) <= 65535; j++) {
+                hexBytes += QString("%1 ").arg(MEMORY_mem[currentAddr + j], 2, 16, QChar('0')).toUpper();
             }
-            
             line["hex"] = hexBytes.trimmed();
+            
+            // Build instruction string
+            QString instruction = inst.mnemonic;
+            if (!inst.operand.isEmpty()) {
+                instruction += " " + inst.operand;
+            }
             line["instruction"] = instruction;
+            
             disassembly.append(line);
+            
+            // Advance to next instruction
+            currentAddr += inst.bytes;
+            
+            // Prevent infinite loop if we hit a bad instruction
+            if (inst.bytes == 0) {
+                currentAddr++;
+            }
         }
         
         result["disassembly"] = disassembly;

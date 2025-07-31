@@ -685,13 +685,34 @@ echo '{"command": "debug.step"}' | nc localhost 6502
 
 #### `debug.disassemble`
 
-Disassemble memory at address.
+Disassemble 6502 instructions at specified address.
 
 ```bash
 echo '{
   "command": "debug.disassemble",
   "params": {"address": 1536, "lines": 10}
 }' | nc localhost 6502
+```
+
+Returns an array of disassembled instructions with:
+- `address`: Memory address of the instruction
+- `hex`: Hex bytes of the instruction (1-3 bytes)
+- `instruction`: Mnemonic and operand (e.g., "LDA #$FF", "JMP $1234")
+
+Example response:
+```json
+{
+  "success": true,
+  "result": {
+    "address": "$0600",
+    "lines": 10,
+    "disassembly": [
+      {"address": "$0600", "hex": "A9 00", "instruction": "LDA #$00"},
+      {"address": "$0602", "hex": "8D 00 D4", "instruction": "STA $D400"},
+      {"address": "$0605", "hex": "60", "instruction": "RTS"}
+    ]
+  }
+}
 ```
 
 ### Config Commands
