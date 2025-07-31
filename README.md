@@ -126,6 +126,7 @@ sudo dnf install qt5-qtbase-devel cmake gcc-c++
 ```bash
 export ATARI800_SRC_PATH=/path/to/atari800-src
 ```
+**Note**: This environment variable needs to be set in each terminal session or shell where you run the build commands. If you get "environment variable not set" errors, set it again in your current shell.
 
 #### **Step 2: Apply Fujisan Patches to Atari800**
 ```bash
@@ -148,10 +149,10 @@ make
 # Navigate to Fujisan directory
 cd /path/to/fujisan
 
-# Configure with CMake
-cmake .
+# Configure with CMake (ATARI800_SRC_PATH must be set)
+ATARI800_SRC_PATH=/path/to/atari800-src cmake .
 # OR for macOS with Homebrew Qt5:
-# CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake .
+# ATARI800_SRC_PATH=/path/to/atari800-src CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake .
 
 # Build
 make
@@ -229,6 +230,28 @@ bash: ./configure: No such file or directory
 cd $ATARI800_SRC_PATH
 ./autogen.sh
 ./configure --target=libatari800
+```
+
+#### **"ATARI800_SRC_PATH environment variable not set" Error**
+```
+CMake Error at CMakeLists.txt:19 (message):
+  ATARI800_SRC_PATH environment variable not set.
+```
+**Solution**: Set the environment variable when running cmake:
+```bash
+ATARI800_SRC_PATH=/path/to/atari800-src cmake .
+# For macOS with Homebrew Qt5:
+ATARI800_SRC_PATH=/path/to/atari800-src CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake .
+```
+
+#### **"unexpected end of file in patch" Error**
+```
+patch: **** unexpected end of file in patch
+```
+**Solution**: This indicates corrupted patch files. Pull the latest fixes:
+```bash
+cd fujisan
+git pull
 ```
 
 #### **Missing Build Tools**
