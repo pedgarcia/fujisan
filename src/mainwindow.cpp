@@ -347,6 +347,25 @@ void MainWindow::createJoystickToolbarSection()
     connect(m_joystickEnabledCheck, &QCheckBox::toggled, this, [this](bool checked) {
         QSettings settings;
         settings.setValue("input/joystickEnabled", checked);
+        settings.sync(); // Force immediate write
+        
+        qDebug() << "=== JOYSTICK CHECKBOX TOGGLED ===";
+        qDebug() << "New value:" << checked;
+        qDebug() << "Saved to settings and synced";
+        
+        if (m_emulator) {
+            // Apply the effective keyboard joystick state based on both checkboxes
+            bool effectiveKbdJoy0 = checked && m_kbdJoy0Check->isChecked();
+            bool effectiveKbdJoy1 = checked && m_kbdJoy1Check->isChecked();
+            m_emulator->setKbdJoy0Enabled(effectiveKbdJoy0);
+            m_emulator->setKbdJoy1Enabled(effectiveKbdJoy1);
+        }
+        
+        // Enable/disable the keyboard joystick checkboxes visually (but preserve their state)
+        m_kbdJoy0Check->setEnabled(checked);
+        m_kbdJoy1Check->setEnabled(checked);
+        m_joystickSwapWidget->setEnabled(checked);
+        
         qDebug() << "Joystick enabled changed to:" << checked;
     });
 
@@ -354,7 +373,9 @@ void MainWindow::createJoystickToolbarSection()
         QSettings settings;
         settings.setValue("input/kbdJoy0Enabled", checked);
         if (m_emulator) {
-            m_emulator->setKbdJoy0Enabled(checked);
+            // Only enable if main joystick support is also enabled
+            bool effectiveEnabled = checked && m_joystickEnabledCheck->isChecked();
+            m_emulator->setKbdJoy0Enabled(effectiveEnabled);
         }
         qDebug() << "Keyboard Joy0 changed to:" << checked;
     });
@@ -363,7 +384,9 @@ void MainWindow::createJoystickToolbarSection()
         QSettings settings;
         settings.setValue("input/kbdJoy1Enabled", checked);
         if (m_emulator) {
-            m_emulator->setKbdJoy1Enabled(checked);
+            // Only enable if main joystick support is also enabled
+            bool effectiveEnabled = checked && m_joystickEnabledCheck->isChecked();
+            m_emulator->setKbdJoy1Enabled(effectiveEnabled);
         }
         qDebug() << "Keyboard Joy1 changed to:" << checked;
     });
@@ -382,10 +405,26 @@ void MainWindow::createJoystickToolbarSection()
 
     // Load initial settings
     QSettings settings;
-    m_joystickEnabledCheck->setChecked(settings.value("input/joystickEnabled", true).toBool());
-    m_kbdJoy0Check->setChecked(settings.value("input/kbdJoy0Enabled", true).toBool());
-    m_kbdJoy1Check->setChecked(settings.value("input/kbdJoy1Enabled", false).toBool());
+    bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();
+    m_joystickEnabledCheck->setChecked(joystickEnabled);
+    
+    // Set keyboard joystick controls enabled state based on main joystick enabled state
+    m_kbdJoy0Check->setEnabled(joystickEnabled);
+    m_kbdJoy1Check->setEnabled(joystickEnabled);
+    m_joystickSwapWidget->setEnabled(joystickEnabled);
+    
+    // Load keyboard joystick settings (checkboxes keep their state)
+    bool kbdJoy0Checked = settings.value("input/kbdJoy0Enabled", true).toBool();
+    bool kbdJoy1Checked = settings.value("input/kbdJoy1Enabled", false).toBool();
+    m_kbdJoy0Check->setChecked(kbdJoy0Checked);
+    m_kbdJoy1Check->setChecked(kbdJoy1Checked);
     m_joystickSwapWidget->setSwapped(settings.value("input/swapJoysticks", false).toBool());
+    
+    // Apply effective keyboard joystick state to emulator (only if main joystick is enabled)
+    if (m_emulator) {
+        m_emulator->setKbdJoy0Enabled(joystickEnabled && kbdJoy0Checked);
+        m_emulator->setKbdJoy1Enabled(joystickEnabled && kbdJoy1Checked);
+    }
 }
 
 void MainWindow::createAudioToolbarSection()
@@ -751,9 +790,19 @@ void MainWindow::restartEmulator()
              << "Fit:" << fitScreen << "80Col:" << show80Column << "VSync:" << vSyncEnabled;
 
     // Load input settings for keyboard joystick emulation
-    bool kbdJoy0Enabled = settings.value("input/kbdJoy0Enabled", true).toBool();  // Default true to match SDL default
-    bool kbdJoy1Enabled = settings.value("input/kbdJoy1Enabled", false).toBool(); // Default false to match SDL default
-    bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();   // Default false: Joy0=Numpad, Joy1=WASD
+    bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();  // Main joystick support
+    bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", true).toBool();     // Saved kbd joy0 state
+    bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();    // Saved kbd joy1 state
+    bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();     // Default false: Joy0=Numpad, Joy1=WASD
+    
+    qDebug() << "=== LOADED JOYSTICK SETTINGS FROM QSETTINGS ===";
+    qDebug() << "Main joystick enabled from settings:" << joystickEnabled;
+    qDebug() << "Kbd Joy0 saved state:" << kbdJoy0Saved;
+    qDebug() << "Kbd Joy1 saved state:" << kbdJoy1Saved;
+    
+    // Only enable keyboard joysticks if main joystick support is enabled
+    bool kbdJoy0Enabled = joystickEnabled && kbdJoy0Saved;
+    bool kbdJoy1Enabled = joystickEnabled && kbdJoy1Saved;
 
     // Load special device settings
     bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
@@ -777,6 +826,11 @@ void MainWindow::restartEmulator()
                          .arg(m_emulator->isBasicEnabled() ? "enabled" : "disabled");
         statusBar()->showMessage(message, 3000);
         qDebug() << message;
+        
+        // Ensure keyboard joystick state is properly applied after restart
+        m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
+        m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
+        qDebug() << "Applied keyboard joystick state after restart - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
         
         // Update toolbar to reflect actual BASIC state (may have been auto-disabled for FujiNet)
         updateToolbarFromSettings();
@@ -902,6 +956,7 @@ void MainWindow::updateToolbarFromSettings()
     m_videoToggle->blockSignals(true);
     m_videoToggle->setChecked(isPAL);
     m_videoToggle->blockSignals(false);
+    
 
     // Update speed toggle (default to normal speed)
     m_speedToggle->blockSignals(true);
@@ -931,22 +986,43 @@ void MainWindow::updateToolbarFromSettings()
     if (m_emulator) {
         m_emulator->enableAudio(true);
     }
+    
+    // Update joystick checkbox from settings
+    bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();
+    m_joystickEnabledCheck->blockSignals(true);
+    m_joystickEnabledCheck->setChecked(joystickEnabled);
+    m_joystickEnabledCheck->blockSignals(false);
+    
+    // Enable/disable keyboard joystick checkboxes based on main joystick state
+    m_kbdJoy0Check->setEnabled(joystickEnabled);
+    m_kbdJoy1Check->setEnabled(joystickEnabled);
+    m_joystickSwapWidget->setEnabled(joystickEnabled);
 
-    // Update joystick settings from emulator state
+    // Update joystick settings from saved state
     if (m_emulator && m_joystickEnabledCheck && m_kbdJoy0Check && m_kbdJoy1Check && m_joystickSwapWidget) {
+        bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();
+        bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", true).toBool();
+        bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();
+        bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();
+        
         m_joystickEnabledCheck->blockSignals(true);
-        m_joystickEnabledCheck->setChecked(settings.value("input/joystickEnabled", true).toBool());
+        m_joystickEnabledCheck->setChecked(joystickEnabled);
         m_joystickEnabledCheck->blockSignals(false);
 
         m_kbdJoy0Check->blockSignals(true);
-        m_kbdJoy0Check->setChecked(m_emulator->isKbdJoy0Enabled());
+        m_kbdJoy0Check->setChecked(kbdJoy0Saved);
         m_kbdJoy0Check->blockSignals(false);
 
         m_kbdJoy1Check->blockSignals(true);
-        m_kbdJoy1Check->setChecked(m_emulator->isKbdJoy1Enabled());
+        m_kbdJoy1Check->setChecked(kbdJoy1Saved);
         m_kbdJoy1Check->blockSignals(false);
 
-        m_joystickSwapWidget->setSwapped(m_emulator->isJoysticksSwapped());
+        m_joystickSwapWidget->setSwapped(swapJoysticks);
+        
+        // Enable/disable keyboard joystick checkboxes based on main joystick state
+        m_kbdJoy0Check->setEnabled(joystickEnabled);
+        m_kbdJoy1Check->setEnabled(joystickEnabled);
+        m_joystickSwapWidget->setEnabled(joystickEnabled);
     }
 
     qDebug() << "Toolbar updated - Machine:" << machineType << "BASIC:" << m_emulator->isBasicEnabled()
@@ -1683,6 +1759,13 @@ void MainWindow::loadInitialSettings()
 {
     QSettings settings("8bitrelics", "Fujisan");
 
+    // Debug checkbox state vs settings
+    if (m_joystickEnabledCheck) {
+        qDebug() << "=== JOYSTICK CHECKBOX STATE AT STARTUP ===";
+        qDebug() << "Checkbox visual state:" << m_joystickEnabledCheck->isChecked();
+        qDebug() << "Settings value:" << settings.value("input/joystickEnabled", true).toBool();
+    }
+
     // Load saved settings or use defaults
     QString machineType = settings.value("machine/type", "-xl").toString();
     QString videoSystem = settings.value("machine/videoSystem", "-pal").toString();
@@ -1704,9 +1787,19 @@ void MainWindow::loadInitialSettings()
              << "Video:" << videoSystem << "BASIC:" << basicEnabled << "Artifacts:" << artifactMode;
 
     // Load input settings for keyboard joystick emulation
-    bool kbdJoy0Enabled = settings.value("input/kbdJoy0Enabled", true).toBool();  // Default true to match SDL default
-    bool kbdJoy1Enabled = settings.value("input/kbdJoy1Enabled", false).toBool(); // Default false to match SDL default
-    bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();   // Default false: Joy0=Numpad, Joy1=WASD
+    bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();  // Main joystick support
+    bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", true).toBool();     // Saved kbd joy0 state
+    bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();    // Saved kbd joy1 state
+    bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();     // Default false: Joy0=Numpad, Joy1=WASD
+    
+    qDebug() << "=== LOADED JOYSTICK SETTINGS FROM QSETTINGS ===";
+    qDebug() << "Main joystick enabled from settings:" << joystickEnabled;
+    qDebug() << "Kbd Joy0 saved state:" << kbdJoy0Saved;
+    qDebug() << "Kbd Joy1 saved state:" << kbdJoy1Saved;
+    
+    // Only enable keyboard joysticks if main joystick support is enabled
+    bool kbdJoy0Enabled = joystickEnabled && kbdJoy0Saved;
+    bool kbdJoy1Enabled = joystickEnabled && kbdJoy1Saved;
 
     // Load special device settings
     bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
@@ -1729,6 +1822,13 @@ void MainWindow::loadInitialSettings()
     // Set additional settings
     m_emulator->setAltirraOSEnabled(altirraOSEnabled);
     m_emulator->enableAudio(audioEnabled);
+    
+    // Ensure keyboard joystick state is properly applied after initialization
+    // This is needed because the initial state from command line args might not match
+    // the effective state we want (main joystick disabled should disable kbd joy)
+    m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
+    m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
+    qDebug() << "Applied keyboard joystick state after init - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
 
     // Load ROM paths
     QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix

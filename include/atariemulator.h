@@ -172,10 +172,10 @@ public:
     
     // Joystick keyboard emulation settings
     bool isKbdJoy0Enabled() const { return m_kbdJoy0Enabled; }
-    void setKbdJoy0Enabled(bool enabled) { m_kbdJoy0Enabled = enabled; }
+    void setKbdJoy0Enabled(bool enabled);
     
     bool isKbdJoy1Enabled() const { return m_kbdJoy1Enabled; }
-    void setKbdJoy1Enabled(bool enabled) { m_kbdJoy1Enabled = enabled; }
+    void setKbdJoy1Enabled(bool enabled);
     
     bool isJoysticksSwapped() const { return m_swapJoysticks; }
     void setJoysticksSwapped(bool swapped) { m_swapJoysticks = swapped; }

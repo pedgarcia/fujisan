@@ -298,6 +298,24 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     argList << machineType;    // -xl, -xe, -atari, -5200, etc.
     argList << videoSystem;    // -ntsc or -pal
     
+    // Configure keyboard joystick emulation based on settings
+    qDebug() << "=== KEYBOARD JOYSTICK CONFIGURATION ===" ;
+    if (kbdJoy0Enabled) {
+        argList << "-kbdjoy0";
+        qDebug() << "Enabled keyboard joystick 0 (Numpad + RCtrl)";
+    } else {
+        argList << "-no-kbdjoy0";
+        qDebug() << "Disabled keyboard joystick 0";
+    }
+    
+    if (kbdJoy1Enabled) {
+        argList << "-kbdjoy1";
+        qDebug() << "Enabled keyboard joystick 1 (WASD + LCtrl)";
+    } else {
+        argList << "-no-kbdjoy1";
+        qDebug() << "Disabled keyboard joystick 1";
+    }
+    
     // Add artifact settings - only supported modes for current build
     qDebug() << "Artifact mode requested:" << artifactMode;
     if (artifactMode != "none") {
@@ -316,12 +334,6 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         }
     }
     
-    // Disable libatari800's internal keyboard joystick emulation
-    // We handle joystick emulation ourselves via input_template_t.joy0/joy1
-    qDebug() << "=== KEYBOARD JOYSTICK CONFIGURATION ===" ;
-    argList << "-no-kbdjoy0";
-    argList << "-no-kbdjoy1";
-    qDebug() << "Disabled libatari800 internal keyboard joystick - using manual joystick control";
     
     // Audio is enabled by default for libatari800
     qDebug() << "Audio enabled for emulator";
@@ -411,6 +423,21 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     
     if (libatari800_init(argBytes.size(), args)) {
         qDebug() << "✓ Emulator initialized successfully with input settings";
+        
+#ifdef GUI_SDL
+        // Check actual keyboard joystick state after initialization
+        extern int PLATFORM_IsKbdJoystickEnabled(int num);
+        bool actualKbdJoy0 = PLATFORM_IsKbdJoystickEnabled(0);
+        bool actualKbdJoy1 = PLATFORM_IsKbdJoystickEnabled(1);
+        qDebug() << "=== ACTUAL KEYBOARD JOYSTICK STATE AFTER INIT ===";
+        qDebug() << "Requested KbdJoy0:" << kbdJoy0Enabled << "-> Actual:" << actualKbdJoy0;
+        qDebug() << "Requested KbdJoy1:" << kbdJoy1Enabled << "-> Actual:" << actualKbdJoy1;
+        
+        if (actualKbdJoy0 != kbdJoy0Enabled || actualKbdJoy1 != kbdJoy1Enabled) {
+            qDebug() << "WARNING: Keyboard joystick state mismatch after init!";
+        }
+#endif
+        
         m_targetFps = libatari800_get_fps();
         m_frameTimeMs = 1000.0f / m_targetFps;
         qDebug() << "Target FPS:" << m_targetFps << "Frame time:" << m_frameTimeMs << "ms";
@@ -1123,6 +1150,49 @@ void AtariEmulator::setVolume(float volume)
         m_audioOutput->setVolume(qBound(0.0f, volume, 1.0f));
         qDebug() << "Audio volume set to:" << volume;
     }
+}
+
+void AtariEmulator::setKbdJoy0Enabled(bool enabled)
+{
+    m_kbdJoy0Enabled = enabled;
+    
+#ifdef GUI_SDL
+    // Apply the setting to the atari800 core
+    // Since we don't have a direct setter, we need to check current state and toggle if needed
+    extern int PLATFORM_IsKbdJoystickEnabled(int num);
+    extern void PLATFORM_ToggleKbdJoystickEnabled(int num);
+    
+    bool currentEnabled = PLATFORM_IsKbdJoystickEnabled(0);
+    qDebug() << "setKbdJoy0Enabled called - requested:" << enabled << "current:" << currentEnabled;
+    if (currentEnabled != enabled) {
+        PLATFORM_ToggleKbdJoystickEnabled(0);
+        qDebug() << "Toggled kbd joy 0 to:" << enabled;
+        // Verify the change
+        bool newEnabled = PLATFORM_IsKbdJoystickEnabled(0);
+        qDebug() << "After toggle, kbd joy 0 is now:" << newEnabled;
+    }
+#endif
+}
+
+void AtariEmulator::setKbdJoy1Enabled(bool enabled)
+{
+    m_kbdJoy1Enabled = enabled;
+    
+#ifdef GUI_SDL
+    // Apply the setting to the atari800 core
+    extern int PLATFORM_IsKbdJoystickEnabled(int num);
+    extern void PLATFORM_ToggleKbdJoystickEnabled(int num);
+    
+    bool currentEnabled = PLATFORM_IsKbdJoystickEnabled(1);
+    qDebug() << "setKbdJoy1Enabled called - requested:" << enabled << "current:" << currentEnabled;
+    if (currentEnabled != enabled) {
+        PLATFORM_ToggleKbdJoystickEnabled(1);
+        qDebug() << "Toggled kbd joy 1 to:" << enabled;
+        // Verify the change
+        bool newEnabled = PLATFORM_IsKbdJoystickEnabled(1);
+        qDebug() << "After toggle, kbd joy 1 is now:" << newEnabled;
+    }
+#endif
 }
 
 void AtariEmulator::updateColorSettings(bool isPal, double saturation, double contrast, double brightness, double gamma, double hue)
