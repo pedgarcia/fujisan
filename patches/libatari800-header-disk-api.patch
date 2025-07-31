@@ -1,0 +1,58 @@
+From: Fujisan Developer
+Date: 2025-07-31
+Subject: Add disk API declarations to libatari800 header
+
+This patch adds the header declarations for disk management, activity monitoring,
+and SIO patch control APIs required by the Fujisan Qt-based frontend.
+
+Compatible with atari800 commit: 575a943b3523bf0f5c9b73ba8641d83cac672f24
+
+--- src/libatari800/libatari800.h.orig	2025-07-31 17:00:00.000000000 -0400
++++ src/libatari800/libatari800.h	2025-07-31 17:00:00.000000000 -0400
+@@ -267,6 +267,10 @@
+ 
+ int libatari800_mount_disk_image(int diskno, const char *filename, int readonly);
+ 
++void libatari800_dismount_disk_image(int diskno);
++
++void libatari800_disable_drive(int diskno);
++
+ int libatari800_reboot_with_file(const char *filename);
+ 
+ UBYTE *libatari800_get_main_memory_ptr();
+@@ -293,4 +297,35 @@
+ 
+ void libatari800_exit();
+ 
++/* Disk activity monitoring API - added for Fujisan emulator */
++/* Get current disk activity state (polling method)
++ * Returns 1 if activity detected, 0 if no activity
++ * drive: receives drive number (1-8) if activity detected  
++ * operation: receives operation type (0=read, 1=write) if activity detected
++ * time_remaining: receives frames remaining for LED display if activity detected
++ */
++int libatari800_get_disk_activity(int *drive, int *operation, int *time_remaining);
++
++/* Set callback for real-time disk activity events
++ * callback: function to call when disk activity occurs, or NULL to disable
++ * Callback receives: drive (1-8), operation (0=read, 1=write)
++ */
++void libatari800_set_disk_activity_callback(void (*callback)(int drive, int operation));
++
++/* SIO patch control API - added for investigating disk speed changes
++ * The SIO patch provides fast disk access by bypassing realistic timing delays
++ * When disabled, emulator uses realistic hardware timing (slower but more authentic)
++ */
++
++/* Get current SIO patch status
++ * Returns 1 if SIO patch (fast disk access) is enabled, 0 if disabled
++ */
++int libatari800_get_sio_patch_enabled();
++
++/* Set SIO patch status
++ * enabled: 1 to enable fast disk access, 0 to use realistic timing
++ * Returns previous state (1 or 0)
++ */
++int libatari800_set_sio_patch_enabled(int enabled);
++
+ #endif /* LIBATARI800_H_ */
