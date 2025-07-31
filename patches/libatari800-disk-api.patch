@@ -8,7 +8,7 @@ by the Fujisan Qt-based frontend.
 
 Compatible with atari800 commit: 575a943b3523bf0f5c9b73ba8641d83cac672f24
 
---- src/libatari800/api.c	2025-07-31 17:00:00.000000000 -0400
+--- src/libatari800/api.c.orig	2025-07-31 17:00:00.000000000 -0400
 +++ src/libatari800/api.c	2025-07-31 17:00:00.000000000 -0400
 @@ -40,6 +40,7 @@
  #include "memory.h"
@@ -136,81 +136,52 @@ Compatible with atari800 commit: 575a943b3523bf0f5c9b73ba8641d83cac672f24
  /*
  vim:ts=4:sw=4:
  */
---- src/libatari800/libatari800.h	2025-07-31 17:00:00.000000000 -0400
+--- src/libatari800/libatari800.h.orig	2025-07-31 17:00:00.000000000 -0400
 +++ src/libatari800/libatari800.h	2025-07-31 17:00:00.000000000 -0400
-@@ -119,6 +119,18 @@
- } input_template_t;
+@@ -267,6 +267,10 @@
  
+ int libatari800_mount_disk_image(int diskno, const char *filename, int readonly);
  
-+/* Disk management functions */
-+void libatari800_dismount_disk_image(int driveNumber);
-+void libatari800_disable_drive(int driveNumber);
++void libatari800_dismount_disk_image(int diskno);
 +
-+/* Disk activity monitoring */
++void libatari800_disable_drive(int diskno);
++
+ int libatari800_reboot_with_file(const char *filename);
+ 
+ UBYTE *libatari800_get_main_memory_ptr();
+@@ -293,4 +297,35 @@
+ 
+ void libatari800_exit();
+ 
++/* Disk activity monitoring API - added for Fujisan emulator */
++/* Get current disk activity state (polling method)
++ * Returns 1 if activity detected, 0 if no activity
++ * drive: receives drive number (1-8) if activity detected  
++ * operation: receives operation type (0=read, 1=write) if activity detected
++ * time_remaining: receives frames remaining for LED display if activity detected
++ */
 +int libatari800_get_disk_activity(int *drive, int *operation, int *time_remaining);
-+typedef void (*disk_activity_callback_t)(int driveNumber, int operation);
-+void libatari800_set_disk_activity_callback(disk_activity_callback_t callback);
 +
-+/* SIO patch control */
-+int libatari800_get_sio_patch_enabled(void);
++/* Set callback for real-time disk activity events
++ * callback: function to call when disk activity occurs, or NULL to disable
++ * Callback receives: drive (1-8), operation (0=read, 1=write)
++ */
++void libatari800_set_disk_activity_callback(void (*callback)(int drive, int operation));
++
++/* SIO patch control API - added for investigating disk speed changes
++ * The SIO patch provides fast disk access by bypassing realistic timing delays
++ * When disabled, emulator uses realistic hardware timing (slower but more authentic)
++ */
++
++/* Get current SIO patch status
++ * Returns 1 if SIO patch (fast disk access) is enabled, 0 if disabled
++ */
++int libatari800_get_sio_patch_enabled();
++
++/* Set SIO patch status
++ * enabled: 1 to enable fast disk access, 0 to use realistic timing
++ * Returns previous state (1 or 0)
++ */
 +int libatari800_set_sio_patch_enabled(int enabled);
 +
- #define STATESAV_MAX_SIZE 210000
- 
- /* byte offsets into output_template.state array of groups of data
---- src/sio.c	2025-07-31 17:00:00.000000000 -0400
-+++ src/sio.c	2025-07-31 17:00:00.000000000 -0400
-@@ -161,6 +161,9 @@
- int SIO_last_drive;
- int SIO_last_sector;
- 
-+/* External callback for disk activity notifications */
-+extern void (*disk_activity_callback)(int drive, int operation);
-+
- char SIO_status[256];
- 
- /* Serial I/O emulation support */
-@@ -669,6 +672,10 @@
- 	SIO_last_op = SIO_LAST_READ;
- 	SIO_last_op_time = 1;
- 	SIO_last_drive = unit + 1;
-+	
-+	/* Notify callback if set */
-+	if (disk_activity_callback)
-+		disk_activity_callback(unit + 1, SIO_LAST_READ);
- 	/* FIXME: what sector size did the user expect? */
- 	size = SeekSector(unit, sector);
- 	if (image_type[unit] == IMAGE_TYPE_PRO) {
-@@ -850,6 +857,10 @@
- 	SIO_last_op = SIO_LAST_WRITE;
- 	SIO_last_op_time = 1;
- 	SIO_last_drive = unit + 1;
-+	
-+	/* Notify callback if set */
-+	if (disk_activity_callback)
-+		disk_activity_callback(unit + 1, SIO_LAST_WRITE);
- #ifdef VAPI_WRITE_ENABLE 	
-  	if (image_type[unit] == IMAGE_TYPE_VAPI) {
- 		vapi_additional_info_t *info;
-@@ -1414,6 +1425,10 @@
- 		SIO_last_op = SIO_LAST_WRITE;
- 		SIO_last_op_time = 10;
- 		SIO_last_drive = unit + 1;
-+		
-+		/* Notify callback if set */
-+		if (disk_activity_callback)
-+			disk_activity_callback(unit + 1, SIO_LAST_WRITE);
- 		return 'A';
- 	case 0x52:				/* Read */
- 	case 0xD2:				/* xf551 hispeed */
-@@ -1455,6 +1470,10 @@
- 		SIO_last_op = SIO_LAST_READ;
- 		SIO_last_op_time = 10;
- 		SIO_last_drive = unit + 1;
-+		
-+		/* Notify callback if set */
-+		if (disk_activity_callback)
-+			disk_activity_callback(unit + 1, SIO_LAST_READ);
- 		return 'A';
- 	case 0x53:				/* Status */
- 	case 0xD3:				/* xf551 hispeed */
+ #endif /* LIBATARI800_H_ */
