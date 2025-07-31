@@ -47,6 +47,11 @@ TCPServer::TCPServer(AtariEmulator* emulator, MainWindow* mainWindow, QObject* p
     , m_mainWindow(mainWindow)
     , m_port(8080)
     , m_isRunning(false)
+    , m_joystickStreamTimer(nullptr)
+    , m_lastJoy0State(0x0f ^ 0xff)  // Center position
+    , m_lastJoy1State(0x0f ^ 0xff)  // Center position
+    , m_lastTrig0(false)
+    , m_lastTrig1(false)
 {
     // Connect server signals
     connect(m_server, &QTcpServer::newConnection, this, &TCPServer::onNewConnection);
@@ -161,6 +166,12 @@ void TCPServer::onClientDisconnected()
     QString clientAddress = client->peerAddress().toString();
     m_clients.removeAll(client);
     m_clientBuffers.remove(client);
+    
+    // Remove from joystick streaming if subscribed
+    m_joystickStreamClients.remove(client);
+    if (m_joystickStreamClients.isEmpty() && m_joystickStreamTimer) {
+        m_joystickStreamTimer->stop();
+    }
     
     qDebug() << "TCP Server: Client disconnected from" << clientAddress
              << "Remaining clients:" << m_clients.count();
@@ -857,7 +868,6 @@ void TCPServer::handleInputCommand(QTcpSocket* client, const QJsonObject& reques
     } else if (subCommand == "joystick") {
         // Control joystick input
         int player = params["player"].toInt(1); // Default to player 1
-        QString direction = params["direction"].toString().toUpper();
         bool fire = params["fire"].toBool(false);
         
         if (player < 1 || player > 2) {
@@ -866,10 +876,177 @@ void TCPServer::handleInputCommand(QTcpSocket* client, const QJsonObject& reques
             return;
         }
         
-        // This is a placeholder for joystick control
-        // The actual implementation would need to interface with the joystick input system
-        sendResponse(client, requestId, false, QJsonValue(), 
-                    "Joystick control not yet implemented - requires joystick input system integration");
+        // Handle direction - can be string name or numeric value
+        int directionValue = -1;
+        if (params.contains("direction")) {
+            QString direction = params["direction"].toString().toUpper();
+            
+            // Map direction names to values (non-inverted Atari values)
+            if (direction == "CENTER") directionValue = 15;
+            else if (direction == "UP") directionValue = 14;
+            else if (direction == "DOWN") directionValue = 13;
+            else if (direction == "LEFT") directionValue = 11;
+            else if (direction == "RIGHT") directionValue = 7;
+            else if (direction == "UP_LEFT") directionValue = 10;
+            else if (direction == "UP_RIGHT") directionValue = 6;
+            else if (direction == "DOWN_LEFT") directionValue = 9;
+            else if (direction == "DOWN_RIGHT") directionValue = 5;
+            else {
+                sendResponse(client, requestId, false, QJsonValue(), 
+                            "Invalid direction. Use: CENTER, UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT");
+                return;
+            }
+        } else if (params.contains("value")) {
+            // Accept numeric value directly (0-15)
+            directionValue = params["value"].toInt(-1);
+            if (directionValue < 0 || directionValue > 15) {
+                sendResponse(client, requestId, false, QJsonValue(), 
+                            "Invalid direction value. Must be 0-15");
+                return;
+            }
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Missing direction or value parameter");
+            return;
+        }
+        
+        // Set joystick state - AtariEmulator will handle the inversion
+        m_emulator->setJoystickState(player, directionValue, fire);
+        
+        QJsonObject result;
+        result["player"] = player;
+        result["direction_value"] = directionValue;
+        result["fire"] = fire;
+        sendResponse(client, requestId, true, result);
+        
+    } else if (subCommand == "joystick_release") {
+        // Release joystick to center position
+        int player = params["player"].toInt(1);
+        
+        if (player < 1 || player > 2) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Invalid player number. Must be 1 or 2");
+            return;
+        }
+        
+        m_emulator->releaseJoystick(player);
+        
+        QJsonObject result;
+        result["player"] = player;
+        result["released"] = true;
+        sendResponse(client, requestId, true, result);
+        
+    } else if (subCommand == "get_joystick") {
+        // Get specific joystick state
+        int player = params["player"].toInt(1);
+        
+        if (player < 1 || player > 2) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Invalid player number. Must be 1 or 2");
+            return;
+        }
+        
+        int state = m_emulator->getJoystickState(player);
+        bool fire = m_emulator->getJoystickFire(player);
+        
+        // Convert inverted value back to direction name
+        auto getDirectionInfo = [](int value) -> QPair<QString, int> {
+            // Map inverted values to direction names and original values
+            const int CENTER = 0x0f ^ 0xff;
+            const int UP = 0x0e ^ 0xff;
+            const int DOWN = 0x0d ^ 0xff;
+            const int LEFT = 0x0b ^ 0xff;
+            const int RIGHT = 0x07 ^ 0xff;
+            const int UP_LEFT = 0x0a ^ 0xff;
+            const int UP_RIGHT = 0x06 ^ 0xff;
+            const int DOWN_LEFT = 0x09 ^ 0xff;
+            const int DOWN_RIGHT = 0x05 ^ 0xff;
+            
+            if (value == CENTER) return qMakePair(QString("CENTER"), 15);
+            else if (value == UP) return qMakePair(QString("UP"), 14);
+            else if (value == DOWN) return qMakePair(QString("DOWN"), 13);
+            else if (value == LEFT) return qMakePair(QString("LEFT"), 11);
+            else if (value == RIGHT) return qMakePair(QString("RIGHT"), 7);
+            else if (value == UP_LEFT) return qMakePair(QString("UP_LEFT"), 10);
+            else if (value == UP_RIGHT) return qMakePair(QString("UP_RIGHT"), 6);
+            else if (value == DOWN_LEFT) return qMakePair(QString("DOWN_LEFT"), 9);
+            else if (value == DOWN_RIGHT) return qMakePair(QString("DOWN_RIGHT"), 5);
+            else return qMakePair(QString("UNKNOWN"), -1);
+        };
+        
+        auto dirInfo = getDirectionInfo(state);
+        
+        QJsonObject result;
+        result["player"] = player;
+        result["direction"] = dirInfo.first;
+        result["direction_value"] = state;
+        result["fire"] = fire;
+        result["keyboard_enabled"] = (player == 1) ? m_emulator->isKbdJoy0Enabled() : m_emulator->isKbdJoy1Enabled();
+        if (player == 1) {
+            result["keyboard_keys"] = m_emulator->isJoysticksSwapped() ? "wasd" : "numpad";
+        } else {
+            result["keyboard_keys"] = m_emulator->isJoysticksSwapped() ? "numpad" : "wasd";
+        }
+        
+        sendResponse(client, requestId, true, result);
+        
+    } else if (subCommand == "get_all_joysticks") {
+        // Get all joystick states
+        QJsonObject result = m_emulator->getAllJoystickStates();
+        sendResponse(client, requestId, true, result);
+        
+    } else if (subCommand == "start_joystick_stream") {
+        // Subscribe to joystick state changes
+        int rate = params["rate"].toInt(60);  // Default 60Hz
+        rate = qBound(10, rate, 120);  // Limit to 10-120Hz
+        
+        if (!m_joystickStreamTimer) {
+            m_joystickStreamTimer = new QTimer(this);
+            connect(m_joystickStreamTimer, &QTimer::timeout, this, &TCPServer::streamJoystickStates);
+        }
+        
+        m_joystickStreamClients.insert(client);
+        
+        if (!m_joystickStreamTimer->isActive()) {
+            int interval = 1000 / rate;  // Convert Hz to milliseconds
+            m_joystickStreamTimer->start(interval);
+            
+            // Initialize last known states
+            m_lastJoy0State = m_emulator->getJoystickState(1);
+            m_lastJoy1State = m_emulator->getJoystickState(2);
+            m_lastTrig0 = m_emulator->getJoystickFire(1);
+            m_lastTrig1 = m_emulator->getJoystickFire(2);
+        }
+        
+        QJsonObject result;
+        result["streaming"] = true;
+        result["rate"] = rate;
+        sendResponse(client, requestId, true, result);
+        
+    } else if (subCommand == "stop_joystick_stream") {
+        // Unsubscribe from joystick state changes
+        m_joystickStreamClients.remove(client);
+        
+        if (m_joystickStreamClients.isEmpty() && m_joystickStreamTimer) {
+            m_joystickStreamTimer->stop();
+        }
+        
+        QJsonObject result;
+        result["streaming"] = false;
+        sendResponse(client, requestId, true, result);
+        
+    } else if (subCommand == "get_joystick_stream_status") {
+        // Check if client is subscribed to joystick streaming
+        bool isStreaming = m_joystickStreamClients.contains(client);
+        
+        QJsonObject result;
+        result["streaming"] = isStreaming;
+        result["total_streaming_clients"] = m_joystickStreamClients.size();
+        if (m_joystickStreamTimer && m_joystickStreamTimer->isActive()) {
+            result["stream_rate"] = 1000 / m_joystickStreamTimer->interval();
+        }
+        
+        sendResponse(client, requestId, true, result);
         
     } else if (subCommand == "caps_lock") {
         // Toggle caps lock or set specific state
@@ -1599,5 +1776,111 @@ void TCPServer::handleScreenCommand(QTcpSocket* client, const QJsonObject& reque
     } else {
         sendResponse(client, requestId, false, QJsonValue(), 
                     "Unknown screen command: " + subCommand);
+    }
+}
+
+void TCPServer::streamJoystickStates()
+{
+    if (m_joystickStreamClients.isEmpty() || !m_emulator) {
+        return;
+    }
+    
+    // Get current joystick states
+    int joy0State = m_emulator->getJoystickState(1);
+    int joy1State = m_emulator->getJoystickState(2);
+    bool trig0 = m_emulator->getJoystickFire(1);
+    bool trig1 = m_emulator->getJoystickFire(2);
+    
+    // Check for changes in joystick 1
+    if (joy0State != m_lastJoy0State || trig0 != m_lastTrig0) {
+        // Convert inverted value back to direction name
+        auto getDirectionInfo = [](int value) -> QPair<QString, int> {
+            const int CENTER = 0x0f ^ 0xff;
+            const int UP = 0x0e ^ 0xff;
+            const int DOWN = 0x0d ^ 0xff;
+            const int LEFT = 0x0b ^ 0xff;
+            const int RIGHT = 0x07 ^ 0xff;
+            const int UP_LEFT = 0x0a ^ 0xff;
+            const int UP_RIGHT = 0x06 ^ 0xff;
+            const int DOWN_LEFT = 0x09 ^ 0xff;
+            const int DOWN_RIGHT = 0x05 ^ 0xff;
+            
+            if (value == CENTER) return qMakePair(QString("CENTER"), 15);
+            else if (value == UP) return qMakePair(QString("UP"), 14);
+            else if (value == DOWN) return qMakePair(QString("DOWN"), 13);
+            else if (value == LEFT) return qMakePair(QString("LEFT"), 11);
+            else if (value == RIGHT) return qMakePair(QString("RIGHT"), 7);
+            else if (value == UP_LEFT) return qMakePair(QString("UP_LEFT"), 10);
+            else if (value == UP_RIGHT) return qMakePair(QString("UP_RIGHT"), 6);
+            else if (value == DOWN_LEFT) return qMakePair(QString("DOWN_LEFT"), 9);
+            else if (value == DOWN_RIGHT) return qMakePair(QString("DOWN_RIGHT"), 5);
+            else return qMakePair(QString("UNKNOWN"), -1);
+        };
+        
+        auto dirInfo = getDirectionInfo(joy0State);
+        auto prevDirInfo = getDirectionInfo(m_lastJoy0State);
+        
+        QJsonObject data;
+        data["player"] = 1;
+        data["direction"] = dirInfo.first;
+        data["direction_value"] = joy0State;
+        data["fire"] = trig0;
+        data["previous_direction"] = prevDirInfo.first;
+        data["previous_fire"] = m_lastTrig0;
+        data["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+        
+        // Send to all subscribed clients
+        for (QTcpSocket* client : m_joystickStreamClients) {
+            sendEvent(client, "joystick_changed", data);
+        }
+        
+        m_lastJoy0State = joy0State;
+        m_lastTrig0 = trig0;
+    }
+    
+    // Check for changes in joystick 2
+    if (joy1State != m_lastJoy1State || trig1 != m_lastTrig1) {
+        auto getDirectionInfo = [](int value) -> QPair<QString, int> {
+            const int CENTER = 0x0f ^ 0xff;
+            const int UP = 0x0e ^ 0xff;
+            const int DOWN = 0x0d ^ 0xff;
+            const int LEFT = 0x0b ^ 0xff;
+            const int RIGHT = 0x07 ^ 0xff;
+            const int UP_LEFT = 0x0a ^ 0xff;
+            const int UP_RIGHT = 0x06 ^ 0xff;
+            const int DOWN_LEFT = 0x09 ^ 0xff;
+            const int DOWN_RIGHT = 0x05 ^ 0xff;
+            
+            if (value == CENTER) return qMakePair(QString("CENTER"), 15);
+            else if (value == UP) return qMakePair(QString("UP"), 14);
+            else if (value == DOWN) return qMakePair(QString("DOWN"), 13);
+            else if (value == LEFT) return qMakePair(QString("LEFT"), 11);
+            else if (value == RIGHT) return qMakePair(QString("RIGHT"), 7);
+            else if (value == UP_LEFT) return qMakePair(QString("UP_LEFT"), 10);
+            else if (value == UP_RIGHT) return qMakePair(QString("UP_RIGHT"), 6);
+            else if (value == DOWN_LEFT) return qMakePair(QString("DOWN_LEFT"), 9);
+            else if (value == DOWN_RIGHT) return qMakePair(QString("DOWN_RIGHT"), 5);
+            else return qMakePair(QString("UNKNOWN"), -1);
+        };
+        
+        auto dirInfo = getDirectionInfo(joy1State);
+        auto prevDirInfo = getDirectionInfo(m_lastJoy1State);
+        
+        QJsonObject data;
+        data["player"] = 2;
+        data["direction"] = dirInfo.first;
+        data["direction_value"] = joy1State;
+        data["fire"] = trig1;
+        data["previous_direction"] = prevDirInfo.first;
+        data["previous_fire"] = m_lastTrig1;
+        data["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+        
+        // Send to all subscribed clients
+        for (QTcpSocket* client : m_joystickStreamClients) {
+            sendEvent(client, "joystick_changed", data);
+        }
+        
+        m_lastJoy1State = joy1State;
+        m_lastTrig1 = trig1;
     }
 }

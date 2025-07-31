@@ -56,9 +56,9 @@ AtariEmulator::AtariEmulator(QObject *parent)
 {
     libatari800_clear_input_array(&m_currentInput);
     
-    // Initialize joysticks to center position (15 = all directions released)
-    m_currentInput.joy0 = 15;
-    m_currentInput.joy1 = 15;
+    // Initialize joysticks to center position (inverted for libatari800)
+    m_currentInput.joy0 = 0x0f ^ 0xff;  // 15 ^ 255 = 240
+    m_currentInput.joy1 = 0x0f ^ 0xff;  // 15 ^ 255 = 240
     m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
     m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
     
@@ -961,13 +961,17 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
         return; // Key was handled by joystick emulation, don't clear all input
     }
     
-    // Clear input when any key is released (for regular keyboard input)
-    libatari800_clear_input_array(&m_currentInput);
-    // Restore joystick center positions after clearing (using libatari800-compatible center)
-    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+    // For regular keyboard input, only clear keyboard-related fields
+    // DO NOT clear joystick values as they should persist
+    m_currentInput.keychar = 0;
+    m_currentInput.keycode = 0;
+    m_currentInput.special = 0;
+    m_currentInput.shift = 0;
+    m_currentInput.control = 0;
+    m_currentInput.start = 0;
+    m_currentInput.select = 0;
+    m_currentInput.option = 0;
+    // Leave joystick values (joy0, joy1, trig0, trig1) unchanged
     // Clear keyboard input on key release
 }
 
@@ -1879,4 +1883,125 @@ void AtariEmulator::setPrintCommand(const QString& command)
         Devices_SetPrintCommand(command.toUtf8().constData());
         qDebug() << "Print command set to:" << command;
     }
+}
+
+// Joystick control methods for TCP server
+void AtariEmulator::setJoystickState(int player, int direction, bool fire)
+{
+    if (player < 1 || player > 2) {
+        qWarning() << "Invalid joystick player:" << player << "- must be 1 or 2";
+        return;
+    }
+    
+    // Direction should be pre-inverted value (0-255) or we can accept 0-15 and invert here
+    // Let's accept both: if direction <= 15, assume it needs inversion
+    int invertedDirection = direction;
+    if (direction <= 15) {
+        invertedDirection = direction ^ 0xff;  // Invert for libatari800
+    }
+    
+    if (player == 1) {
+        m_currentInput.joy0 = invertedDirection;
+        m_currentInput.trig0 = fire ? 1 : 0;  // 1 = pressed (inverted for libatari800)
+        qDebug() << "TCP Joystick 1 set - Direction:" << invertedDirection << "Fire:" << fire;
+    } else {
+        m_currentInput.joy1 = invertedDirection;
+        m_currentInput.trig1 = fire ? 1 : 0;  // 1 = pressed (inverted for libatari800)
+        qDebug() << "TCP Joystick 2 set - Direction:" << invertedDirection << "Fire:" << fire;
+    }
+}
+
+void AtariEmulator::releaseJoystick(int player)
+{
+    if (player < 1 || player > 2) {
+        qWarning() << "Invalid joystick player:" << player << "- must be 1 or 2";
+        return;
+    }
+    
+    const int CENTER = 0x0f ^ 0xff;  // Center position inverted for libatari800
+    
+    if (player == 1) {
+        m_currentInput.joy0 = CENTER;
+        m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+        qDebug() << "TCP Joystick 1 released";
+    } else {
+        m_currentInput.joy1 = CENTER;
+        m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+        qDebug() << "TCP Joystick 2 released";
+    }
+}
+
+// Joystick monitoring methods for TCP server
+int AtariEmulator::getJoystickState(int player) const
+{
+    if (player == 1) {
+        return m_currentInput.joy0;
+    } else if (player == 2) {
+        return m_currentInput.joy1;
+    }
+    return 0x0f ^ 0xff;  // Return center if invalid player
+}
+
+bool AtariEmulator::getJoystickFire(int player) const
+{
+    if (player == 1) {
+        return m_currentInput.trig0 == 1;  // 1 = pressed in our inverted logic
+    } else if (player == 2) {
+        return m_currentInput.trig1 == 1;  // 1 = pressed in our inverted logic
+    }
+    return false;
+}
+
+QJsonObject AtariEmulator::getAllJoystickStates() const
+{
+    QJsonObject result;
+    
+    // Helper to convert inverted direction value back to human-readable direction
+    auto getDirectionName = [](int value) -> QString {
+        // These are the inverted values we use
+        const int CENTER = 0x0f ^ 0xff;  // 240
+        const int UP = 0x0e ^ 0xff;      // 241
+        const int DOWN = 0x0d ^ 0xff;    // 242
+        const int LEFT = 0x0b ^ 0xff;    // 244
+        const int RIGHT = 0x07 ^ 0xff;   // 248
+        const int UP_LEFT = 0x0a ^ 0xff; // 245
+        const int UP_RIGHT = 0x06 ^ 0xff; // 249
+        const int DOWN_LEFT = 0x09 ^ 0xff; // 246
+        const int DOWN_RIGHT = 0x05 ^ 0xff; // 250
+        
+        switch(value) {
+            case CENTER: return "CENTER";
+            case UP: return "UP";
+            case DOWN: return "DOWN";
+            case LEFT: return "LEFT";
+            case RIGHT: return "RIGHT";
+            case UP_LEFT: return "UP_LEFT";
+            case UP_RIGHT: return "UP_RIGHT";
+            case DOWN_LEFT: return "DOWN_LEFT";
+            case DOWN_RIGHT: return "DOWN_RIGHT";
+            default: return QString("UNKNOWN_%1").arg(value);
+        }
+    };
+    
+    // Joystick 1
+    QJsonObject joy1;
+    joy1["direction"] = getDirectionName(m_currentInput.joy0);
+    joy1["direction_value"] = m_currentInput.joy0;
+    joy1["fire"] = (m_currentInput.trig0 == 1);  // 1 = pressed in our inverted logic
+    joy1["keyboard_enabled"] = m_kbdJoy0Enabled;
+    joy1["keyboard_keys"] = m_swapJoysticks ? "wasd" : "numpad";
+    
+    // Joystick 2
+    QJsonObject joy2;
+    joy2["direction"] = getDirectionName(m_currentInput.joy1);
+    joy2["direction_value"] = m_currentInput.joy1;
+    joy2["fire"] = (m_currentInput.trig1 == 1);  // 1 = pressed in our inverted logic
+    joy2["keyboard_enabled"] = m_kbdJoy1Enabled;
+    joy2["keyboard_keys"] = m_swapJoysticks ? "numpad" : "wasd";
+    
+    result["joystick1"] = joy1;
+    result["joystick2"] = joy2;
+    result["swapped"] = m_swapJoysticks;
+    
+    return result;
 }

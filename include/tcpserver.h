@@ -56,6 +56,7 @@ private slots:
     void onClientDisconnected();
     void onClientDataReady();
     void processCommand(QTcpSocket* client, const QJsonObject& request);
+    void streamJoystickStates();  // Timer callback for joystick streaming
 
 private:
     // Command handlers
@@ -88,6 +89,14 @@ private:
     
     // Command statistics (for debugging/monitoring)
     QMap<QString, int> m_commandStats;
+    
+    // Joystick streaming infrastructure
+    QTimer* m_joystickStreamTimer;
+    QSet<QTcpSocket*> m_joystickStreamClients;
+    int m_lastJoy0State;
+    int m_lastJoy1State;
+    bool m_lastTrig0;
+    bool m_lastTrig1;
 };
 
 #endif // TCPSERVER_H

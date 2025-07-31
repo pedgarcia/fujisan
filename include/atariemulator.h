@@ -18,6 +18,7 @@
 #include <QBuffer>
 #include <functional>
 #include <QSet>
+#include <QJsonObject>
 
 extern "C" {
     #include "libatari800.h"
@@ -179,6 +180,15 @@ public:
     
     float getTargetFPS() const { return m_targetFps; }
     float getFrameTimeMs() const { return m_frameTimeMs; }
+    
+    // Joystick control methods for TCP server
+    void setJoystickState(int player, int direction, bool fire);
+    void releaseJoystick(int player);
+    
+    // Joystick monitoring methods for TCP server
+    int getJoystickState(int player) const;
+    bool getJoystickFire(int player) const;
+    QJsonObject getAllJoystickStates() const;
     
     // Color adjustment methods
     void updateColorSettings(bool isPal, double saturation, double contrast, double brightness, double gamma, double hue);

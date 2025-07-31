@@ -417,6 +417,173 @@ echo '{
 - `on` - Turn caps lock on (enable)
 - `off` - Turn caps lock off (disable)
 
+#### `input.joystick`
+
+Control joystick input for either player.
+
+```bash
+# Set player 1 joystick to UP with fire button
+echo '{
+  "command": "input.joystick",
+  "params": {
+    "player": 1,
+    "direction": "UP",
+    "fire": true
+  }
+}' | nc localhost 6502
+
+# Set player 2 to diagonal movement
+echo '{
+  "command": "input.joystick",
+  "params": {
+    "player": 2,
+    "direction": "UP_LEFT",
+    "fire": false
+  }
+}' | nc localhost 6502
+
+# Use numeric direction value (0-15)
+echo '{
+  "command": "input.joystick",
+  "params": {
+    "player": 1,
+    "value": 14,
+    "fire": true
+  }
+}' | nc localhost 6502
+```
+
+**Parameters:**
+- `player` - Player number (1 or 2)
+- `direction` - Direction string: CENTER, UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT
+- `value` - Alternative: numeric direction value (0-15)
+- `fire` - Fire button state (true/false)
+
+#### `input.joystick_release`
+
+Release joystick to center position.
+
+```bash
+echo '{
+  "command": "input.joystick_release",
+  "params": {"player": 1}
+}' | nc localhost 6502
+```
+
+#### `input.get_joystick`
+
+Get current state of specific joystick.
+
+```bash
+echo '{
+  "command": "input.get_joystick",
+  "params": {"player": 1}
+}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "player": 1,
+    "direction": "UP",
+    "direction_value": 241,
+    "fire": true,
+    "keyboard_enabled": true,
+    "keyboard_keys": "numpad"
+  }
+}
+```
+
+#### `input.get_all_joysticks`
+
+Get state of all joysticks.
+
+```bash
+echo '{"command": "input.get_all_joysticks"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "joystick1": {
+      "direction": "CENTER",
+      "direction_value": 240,
+      "fire": false,
+      "keyboard_enabled": true,
+      "keyboard_keys": "numpad"
+    },
+    "joystick2": {
+      "direction": "DOWN",
+      "direction_value": 242,
+      "fire": true,
+      "keyboard_enabled": false,
+      "keyboard_keys": "wasd"
+    },
+    "swapped": false
+  }
+}
+```
+
+#### `input.start_joystick_stream`
+
+Subscribe to real-time joystick state changes.
+
+```bash
+echo '{
+  "command": "input.start_joystick_stream",
+  "params": {"rate": 60}
+}' | nc localhost 6502
+```
+
+**Parameters:**
+- `rate` - Update rate in Hz (10-120, default 60)
+
+**Events sent on changes:**
+```json
+{
+  "type": "event",
+  "event": "joystick_changed",
+  "data": {
+    "player": 1,
+    "direction": "UP",
+    "direction_value": 241,
+    "fire": true,
+    "previous_direction": "CENTER",
+    "previous_fire": false,
+    "timestamp": 1234567890
+  }
+}
+```
+
+#### `input.stop_joystick_stream`
+
+Unsubscribe from joystick state changes.
+
+```bash
+echo '{"command": "input.stop_joystick_stream"}' | nc localhost 6502
+```
+
+#### `input.get_joystick_stream_status`
+
+Check if client is subscribed to joystick streaming.
+
+```bash
+echo '{"command": "input.get_joystick_stream_status"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "streaming": true,
+    "total_streaming_clients": 2,
+    "stream_rate": 60
+  }
+}
+```
+
 ### Debug Commands
 
 Control debugging features, breakpoints, and memory access.
