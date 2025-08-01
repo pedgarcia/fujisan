@@ -1,0 +1,199 @@
+From 47503bf8154c8c656350834505d4202a07de9957 Mon Sep 17 00:00:00 2001
+From: Paulo Garcia <pgarcia@blackberry.com>
+Date: Fri, 1 Aug 2025 08:23:20 -0400
+Subject: [PATCH] Add disk management and activity API functions to libatari800
+
+- Add libatari800_dismount_disk_image() to unmount disk images
+- Add libatari800_disable_drive() to disable drives completely
+- Add disk activity monitoring API for LED indicators
+- Add SIO patch control API for disk speed management
+- Required for Fujisan Qt frontend disk management features
+---
+ src/libatari800/api.c         | 98 +++++++++++++++++++++++++++++++++++
+ src/libatari800/libatari800.h | 35 +++++++++++++
+ 2 files changed, 133 insertions(+)
+
+diff --git a/src/libatari800/api.c b/src/libatari800/api.c
+index 1f0e4088..84024019 100644
+--- a/src/libatari800/api.c
++++ b/src/libatari800/api.c
+@@ -40,6 +40,7 @@
+ #include "memory.h"
+ #include "screen.h"
+ #include "sio.h"
++#include "esc.h"
+ #include "../sound.h"
+ #include "util.h"
+ #include "libatari800/main.h"
+@@ -51,6 +52,9 @@
+ #include "libatari800/statesav.h"
+ 
+ 
++/* Callback pointer for disk activity notifications */
++void (*disk_activity_callback)(int drive, int operation) = NULL;
++
+ #ifdef HAVE_SETJMP
+ jmp_buf libatari800_cpu_crash;
+ #endif
+@@ -250,6 +254,30 @@ int libatari800_mount_disk_image(int diskno, const char *filename, int readonly)
+ 	return SIO_Mount(diskno, filename, readonly);
+ }
+ 
++/** Dismount disk image from drive
++ * 
++ * Remove the disk image from the specified drive. The drive status will be set to
++ * SIO_NO_DISK and the filename will be cleared to "Empty".
++ * 
++ * @param diskno drive number (1-8 for D1: through D8:)
++ */
++void libatari800_dismount_disk_image(int diskno)
++{
++	SIO_Dismount(diskno);
++}
++
++/** Disable disk drive
++ * 
++ * Dismount any disk image and disable the drive completely. The drive status will be set to
++ * SIO_OFF and the filename will be set to "Off".
++ * 
++ * @param diskno drive number (1-8 for D1: through D8:)
++ */
++void libatari800_disable_drive(int diskno)
++{
++	SIO_DisableDrive(diskno);
++}
++
+ 
+ /** Restart emulation using file
+  * 
+@@ -490,6 +518,76 @@ void libatari800_exit() {
+ 	Atari800_Exit(0);
+ }
+ 
++/** Get current disk activity state (polling method)
++ * 
++ * Checks if there is currently disk I/O activity happening and returns
++ * information about the active drive and operation type.
++ * 
++ * @param drive pointer to receive drive number (1-8) if activity detected
++ * @param operation pointer to receive operation type (0=read, 1=write) if activity detected  
++ * @param time_remaining pointer to receive frames remaining for LED display if activity detected
++ * 
++ * @retval 1 if disk activity is currently happening
++ * @retval 0 if no disk activity
++ */
++int libatari800_get_disk_activity(int *drive, int *operation, int *time_remaining)
++{
++	if (SIO_last_op_time > 0) {
++		if (drive) *drive = SIO_last_drive;
++		if (operation) *operation = SIO_last_op;
++		if (time_remaining) *time_remaining = SIO_last_op_time;
++		return 1;
++	}
++	return 0;
++}
++
++/** Set callback for real-time disk activity events
++ * 
++ * Sets a callback function that will be called whenever disk I/O activity
++ * occurs. This provides real-time notification without polling.
++ * 
++ * Note: The callback is called from within the emulation loop, so it should
++ * be kept lightweight and avoid blocking operations.
++ * 
++ * @param callback function to call when disk activity occurs, or NULL to disable
++ *                 callback receives: drive (1-8), operation (0=read, 1=write)
++ */
++void libatari800_set_disk_activity_callback(void (*callback)(int drive, int operation))
++{
++	disk_activity_callback = callback;
++}
++
++/** Get current SIO patch status
++ * 
++ * Returns the current state of the SIO patch which controls disk access speed.
++ * When enabled (1), disk access is fast and bypasses realistic timing delays.
++ * When disabled (0), disk access uses realistic hardware timing (slower).
++ * 
++ * @retval 1 if SIO patch (fast disk access) is enabled
++ * @retval 0 if SIO patch is disabled (realistic timing)
++ */
++int libatari800_get_sio_patch_enabled()
++{
++	return ESC_enable_sio_patch;
++}
++
++/** Set SIO patch status
++ * 
++ * Controls the SIO patch which affects disk access speed.
++ * - enabled=1: Fast disk access (bypasses realistic timing)
++ * - enabled=0: Realistic hardware timing (slower but authentic)
++ * 
++ * @param enabled 1 to enable fast disk access, 0 to use realistic timing
++ * 
++ * @retval previous SIO patch state (1 or 0)
++ */
++int libatari800_set_sio_patch_enabled(int enabled)
++{
++	int previous_state = ESC_enable_sio_patch;
++	ESC_enable_sio_patch = enabled ? TRUE : FALSE;
++	return previous_state;
++}
++
+ /*
+ vim:ts=4:sw=4:
+ */
+diff --git a/src/libatari800/libatari800.h b/src/libatari800/libatari800.h
+index 8091b97a..1a6bb259 100644
+--- a/src/libatari800/libatari800.h
++++ b/src/libatari800/libatari800.h
+@@ -278,6 +278,10 @@ int libatari800_next_frame(input_template_t *input);
+ 
+ int libatari800_mount_disk_image(int diskno, const char *filename, int readonly);
+ 
++void libatari800_dismount_disk_image(int diskno);
++
++void libatari800_disable_drive(int diskno);
++
+ int libatari800_reboot_with_file(const char *filename);
+ 
+ UBYTE *libatari800_get_main_memory_ptr();
+@@ -306,4 +310,35 @@ void libatari800_restore_state(emulator_state_t *state);
+ 
+ void libatari800_exit();
+ 
++/* Disk activity monitoring API - added for Fujisan emulator */
++/* Get current disk activity state (polling method)
++ * Returns 1 if activity detected, 0 if no activity
++ * drive: receives drive number (1-8) if activity detected  
++ * operation: receives operation type (0=read, 1=write) if activity detected
++ * time_remaining: receives frames remaining for LED display if activity detected
++ */
++int libatari800_get_disk_activity(int *drive, int *operation, int *time_remaining);
++
++/* Set callback for real-time disk activity events
++ * callback: function to call when disk activity occurs, or NULL to disable
++ * Callback receives: drive (1-8), operation (0=read, 1=write)
++ */
++void libatari800_set_disk_activity_callback(void (*callback)(int drive, int operation));
++
++/* SIO patch control API - added for investigating disk speed changes
++ * The SIO patch provides fast disk access by bypassing realistic timing delays
++ * When disabled, emulator uses realistic hardware timing (slower but more authentic)
++ */
++
++/* Get current SIO patch status
++ * Returns 1 if SIO patch (fast disk access) is enabled, 0 if disabled
++ */
++int libatari800_get_sio_patch_enabled();
++
++/* Set SIO patch status
++ * enabled: 1 to enable fast disk access, 0 to use realistic timing
++ * Returns previous state (1 or 0)
++ */
++int libatari800_set_sio_patch_enabled(int enabled);
++
+ #endif /* LIBATARI800_H_ */
+-- 
+2.39.5 (Apple Git-154)
+

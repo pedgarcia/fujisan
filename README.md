@@ -78,6 +78,7 @@ The objective is to always use libatari800 so there is never incompatibility bet
 - **CMake 3.16+**
 - **C++17 compatible compiler**
 - **Atari800 source code** (download from https://github.com/atari800/atari800)
+- **autoconf** and **automake** (for building atari800)
 - **Environment variable**: `export ATARI800_SRC_PATH=/path/to/atari800-src`
 
 ### Platform-Specific Setup
@@ -89,6 +90,9 @@ brew install qt@5
 
 # Install CMake if not available
 brew install cmake
+
+# Install autotools for building atari800
+brew install autoconf automake
 
 # Add Qt5 to PATH (if needed)
 export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
@@ -102,6 +106,9 @@ sudo apt install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools
 
 # Install CMake and build tools
 sudo apt install cmake build-essential
+
+# Install autotools for building atari800
+sudo apt install autoconf automake
 ```
 
 #### **Linux (CentOS/RHEL/Fedora)**
@@ -137,10 +144,12 @@ cd fujisan/patches
 #### **Step 3: Build libatari800**
 ```bash
 cd $ATARI800_SRC_PATH
-./autogen.sh              # Generate configure script
+./autogen.sh              # Generate configure script (requires autoconf/automake)
 ./configure --target=libatari800
 make
 ```
+
+**Note**: If you get errors about missing auxiliary files when running `./configure`, make sure you've run `./autogen.sh` first.
 
 #### **Step 4: Build Fujisan**
 
