@@ -153,15 +153,26 @@ make
 
 #### **Step 4: Build Fujisan**
 
+**Important**: We recommend out-of-source builds to keep the source directory clean. If you previously built in-source, clean up first:
+```bash
+# Clean up any previous in-source build files
+cd /path/to/fujisan
+rm -rf CMakeCache.txt CMakeFiles/ Makefile cmake_install.cmake Fujisan_autogen/
+```
+
 **macOS/Linux:**
 ```bash
 # Navigate to Fujisan directory
 cd /path/to/fujisan
 
+# Create and enter build directory
+mkdir -p build
+cd build
+
 # Configure with CMake (ATARI800_SRC_PATH must be set)
-ATARI800_SRC_PATH=/path/to/atari800-src cmake .
+ATARI800_SRC_PATH=/path/to/atari800-src cmake ..
 # OR for macOS with Homebrew Qt5:
-# ATARI800_SRC_PATH=/path/to/atari800-src CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake .
+# ATARI800_SRC_PATH=/path/to/atari800-src CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake ..
 
 # Build
 make
@@ -267,6 +278,24 @@ git pull
 - **macOS**: Install Xcode Command Line Tools: `xcode-select --install`
 - **Linux**: Install build-essential: `sudo apt install build-essential`
 - **Windows**: Install Visual Studio with C++ tools
+
+### Cleaning Build Files
+
+If you need to clean your build and start fresh:
+
+#### **Out-of-source build (recommended)**
+```bash
+# Simply remove the build directory
+rm -rf build/
+```
+
+#### **In-source build cleanup**
+```bash
+# Remove all CMake-generated files
+rm -rf CMakeCache.txt CMakeFiles/ Makefile cmake_install.cmake Fujisan_autogen/
+# Remove compiled binary
+rm -f Fujisan fujisan Fujisan.exe
+```
 
 ### Running
 ```bash
