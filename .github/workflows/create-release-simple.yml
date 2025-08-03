@@ -1,0 +1,204 @@
+name: Create Release (Simple)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      windows_run_id:
+        description: 'Windows build run ID (get from Actions page)'
+        required: true
+        type: string
+      linux_run_id:
+        description: 'Linux build run ID (get from Actions page)'  
+        required: true
+        type: string
+      release_notes:
+        description: 'Release notes (optional)'
+        required: false
+        default: ''
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        brew install cmake qt@5
+
+    - name: Build macOS app bundle
+      run: |
+        export CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5"
+        export FUJISAN_VERSION="${{ github.event.inputs.version }}"
+        ./scripts/build-macos-release.sh --skip-sign --skip-notarize
+
+    - name: Upload macOS artifacts  
+      uses: actions/upload-artifact@v4
+      with:
+        name: fujisan-macos-x64
+        path: |
+          dist/Fujisan-*.dmg
+          dist/Fujisan-*.dmg.sha256
+        retention-days: 30
+
+  create-draft-release:
+    needs: [build-macos]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download macOS artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: fujisan-macos-x64
+        path: artifacts/macos
+
+    - name: Download Windows artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: fujisan-windows-x64
+        run-id: ${{ github.event.inputs.windows_run_id }}
+        path: artifacts/windows
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: fujisan-linux-x64
+        run-id: ${{ github.event.inputs.linux_run_id }}
+        path: artifacts/linux
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: List all artifacts
+      run: |
+        echo "=== Downloaded Artifacts ==="
+        find artifacts -type f -exec ls -lh {} \;
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        CUSTOM_NOTES="${{ github.event.inputs.release_notes }}"
+        
+        if [ -n "$CUSTOM_NOTES" ]; then
+          RELEASE_NOTES="$CUSTOM_NOTES"
+        else
+          # Auto-generate release notes
+          COMMITS=$(git log --oneline --since="2 weeks ago" --pretty=format:"- %s" | head -10)
+          
+          RELEASE_NOTES="## Fujisan $VERSION
+
+### 🎮 Multi-Platform Atari 8-bit Emulator
+
+Self-contained packages with Qt5 and libatari800 included - no external dependencies required.
+
+### 📦 Downloads
+
+- **Windows**: \`Fujisan-$VERSION-Windows-x64.msi\` - MSI installer for Windows 10/11
+- **Linux**: \`fujisan_*_amd64.deb\` (Debian/Ubuntu) + \`fujisan-*-linux-x64.tar.gz\` (Portable)
+- **macOS**: \`Fujisan-$VERSION-macOS.dmg\` - DMG installer for macOS 11.0+
+
+### ✅ What's Included
+
+- Complete Atari 8-bit emulation (400/800/XL/XE systems)
+- Modern Qt5 interface with disk management
+- Network debugging support via TCP server
+- All dependencies bundled (Qt5 frameworks + libatari800)
+
+### 📋 Recent Changes
+
+$COMMITS
+
+### 🔐 Verification
+
+Each download includes SHA256 checksums for integrity verification.
+
+**Visit**: https://github.com/pedgarcia/fujisan"
+        fi
+        
+        # Save for next step
+        echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        release_name: Fujisan ${{ github.event.inputs.version }}
+        body: ${{ steps.release_notes.outputs.release_notes }}
+        draft: true
+        prerelease: ${{ github.event.inputs.prerelease }}
+
+    - name: Upload Release Assets
+      run: |
+        # Function to upload file if it exists
+        upload_if_exists() {
+          local file_pattern="$1"
+          local asset_name="$2"
+          local content_type="$3"
+          
+          local file=$(find artifacts -name "$file_pattern" -type f | head -1)
+          if [ -f "$file" ]; then
+            echo "Uploading: $file as $asset_name"
+            curl -s -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: $content_type" \
+              --data-binary @"$file" \
+              "${{ steps.create_release.outputs.upload_url }}?name=$asset_name"
+          else
+            echo "Warning: File not found: $file_pattern"
+          fi
+        }
+        
+        VERSION="${{ github.event.inputs.version }}"
+        VERSION_CLEAN=$(echo $VERSION | sed 's/^v//')
+        
+        # Upload Windows assets
+        upload_if_exists "Fujisan-*-Windows-x64.msi" "Fujisan-$VERSION-Windows-x64.msi" "application/x-msi"
+        upload_if_exists "Fujisan-*-Windows-x64.msi.sha256" "Fujisan-$VERSION-Windows-x64.msi.sha256" "text/plain"
+        
+        # Upload Linux assets  
+        upload_if_exists "fujisan_*_amd64.deb" "fujisan_${VERSION_CLEAN}_amd64.deb" "application/vnd.debian.binary-package"
+        upload_if_exists "fujisan_*_amd64.deb.sha256" "fujisan_${VERSION_CLEAN}_amd64.deb.sha256" "text/plain"
+        upload_if_exists "fujisan-*-linux-x64.tar.gz" "fujisan-$VERSION-linux-x64.tar.gz" "application/gzip"
+        upload_if_exists "fujisan-*-linux-x64.tar.gz.sha256" "fujisan-$VERSION-linux-x64.tar.gz.sha256" "text/plain"
+        
+        # Upload macOS assets
+        upload_if_exists "Fujisan-*-macOS.dmg" "Fujisan-$VERSION-macOS.dmg" "application/x-apple-diskimage"
+        upload_if_exists "Fujisan-*-macOS.dmg.sha256" "Fujisan-$VERSION-macOS.dmg.sha256" "text/plain"
+
+    - name: Display release summary
+      run: |
+        echo "🎉 Draft Release Created Successfully!"
+        echo ""
+        echo "📝 Release Details:"
+        echo "   Version: ${{ github.event.inputs.version }}"
+        echo "   Draft: Yes (ready for testing)"
+        echo "   Pre-release: ${{ github.event.inputs.prerelease }}"
+        echo ""
+        echo "🔗 Release URL: ${{ steps.create_release.outputs.html_url }}"
+        echo ""
+        echo "📋 Next Steps:"
+        echo "   1. Visit the release URL above"
+        echo "   2. Download and test each platform's binaries"
+        echo "   3. Publish the release when ready"

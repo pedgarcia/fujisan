@@ -38,10 +38,16 @@ jobs:
     - name: Setup MSVC
       uses: microsoft/setup-msbuild@v1.3
 
-    - name: Setup NSIS for installer creation
+    - name: Setup build tools
       run: |
+        # Install NSIS for installer creation
         choco install nsis -y
+        # Install Git (should be available, but ensure it's in PATH)
+        # Install MSYS2 for autotools (needed for atari800 build)
+        choco install msys2 -y
+        # Add tools to PATH
         echo "C:\Program Files (x86)\NSIS" >> $GITHUB_PATH
+        echo "C:\tools\msys64\usr\bin" >> $GITHUB_PATH
 
     - name: Create build directory
       run: mkdir build-release
@@ -49,9 +55,11 @@ jobs:
     - name: Configure CMake
       run: |
         cd build-release
+        # Use proper path format for Windows
+        $QtPath = "${{ env.Qt5_Dir }}".Replace('\', '/')
         cmake -G "Visual Studio 17 2022" -A x64 `
           -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_PREFIX_PATH="${{ env.Qt5_Dir }}" `
+          -DCMAKE_PREFIX_PATH="$QtPath" `
           -DFUJISAN_VERSION="${{ github.event.inputs.version || 'dev' }}" `
           ..
 
