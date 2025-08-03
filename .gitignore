@@ -2,6 +2,8 @@
 build/
 Build/
 cmake-build-*/
+build-release/
+dist/
 
 # Qt generated files
 *.pro.user
