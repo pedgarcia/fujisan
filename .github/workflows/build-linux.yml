@@ -8,12 +8,6 @@ on:
         required: true
         default: 'v1.0.0'
         type: string
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - '.gitignore'
 
 jobs:
   build-linux:
