@@ -42,7 +42,7 @@ ExternalProject_Add(atari800_external
     
     CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>
     
-    BUILD_COMMAND make -j4 -C <SOURCE_DIR>
+    BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make -j4
     
     # No install step needed, we'll link directly to the library
     INSTALL_COMMAND ""

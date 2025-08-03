@@ -37,9 +37,10 @@ jobs:
       run: |
         # Install NSIS for installer creation
         choco install nsis -y
-        # Install Git (should be available, but ensure it's in PATH)
-        # Install MSYS2 for autotools (needed for atari800 build)
+        # Install MSYS2 for Unix tools (needed for atari800 autotools build)
         choco install msys2 -y
+        # Initialize MSYS2 and install required packages
+        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm autoconf automake make pkgconf"
         # Add tools to PATH
         echo "C:\Program Files (x86)\NSIS" >> $GITHUB_PATH
         echo "C:\tools\msys64\usr\bin" >> $GITHUB_PATH
