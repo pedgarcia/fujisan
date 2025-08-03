@@ -32,7 +32,8 @@ jobs:
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2019_64'
-        modules: 'qtmultimedia qtnetwork'
+        # Note: qtmultimedia and qtnetwork are included in base Qt5 installation
+        # modules: 'qtmultimedia qtnetwork'  # These aren't separate modules in 5.15.2
         setup-python: 'false'
 
     - name: Setup MSVC

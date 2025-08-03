@@ -1,0 +1,68 @@
+# Dockerfile for testing Linux build locally
+# Based on Ubuntu 20.04 LTS (same as GitHub Actions)
+
+FROM ubuntu:20.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install system dependencies (same as GitHub Actions workflow)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libtool \
+    autoconf \
+    automake \
+    libgl1-mesa-dev \
+    libglu1-mesa-dev \
+    libxrandr-dev \
+    libxss-dev \
+    libxcursor-dev \
+    libxinerama-dev \
+    libxi-dev \
+    libxext-dev \
+    libxfixes-dev \
+    libxrender-dev \
+    libxcb1-dev \
+    libx11-xcb-dev \
+    libxcb-glx0-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libxcb-dri2-0-dev \
+    libxcb-dri3-dev \
+    libxcb-present-dev \
+    libxcb-sync-dev \
+    libxshmfence-dev \
+    libasound2-dev \
+    libpulse-dev \
+    file \
+    wget \
+    fuse \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Qt5 (same as workflow)
+RUN apt-get update && apt-get install -y \
+    qt5-default \
+    qtbase5-dev \
+    qtmultimedia5-dev \
+    libqt5multimedia5-plugins \
+    libqt5network5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install packaging tools
+RUN apt-get update && apt-get install -y \
+    dpkg-dev \
+    fakeroot \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up working directory
+WORKDIR /workspace
+
+# Copy source code (will be mounted)
+# COPY . .
+
+# Default command
+CMD ["/bin/bash"]
