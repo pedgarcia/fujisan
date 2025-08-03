@@ -40,8 +40,17 @@ if [ ! -f "configure" ]; then
     ./autogen.sh
 fi
 
-# Configure for libatari800
+# Configure for libatari800 with universal build support on macOS
 echo "Configuring libatari800..."
+
+# Set universal build flags for macOS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "Configuring for universal macOS build (Intel + Apple Silicon)..."
+    export CFLAGS="-arch arm64 -arch x86_64 ${CFLAGS:-}"
+    export LDFLAGS="-arch arm64 -arch x86_64 ${LDFLAGS:-}"
+    export CPPFLAGS="${CPPFLAGS:-}"
+fi
+
 ./configure --target=libatari800 --enable-netsio
 
 echo "atari800 configuration completed"

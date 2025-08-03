@@ -16,6 +16,26 @@ if(NOT CMAKE_PREFIX_PATH)
     set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/qt@5/lib/cmake")
 endif()
 
+# Configure builds for macOS (Intel + Apple Silicon)
+if(APPLE)
+    # Set deployment target
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum OS X deployment version" FORCE)
+    
+    # Handle architecture-specific builds
+    if(NOT CMAKE_OSX_ARCHITECTURES)
+        # Default to current architecture if not specified
+        execute_process(COMMAND uname -m OUTPUT_VARIABLE CURRENT_ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if(CURRENT_ARCH STREQUAL "arm64")
+            set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Build architectures for Mac OS X" FORCE)
+        else()
+            set(CMAKE_OSX_ARCHITECTURES "x86_64" CACHE STRING "Build architectures for Mac OS X" FORCE)
+        endif()
+    endif()
+    
+    message(STATUS "macOS Build Architecture(s): ${CMAKE_OSX_ARCHITECTURES}")
+    
+endif()
+
 # Find Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
@@ -169,6 +189,17 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     # Remove dependency on runtime ATARI800_SRC_PATH
     EMBEDDED_LIBATARI800
 )
+
+# Add architecture-specific definitions for macOS
+if(APPLE)
+    if(CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+        target_compile_definitions(${PROJECT_NAME} PRIVATE FUJISAN_X86_64_BUILD)
+    endif()
+    
+    if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+        target_compile_definitions(${PROJECT_NAME} PRIVATE FUJISAN_ARM64_BUILD)
+    endif()
+endif()
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME}

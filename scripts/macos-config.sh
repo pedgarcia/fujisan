@@ -59,16 +59,37 @@ ARCHIVE_NAME="${PROJECT_NAME}-v${PROJECT_VERSION}-macOS.zip"
 # QT5 CONFIGURATION (Auto-detection)
 # ============================================================================
 
-# Qt5 paths in order of preference
-QT5_SEARCH_PATHS=(
-    "$CMAKE_PREFIX_PATH"
-    "/opt/homebrew/opt/qt@5"
-    "/usr/local/opt/qt@5"
-    "/opt/local/libexec/qt5"
-    "/usr/local/Cellar/qt@5"
-    "/Applications/Qt/5.15.2/clang_64"
-    "/Users/$(whoami)/Qt/5.15.2/clang_64"
-)
+# Qt5 paths in order of preference - architecture specific
+if [[ "${TARGET_ARCH:-}" == "x86_64" ]]; then
+    QT5_SEARCH_PATHS=(
+        "/usr/local/opt/qt@5"                    # Intel Homebrew Qt5
+        "$CMAKE_PREFIX_PATH"
+        "/opt/local/libexec/qt5"
+        "/usr/local/Cellar/qt@5"
+        "/Applications/Qt/5.15.2/clang_64"
+        "/Users/$(whoami)/Qt/5.15.2/clang_64"
+    )
+elif [[ "${TARGET_ARCH:-}" == "arm64" ]]; then
+    QT5_SEARCH_PATHS=(
+        "/opt/homebrew/opt/qt@5"                 # ARM Homebrew Qt5
+        "$CMAKE_PREFIX_PATH"
+        "/opt/local/libexec/qt5"
+        "/usr/local/Cellar/qt@5"
+        "/Applications/Qt/5.15.2/clang_64"
+        "/Users/$(whoami)/Qt/5.15.2/clang_64"
+    )
+else
+    # Default search order for universal builds
+    QT5_SEARCH_PATHS=(
+        "$CMAKE_PREFIX_PATH"
+        "/opt/homebrew/opt/qt@5"                 # ARM Homebrew Qt5
+        "/usr/local/opt/qt@5"                    # Intel Homebrew Qt5
+        "/opt/local/libexec/qt5"
+        "/usr/local/Cellar/qt@5"
+        "/Applications/Qt/5.15.2/clang_64"
+        "/Users/$(whoami)/Qt/5.15.2/clang_64"
+    )
+fi
 
 # Auto-detect Qt5 installation
 detect_qt5_path() {
@@ -125,8 +146,12 @@ ENTITLEMENTS_FILE="${PROJECT_ROOT}/scripts/entitlements.plist"
 # CMake build type
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
 
-# macOS deployment target
+# macOS deployment target and universal build support
 MACOS_DEPLOYMENT_TARGET="${MACOS_DEPLOYMENT_TARGET:-11.0}"
+CMAKE_OSX_ARCHITECTURES="${CMAKE_OSX_ARCHITECTURES:-arm64;x86_64}"
+
+# Universal build flags
+UNIVERSAL_BUILD="${UNIVERSAL_BUILD:-true}"
 
 # CMake generator
 CMAKE_GENERATOR="${CMAKE_GENERATOR:-Unix Makefiles}"
@@ -226,5 +251,6 @@ export QT5_PATH QT5_BIN_PATH MACDEPLOYQT
 export DEVELOPER_ID DEVELOPER_TEAM_ID NOTARIZATION_PROFILE NOTARIZATION_TIMEOUT
 export CODESIGN_OPTIONS ENTITLEMENTS_FILE
 export CMAKE_BUILD_TYPE MACOS_DEPLOYMENT_TARGET CMAKE_GENERATOR BUILD_JOBS
+export CMAKE_OSX_ARCHITECTURES UNIVERSAL_BUILD
 export DMG_TITLE DMG_BACKGROUND DMG_WINDOW_SIZE DMG_ICON_SIZE
 export DMG_APP_POSITION DMG_APPLICATIONS_POSITION
