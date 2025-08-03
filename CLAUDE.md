@@ -141,3 +141,7 @@ Fujisan includes comprehensive FujiNet-PC network connectivity:
 - Test TCP server with multiple concurrent clients
 - Test NetSIO/FujiNet connectivity with FujiNet-PC running on port 9997
 - Verify local disk priority over network devices
+
+## Build and Release Memories
+
+- macOS build and DMG will be done locally
