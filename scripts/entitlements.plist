@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Basic hardened runtime entitlements for Fujisan -->
+	
+	<!-- Allow loading of unsigned dynamic libraries (needed for Qt5 plugins) -->
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<false/>
+	
+	<!-- Allow dynamic code generation (needed for Qt5 and audio) -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<false/>
+	
+	<!-- Allow loading of arbitrary libraries (needed for Qt5 framework loading) -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<false/>
+	
+	<!-- Network entitlements for TCP server -->
+	<key>com.apple.security.network.server</key>
+	<true/>
+	
+	<key>com.apple.security.network.client</key>
+	<true/>
+	
+	<!-- Audio device access for sound emulation -->
+	<key>com.apple.security.device.audio-input</key>
+	<false/>
+	
+	<!-- File system access for disk images and ROMs -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	
+	<!-- Disable App Sandbox (needed for full file system access) -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	
+	<!-- Camera and microphone not needed -->
+	<key>com.apple.security.device.camera</key>
+	<false/>
+	
+	<key>com.apple.security.device.microphone</key>
+	<false/>
+	
+	<!-- Location services not needed -->
+	<key>com.apple.security.personal-information.location</key>
+	<false/>
+	
+	<!-- Contacts access not needed -->
+	<key>com.apple.security.personal-information.addressbook</key>
+	<false/>
+	
+	<!-- Calendar access not needed -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<false/>
+</dict>
+</plist>

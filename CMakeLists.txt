@@ -8,38 +8,62 @@ project(Fujisan VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Set Qt5 path for Homebrew installation
-set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/qt@5/lib/cmake")
+# Include ExternalProject for building libatari800
+include(ExternalProject)
+
+# Set Qt5 path for Homebrew installation (can be overridden)
+if(NOT CMAKE_PREFIX_PATH)
+    set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/qt@5/lib/cmake")
+endif()
 
 # Find Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
-# Find libatari800 using environment variable
-if(NOT DEFINED ENV{ATARI800_SRC_PATH})
-    message(FATAL_ERROR "ATARI800_SRC_PATH environment variable not set. Please set it to the atari800 source directory.")
-endif()
+# ============================================================================
+# BUILD LIBATARI800 AS EXTERNAL PROJECT
+# ============================================================================
 
-set(ATARI800_ROOT $ENV{ATARI800_SRC_PATH})
-message(STATUS "Using Atari800 source from: ${ATARI800_ROOT}")
+# Define atari800 source directory
+set(ATARI800_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/atari800-src")
+set(ATARI800_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/atari800-build")
+set(ATARI800_LIBRARY "${ATARI800_SOURCE_DIR}/src/libatari800.a")
 
-find_library(ATARI800_LIBRARY 
-    NAMES libatari800.a atari800
-    PATHS ${ATARI800_ROOT}/src
-    NO_DEFAULT_PATH
+# Download and build atari800 with Fujisan patches
+ExternalProject_Add(atari800_external
+    GIT_REPOSITORY https://github.com/atari800/atari800.git
+    GIT_TAG 575a943b3523bf0f5c9b73ba8641d83cac672f24  # Known compatible version
+    SOURCE_DIR ${ATARI800_SOURCE_DIR}
+    BINARY_DIR ${ATARI800_BINARY_DIR}
+    
+    # Apply Fujisan patches during configure step
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy_directory 
+                  "${CMAKE_CURRENT_SOURCE_DIR}/patches" 
+                  "<SOURCE_DIR>/fujisan-patches"
+    
+    CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>
+    
+    BUILD_COMMAND make -j4 -C <SOURCE_DIR>
+    
+    # No install step needed, we'll link directly to the library
+    INSTALL_COMMAND ""
+    
+    # Export the library location
+    BUILD_BYPRODUCTS ${ATARI800_LIBRARY}
 )
 
-if(NOT ATARI800_LIBRARY)
-    message(FATAL_ERROR "libatari800 not found at ${ATARI800_ROOT}/src. Please build it first with: cd ${ATARI800_ROOT} && ./configure --target=libatari800 && make")
-endif()
-
-# Include directories
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${ATARI800_ROOT}/src/libatari800
-    ${ATARI800_ROOT}/src
+# Create imported target for libatari800
+add_library(libatari800 STATIC IMPORTED)
+set_target_properties(libatari800 PROPERTIES
+    IMPORTED_LOCATION ${ATARI800_LIBRARY}
 )
 
-# Source files
+# Add dependency to ensure atari800 is built first
+add_dependencies(libatari800 atari800_external)
+
+# ============================================================================
+# FUJISAN SOURCE FILES
+# ============================================================================
+
 set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
@@ -84,15 +108,71 @@ set(HEADERS
     include/tcpserver.h
 )
 
-# Create executable
+# ============================================================================
+# CREATE FUJISAN EXECUTABLE
+# ============================================================================
+
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
+# Add dependency to ensure atari800 is built before Fujisan
+add_dependencies(${PROJECT_NAME} atari800_external)
+
+# Include directories for Fujisan and atari800 headers
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${ATARI800_SOURCE_DIR}/src/libatari800
+    ${ATARI800_SOURCE_DIR}/src
+)
+
+# ============================================================================
+# MACOS APP BUNDLE CONFIGURATION
+# ============================================================================
+
+if(APPLE)
+    # Configure as macOS app bundle
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
+        MACOSX_BUNDLE_BUNDLE_NAME "Fujisan"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_IDENTIFIER "com.8bitrelics.fujisan"
+        MACOSX_BUNDLE_EXECUTABLE_NAME "Fujisan"
+        MACOSX_BUNDLE_ICON_FILE "Fujisan.icns"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.8bitrelics.fujisan"
+        MACOSX_BUNDLE_DISPLAY_NAME "Fujisan"
+        MACOSX_BUNDLE_INFO_STRING "Fujisan - Modern Atari Emulator"
+        MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_COPYRIGHT "Copyright (c) 2025 Paulo Garcia (8bitrelics.com)"
+        MACOSX_DEPLOYMENT_TARGET "11.0"
+    )
+    
+    # Copy app icon to bundle
+    set(ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/Fujisan.icns")
+    if(EXISTS ${ICON_FILE})
+        set_source_files_properties(${ICON_FILE} PROPERTIES
+            MACOSX_PACKAGE_LOCATION "Resources"
+        )
+        target_sources(${PROJECT_NAME} PRIVATE ${ICON_FILE})
+    else()
+        message(WARNING "App icon not found: ${ICON_FILE}")
+    endif()
+endif()
+
+# ============================================================================
+# COMPILE DEFINITIONS AND LINKING
+# ============================================================================
+
 # Add compile definitions
-target_compile_definitions(${PROJECT_NAME} PRIVATE SCREENSHOTS)
+target_compile_definitions(${PROJECT_NAME} PRIVATE 
+    SCREENSHOTS
+    # Remove dependency on runtime ATARI800_SRC_PATH
+    EMBEDDED_LIBATARI800
+)
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME}
-    ${ATARI800_LIBRARY}
+    libatari800
     Qt5::Core
     Qt5::Widgets
     Qt5::Gui
@@ -114,5 +194,25 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     AUTOMOC ON
 )
 
-# Install target
+# ============================================================================
+# INSTALL TARGET
+# ============================================================================
+
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+
+# ============================================================================
+# HELPFUL MESSAGES
+# ============================================================================
+
+# Print build information
+message(STATUS "=== Fujisan Build Configuration ===")
+message(STATUS "Project Version: ${PROJECT_VERSION}")
+message(STATUS "Qt5 Path: ${CMAKE_PREFIX_PATH}")
+message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "libatari800 will be built automatically as external project")
+message(STATUS "No ATARI800_SRC_PATH environment variable required")
+if(APPLE)
+    message(STATUS "macOS app bundle will be created")
+    message(STATUS "Bundle ID: com.8bitrelics.fujisan")
+endif()
+message(STATUS "=====================================")
