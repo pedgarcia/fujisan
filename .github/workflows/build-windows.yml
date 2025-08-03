@@ -1,0 +1,218 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+        type: string
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.gitignore'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup Qt5
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '5.15.2'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2019_64'
+        modules: 'qtmultimedia qtnetwork'
+        setup-python: 'false'
+
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v1.3
+
+    - name: Setup NSIS for installer creation
+      run: |
+        choco install nsis -y
+        echo "C:\Program Files (x86)\NSIS" >> $GITHUB_PATH
+
+    - name: Create build directory
+      run: mkdir build-release
+
+    - name: Configure CMake
+      run: |
+        cd build-release
+        cmake -G "Visual Studio 17 2022" -A x64 `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_PREFIX_PATH="${{ env.Qt5_Dir }}" `
+          -DFUJISAN_VERSION="${{ github.event.inputs.version || 'dev' }}" `
+          ..
+
+    - name: Build Fujisan
+      run: |
+        cd build-release
+        cmake --build . --config Release --parallel 4
+
+    - name: Deploy Qt5 libraries
+      run: |
+        cd build-release
+        & "${{ env.Qt5_Dir }}\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler Release\Fujisan.exe
+
+    - name: Verify libatari800 integration
+      run: |
+        cd build-release
+        if (Test-Path "atari800-src\src\libatari800.a") {
+          echo "✓ libatari800.a found and integrated"
+          $size = (Get-Item "atari800-src\src\libatari800.a").Length
+          echo "Library size: $size bytes"
+        } else {
+          echo "❌ libatari800.a not found"
+          exit 1
+        }
+
+    - name: Create Windows installer structure
+      run: |
+        mkdir installer
+        mkdir installer\bin
+        Copy-Item "build-release\Release\Fujisan.exe" "installer\bin\"
+        Copy-Item "build-release\Release\*.dll" "installer\bin\" -ErrorAction SilentlyContinue
+        
+        # Copy Qt5 DLLs deployed by windeployqt
+        if (Test-Path "build-release\Release\platforms") {
+          Copy-Item "build-release\Release\platforms" "installer\bin\platforms" -Recurse
+        }
+        if (Test-Path "build-release\Release\*.dll") {
+          Copy-Item "build-release\Release\*.dll" "installer\bin\" -Force
+        }
+        
+        # Copy additional files
+        if (Test-Path "README.md") { Copy-Item "README.md" "installer\" }
+        if (Test-Path "LICENSE") { Copy-Item "LICENSE" "installer\" }
+
+    - name: Create NSIS installer script
+      run: |
+        $version = "${{ github.event.inputs.version || 'dev' }}"
+        $versionClean = $version -replace '^v', ''
+        
+        @"
+        !define PRODUCT_NAME "Fujisan"
+        !define PRODUCT_VERSION "$versionClean"
+        !define PRODUCT_PUBLISHER "8bitrelics.com"
+        !define PRODUCT_WEB_SITE "https://github.com/8bitrelics/fujisan"
+        !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Fujisan"
+        !define PRODUCT_UNINST_ROOT_KEY "HKLM"
+
+        SetCompressor lzma
+        Name "`${PRODUCT_NAME} `${PRODUCT_VERSION}"
+        OutFile "Fujisan-`${PRODUCT_VERSION}-Windows-x64.msi"
+        InstallDir "`$PROGRAMFILES64\Fujisan"
+        InstallDirRegKey HKLM "`${PRODUCT_UNINST_KEY}" "InstallLocation"
+        ShowInstDetails show
+        ShowUnInstDetails show
+
+        Page directory
+        Page instfiles
+
+        UninstPage uninstConfirm
+        UninstPage instfiles
+
+        Section "MainSection" SEC01
+          SetOutPath "`$INSTDIR\bin"
+          SetOverwrite ifnewer
+          File /r "installer\bin\*.*"
+          
+          SetOutPath "`$INSTDIR"
+          File /nonfatal "installer\README.md"
+          File /nonfatal "installer\LICENSE"
+          
+          CreateDirectory "`$SMPROGRAMS\Fujisan"
+          CreateShortCut "`$SMPROGRAMS\Fujisan\Fujisan.lnk" "`$INSTDIR\bin\Fujisan.exe"
+          CreateShortCut "`$DESKTOP\Fujisan.lnk" "`$INSTDIR\bin\Fujisan.exe"
+        SectionEnd
+
+        Section -AdditionalIcons
+          CreateShortCut "`$SMPROGRAMS\Fujisan\Uninstall.lnk" "`$INSTDIR\uninst.exe"
+        SectionEnd
+
+        Section -Post
+          WriteUninstaller "`$INSTDIR\uninst.exe"
+          WriteRegStr HKLM "`${PRODUCT_UNINST_KEY}" "DisplayName" "`$(^Name)"
+          WriteRegStr HKLM "`${PRODUCT_UNINST_KEY}" "UninstallString" "`$INSTDIR\uninst.exe"
+          WriteRegStr HKLM "`${PRODUCT_UNINST_KEY}" "DisplayVersion" "`${PRODUCT_VERSION}"
+          WriteRegStr HKLM "`${PRODUCT_UNINST_KEY}" "URLInfoAbout" "`${PRODUCT_WEB_SITE}"
+          WriteRegStr HKLM "`${PRODUCT_UNINST_KEY}" "Publisher" "`${PRODUCT_PUBLISHER}"
+        SectionEnd
+
+        Function un.onUninstSuccess
+          HideWindow
+          MessageBox MB_ICONINFORMATION|MB_OK "Fujisan was successfully removed from your computer."
+        FunctionEnd
+
+        Section Uninstall
+          Delete "`$INSTDIR\uninst.exe"
+          Delete "`$INSTDIR\bin\*.*"
+          Delete "`$INSTDIR\*.*"
+          
+          Delete "`$SMPROGRAMS\Fujisan\*.*"
+          Delete "`$DESKTOP\Fujisan.lnk"
+          
+          RMDir "`$SMPROGRAMS\Fujisan"
+          RMDir "`$INSTDIR\bin\platforms"
+          RMDir "`$INSTDIR\bin"
+          RMDir "`$INSTDIR"
+          
+          DeleteRegKey `${PRODUCT_UNINST_ROOT_KEY} "`${PRODUCT_UNINST_KEY}"
+          SetAutoClose true
+        SectionEnd
+        "@ | Out-File -FilePath "installer.nsi" -Encoding UTF8
+
+    - name: Build MSI installer
+      run: |
+        makensis installer.nsi
+        $version = "${{ github.event.inputs.version || 'dev' }}"
+        $versionClean = $version -replace '^v', ''
+        if (Test-Path "Fujisan-$versionClean-Windows-x64.msi") {
+          echo "✓ MSI installer created successfully"
+          $size = (Get-Item "Fujisan-$versionClean-Windows-x64.msi").Length
+          echo "Installer size: $([math]::Round($size/1MB, 2)) MB"
+        } else {
+          echo "❌ MSI installer creation failed"
+          exit 1
+        }
+
+    - name: Generate checksums
+      run: |
+        $version = "${{ github.event.inputs.version || 'dev' }}"
+        $versionClean = $version -replace '^v', ''
+        $msiFile = "Fujisan-$versionClean-Windows-x64.msi"
+        
+        if (Test-Path $msiFile) {
+          $hash = Get-FileHash $msiFile -Algorithm SHA256
+          "$($hash.Hash.ToLower())  $msiFile" | Out-File -FilePath "$msiFile.sha256" -Encoding ASCII
+          echo "SHA256: $($hash.Hash.ToLower())"
+        }
+
+    - name: Upload Windows artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: fujisan-windows-x64
+        path: |
+          Fujisan-*.msi
+          Fujisan-*.msi.sha256
+        retention-days: 30
+
+    - name: Display build summary
+      run: |
+        echo "=== Windows Build Summary ==="
+        echo "Version: ${{ github.event.inputs.version || 'dev' }}"
+        echo "Qt5 Version: 5.15.2"
+        echo "Architecture: x64 (Windows 10/11)"
+        echo "Package: MSI installer with embedded Qt5 and libatari800"
+        echo "Build completed successfully!"

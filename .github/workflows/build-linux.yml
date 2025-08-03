@@ -1,0 +1,299 @@
+name: Build Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+        type: string
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.gitignore'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-20.04  # LTS for better compatibility
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          git \
+          pkg-config \
+          libtool \
+          autoconf \
+          automake \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          libxrandr-dev \
+          libxss-dev \
+          libxcursor-dev \
+          libxinerama-dev \
+          libxi-dev \
+          libxext-dev \
+          libxfixes-dev \
+          libxrender-dev \
+          libxcb1-dev \
+          libx11-xcb-dev \
+          libxcb-glx0-dev \
+          libfontconfig1-dev \
+          libfreetype6-dev \
+          libxcb-dri2-0-dev \
+          libxcb-dri3-dev \
+          libxcb-present-dev \
+          libxcb-sync-dev \
+          libxshmfence-dev \
+          libasound2-dev \
+          libpulse-dev \
+          file \
+          wget \
+          fuse
+
+    - name: Install Qt5
+      run: |
+        sudo apt-get install -y \
+          qt5-default \
+          qtbase5-dev \
+          qtmultimedia5-dev \
+          qtnetwork5-dev \
+          libqt5multimedia5-plugins
+
+    - name: Install additional packaging tools
+      run: |
+        # For .deb package creation
+        sudo apt-get install -y dpkg-dev fakeroot
+        
+        # For AppImage creation
+        wget -O linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        wget -O linuxdeploy-qt https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+        chmod +x linuxdeploy linuxdeploy-qt
+
+    - name: Create build directory
+      run: mkdir build-release
+
+    - name: Configure CMake
+      run: |
+        cd build-release
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/usr \
+              -DFUJISAN_VERSION="${{ github.event.inputs.version || 'dev' }}" \
+              ..
+
+    - name: Build Fujisan
+      run: |
+        cd build-release
+        make -j$(nproc)
+
+    - name: Verify libatari800 integration
+      run: |
+        cd build-release
+        if [ -f "atari800-src/src/libatari800.a" ]; then
+          echo "✓ libatari800.a found and integrated"
+          ls -lh atari800-src/src/libatari800.a
+        else
+          echo "❌ libatari800.a not found"
+          exit 1
+        fi
+
+    - name: Test binary
+      run: |
+        cd build-release
+        echo "Testing Fujisan binary..."
+        ldd Fujisan | head -20
+        file Fujisan
+
+    - name: Prepare installation directory
+      run: |
+        cd build-release
+        make DESTDIR=$PWD/install-root install
+        
+        # Create application directory structure
+        mkdir -p fujisan-linux/usr/bin
+        mkdir -p fujisan-linux/usr/share/applications
+        mkdir -p fujisan-linux/usr/share/pixmaps
+        mkdir -p fujisan-linux/usr/share/doc/fujisan
+        
+        # Copy binary
+        cp Fujisan fujisan-linux/usr/bin/
+        
+        # Create desktop file
+        cat > fujisan-linux/usr/share/applications/fujisan.desktop << EOF
+        [Desktop Entry]
+        Name=Fujisan
+        Comment=Modern Atari 8-bit Emulator
+        Exec=fujisan
+        Icon=fujisan
+        Terminal=false
+        Type=Application
+        Categories=Game;Emulator;
+        Keywords=atari;emulator;8bit;retro;gaming;
+        StartupNotify=true
+        EOF
+        
+        # Create icon (placeholder - you might want to add a proper icon)
+        if [ -f "../images/fujisanlogo.png" ]; then
+          cp ../images/fujisanlogo.png fujisan-linux/usr/share/pixmaps/fujisan.png
+        fi
+        
+        # Copy documentation
+        if [ -f "../README.md" ]; then
+          cp ../README.md fujisan-linux/usr/share/doc/fujisan/
+        fi
+        if [ -f "../LICENSE" ]; then
+          cp ../LICENSE fujisan-linux/usr/share/doc/fujisan/
+        fi
+
+    - name: Create .deb package
+      run: |
+        cd build-release
+        VERSION="${{ github.event.inputs.version || 'dev' }}"
+        VERSION_CLEAN=$(echo $VERSION | sed 's/^v//')
+        
+        # Create DEBIAN control directory
+        mkdir -p fujisan-linux/DEBIAN
+        
+        # Calculate installed size (in KB)
+        INSTALLED_SIZE=$(du -sk fujisan-linux/usr | cut -f1)
+        
+        cat > fujisan-linux/DEBIAN/control << EOF
+        Package: fujisan
+        Version: $VERSION_CLEAN
+        Section: games
+        Priority: optional
+        Architecture: amd64
+        Essential: no
+        Installed-Size: $INSTALLED_SIZE
+        Maintainer: 8bitrelics.com <noreply@8bitrelics.com>
+        Homepage: https://github.com/8bitrelics/fujisan
+        Description: Modern Atari 8-bit Emulator
+         Fujisan is a modern, Qt5-based Atari 8-bit computer emulator.
+         It provides accurate emulation of Atari 400/800/XL/XE systems
+         with a user-friendly interface and modern features.
+         .
+         This package includes all necessary Qt5 libraries and libatari800
+         for a complete, self-contained installation.
+        Depends: libc6, libstdc++6, libgl1, libasound2
+        EOF
+        
+        # Set proper permissions
+        find fujisan-linux -type d -exec chmod 755 {} \;
+        find fujisan-linux -type f -exec chmod 644 {} \;
+        chmod 755 fujisan-linux/usr/bin/fujisan
+        
+        # Build .deb package
+        dpkg-deb --build fujisan-linux "fujisan_${VERSION_CLEAN}_amd64.deb"
+        
+        echo "✓ .deb package created"
+        ls -lh "fujisan_${VERSION_CLEAN}_amd64.deb"
+
+    - name: Create .tar.gz package
+      run: |
+        cd build-release
+        VERSION="${{ github.event.inputs.version || 'dev' }}"
+        VERSION_CLEAN=$(echo $VERSION | sed 's/^v//')
+        
+        # Create portable directory structure
+        mkdir -p fujisan-portable/bin
+        mkdir -p fujisan-portable/share/doc
+        
+        # Copy binary and libraries
+        cp Fujisan fujisan-portable/bin/
+        
+        # Copy Qt5 libraries that aren't system-standard
+        mkdir -p fujisan-portable/lib
+        
+        # Copy documentation
+        if [ -f "../README.md" ]; then
+          cp ../README.md fujisan-portable/share/doc/
+        fi
+        if [ -f "../LICENSE" ]; then
+          cp ../LICENSE fujisan-portable/share/doc/
+        fi
+        
+        # Create run script
+        cat > fujisan-portable/fujisan.sh << 'EOF'
+        #!/bin/bash
+        # Fujisan Portable Launcher
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
+        exec "$SCRIPT_DIR/bin/Fujisan" "$@"
+        EOF
+        chmod +x fujisan-portable/fujisan.sh
+        
+        # Create README for portable version
+        cat > fujisan-portable/README-PORTABLE.txt << EOF
+        Fujisan Portable - Modern Atari 8-bit Emulator
+        ===============================================
+        
+        Version: $VERSION_CLEAN
+        
+        To run Fujisan:
+        1. Extract this archive to any directory
+        2. Run: ./fujisan.sh
+        
+        Requirements:
+        - Linux x86_64
+        - glibc 2.27+ (Ubuntu 18.04+, CentOS 8+)
+        - Basic OpenGL support
+        
+        For system-wide installation, use the .deb package instead.
+        
+        Visit: https://github.com/8bitrelics/fujisan
+        EOF
+        
+        # Create tar.gz
+        tar -czf "fujisan-${VERSION_CLEAN}-linux-x64.tar.gz" fujisan-portable/
+        
+        echo "✓ .tar.gz package created"
+        ls -lh "fujisan-${VERSION_CLEAN}-linux-x64.tar.gz"
+
+    - name: Generate checksums
+      run: |
+        cd build-release
+        VERSION="${{ github.event.inputs.version || 'dev' }}"
+        VERSION_CLEAN=$(echo $VERSION | sed 's/^v//')
+        
+        # Generate checksums for all packages
+        for file in "fujisan_${VERSION_CLEAN}_amd64.deb" "fujisan-${VERSION_CLEAN}-linux-x64.tar.gz"; do
+          if [ -f "$file" ]; then
+            sha256sum "$file" > "$file.sha256"
+            echo "SHA256 for $file:"
+            cat "$file.sha256"
+          fi
+        done
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: fujisan-linux-x64
+        path: |
+          build-release/fujisan_*.deb
+          build-release/fujisan_*.deb.sha256
+          build-release/fujisan-*-linux-x64.tar.gz
+          build-release/fujisan-*-linux-x64.tar.gz.sha256
+        retention-days: 30
+
+    - name: Display build summary
+      run: |
+        cd build-release
+        echo "=== Linux Build Summary ==="
+        echo "Version: ${{ github.event.inputs.version || 'dev' }}"
+        echo "Qt5 Version: $(qmake -query QT_VERSION)"
+        echo "Distribution: Ubuntu 20.04 LTS compatible"
+        echo "Architecture: x86_64"
+        echo "Packages created:"
+        ls -1 fujisan_*.deb fujisan-*-linux-x64.tar.gz 2>/dev/null || echo "No packages found"
+        echo "Build completed successfully!"
