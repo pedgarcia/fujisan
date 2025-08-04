@@ -68,6 +68,12 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     export CPPFLAGS="${CPPFLAGS:-}"
 elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     echo "Configuring for Windows build with MSYS2/MinGW..."
+    echo "Current PATH: $PATH"
+    echo "Checking for autotools..."
+    which autoconf || echo "autoconf not found"
+    which aclocal || echo "aclocal not found"
+    which automake || echo "automake not found"
+    
     # Ensure we're using MinGW-w64 compiler
     export CC=gcc
     export CXX=g++
