@@ -3,6 +3,7 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ATARI800_SRC_PATH="$1"
 
 if [ -z "$ATARI800_SRC_PATH" ]; then
@@ -71,10 +72,14 @@ if [ ! -f "configure" ]; then
                 echo "Using autoconf/aclocal manually..."
                 aclocal && autoheader && autoconf && automake --add-missing --copy || true
             else
-                echo "ERROR: No autotools available and no pre-built configure script found"
-                echo "Available files:"
-                ls -la
-                exit 1
+                echo "ERROR: No autotools available - using minimal Makefile fallback"
+                echo "Creating minimal build system for libatari800..."
+                "$SCRIPT_DIR/create-minimal-makefile.sh" "$ATARI800_SRC_PATH"
+                
+                # Skip the ./configure step since we're using direct Makefile
+                echo "Skipping configure step - using minimal Makefile approach"
+                echo "atari800 configuration completed (minimal build)"
+                exit 0
             fi
         else
             echo "ERROR: No configure.ac or configure.in found"
