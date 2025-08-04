@@ -64,9 +64,9 @@ if(WIN32)
     
     message(STATUS "Found MSYS2 bash: ${MSYS2_BASH}")
     
-    # Use msys2 shell environment directly instead of bash -l -c
-    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
-    set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "cd '<SOURCE_DIR>' && make -j4")
+    # Use msys2 shell environment with proper PATH for MinGW gcc
+    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:$PATH' && cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
+    set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:$PATH' && cd '<SOURCE_DIR>' && make -j4")
 else()
     # Unix/macOS: Use native tools
     set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>)
@@ -116,8 +116,7 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E echo "=== Verifying libatari800 build on Windows ==="
         COMMAND ${CMAKE_COMMAND} -E echo "Expected library: ${ATARI800_LIBRARY}"
         COMMAND ${CMAKE_COMMAND} -E echo "Checking if library exists..."
-        COMMAND ${CMAKE_COMMAND} -E echo "$<IF:$<BOOL:$<TARGET_EXISTS:${ATARI800_LIBRARY}>>,Library found,Library NOT found>"
-        COMMAND ${MSYS2_BASH} -l -c "if [ -f '${ATARI800_LIBRARY}' ]; then echo 'SUCCESS: libatari800.a exists'; ls -la '${ATARI800_LIBRARY}'; else echo 'ERROR: libatari800.a missing'; ls -la '${ATARI800_SOURCE_DIR}/src/'; fi"
+        COMMAND ${MSYS2_BASH} -l -c "export PATH='/mingw64/bin:$PATH' && if [ -f '${ATARI800_LIBRARY}' ]; then echo 'SUCCESS: libatari800.a exists'; ls -la '${ATARI800_LIBRARY}'; else echo 'ERROR: libatari800.a missing'; ls -la '${ATARI800_SOURCE_DIR}/src/'; fi"
         COMMENT "Verifying libatari800 library creation"
     )
 endif()

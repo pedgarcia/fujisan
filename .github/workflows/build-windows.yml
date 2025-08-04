@@ -60,13 +60,22 @@ jobs:
     - name: Verify MSYS2 setup
       shell: msys2 {0}
       run: |
+        # Add MinGW paths to ensure gcc is accessible
+        export PATH="/mingw64/bin:$PATH"
+        
         # Verify MSYS2 tools are available
         echo "=== Checking MSYS2 Tools ==="
-        which gcc && gcc --version | head -1
-        which make && make --version | head -1
-        which autoconf && autoconf --version | head -1
-        which aclocal && aclocal --version | head -1
-        which automake && automake --version | head -1
+        echo "Current PATH: $PATH"
+        which gcc && gcc --version | head -1 || echo "gcc not found in PATH"
+        which make && make --version | head -1 || echo "make not found in PATH"
+        which autoconf && autoconf --version | head -1 || echo "autoconf not found in PATH"
+        which aclocal && aclocal --version | head -1 || echo "aclocal not found in PATH" 
+        which automake && automake --version | head -1 || echo "automake not found in PATH"
+        
+        # List available compilers
+        echo "=== Available GCC compilers ==="
+        ls -la /mingw64/bin/gcc* 2>/dev/null || echo "No MinGW64 GCC found"
+        ls -la /usr/bin/gcc* 2>/dev/null || echo "No MSYS GCC found"
         echo "=== MSYS2 Setup Complete ==="
 
     - name: Create build directory
