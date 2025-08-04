@@ -52,12 +52,21 @@ set(ATARI800_LIBRARY "${ATARI800_SOURCE_DIR}/src/libatari800.a")
 if(WIN32)
     # Windows: Use MSYS2 environment for building atari800
     # GitHub Actions uses setup-msys2 which sets up environment differently
-    find_program(MSYS2_BASH bash.exe PATHS 
-        "$ENV{MSYSTEM_PREFIX}/bin"
-        "D:/a/_temp/msys64/usr/bin"
-        "C:/tools/msys64/usr/bin" 
-        "C:/msys64/usr/bin"
-        DOC "MSYS2 bash executable")
+    # Look for MSYS2 bash in GitHub Actions setup-msys2 location
+    find_program(MSYS2_BASH NAMES msys2.cmd msys2.CMD PATHS 
+        "D:/a/_temp/setup-msys2"
+        DOC "MSYS2 wrapper script")
+    
+    if(NOT MSYS2_BASH)
+        # Fallback to traditional bash.exe locations
+        find_program(MSYS2_BASH bash.exe PATHS 
+            "$ENV{MSYSTEM_PREFIX}/bin"
+            "D:/a/_temp/msys64/usr/bin"
+            "C:/tools/msys64/usr/bin" 
+            "C:/msys64/usr/bin"
+            NO_DEFAULT_PATH
+            DOC "MSYS2 bash executable")
+    endif()
     if(NOT MSYS2_BASH)
         message(FATAL_ERROR "MSYS2 bash not found. Please install MSYS2 or ensure it's in the expected location.")
     endif()
@@ -65,8 +74,15 @@ if(WIN32)
     message(STATUS "Found MSYS2 bash: ${MSYS2_BASH}")
     
     # Use msys2 shell environment with proper PATH for MinGW gcc
-    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:$PATH' && cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
-    set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:$PATH' && cd '<SOURCE_DIR>' && make -j4")
+    if(MSYS2_BASH MATCHES "msys2\.(cmd|CMD)$")
+        # GitHub Actions setup-msys2 wrapper
+        set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:$PATH' && cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
+        set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:$PATH' && cd '<SOURCE_DIR>' && make -j4")
+    else()
+        # Traditional bash.exe
+        set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:$PATH' && cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
+        set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:$PATH' && cd '<SOURCE_DIR>' && make -j4")
+    endif()
 else()
     # Unix/macOS: Use native tools
     set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>)
@@ -116,7 +132,7 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E echo "=== Verifying libatari800 build on Windows ==="
         COMMAND ${CMAKE_COMMAND} -E echo "Expected library: ${ATARI800_LIBRARY}"
         COMMAND ${CMAKE_COMMAND} -E echo "Checking if library exists..."
-        COMMAND ${MSYS2_BASH} -l -c "export PATH='/mingw64/bin:$PATH' && if [ -f '${ATARI800_LIBRARY}' ]; then echo 'SUCCESS: libatari800.a exists'; ls -la '${ATARI800_LIBRARY}'; else echo 'ERROR: libatari800.a missing'; ls -la '${ATARI800_SOURCE_DIR}/src/'; fi"
+        COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:$PATH' && if [ -f '${ATARI800_LIBRARY}' ]; then echo 'SUCCESS: libatari800.a exists'; ls -la '${ATARI800_LIBRARY}'; else echo 'ERROR: libatari800.a missing'; ls -la '${ATARI800_SOURCE_DIR}/src/'; fi"
         COMMENT "Verifying libatari800 library creation"
     )
 endif()
