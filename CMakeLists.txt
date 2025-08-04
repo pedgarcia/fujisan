@@ -48,6 +48,22 @@ set(ATARI800_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/atari800-src")
 set(ATARI800_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/atari800-build")
 set(ATARI800_LIBRARY "${ATARI800_SOURCE_DIR}/src/libatari800.a")
 
+# Configure platform-specific build commands for atari800
+if(WIN32)
+    # Windows: Use MSYS2 environment for building atari800
+    find_program(MSYS2_BASH bash.exe PATHS "C:/tools/msys64/usr/bin" "C:/msys64/usr/bin" DOC "MSYS2 bash executable")
+    if(NOT MSYS2_BASH)
+        message(FATAL_ERROR "MSYS2 bash not found. Please install MSYS2 or ensure it's in the expected location.")
+    endif()
+    
+    set(ATARI800_CONFIGURE_COMMAND ${MSYS2_BASH} -l -c "cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
+    set(ATARI800_BUILD_COMMAND ${MSYS2_BASH} -l -c "cd '<SOURCE_DIR>' && make -j4")
+else()
+    # Unix/macOS: Use native tools
+    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>)
+    set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make -j4)
+endif()
+
 # Download and build atari800 with Fujisan patches
 ExternalProject_Add(atari800_external
     GIT_REPOSITORY https://github.com/atari800/atari800.git
@@ -60,9 +76,9 @@ ExternalProject_Add(atari800_external
                   "${CMAKE_CURRENT_SOURCE_DIR}/patches" 
                   "<SOURCE_DIR>/fujisan-patches"
     
-    CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>
+    CONFIGURE_COMMAND ${ATARI800_CONFIGURE_COMMAND}
     
-    BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make -j4
+    BUILD_COMMAND ${ATARI800_BUILD_COMMAND}
     
     # No install step needed, we'll link directly to the library
     INSTALL_COMMAND ""

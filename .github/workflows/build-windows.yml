@@ -39,11 +39,20 @@ jobs:
         choco install nsis -y
         # Install MSYS2 for Unix tools (needed for atari800 autotools build)
         choco install msys2 -y
-        # Initialize MSYS2 and install required packages
-        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm autoconf automake make pkgconf"
+        # Initialize MSYS2 and install required packages for atari800 build
+        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"
+        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm autoconf automake make pkgconf mingw-w64-x86_64-gcc mingw-w64-x86_64-binutils"
         # Add tools to PATH
         echo "C:\Program Files (x86)\NSIS" >> $GITHUB_PATH
         echo "C:\tools\msys64\usr\bin" >> $GITHUB_PATH
+        echo "C:\tools\msys64\mingw64\bin" >> $GITHUB_PATH
+
+    - name: Verify MSYS2 setup
+      run: |
+        # Verify MSYS2 tools are available
+        C:\tools\msys64\usr\bin\bash.exe -lc "which gcc && gcc --version"
+        C:\tools\msys64\usr\bin\bash.exe -lc "which make && make --version"
+        C:\tools\msys64\usr\bin\bash.exe -lc "which autoconf && autoconf --version"
 
     - name: Create build directory
       run: mkdir build-release
