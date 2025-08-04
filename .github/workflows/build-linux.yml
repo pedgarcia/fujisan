@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-20.04  # LTS for better compatibility
+    runs-on: ubuntu-24.04  # LTS for better compatibility
     
     steps:
     - name: Checkout code
