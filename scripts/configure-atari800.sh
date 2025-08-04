@@ -33,6 +33,16 @@ cd "$ATARI800_SRC_PATH"
 # Apply patches if they exist
 if [ -d "fujisan-patches" ] && [ -f "fujisan-patches/apply-patches.sh" ]; then
     echo "Applying Fujisan patches..."
+    
+    # Configure git identity for patch application (needed in CI environments)
+    if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]] || [[ "$CI" == "true" ]]; then
+        if ! git config user.email >/dev/null 2>&1; then
+            echo "Configuring git identity for patch application..."
+            git config user.email "ci@fujisan.build"
+            git config user.name "Fujisan CI"
+        fi
+    fi
+    
     cd fujisan-patches
     chmod +x apply-patches.sh
     ./apply-patches.sh
