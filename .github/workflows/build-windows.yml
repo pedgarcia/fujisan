@@ -41,7 +41,7 @@ jobs:
         choco install msys2 -y
         # Initialize MSYS2 and install required packages for atari800 build
         C:\tools\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"
-        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm autoconf automake make pkgconf mingw-w64-x86_64-gcc mingw-w64-x86_64-binutils"
+        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm autoconf automake make pkgconf libtool autoconf-archive mingw-w64-x86_64-gcc mingw-w64-x86_64-binutils mingw-w64-x86_64-pkg-config"
         # Add tools to PATH
         echo "C:\Program Files (x86)\NSIS" >> $GITHUB_PATH
         echo "C:\tools\msys64\usr\bin" >> $GITHUB_PATH
@@ -53,6 +53,8 @@ jobs:
         C:\tools\msys64\usr\bin\bash.exe -lc "which gcc && gcc --version"
         C:\tools\msys64\usr\bin\bash.exe -lc "which make && make --version"
         C:\tools\msys64\usr\bin\bash.exe -lc "which autoconf && autoconf --version"
+        C:\tools\msys64\usr\bin\bash.exe -lc "which aclocal && aclocal --version"
+        C:\tools\msys64\usr\bin\bash.exe -lc "which automake && automake --version"
 
     - name: Create build directory
       run: mkdir build-release
