@@ -59,11 +59,12 @@ jobs:
     - name: Install Qt5
       run: |
         sudo apt-get install -y \
-          qt5-default \
           qtbase5-dev \
           qtmultimedia5-dev \
           libqt5multimedia5-plugins \
-          libqt5network5
+          libqt5network5 \
+          qt5-qmake \
+          qtbase5-dev-tools
 
     - name: Install additional packaging tools
       run: |
