@@ -11,7 +11,7 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SOURCE_PNG="$PROJECT_ROOT/images/fujisanlogo.png"
+SOURCE_PNG="$PROJECT_ROOT/images/FujisanLogoIcon.png"
 OUTPUT_ICNS="$PROJECT_ROOT/Fujisan.icns"
 TEMP_DIR="$(mktemp -d)"
 

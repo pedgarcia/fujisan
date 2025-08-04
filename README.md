@@ -2,15 +2,17 @@
 
 ![Fujisan Logo](images/fujisanlogo.png)
 
-A modern Qt5 frontend for the Atari800 emulator, providing a native desktop experience with full keyboard support, machine configuration, and authentic Atari behavior.
+A modern frontend for the Atari800 emulator, providing a native desktop experience with full keyboard support, machine configuration, and authentic Atari behavior.
 
-**Do we need another emulator?**
+**Motivation**
 
-Not really, and Fujisan is a UI built on top of Atari800, so it is not really a new emulator, but a new way to use Atari800. Users have plenty of good options with Altirra, Atari800 (vanilla), Atari800MacX and Mame. Fujisan is an exercise and hobby for me, to build an emulator tailored to my personal use, with fewer customization available but ready to go for 90% of the use cases. Hopefully it will attract more people like me.
+"Do we really need a new emulator?" some of you might be asking. And a simple answer is, "no, not really". But, to be precise, Fujisan is a UI built on top of Atari800, so it is not really a new emulator, but a new way to use Atari800. Users have plenty of good options with Altirra, Atari800 (vanilla), Atari800MacX and Mame. One thing that Atari800 has that is great, but it throws some users off, is its built-in UI inside the emulator window. A lot of users prefer to have the native feeling like Altirra on Windows, and Atari800MacX on macOS delivers. 
 
-The objective is to always use libatari800 so there is never incompatibility between the Atari800 source code and Fujisan (as much as possible).
+Fujisan is an AI-based exercise and hobby for me, to build an emulator tailored to my personal use, with fewer customization available but ready to go for 90% of the use cases. Hopefully it will attract more people like me. Also, the fact that the users will have the same native experience in Windows, MacOS or Linux is a differentiator compared to the other emulators.
 
- The big difference is that Fujisan is a UI-based emulator that is available for Windows, Mac, and Linux. (The builds and binaries will be available soon), and overtime, with some features that will help software development.
+Another important objective is to always use **libatari800** so there is never incompatibility between the Atari800 source code and Fujisan (as much as possible). There are some patches I had to apply, but I am set to always make it easier for anyone that wants to build Fujisan, to be able to reproduce my steps and patch atari800 properly (There is a patches folder with detailed instructions).
+
+I guess, the big difference is that Fujisan is a UI-based emulator that is available for Windows, Mac, and Linux. (The builds and binaries will be available soon), and overtime, with some features that will help software development.
 
 
 
@@ -25,10 +27,14 @@ The objective is to always use libatari800 so there is never incompatibility bet
 - **Real-time Performance**: Proper 49.86 FPS (PAL) / 59.92 FPS (NTSC) timing
 
 ### User Interface
-- **Native Qt5 Menus**: Standard desktop menu bar and dialogs
+- **Native Menus**: Standard desktop menu bar and dialogs
 - **File Management**: Native file dialogs for ROM loading
 - **Status Bar**: Real-time feedback for user actions
 - **Focus Management**: Click-to-focus emulator display
+
+### Developer Friendly
+
+- Built-in TCP Server API - Fujisan includes a powerful TCP server for remote control and automation. This enables IDE integration, automated testing, and programmatic control of all emulator features. See usage below for more details
 
 ### Keyboard Input
 - **Full Keyboard Support**: All letters, numbers, and symbols

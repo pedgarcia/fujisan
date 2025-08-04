@@ -228,12 +228,20 @@ target_link_libraries(${PROJECT_NAME}
     -lm
 )
 
-# Platform-specific linking
+# Platform-specific linking and resources
 if(APPLE)
     target_link_libraries(${PROJECT_NAME}
         "-framework Cocoa"
         "-framework UniformTypeIdentifiers"
     )
+elseif(WIN32)
+    # Add Windows application icon
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Fujisan.ico")
+        # Create Windows resource file for icon
+        set(WINDOWS_RC_FILE "${CMAKE_CURRENT_BINARY_DIR}/fujisan_icon.rc")
+        file(WRITE ${WINDOWS_RC_FILE} "IDI_ICON1 ICON \"${CMAKE_CURRENT_SOURCE_DIR}/Fujisan.ico\"\n")
+        target_sources(${PROJECT_NAME} PRIVATE ${WINDOWS_RC_FILE})
+    endif()
 endif()
 
 # Enable Qt's MOC (Meta-Object Compiler)

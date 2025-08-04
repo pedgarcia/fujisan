@@ -137,9 +137,14 @@ jobs:
         StartupNotify=true
         EOF
         
-        # Create icon (placeholder - you might want to add a proper icon)
-        if [ -f "../images/fujisanlogo.png" ]; then
-          cp ../images/fujisanlogo.png fujisan-linux/usr/share/pixmaps/fujisan.png
+        # Use the new Fujisan logo icon
+        if [ -f "../images/FujisanLogoIcon.png" ]; then
+          cp ../images/FujisanLogoIcon.png fujisan-linux/usr/share/pixmaps/fujisan.png
+        else
+          # Fallback to old logo if available
+          if [ -f "../images/fujisanlogo.png" ]; then
+            cp ../images/fujisanlogo.png fujisan-linux/usr/share/pixmaps/fujisan.png
+          fi
         fi
         
         # Copy documentation
