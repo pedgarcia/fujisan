@@ -21,7 +21,7 @@ cat > Makefile << 'EOF'
 
 CC = gcc
 AR = ar
-CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800 -DNETSIO -DNOSOUND -DNO_SIMPLE_MENU
+CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800 -DNETSIO
 ARFLAGS = rcs
 
 LIBATARI800_OBJS = \
@@ -37,7 +37,9 @@ LIBATARI800_OBJS = \
 	src/pbi.o \
 	src/pia.o \
 	src/pokey.o \
+	src/pokeysnd.o \
 	src/sio.o \
+	src/sound.o \
 	src/statesav.o \
 	src/pbi_mio.o \
 	src/pbi_bb.o \
@@ -96,8 +98,8 @@ cat > src/config.h << 'EOF'
 #define SOUND_INTERPOLATION 1
 #define NONLINEAR_MIXING 1
 
-/* Sound system - use no sound for libatari800 */
-#define NOSOUND 1
+/* Sound system - enable sound for libatari800 */
+#define SOUND 1
 
 /* NetSIO support */
 #define NETSIO 1
