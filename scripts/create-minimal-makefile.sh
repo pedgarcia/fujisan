@@ -21,7 +21,7 @@ cat > Makefile << 'EOF'
 
 CC = gcc
 AR = ar
-CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800 -DNETSIO
+CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800 -DNETSIO -DNOSOUND -DNO_SIMPLE_MENU
 ARFLAGS = rcs
 
 LIBATARI800_OBJS = \
@@ -69,6 +69,9 @@ cat > src/config.h << 'EOF'
 #define CONFIG_H
 
 #define PACKAGE_STRING "atari800 4.2.0"
+#define PACKAGE_VERSION "4.2.0"
+#define VERSION "4.2.0"
+
 #define HAVE_STDINT_H 1
 #define HAVE_STDLIB_H 1
 #define HAVE_STRING_H 1
@@ -93,6 +96,9 @@ cat > src/config.h << 'EOF'
 #define SOUND_INTERPOLATION 1
 #define NONLINEAR_MIXING 1
 
+/* Sound system - use no sound for libatari800 */
+#define NOSOUND 1
+
 /* NetSIO support */
 #define NETSIO 1
 
@@ -108,6 +114,9 @@ cat > src/config.h << 'EOF'
 #define BUFFERED_LOG 1
 #define CYCLE_EXACT 1
 #define PAGED_ATTRIB 1
+
+/* Disable features that require additional dependencies */
+#define NO_SIMPLE_MENU 1
 
 #endif /* CONFIG_H */
 EOF
