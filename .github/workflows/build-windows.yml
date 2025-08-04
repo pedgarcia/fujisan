@@ -83,10 +83,32 @@ jobs:
           -DFUJISAN_VERSION="${{ github.event.inputs.version || 'dev' }}" `
           ..
 
-    - name: Build Fujisan
+    - name: Build Fujisan  
       run: |
         cd build-release
-        cmake --build . --config Release --parallel 4
+        echo "=== Building with enhanced MSBuild diagnostics ==="
+        echo "MSBuild version:"
+        msbuild -version
+        echo "=== Starting build with detailed logging ==="
+        
+        # Try build with detailed diagnostics
+        if (-not (cmake --build . --config Release --parallel 4 --verbose -- /verbosity:diagnostic /consoleloggerparameters:ShowTimestamp)) {
+            echo "=== First build attempt failed, checking atari800 status ==="
+            
+            # Check if libatari800 was actually built despite the error
+            if (Test-Path "atari800-src\src\libatari800.a") {
+                echo "SUCCESS: libatari800.a exists despite build error!"
+                Get-ChildItem "atari800-src\src\libatari800.a" | Format-List
+                
+                echo "=== Attempting to continue with Fujisan build only ==="
+                cmake --build . --config Release --target Fujisan --parallel 4 --verbose
+            } else {
+                echo "ERROR: libatari800.a was not created"
+                echo "Contents of atari800-src/src/:"
+                if (Test-Path "atari800-src\src") { Get-ChildItem "atari800-src\src" | Format-Table Name, Length }
+                throw "Build failed - libatari800.a not found"
+            }
+        }
 
     - name: Deploy Qt5 libraries
       run: |

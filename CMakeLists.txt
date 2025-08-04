@@ -92,9 +92,35 @@ ExternalProject_Add(atari800_external
     # No install step needed, we'll link directly to the library
     INSTALL_COMMAND ""
     
+    # Enhanced logging and debugging
+    LOG_DOWNLOAD ON
+    LOG_UPDATE ON
+    LOG_PATCH ON
+    LOG_CONFIGURE ON
+    LOG_BUILD ON
+    LOG_INSTALL ON
+    LOG_MERGED_STDOUTERR ON
+    LOG_OUTPUT_ON_FAILURE ON
+    
+    # Force rebuild to ensure we see all output
+    BUILD_ALWAYS ON
+    
     # Export the library location
     BUILD_BYPRODUCTS ${ATARI800_LIBRARY}
 )
+
+# Verify that the library was created successfully
+if(WIN32)
+    # Add custom command to verify library creation on Windows
+    add_custom_command(TARGET atari800_external POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E echo "=== Verifying libatari800 build on Windows ==="
+        COMMAND ${CMAKE_COMMAND} -E echo "Expected library: ${ATARI800_LIBRARY}"
+        COMMAND ${CMAKE_COMMAND} -E echo "Checking if library exists..."
+        COMMAND ${CMAKE_COMMAND} -E echo "$<IF:$<BOOL:$<TARGET_EXISTS:${ATARI800_LIBRARY}>>,Library found,Library NOT found>"
+        COMMAND ${MSYS2_BASH} -l -c "if [ -f '${ATARI800_LIBRARY}' ]; then echo 'SUCCESS: libatari800.a exists'; ls -la '${ATARI800_LIBRARY}'; else echo 'ERROR: libatari800.a missing'; ls -la '${ATARI800_SOURCE_DIR}/src/'; fi"
+        COMMENT "Verifying libatari800 library creation"
+    )
+endif()
 
 # Create imported target for libatari800
 add_library(libatari800 STATIC IMPORTED)
