@@ -54,7 +54,36 @@ fi
 # Generate configure script if needed
 if [ ! -f "configure" ]; then
     echo "Generating configure script..."
-    ./autogen.sh
+    
+    # Try different approaches to generate configure script
+    if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]] || [[ "$CI" == "true" ]]; then
+        echo "Windows CI detected - trying alternative configure generation..."
+        
+        # Check if we can find a distributed configure script
+        if [ -f "configure.ac" ] || [ -f "configure.in" ]; then
+            echo "Found autotools files, attempting manual configure generation..."
+            
+            # Try to run autotools manually if available
+            if command -v autoreconf >/dev/null 2>&1; then
+                echo "Using autoreconf..."
+                autoreconf -fiv
+            elif command -v autoconf >/dev/null 2>&1 && command -v aclocal >/dev/null 2>&1; then
+                echo "Using autoconf/aclocal manually..."
+                aclocal && autoheader && autoconf && automake --add-missing --copy || true
+            else
+                echo "ERROR: No autotools available and no pre-built configure script found"
+                echo "Available files:"
+                ls -la
+                exit 1
+            fi
+        else
+            echo "ERROR: No configure.ac or configure.in found"
+            exit 1
+        fi
+    else
+        # Unix/macOS - use autogen.sh as normal
+        ./autogen.sh
+    fi
 fi
 
 # Configure for libatari800 with platform-specific settings
@@ -68,11 +97,20 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     export CPPFLAGS="${CPPFLAGS:-}"
 elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     echo "Configuring for Windows build with MSYS2/MinGW..."
+    echo "MSYSTEM: $MSYSTEM"
     echo "Current PATH: $PATH"
     echo "Checking for autotools..."
+    
+    # Initialize MSYS2 environment if needed
+    if [[ "$MSYSTEM" == "MSYS" ]] && [[ -f "/etc/profile" ]]; then
+        echo "Sourcing MSYS2 profile..."
+        source /etc/profile || true
+    fi
+    
     which autoconf || echo "autoconf not found"
-    which aclocal || echo "aclocal not found"
+    which aclocal || echo "aclocal not found"  
     which automake || echo "automake not found"
+    which autoreconf || echo "autoreconf not found"
     
     # Ensure we're using MinGW-w64 compiler
     export CC=gcc

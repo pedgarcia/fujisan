@@ -51,19 +51,22 @@ set(ATARI800_LIBRARY "${ATARI800_SOURCE_DIR}/src/libatari800.a")
 # Configure platform-specific build commands for atari800
 if(WIN32)
     # Windows: Use MSYS2 environment for building atari800
-    # The setup-msys2 GitHub Action creates MSYS2 at D:/a/_temp/msys64
+    # GitHub Actions uses setup-msys2 which sets up environment differently
     find_program(MSYS2_BASH bash.exe PATHS 
-        "D:/a/_temp/msys64/usr/bin" 
+        "$ENV{MSYSTEM_PREFIX}/bin"
+        "D:/a/_temp/msys64/usr/bin"
         "C:/tools/msys64/usr/bin" 
-        "C:/msys64/usr/bin" 
+        "C:/msys64/usr/bin"
         DOC "MSYS2 bash executable")
     if(NOT MSYS2_BASH)
         message(FATAL_ERROR "MSYS2 bash not found. Please install MSYS2 or ensure it's in the expected location.")
     endif()
     
     message(STATUS "Found MSYS2 bash: ${MSYS2_BASH}")
-    set(ATARI800_CONFIGURE_COMMAND ${MSYS2_BASH} -l -c "cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
-    set(ATARI800_BUILD_COMMAND ${MSYS2_BASH} -l -c "cd '<SOURCE_DIR>' && make -j4")
+    
+    # Use msys2 shell environment directly instead of bash -l -c
+    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
+    set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "cd '<SOURCE_DIR>' && make -j4")
 else()
     # Unix/macOS: Use native tools
     set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>)
