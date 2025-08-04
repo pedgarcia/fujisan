@@ -122,7 +122,7 @@ jobs:
         mkdir -p fujisan-linux/usr/share/doc/fujisan
         
         # Copy binary
-        cp Fujisan fujisan-linux/usr/bin/
+        cp Fujisan fujisan-linux/usr/bin/fujisan
         
         # Create desktop file
         cat > fujisan-linux/usr/share/applications/fujisan.desktop << EOF
