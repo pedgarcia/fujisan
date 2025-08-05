@@ -86,9 +86,7 @@ LIBATARI800_OBJS = \
 	src/devices.o \
 	src/img_tape.o \
 	src/remez.o \
-	src/libatari800/platform.o \
-	src/libatari800/video.o \
-	src/libatari800/sound.o
+	src/lib.o
 
 all: src/libatari800.a
 
