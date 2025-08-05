@@ -55,7 +55,8 @@ set(ATARI800_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/atari800-build")
 set(ATARI800_LIBRARY "${ATARI800_SOURCE_DIR}/src/libatari800.a")
 
 # Configure platform-specific build commands for atari800
-if(WIN32)
+if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
+    # Native Windows build with MSYS2
     # Windows: Use MSYS2 environment for building atari800
     # GitHub Actions uses setup-msys2 which sets up environment differently
     # Look for MSYS2 bash in GitHub Actions setup-msys2 location
@@ -89,6 +90,11 @@ if(WIN32)
         set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS OS=Windows_NT RUNNER_OS=Windows CI=true ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && echo 'FORCING MINIMAL BUILD FOR WINDOWS' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/create-minimal-makefile.sh' '<SOURCE_DIR>'")
         set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && echo '=== Starting make build ===' && make -j4 VERBOSE=1 || (echo '=== Make failed, trying single-threaded build ===' && make VERBOSE=1)")
     endif()
+elseif(CMAKE_CROSSCOMPILING AND WIN32)
+    # Cross-compilation for Windows (using MinGW on Linux)
+    message(STATUS "Configuring for Windows cross-compilation")
+    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/create-minimal-makefile.sh <SOURCE_DIR>)
+    set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make -j4 CC=${CMAKE_C_COMPILER} AR=x86_64-w64-mingw32-ar)
 else()
     # Unix/macOS: Use native tools
     set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>)
@@ -132,7 +138,7 @@ ExternalProject_Add(atari800_external
 )
 
 # Verify that the library was created successfully
-if(WIN32)
+if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
     # Add custom command to verify library creation on Windows
     add_custom_command(TARGET atari800_external POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E echo "=== Verifying libatari800 build on Windows ==="
@@ -140,6 +146,14 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E echo "Checking if library exists..."
         COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && if [ -f '${ATARI800_LIBRARY}' ]; then echo 'SUCCESS: libatari800.a exists'; ls -la '${ATARI800_LIBRARY}'; if [ -f '${ATARI800_SOURCE_DIR}/.minimal-build-marker' ]; then echo 'INFO: Built using minimal Makefile approach'; cat '${ATARI800_SOURCE_DIR}/.minimal-build-marker'; fi; else echo 'ERROR: libatari800.a missing'; ls -la '${ATARI800_SOURCE_DIR}/src/'; if [ -f '${ATARI800_SOURCE_DIR}/.minimal-build-marker' ]; then echo 'DEBUG: Minimal build was attempted'; cat '${ATARI800_SOURCE_DIR}/.minimal-build-marker'; fi; fi"
         COMMENT "Verifying libatari800 library creation"
+    )
+elseif(CMAKE_CROSSCOMPILING AND WIN32)
+    # Add custom command to verify library creation during cross-compilation
+    add_custom_command(TARGET atari800_external POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E echo "=== Verifying libatari800 cross-compilation build ==="
+        COMMAND ${CMAKE_COMMAND} -E echo "Expected library: ${ATARI800_LIBRARY}"
+        COMMAND test -f "${ATARI800_LIBRARY}" && echo "SUCCESS: libatari800.a exists" || echo "ERROR: libatari800.a missing"
+        COMMENT "Verifying cross-compiled libatari800 library creation"
     )
 endif()
 

@@ -45,7 +45,7 @@ DESIRED_SOURCES="
 afile antic atari cartridge cpu esc gtia memory monitor pbi pia pokey pokeysnd
 sio sound statesav pbi_mio pbi_bb pbi_xld mzpokeysnd votraxsnd votrax pbi_scsi
 rtime cassette compfile cfg log util colours screen input binload devices
-img_tape remez lib
+img_tape remez lib artifact ide rdevice sysrom videomode
 "
 
 # Check which files actually exist and build the object list
@@ -59,10 +59,46 @@ for src in $DESIRED_SOURCES; do
     fi
 done
 
-# Always include libatari800 API files
-EXISTING_OBJS="$EXISTING_OBJS src/libatari800/api.o src/libatari800/main.o src/libatari800/init.o src/libatari800/input.o src/libatari800/statesav.o"
+# Always include libatari800 API files and platform stubs
+EXISTING_OBJS="$EXISTING_OBJS src/libatari800/api.o src/libatari800/main.o src/libatari800/init.o src/libatari800/input.o src/libatari800/statesav.o src/platform_stubs.o"
 
 echo "Will compile these object files: $EXISTING_OBJS"
+
+# Create platform stubs for missing functions
+cat > src/platform_stubs.c << 'PLATFORM_EOF'
+/* Platform function stubs for minimal libatari800 build */
+
+#include "videomode.h"
+#include "platform.h"
+
+/* Platform video mode stubs */
+int PLATFORM_SupportsVideomode(VIDEOMODE_MODE_t mode, int windowed, VIDEOMODE_ROTATE_t rotate) {
+    return 1; /* Assume all modes supported */
+}
+
+void PLATFORM_SetVideoMode(VIDEOMODE_resolution_t *res, int windowed, VIDEOMODE_MODE_t mode, VIDEOMODE_ROTATE_t rotate) {
+    /* Stub - no actual video mode setting */
+}
+
+VIDEOMODE_resolution_t* PLATFORM_DesktopResolution(void) {
+    static VIDEOMODE_resolution_t res = {640, 480};
+    return &res;
+}
+
+int PLATFORM_WindowMaximised(void) {
+    return 0; /* Never maximized */
+}
+
+VIDEOMODE_resolution_t* PLATFORM_AvailableResolutions(int *size) {
+    static VIDEOMODE_resolution_t resolutions[] = {{640, 480}, {800, 600}, {1024, 768}};
+    *size = 3;
+    return resolutions;
+}
+
+void PLATFORM_Exit(int code) {
+    /* Stub - no platform-specific exit handling */
+}
+PLATFORM_EOF
 
 # Create a basic Makefile that compiles the essential files for libatari800
 cat > Makefile << EOF
@@ -74,19 +110,19 @@ AR = ar
 CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800
 ARFLAGS = rcs
 
-LIBATARI800_OBJS = $EXISTING_OBJS
+LIBATARI800_OBJS =$EXISTING_OBJS
 
 all: src/libatari800.a
 
-src/libatari800.a: $(LIBATARI800_OBJS)
-	@echo "=== Creating libatari800.a from $(words $(LIBATARI800_OBJS)) object files ==="
-	$(AR) $(ARFLAGS) $@ $^
+src/libatari800.a: \$(LIBATARI800_OBJS)
+	@echo "=== Creating libatari800.a from \$(words \$(LIBATARI800_OBJS)) object files ==="
+	\$(AR) \$(ARFLAGS) \$@ \$^
 	@echo "=== libatari800.a created successfully ==="
-	@ls -la $@
+	@ls -la \$@
 
 %.o: %.c
-	@echo "Compiling $< ..."
-	$(CC) $(CFLAGS) -c $< -o $@
+	@echo "Compiling \$< ..."
+	\$(CC) \$(CFLAGS) -c \$< -o \$@
 
 clean:
 	rm -f \$(LIBATARI800_OBJS) src/libatari800.a
@@ -108,6 +144,8 @@ cat > src/config.h << 'EOF'
 #define HAVE_STDLIB_H 1
 #define HAVE_STRING_H 1
 #define HAVE_UNISTD_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_DIRENT_H 1
 
 #ifdef _WIN32
 #define HAVE_WINDOWS_H 1
