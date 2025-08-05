@@ -8,6 +8,12 @@ project(Fujisan VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Use C++14 on Windows to avoid potential SDK conflicts
+if(WIN32 AND MSVC)
+    set(CMAKE_CXX_STANDARD 14)
+    message(STATUS "Using C++14 on Windows for SDK compatibility")
+endif()
+
 # Include ExternalProject for building libatari800
 include(ExternalProject)
 
@@ -285,6 +291,25 @@ if(APPLE)
         "-framework UniformTypeIdentifiers"
     )
 elseif(WIN32)
+    # Windows-specific compiler settings to fix SDK compatibility
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _WIN32_WINNT=0x0A00  # Windows 10
+        WINVER=0x0A00        # Windows 10
+        UNICODE
+        _UNICODE
+    )
+    
+    # MSVC-specific compiler options
+    if(MSVC)
+        target_compile_options(${PROJECT_NAME} PRIVATE
+            /permissive-    # Disable non-conforming code
+            /Zc:__cplusplus # Enable __cplusplus macro
+            /utf-8          # Specify UTF-8 encoding
+        )
+    endif()
+    
     # Add Windows application icon
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Fujisan.ico")
         # Create Windows resource file for icon
