@@ -19,6 +19,7 @@ if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
 fi
 
 echo "Creating minimal Makefile for libatari800..."
+echo "This approach avoids autotools and problematic modules like XEP80"
 
 # Create a basic Makefile that compiles the essential files for libatari800
 cat > Makefile << 'EOF'
@@ -59,9 +60,13 @@ LIBATARI800_OBJS = \
 all: src/libatari800.a
 
 src/libatari800.a: $(LIBATARI800_OBJS)
+	@echo "=== Creating libatari800.a from $(words $(LIBATARI800_OBJS)) object files ==="
 	$(AR) $(ARFLAGS) $@ $^
+	@echo "=== libatari800.a created successfully ==="
+	@ls -la $@
 
 %.o: %.c
+	@echo "Compiling $< ..."
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -136,3 +141,7 @@ EOF
 
 echo "Created minimal Makefile and config.h for libatari800"
 echo "You can now run 'make' to build libatari800.a"
+
+# Create a marker file to indicate minimal build was used
+echo "MINIMAL_BUILD_USED=$(date)" > .minimal-build-marker
+echo "Minimal build marker created for debugging"

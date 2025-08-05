@@ -132,7 +132,7 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E echo "=== Verifying libatari800 build on Windows ==="
         COMMAND ${CMAKE_COMMAND} -E echo "Expected library: ${ATARI800_LIBRARY}"
         COMMAND ${CMAKE_COMMAND} -E echo "Checking if library exists..."
-        COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && if [ -f '${ATARI800_LIBRARY}' ]; then echo 'SUCCESS: libatari800.a exists'; ls -la '${ATARI800_LIBRARY}'; else echo 'ERROR: libatari800.a missing'; ls -la '${ATARI800_SOURCE_DIR}/src/'; fi"
+        COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && if [ -f '${ATARI800_LIBRARY}' ]; then echo 'SUCCESS: libatari800.a exists'; ls -la '${ATARI800_LIBRARY}'; if [ -f '${ATARI800_SOURCE_DIR}/.minimal-build-marker' ]; then echo 'INFO: Built using minimal Makefile approach'; cat '${ATARI800_SOURCE_DIR}/.minimal-build-marker'; fi; else echo 'ERROR: libatari800.a missing'; ls -la '${ATARI800_SOURCE_DIR}/src/'; if [ -f '${ATARI800_SOURCE_DIR}/.minimal-build-marker' ]; then echo 'DEBUG: Minimal build was attempted'; cat '${ATARI800_SOURCE_DIR}/.minimal-build-marker'; fi; fi"
         COMMENT "Verifying libatari800 library creation"
     )
 endif()
