@@ -28,7 +28,7 @@ cat > Makefile << 'EOF'
 
 CC = gcc
 AR = ar
-CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800 -DNETSIO
+CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800
 ARFLAGS = rcs
 
 LIBATARI800_OBJS = \
@@ -118,7 +118,8 @@ cat > src/config.h << 'EOF'
 #define SOUND 1
 
 /* NetSIO support */
-#define NETSIO 1
+/* NETSIO officially not supported on Windows platform */
+#undef NETSIO
 
 /* Screenshot support */
 #define HAVE_LIBPNG 1
