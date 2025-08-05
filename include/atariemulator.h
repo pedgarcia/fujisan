@@ -8,6 +8,10 @@
 #ifndef ATARIEMULATOR_H
 #define ATARIEMULATOR_H
 
+#ifdef _WIN32
+#include "../src/windows_compat.h"
+#endif
+
 #include <QObject>
 #include <QTimer>
 #include <QKeyEvent>
@@ -21,6 +25,12 @@
 #include <QJsonObject>
 
 extern "C" {
+    // Temporarily undefine potentially conflicting macros
+    #ifdef string
+    #define TEMP_STRING_BACKUP string
+    #undef string
+    #endif
+    
     #include "libatari800.h"
     #include "akey.h"
     // Access the actual Atari color table
@@ -84,6 +94,12 @@ extern "C" {
     extern int Devices_SetPrintCommand(const char *command);
     // State save functions
     #include "statesav.h"
+    
+    // Restore string macro if it was defined
+    #ifdef TEMP_STRING_BACKUP
+    #define string TEMP_STRING_BACKUP
+    #undef TEMP_STRING_BACKUP
+    #endif
 }
 
 class AtariEmulator : public QObject

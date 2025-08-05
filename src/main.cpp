@@ -5,6 +5,10 @@
  * Licensed under the MIT License. See LICENSE file for details.
  */
 
+#ifdef _WIN32
+#include "windows_compat.h"
+#endif
+
 #include <QApplication>
 #include <QDebug>
 #include "mainwindow.h"

@@ -299,6 +299,16 @@ elseif(WIN32)
         WINVER=0x0A00        # Windows 10
         UNICODE
         _UNICODE
+        # Prevent common macro conflicts
+        NOSERVICE
+        NOMCX
+        NOIME
+        NOSOUND
+        NOKANJI
+        NOHELP
+        NOPROFILER
+        NODEFERWINDOWPOS
+        NOMCX
     )
     
     # MSVC-specific compiler options
