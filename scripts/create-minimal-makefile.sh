@@ -12,6 +12,12 @@ fi
 
 cd "$ATARI800_SRC_PATH"
 
+# Ensure MinGW-w64 tools are in PATH for Windows builds
+if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
+    export PATH="/mingw64/bin:/usr/bin:$PATH"
+    echo "Updated PATH for MinGW-w64: $PATH"
+fi
+
 echo "Creating minimal Makefile for libatari800..."
 
 # Create a basic Makefile that compiles the essential files for libatari800

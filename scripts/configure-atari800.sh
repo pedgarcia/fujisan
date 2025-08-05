@@ -117,6 +117,12 @@ elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     which automake || echo "automake not found"
     which autoreconf || echo "autoreconf not found"
     
+    # Ensure MinGW-w64 tools are in PATH
+    export PATH="/mingw64/bin:/usr/bin:$PATH"
+    echo "Updated PATH for MinGW-w64: $PATH"
+    which gcc || echo "gcc not found"
+    which g++ || echo "g++ not found"
+    
     # Ensure we're using MinGW-w64 compiler
     export CC=gcc
     export CXX=g++
