@@ -21,6 +21,7 @@
 #include <QDateTime>
 #include <QFile>
 #include <cstring>  // for memset
+#include <vector>   // for std::vector
 
 extern "C" {
 #ifdef NETSIO
@@ -243,7 +244,7 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         argBytes.append(arg.toUtf8());
     }
     
-    char* args[argBytes.size() + 1];
+    std::vector<char*> args(argBytes.size() + 1);
     for (int i = 0; i < argBytes.size(); ++i) {
         args[i] = argBytes[i].data();
     }
@@ -254,7 +255,7 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     qDebug() << "Number of arguments:" << argBytes.size();
     qDebug() << "Note: Display parameters excluded due to libatari800 limitations";
     
-    if (libatari800_init(argBytes.size(), args)) {
+    if (libatari800_init(argBytes.size(), args.data())) {
         qDebug() << "✓ Emulator initialized successfully";
         qDebug() << "  Display settings saved to profile but not applied (requires full SDL atari800)";
         m_targetFps = libatari800_get_fps();
@@ -413,7 +414,7 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         argBytes.append(arg.toUtf8());
     }
     
-    char* args[argBytes.size() + 1];
+    std::vector<char*> args(argBytes.size() + 1);
     for (int i = 0; i < argBytes.size(); ++i) {
         args[i] = argBytes[i].data();
     }
@@ -425,7 +426,7 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     qDebug() << "Keyboard Joystick 0 (Numpad + RCtrl):" << (kbdJoy0Enabled ? "ENABLED" : "DISABLED");
     qDebug() << "Keyboard Joystick 1 (WASD + LCtrl):" << (kbdJoy1Enabled ? "ENABLED" : "DISABLED");
     
-    if (libatari800_init(argBytes.size(), args)) {
+    if (libatari800_init(argBytes.size(), args.data())) {
         qDebug() << "✓ Emulator initialized successfully with input settings";
         
 #ifdef GUI_SDL

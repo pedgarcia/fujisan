@@ -21,6 +21,17 @@ fi
 echo "Creating minimal Makefile for libatari800..."
 echo "This approach avoids autotools and problematic modules like XEP80"
 
+# Ensure Fujisan patches are applied for required API functions
+if [ -d "fujisan-patches" ] && [ -f "fujisan-patches/apply-patches.sh" ]; then
+    echo "Applying Fujisan patches for API functions..."
+    cd fujisan-patches
+    chmod +x apply-patches.sh
+    ./apply-patches.sh || echo "Patches may already be applied"
+    cd ..
+else
+    echo "Warning: Fujisan patches not found - some API functions may be missing"
+fi
+
 # Create a basic Makefile that compiles the essential files for libatari800
 cat > Makefile << 'EOF'
 # Minimal Makefile for libatari800

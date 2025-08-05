@@ -10,15 +10,33 @@
 #endif
 
 // Prevent common macro conflicts
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
+#ifndef NOSERVICE
 #define NOSERVICE
+#endif
+#ifndef NOMCX
 #define NOMCX
+#endif
+#ifndef NOIME
 #define NOIME
+#endif
+#ifndef NOKANJI
 #define NOKANJI
+#endif
+#ifndef NOHELP
 #define NOHELP
+#endif
+#ifndef NOPROFILER
 #define NOPROFILER
+#endif
+#ifndef NODEFERWINDOWPOS
 #define NODEFERWINDOWPOS
+#endif
 
 // Include Windows headers first to prevent conflicts
 #include <windows.h>
