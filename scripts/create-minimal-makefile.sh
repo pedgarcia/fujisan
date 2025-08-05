@@ -3,6 +3,11 @@
 
 set -e
 
+echo "=== Creating minimal build system for libatari800 ==="
+echo "PWD: $(pwd)"
+echo "Available files in src/:"
+ls -la src/ 2>/dev/null | head -10 || echo "Cannot list src/ directory"
+
 ATARI800_SRC_PATH="$1"
 
 if [ -z "$ATARI800_SRC_PATH" ]; then
@@ -33,9 +38,34 @@ else
 fi
 
 # Include real source files for full Windows functionality
+echo "Checking which source files exist..."
+
+# List of source files we want to include (without .o extension)
+DESIRED_SOURCES="
+afile antic atari cartridge cpu esc gtia memory monitor pbi pia pokey pokeysnd
+sio sound statesav pbi_mio pbi_bb pbi_xld mzpokeysnd votraxsnd votrax pbi_scsi
+rtime cassette compfile cfg log util colours screen input binload devices
+img_tape remez lib
+"
+
+# Check which files actually exist and build the object list
+EXISTING_OBJS=""
+for src in $DESIRED_SOURCES; do
+    if [ -f "src/${src}.c" ]; then
+        echo "Found: src/${src}.c"
+        EXISTING_OBJS="$EXISTING_OBJS src/${src}.o"
+    else
+        echo "Missing: src/${src}.c - skipping"
+    fi
+done
+
+# Always include libatari800 API files
+EXISTING_OBJS="$EXISTING_OBJS src/libatari800/api.o src/libatari800/main.o src/libatari800/init.o src/libatari800/input.o src/libatari800/statesav.o"
+
+echo "Will compile these object files: $EXISTING_OBJS"
 
 # Create a basic Makefile that compiles the essential files for libatari800
-cat > Makefile << 'EOF'
+cat > Makefile << EOF
 # Minimal Makefile for libatari800
 # Generated when autotools are not available
 
@@ -44,49 +74,7 @@ AR = ar
 CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800
 ARFLAGS = rcs
 
-LIBATARI800_OBJS = \
-	src/afile.o \
-	src/antic.o \
-	src/atari.o \
-	src/cartridge.o \
-	src/cpu.o \
-	src/esc.o \
-	src/gtia.o \
-	src/memory.o \
-	src/monitor.o \
-	src/pbi.o \
-	src/pia.o \
-	src/pokey.o \
-	src/pokeysnd.o \
-	src/sio.o \
-	src/sound.o \
-	src/statesav.o \
-	src/pbi_mio.o \
-	src/pbi_bb.o \
-	src/pbi_xld.o \
-	src/mzpokeysnd.o \
-	src/votraxsnd.o \
-	src/votrax.o \
-	src/pbi_scsi.o \
-	src/rtime.o \
-	src/cassette.o \
-	src/compfile.o \
-	src/cfg.o \
-	src/log.o \
-	src/util.o \
-	src/colours.o \
-	src/screen.o \
-	src/input.o \
-	src/binload.o \
-	src/libatari800/api.o \
-	src/libatari800/main.o \
-	src/libatari800/init.o \
-	src/libatari800/input.o \
-	src/libatari800/statesav.o \
-	src/devices.o \
-	src/img_tape.o \
-	src/remez.o \
-	src/lib.o
+LIBATARI800_OBJS = $EXISTING_OBJS
 
 all: src/libatari800.a
 
@@ -101,7 +89,7 @@ src/libatari800.a: $(LIBATARI800_OBJS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(LIBATARI800_OBJS) src/libatari800.a
+	rm -f \$(LIBATARI800_OBJS) src/libatari800.a
 
 .PHONY: all clean
 EOF
