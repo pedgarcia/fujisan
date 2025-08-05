@@ -82,7 +82,13 @@ LIBATARI800_OBJS = \
 	src/libatari800/main.o \
 	src/libatari800/init.o \
 	src/libatari800/input.o \
-	src/libatari800/statesav.o
+	src/libatari800/statesav.o \
+	src/devices.o \
+	src/img_tape.o \
+	src/remez.o \
+	src/libatari800/platform.o \
+	src/libatari800/video.o \
+	src/libatari800/sound.o
 
 all: src/libatari800.a
 
@@ -212,3 +218,4 @@ echo "You can now run 'make' to build libatari800.a"
 # Create a marker file to indicate minimal build was used
 echo "MINIMAL_BUILD_USED=$(date)" > .minimal-build-marker
 echo "Minimal build marker created for debugging"
+
