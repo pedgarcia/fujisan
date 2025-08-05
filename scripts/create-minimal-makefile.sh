@@ -152,6 +152,45 @@ cat > src/config.h << 'EOF'
 EOF
 
 echo "Created minimal Makefile and config.h for libatari800"
+
+# Add missing Fujisan API functions to api.c if not present
+if ! grep -q "libatari800_set_disk_activity_callback" src/libatari800/api.c 2>/dev/null; then
+    echo "Adding missing Fujisan API functions to api.c..."
+    cat >> src/libatari800/api.c << 'API_EOF'
+/* Fujisan-specific API functions for disk management */
+static void (*disk_activity_callback)(int drive, int operation) = NULL;
+
+void libatari800_set_disk_activity_callback(void (*callback)(int drive, int operation)) {
+    disk_activity_callback = callback;
+}
+
+void libatari800_dismount_disk_image(int diskno) {
+    /* Simple dismount implementation */
+    if (diskno >= 1 && diskno <= 8) {
+        /* Implementation would go here - for now just placeholder */
+    }
+}
+
+void libatari800_disable_drive(int diskno) {
+    /* Simple disable implementation */
+    if (diskno >= 1 && diskno <= 8) {
+        /* Implementation would go here - for now just placeholder */
+    }
+}
+API_EOF
+fi
+
+# Add missing function declarations to libatari800.h if not present
+if ! grep -q "libatari800_set_disk_activity_callback" src/libatari800/libatari800.h 2>/dev/null; then
+    echo "Adding missing function declarations to libatari800.h..."
+    cat >> src/libatari800/libatari800.h << 'HEADER_EOF'
+/* Fujisan-specific API function declarations */
+void libatari800_set_disk_activity_callback(void (*callback)(int drive, int operation));
+void libatari800_dismount_disk_image(int diskno);
+void libatari800_disable_drive(int diskno);
+HEADER_EOF
+fi
+
 echo "You can now run 'make' to build libatari800.a"
 
 # Create a marker file to indicate minimal build was used
