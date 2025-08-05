@@ -100,34 +100,15 @@ jobs:
         msbuild -version
         echo "=== Starting build with detailed logging ==="
         
-        # Try build with detailed diagnostics - capture full output
-        $buildOutput = ""
-        $buildError = ""
-        try {
-            # Use Start-Process to capture all output
-            $process = Start-Process -FilePath "cmake" -ArgumentList "--build", ".", "--config", "Release", "--parallel", "4", "--verbose", "--", "/verbosity:detailed" -NoNewWindow -Wait -PassThru -RedirectStandardOutput "build-output.log" -RedirectStandardError "build-error.log"
-            $buildOutput = Get-Content "build-output.log" -Raw -ErrorAction SilentlyContinue
-            $buildError = Get-Content "build-error.log" -Raw -ErrorAction SilentlyContinue
-            
-            if ($process.ExitCode -ne 0) {
-                echo "=== BUILD FAILED - Exit Code: $($process.ExitCode) ==="
-                echo "=== STDOUT OUTPUT ==="
-                if ($buildOutput) { echo $buildOutput } else { echo "No stdout output" }
-                echo "=== STDERR OUTPUT ==="  
-                if ($buildError) { echo $buildError } else { echo "No stderr output" }
-                $buildFailed = $true
-            } else {
-                echo "=== BUILD SUCCEEDED ==="
-                $buildFailed = $false
-            }
-        } catch {
-            echo "=== BUILD PROCESS EXCEPTION ==="
-            echo $_.Exception.Message
-            $buildFailed = $true
-        }
+        # Try build with detailed diagnostics - use simpler approach
+        echo "Starting CMake build..."
+        $buildResult = $?
+        cmake --build . --config Release --parallel 4 --verbose -- /verbosity:detailed
+        $buildResult = $?
         
-        if ($buildFailed) {
-            echo "=== First build attempt failed, checking atari800 status ==="
+        if (-not $buildResult) {
+            echo "=== BUILD FAILED - Checking atari800 status ==="
+            echo "=== Build failed, checking atari800 status ==="
             
             # Check if libatari800 was actually built despite the error
             if (Test-Path "atari800-src\src\libatari800.a") {
