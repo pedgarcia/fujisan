@@ -132,9 +132,22 @@ elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     export CPPFLAGS="${CPPFLAGS:-}"
 fi
 
+# Debug environment variables
+echo "=== Environment Detection ==="
+echo "OSTYPE: $OSTYPE"
+echo "MSYSTEM: $MSYSTEM"
+echo "OS: $OS" 
+echo "RUNNER_OS: $RUNNER_OS"
+echo "CI: $CI"
+echo "pwd: $(pwd)"
+echo "uname: $(uname -a 2>/dev/null || echo 'uname not available')"
+echo "=========================="
+
 # Configure with Windows-specific settings if needed
-if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
+# Check multiple ways to detect Windows environment
+if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]] || [[ "$OS" == "Windows_NT" ]] || [[ "$RUNNER_OS" == "Windows" ]] || [[ "$CI" == "true" && $(uname -s 2>/dev/null || echo '') == *"MSYS"* ]]; then
     echo "Windows detected - using minimal Makefile approach to avoid autotools issues"
+    echo "Detection triggered by: OSTYPE=$OSTYPE, MSYSTEM=$MSYSTEM, OS=$OS, RUNNER_OS=$RUNNER_OS"
     echo "Creating minimal build system for libatari800..."
     "$SCRIPT_DIR/create-minimal-makefile.sh" "$ATARI800_SRC_PATH"
     echo "Skipping configure step - using minimal Makefile approach"
