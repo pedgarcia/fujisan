@@ -77,11 +77,11 @@ if(WIN32)
     if(MSYS2_BASH MATCHES "msys2\.(cmd|CMD)$")
         # GitHub Actions setup-msys2 wrapper
         set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
-        set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && make -j4")
+        set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && echo '=== Starting make build ===' && make -j4 VERBOSE=1 || (echo '=== Make failed, trying single-threaded build ===' && make VERBOSE=1)")
     else()
         # Traditional bash.exe
         set(ATARI800_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && '${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh' '<SOURCE_DIR>'")
-        set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && make -j4")
+        set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && echo '=== Starting make build ===' && make -j4 VERBOSE=1 || (echo '=== Make failed, trying single-threaded build ===' && make VERBOSE=1)")
     endif()
 else()
     # Unix/macOS: Use native tools

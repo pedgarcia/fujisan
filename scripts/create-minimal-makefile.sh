@@ -102,6 +102,11 @@ cat > src/config.h << 'EOF'
 #define CLIP_SOUND 1
 #define SYNCHRONIZED_SOUND 1
 #define SOUND_INTERPOLATION 1
+
+/* Disable potentially problematic Windows features */
+#undef XEP80_EMULATION
+#undef AF80
+#undef BIT3
 #define NONLINEAR_MIXING 1
 
 /* Sound system - enable sound for libatari800 */

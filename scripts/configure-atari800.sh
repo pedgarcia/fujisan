@@ -132,6 +132,24 @@ elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     export CPPFLAGS="${CPPFLAGS:-}"
 fi
 
-./configure --target=libatari800 --enable-netsio
+# Configure with Windows-specific settings if needed
+if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
+    echo "Configuring for Windows with basic settings..."
+    # Try a simple, minimal configuration for Windows
+    ./configure --target=libatari800 --enable-netsio || {
+        echo "Basic configure with netsio failed, trying minimal configure..."
+        ./configure --target=libatari800 || {
+            echo "Configure failed completely, using minimal Makefile fallback"
+            echo "Creating minimal build system for libatari800..."
+            "$SCRIPT_DIR/create-minimal-makefile.sh" "$ATARI800_SRC_PATH"
+            echo "Skipping configure step - using minimal Makefile approach"
+            echo "atari800 configuration completed (minimal build)"
+            exit 0
+        }
+    }
+else
+    # Unix/macOS: Use full configuration
+    ./configure --target=libatari800 --enable-netsio
+fi
 
 echo "atari800 configuration completed"
