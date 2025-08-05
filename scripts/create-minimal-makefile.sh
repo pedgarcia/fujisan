@@ -32,6 +32,8 @@ else
     echo "Warning: Fujisan patches not found - some API functions may be missing"
 fi
 
+# Include real source files for full Windows functionality
+
 # Create a basic Makefile that compiles the essential files for libatari800
 cat > Makefile << 'EOF'
 # Minimal Makefile for libatari800
@@ -62,6 +64,20 @@ LIBATARI800_OBJS = \
 	src/pbi_mio.o \
 	src/pbi_bb.o \
 	src/pbi_xld.o \
+	src/mzpokeysnd.o \
+	src/votraxsnd.o \
+	src/votrax.o \
+	src/pbi_scsi.o \
+	src/rtime.o \
+	src/cassette.o \
+	src/compfile.o \
+	src/cfg.o \
+	src/log.o \
+	src/util.o \
+	src/colours.o \
+	src/screen.o \
+	src/input.o \
+	src/binload.o \
 	src/libatari800/api.o \
 	src/libatari800/main.o \
 	src/libatari800/init.o \
