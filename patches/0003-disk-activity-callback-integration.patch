@@ -1,0 +1,147 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Code <noreply@example.com>
+Date: Wed, 6 Aug 2025 00:00:00 +0000
+Subject: [PATCH] Integrate disk activity callback with SIO operations
+
+The disk activity callback was defined but never called from SIO operations.
+This patch adds the callback invocations to the main SIO read/write operations
+to enable real-time disk LED activity monitoring in Fujisan.
+
+diff --git a/src/sio.c b/src/sio.c
+index 1234567..abcdef0 100644
+--- a/src/sio.c
++++ b/src/sio.c
+@@ -78,6 +78,10 @@
+ #include "cassette.h"
+ #include "util.h"
+ 
++#ifdef LIBATARI800
++extern void (*disk_activity_callback)(int drive, int operation);
++#endif
++
+ /* If this is defined, consecutive sectors are read with at most one
+    intervening sector. */
+ #define CONSECUTIVE_SECTORS_FAST_IO
+@@ -662,9 +666,15 @@ UBYTE ReadSector(int unit, int sector, UBYTE *buffer)
+ 		return 'N';
+ 	if (sector <= 0 || sector > sectorcount[unit])
+ 		return 'E';
+ 	SIO_last_op = SIO_LAST_READ;
+ 	SIO_last_op_time = 1;
+ 	SIO_last_drive = unit + 1;
++	
++#ifdef LIBATARI800
++	/* Call disk activity callback for real-time LED updates */
++	if (disk_activity_callback) {
++		disk_activity_callback(SIO_last_drive, SIO_LAST_READ);
++	}
++#endif
++
+ 	/* FIXME: what sector size did the user expect? */
+ 	size = SeekSector(unit, sector);
+ 	if (size == 0)
+@@ -839,9 +849,15 @@ UBYTE WriteSector(int unit, int sector, const UBYTE *buffer)
+ 		return 'N';
+ 	if (SIO_drive_status[unit] != SIO_READ_WRITE || sector <= 0 || sector > sectorcount[unit])
+ 		return 'E';
+ 	SIO_last_op = SIO_LAST_WRITE;
+ 	SIO_last_op_time = 1;
+ 	SIO_last_drive = unit + 1;
++
++#ifdef LIBATARI800
++	/* Call disk activity callback for real-time LED updates */
++	if (disk_activity_callback) {
++		disk_activity_callback(SIO_last_drive, SIO_LAST_WRITE);
++	}
++#endif
++
+ #ifdef VAPI_WRITE_ENABLE 	
+  	if (image_type[unit] == IMAGE_TYPE_VAPI) {
+ 		if (fseek(disk[unit], (long) sector * sectorsize[unit], SEEK_SET) != 0)
+@@ -1399,9 +1415,15 @@ UBYTE SIO_ChkSum(const UBYTE *data, int length)
+ 		ExpectedBytes = realsize + 1;
+ 		DataIndex = 0;
+ 		TransferStatus = SIO_WriteFrame;
+ 		SIO_last_op = SIO_LAST_WRITE;
+ 		SIO_last_op_time = 10;
+ 		SIO_last_drive = unit + 1;
++
++#ifdef LIBATARI800
++		/* Call disk activity callback for real-time LED updates */
++		if (disk_activity_callback) {
++			disk_activity_callback(SIO_last_drive, SIO_LAST_WRITE);
++		}
++#endif
++
+ 		return 'A';
+ 	case 0x52:				/* Read */
+ 		if (SIO_drive_status[unit] == SIO_OFF)
+@@ -1436,9 +1458,15 @@ UBYTE SIO_ChkSum(const UBYTE *data, int length)
+ 			delay_counter = 0;
+ 		}
+ #endif
+ 		SIO_last_op = SIO_LAST_READ;
+ 		SIO_last_op_time = 10;
+ 		SIO_last_drive = unit + 1;
++
++#ifdef LIBATARI800
++		/* Call disk activity callback for real-time LED updates */
++		if (disk_activity_callback) {
++			disk_activity_callback(SIO_last_drive, SIO_LAST_READ);
++		}
++#endif
++
+ 		return 'A';
+ 	case 0x53:				/* Status */
+ 		if (SIO_drive_status[unit] == SIO_OFF)
+diff --git a/src/pbi_xld.c b/src/pbi_xld.c
+index 1234567..abcdef0 100644
+--- a/src/pbi_xld.c
++++ b/src/pbi_xld.c
+@@ -44,6 +44,10 @@
+ #include "pokeysnd.h"
+ #include "util.h"
+ 
++#ifdef LIBATARI800
++extern void (*disk_activity_callback)(int drive, int operation);
++#endif
++
+ enum xld_status {
+     XLD_OFF,
+     XLD_ON
+@@ -495,9 +499,15 @@ static UBYTE XLD_D_GetByte(UWORD addr, int no_side_effects)
+ 		ExpectedBytes = realsize + 1;
+ 		DataIndex = 0;
+ 		TransferStatus = PIO_WriteFrame;
+ 		SIO_last_op = SIO_LAST_WRITE;
+ 		SIO_last_op_time = 10;
+ 		SIO_last_drive = unit + 1;
++
++#ifdef LIBATARI800
++		/* Call disk activity callback for real-time LED updates */
++		if (disk_activity_callback) {
++			disk_activity_callback(SIO_last_drive, SIO_LAST_WRITE);
++		}
++#endif
++
+ 		return 'A';
+ 	case 0x52:				/* Read */
+ 		if (SIO_drive_status[unit] == SIO_OFF)
+@@ -524,9 +534,15 @@ static UBYTE XLD_D_GetByte(UWORD addr, int no_side_effects)
+ 			delay_counter = 0;
+ 		}
+ #endif*/
+ 		SIO_last_op = SIO_LAST_READ;
+ 		SIO_last_op_time = 10;
+ 		SIO_last_drive = unit + 1;
++
++#ifdef LIBATARI800
++		/* Call disk activity callback for real-time LED updates */
++		if (disk_activity_callback) {
++			disk_activity_callback(SIO_last_drive, SIO_LAST_READ);
++		}
++#endif
++
+ 		return 'A';
+ 	case 0x53:				/* Status */
+ 		if (SIO_drive_status[unit] == SIO_OFF)

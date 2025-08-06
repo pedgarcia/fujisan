@@ -14,7 +14,7 @@ cd "$ATARI800_SRC_PATH"
 echo "Building in: $(pwd)"
 
 # Apply Fujisan patches if they exist and haven't been applied
-if [ -d "fujisan-patches" ] && [ -f "fujisan-patches/0001-libatari800-disk-api.patch" ]; then
+if [ -d "fujisan-patches" ]; then
     echo "=== Applying Fujisan patches ==="
     if git status >/dev/null 2>&1; then
         # We're in a git repository - use git am
@@ -37,7 +37,7 @@ if [ -d "fujisan-patches" ] && [ -f "fujisan-patches/0001-libatari800-disk-api.p
         done
     fi
 else
-    echo "No Fujisan patches found or already applied"
+    echo "No Fujisan patches found"
 fi
 
 # Generate configure script if it doesn't exist
