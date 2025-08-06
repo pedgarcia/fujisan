@@ -42,6 +42,14 @@ if(APPLE)
     
 endif()
 
+# Configure Qt5 for static linking on Windows cross-compilation
+if(CMAKE_CROSSCOMPILING AND WIN32)
+    # Force static Qt5 linking for Windows cross-compilation
+    set(Qt5_USE_STATIC_LIBS ON)
+    set(Qt5_USE_STATIC_RUNTIME ON)
+    message(STATUS "Configuring Qt5 for static linking (Windows cross-compilation)")
+endif()
+
 # Find Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
@@ -91,10 +99,10 @@ if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
         set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E env MSYSTEM=MSYS ${MSYS2_BASH} --login -c "export PATH='/mingw64/bin:/usr/bin:$PATH' && cd '<SOURCE_DIR>' && echo '=== Starting make build ===' && make -j4 VERBOSE=1 || (echo '=== Make failed, trying single-threaded build ===' && make VERBOSE=1)")
     endif()
 elseif(CMAKE_CROSSCOMPILING AND WIN32)
-    # Cross-compilation for Windows (using MinGW on Linux)
-    message(STATUS "Configuring for Windows cross-compilation")
-    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/create-minimal-makefile.sh <SOURCE_DIR>)
-    set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make -j4 CC=${CMAKE_C_COMPILER} AR=x86_64-w64-mingw32-ar)
+    # Cross-compilation for Windows (using MinGW on Linux with full autotools)
+    message(STATUS "Configuring for Windows cross-compilation with autotools")
+    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libatari800-simple.sh <SOURCE_DIR>)
+    set(ATARI800_BUILD_COMMAND echo "Build completed by configure script")
 else()
     # Unix/macOS: Use native tools
     set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/configure-atari800.sh <SOURCE_DIR>)
@@ -305,6 +313,41 @@ if(APPLE)
         "-framework UniformTypeIdentifiers"
     )
 elseif(WIN32)
+    # Static linking for MinGW to avoid DLL dependencies
+    if(CMAKE_CROSSCOMPILING)
+        # Force static Qt5 linking
+        set(Qt5_USE_STATIC_LIBS ON)
+        set(Qt5_USE_STATIC_RUNTIME ON)
+        
+        # Add static linking flags
+        target_link_libraries(${PROJECT_NAME}
+            -static-libgcc
+            -static-libstdc++
+            -static
+            # Windows system libraries needed for static Qt5
+            -lws2_32
+            -lkernel32
+            -luser32
+            -lgdi32
+            -lwinspool
+            -lshell32
+            -lole32
+            -loleaut32
+            -luuid
+            -lcomdlg32
+            -ladvapi32
+            -limm32
+            -lwinmm
+            -lversion
+            -ldwmapi
+            -luxtheme
+        )
+        
+        # Additional static linking options - force all linking to be static
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            LINK_FLAGS "-static-libgcc -static-libstdc++ -static -Wl,-Bstatic -Wl,--no-undefined"
+        )
+    endif()
     # Windows-specific compiler settings to fix SDK compatibility
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         WIN32_LEAN_AND_MEAN
