@@ -74,6 +74,7 @@ Examples:
   $0 macos                    # Build both Mac versions
   $0 windows --clean           # Clean build for Windows
   $0 all --version v1.2.0      # Build all platforms
+  $0 all --sign --clean        # Build everything with signing
 
 Output:
   All builds output to: dist/
@@ -282,10 +283,15 @@ case $PLATFORM in
 esac
 
 # Sign macOS builds if requested
-if [[ "$SIGN" == "true" ]] && [[ "$PLATFORM" == macos* ]]; then
-    if [[ -f "$SCRIPT_DIR/scripts/sign-macos-apps.sh" ]]; then
-        echo_step "Signing macOS builds"
-        "$SCRIPT_DIR/scripts/sign-macos-apps.sh"
+if [[ "$SIGN" == "true" ]]; then
+    # Sign if we built macOS (either directly or as part of 'all')
+    if [[ "$PLATFORM" == macos* ]] || ([[ "$PLATFORM" == "all" ]] && [[ "$OSTYPE" == "darwin"* ]]); then
+        if [[ -f "$SCRIPT_DIR/scripts/sign-macos-apps.sh" ]]; then
+            echo_step "Signing macOS builds"
+            "$SCRIPT_DIR/scripts/sign-macos-apps.sh"
+        else
+            echo_info "Signing script not found, skipping macOS signing"
+        fi
     fi
 fi
 
