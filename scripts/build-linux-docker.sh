@@ -225,6 +225,10 @@ fi
 [ -f "../README.md" ] && cp ../README.md fujisan-linux/usr/share/doc/fujisan/
 [ -f "../LICENSE" ] && cp ../LICENSE fujisan-linux/usr/share/doc/fujisan/
 
+# Copy images
+mkdir -p fujisan-linux/usr/share/fujisan/images
+cp ../images/*.png fujisan-linux/usr/share/fujisan/images/ 2>/dev/null || true
+
 # Create .deb package
 if [ "$BUILD_DEB" = "true" ]; then
     echo "Creating .deb package..."
@@ -284,6 +288,10 @@ if [ "$BUILD_TARBALL" = "true" ]; then
     # Copy documentation
     [ -f "../README.md" ] && cp ../README.md fujisan-portable/share/doc/
     [ -f "../LICENSE" ] && cp ../LICENSE fujisan-portable/share/doc/
+    
+    # Copy images
+    mkdir -p fujisan-portable/share/images
+    cp ../images/*.png fujisan-portable/share/images/ 2>/dev/null || true
     
     # Create run script
     cat > fujisan-portable/fujisan.sh << 'EOF'

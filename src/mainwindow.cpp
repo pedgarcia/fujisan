@@ -241,7 +241,8 @@ void MainWindow::createToolBar()
     m_toolBar->setIconSize(QSize(32, 32));
 
     // Set toolbar background color
-    m_toolBar->setStyleSheet("QToolBar { background-color: rgb(220, 216, 207); }");
+    // Don't set a specific background color - let the system theme handle it
+    // m_toolBar->setStyleSheet("QToolBar { background-color: rgb(220, 216, 207); }");
 
     // Increase toolbar height to accommodate multiple controls
     m_toolBar->setMinimumHeight(70);
@@ -253,7 +254,7 @@ void MainWindow::createToolBar()
     QFrame* separator = new QFrame();
     separator->setFrameShape(QFrame::VLine);
     separator->setFrameShadow(QFrame::Sunken);
-    separator->setStyleSheet("color: #999; margin: 2px;");
+    separator->setStyleSheet("margin: 2px;");
     m_toolBar->addWidget(separator);
 
     // Create audio configuration section
@@ -301,7 +302,7 @@ void MainWindow::createJoystickToolbarSection()
 
     // Title label
     QLabel* titleLabel = new QLabel("🕹️ Joystick");
-    titleLabel->setStyleSheet("font-weight: bold; font-size: 10px; color: #444;");
+    titleLabel->setStyleSheet("font-weight: bold; font-size: 10px;");
     titleLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(titleLabel);
 
@@ -338,7 +339,8 @@ void MainWindow::createJoystickToolbarSection()
     QFrame* separator = new QFrame();
     separator->setFrameShape(QFrame::VLine);
     separator->setFrameShadow(QFrame::Sunken);
-    separator->setStyleSheet("color: #ccc;");
+    // Let system theme handle separator color
+    // separator->setStyleSheet("color: #ccc;");
     controlsLayout->addWidget(separator);
 
     // Right column: compact swap widget
@@ -441,7 +443,7 @@ void MainWindow::createAudioToolbarSection()
 
     // Title label
     QLabel* titleLabel = new QLabel("🔊 Audio");
-    titleLabel->setStyleSheet("font-weight: bold; font-size: 10px; color: #444;");
+    titleLabel->setStyleSheet("font-weight: bold; font-size: 10px;");
     titleLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(titleLabel);
 
@@ -460,7 +462,7 @@ void MainWindow::createAudioToolbarSection()
 
     // Volume percentage label
     QLabel* volumePercentLabel = new QLabel("75%");
-    volumePercentLabel->setStyleSheet("font-size: 9px; color: #666; min-width: 25px;");
+    volumePercentLabel->setStyleSheet("font-size: 9px; min-width: 25px;");
     volumePercentLabel->setAlignment(Qt::AlignCenter);
     volumeLayout->addWidget(volumePercentLabel);
 
@@ -503,7 +505,7 @@ void MainWindow::createProfileToolbarSection()
     // Add centered label at the top
     QLabel* profileLabel = new QLabel("Profile/State");
     profileLabel->setAlignment(Qt::AlignCenter);
-    profileLabel->setStyleSheet("font-weight: bold; font-size: 11px; color: #333;");
+    profileLabel->setStyleSheet("font-weight: bold; font-size: 11px;");
     mainLayout->addWidget(profileLabel);
 
     // Top row: Profile dropdown and load button
@@ -529,16 +531,10 @@ void MainWindow::createProfileToolbarSection()
         "    font-weight: bold;"
         "    padding: 1px 4px;"
         "    margin: 0px;"
-        "    border: 1px solid gray;"
-        "    background-color: #f0f0f0;"
         "    min-width: 50px;"
         "    max-width: 80px;"  // Increased for longer text
         "    min-height: 10px;"
         "    max-height: 12px;"
-        "}"
-        "QPushButton:pressed {"
-        "    background-color: #d0d0d0;"
-        "    border: 1px solid black;"
         "}";
     m_loadProfileButton->setStyleSheet(profileButtonStyle);
     m_loadProfileButton->setToolTip("Load selected profile");
@@ -589,6 +585,13 @@ void MainWindow::createLogoSection()
         "../images/fujisanlogo.png",
         QApplication::applicationDirPath() + "/images/fujisanlogo.png",
         QApplication::applicationDirPath() + "/../images/fujisanlogo.png",
+#ifdef Q_OS_MAC
+        QApplication::applicationDirPath() + "/../Resources/images/fujisanlogo.png",
+#endif
+#ifdef Q_OS_LINUX
+        "/usr/share/fujisan/images/fujisanlogo.png",
+        QApplication::applicationDirPath() + "/../share/images/fujisanlogo.png",
+#endif
         "/Users/pgarcia/Downloads/fujisanlogo.png",  // Fallback to Downloads
         ":/images/fujisanlogo.png"
     };
@@ -606,7 +609,7 @@ void MainWindow::createLogoSection()
     if (!logoLoaded) {
         // Create a simple text-based logo as fallback
         logoLabel->setText("FUJISAN");
-        logoLabel->setStyleSheet("font-weight: bold; font-size: 12px; color: #666; margin: 0 8px;");
+        logoLabel->setStyleSheet("font-weight: bold; font-size: 12px; margin: 0 8px;");
         logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
     } else {
         // Scale logo to appropriate toolbar size (max 40px height for better visibility)
@@ -1134,6 +1137,13 @@ void MainWindow::showAbout()
         "../images/fujisanlogo.png",
         QApplication::applicationDirPath() + "/images/fujisanlogo.png",
         QApplication::applicationDirPath() + "/../images/fujisanlogo.png",
+#ifdef Q_OS_MAC
+        QApplication::applicationDirPath() + "/../Resources/images/fujisanlogo.png",
+#endif
+#ifdef Q_OS_LINUX
+        "/usr/share/fujisan/images/fujisanlogo.png",
+        QApplication::applicationDirPath() + "/../share/images/fujisanlogo.png",
+#endif
         ":/images/fujisanlogo.png"
     };
     

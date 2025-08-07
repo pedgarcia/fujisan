@@ -66,6 +66,13 @@ void CartridgeWidget::loadImages()
         "../images/",
         QApplication::applicationDirPath() + "/images/",
         QApplication::applicationDirPath() + "/../images/",
+#ifdef Q_OS_MAC
+        QApplication::applicationDirPath() + "/../Resources/images/",
+#endif
+#ifdef Q_OS_LINUX
+        "/usr/share/fujisan/images/",
+        QApplication::applicationDirPath() + "/../share/images/",
+#endif
         ":/images/"
     };
     

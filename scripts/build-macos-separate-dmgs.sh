@@ -207,6 +207,11 @@ if [[ "$SKIP_ARM64" == "false" ]]; then
     echo_info "Deploying Qt frameworks..."
     "$QT_ARM64_PATH/bin/macdeployqt" "Fujisan.app"
     
+    # Copy images to app bundle
+    echo_info "Copying images to app bundle..."
+    mkdir -p "Fujisan.app/Contents/Resources/images"
+    cp -r "$PROJECT_ROOT/images/"*.png "Fujisan.app/Contents/Resources/images/" 2>/dev/null || true
+    
     # Sign
     echo_info "Signing app..."
     codesign --force --deep --sign - "Fujisan.app"
@@ -264,6 +269,11 @@ if [[ "$SKIP_X86_64" == "false" ]]; then
     # Deploy Qt frameworks
     echo_info "Deploying Qt frameworks..."
     "$QT_X86_64_PATH/bin/macdeployqt" "Fujisan.app"
+    
+    # Copy images to app bundle
+    echo_info "Copying images to app bundle..."
+    mkdir -p "Fujisan.app/Contents/Resources/images"
+    cp -r "$PROJECT_ROOT/images/"*.png "Fujisan.app/Contents/Resources/images/" 2>/dev/null || true
     
     # Sign
     echo_info "Signing app..."

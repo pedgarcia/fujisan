@@ -95,6 +95,10 @@ cp /usr/x86_64-w64-mingw32/lib/qt/plugins/audio/qtaudio_windows.dll build-window
 mkdir -p build-windows/mediaservice
 cp /usr/x86_64-w64-mingw32/lib/qt/plugins/mediaservice/qtmedia_audioengine.dll build-windows/mediaservice/
 
+# Copy images
+mkdir -p build-windows/images
+cp -r images/*.png build-windows/images/ 2>/dev/null || true
+
 echo "✓ Windows package created in build-windows/"
 '
 
