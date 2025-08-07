@@ -8,6 +8,25 @@ Fujisan is a modern Qt5-based frontend for the Atari800 emulator that provides a
 
 ## Build System and Common Commands
 
+### Unified Build Script (Recommended)
+```bash
+# Build for any platform using the unified script
+./build.sh [platform] [options]
+
+# Examples:
+./build.sh macos          # Build both Intel and ARM64 DMGs
+./build.sh windows        # Cross-compile for Windows
+./build.sh linux          # Build Linux packages with Docker/Podman
+./build.sh all --clean    # Build all platforms with clean
+
+# All outputs go to dist/ directory:
+# - Fujisan-{version}-arm64.dmg   (macOS Apple Silicon)
+# - Fujisan-{version}-x86_64.dmg  (macOS Intel)  
+# - Fujisan-{version}-windows.zip (Windows)
+# - fujisan-{version}-linux-x64.tar.gz (Linux)
+# - fujisan_{version}_amd64.deb   (Debian/Ubuntu)
+```
+
 ### Prerequisites Setup
 ```bash
 # Set required environment variable (needed for all build operations)
@@ -20,7 +39,7 @@ brew install qt@5 cmake autoconf automake
 sudo apt install qtbase5-dev cmake build-essential autoconf automake
 ```
 
-### Build Process
+### Manual Build Process
 ```bash
 # 1. Apply Fujisan patches to atari800 source
 cd fujisan/patches
@@ -51,7 +70,7 @@ Fujisan uses Git format-patch files for reliable patching:
 - Use `apply-patches.sh` which auto-detects Git repos and uses appropriate commands
 - Patches add essential libatari800 API functions for disk management and activity monitoring
 
-### macOS Universal Binary Build
+### macOS Platform-Specific Builds (Recommended)
 ```bash
 # Prerequisites: Install Qt5 for both architectures
 # ARM64 (Apple Silicon):
@@ -60,17 +79,21 @@ brew install qt@5
 # x86_64 (Intel) - requires Rosetta:
 arch -x86_64 /usr/local/bin/brew install qt@5
 
-# Build universal binary with universal Qt frameworks
-./scripts/build-universal-macos-complete.sh
+# Build separate DMGs for each platform (recommended approach)
+./scripts/build-macos-separate-dmgs.sh
 
 # Options:
 #   --clean       Clean build directories before starting
 #   --skip-arm64  Skip ARM64 build (use existing)
 #   --skip-x86_64 Skip x86_64 build (use existing)
-#   --sign        Sign the application (requires certificates)
+#   --skip-dmg    Skip DMG creation
 
-# Output: dist/Fujisan-{version}-universal.dmg
-# The DMG contains a universal app bundle that runs natively on both Intel and Apple Silicon Macs
+# Output: 
+#   dist/Fujisan-{version}-arm64.dmg  - For Apple Silicon Macs
+#   dist/Fujisan-{version}-x86_64.dmg - For Intel Macs
+
+# Note: Universal binaries with Qt are problematic due to framework
+# architecture incompatibilities. Platform-specific builds are more reliable.
 ```
 
 ### Windows Cross-Compilation (from macOS/Linux)
@@ -191,11 +214,10 @@ Fujisan includes comprehensive FujiNet-PC network connectivity:
 ### Platform-Specific Build Folders
 - **macOS**: 
   - `build/` - Native single-architecture build
-  - `build-arm64/` - ARM64 build for universal binary
-  - `build-x86_64/` - x86_64 build for universal binary
-  - `build-universal/` - Universal binary with both architectures
-  - `dist/` - Final DMG distribution files
-- **Windows**: `build-windows/` (cross-compiled release package with all DLLs)
+  - `build-arm64/` - ARM64 build for platform-specific DMG
+  - `build-x86_64/` - x86_64 build for platform-specific DMG
+  - `dist/` - Final distribution files for all platforms
+- **Windows**: `build-windows/` (temporary - gets zipped to dist/)
 - **Linux**: `build/` (native build)
 
 ### Windows Release Package Structure
@@ -216,9 +238,17 @@ build-windows/
 - `build/` - Native build directory
 - `build-arm64/` - macOS ARM64 build directory
 - `build-x86_64/` - macOS x86_64 build directory
-- `build-universal/` - macOS universal binary directory
 - `build-cross-windows/` - Windows cross-compilation temp directory
-- `build-windows/` - Windows release package
-- `dist/` - Distribution files (DMGs, etc.)
+- `build-windows/` - Windows release package (temporary)
+- `dist/` - All distribution files (DMGs, ZIPs, DEBs, tarballs)
 - `*.exe`, `*.dll` - Binary files
-- `*.dmg` - macOS disk images 
+
+## Distribution and Release Guidelines
+
+### Unified Distribution Management
+- **Single Distribution Directory**: All platform releases go to `dist/`
+- **Consistent Naming**: 
+  - macOS: `Fujisan-{version}-{arch}.dmg`
+  - Windows: `Fujisan-{version}-windows.zip`
+  - Linux: `fujisan-{version}-linux-x64.tar.gz`, `fujisan_{version}_amd64.deb`
+- **Build Script**: Use `./build.sh` for all platforms to maintain consistency

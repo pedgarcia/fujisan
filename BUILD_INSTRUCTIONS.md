@@ -3,6 +3,7 @@
 This document provides comprehensive instructions for building Fujisan on all supported platforms.
 
 ## Table of Contents
+- [Quick Start - Unified Build Script](#quick-start---unified-build-script)
 - [Prerequisites](#prerequisites)
 - [macOS Builds](#macos-builds)
   - [Native Single-Architecture Build](#native-single-architecture-build)
@@ -12,6 +13,30 @@ This document provides comprehensive instructions for building Fujisan on all su
 - [Windows Cross-Compilation](#windows-cross-compilation)
 - [Linux Build](#linux-build)
 - [Build Scripts Reference](#build-scripts-reference)
+
+## Quick Start - Unified Build Script
+
+The easiest way to build Fujisan for any platform:
+
+```bash
+# Build for specific platform
+./build.sh macos          # Both Intel and ARM64 DMGs
+./build.sh windows        # Windows ZIP package
+./build.sh linux          # Linux DEB and tarball
+./build.sh all            # All platforms
+
+# Options
+./build.sh macos --clean  # Clean build
+./build.sh all --version v1.2.0  # Specify version
+
+# All outputs go to dist/
+ls dist/
+# Fujisan-1.2.0-arm64.dmg
+# Fujisan-1.2.0-x86_64.dmg  
+# Fujisan-1.2.0-windows.zip
+# fujisan-1.2.0-linux-x64.tar.gz
+# fujisan_1.2.0_amd64.deb
+```
 
 ## Prerequisites
 

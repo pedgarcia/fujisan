@@ -10,8 +10,13 @@ build-cross-windows/
 build-windows/
 build-linux/
 build-package/
+
+# Distribution output directory (all platforms)
 dist/
+
+# Legacy distribution directories (to be removed)
 windows-release/
+windows-release-led-fixed/
 
 # Qt generated files
 *.pro.user
@@ -64,6 +69,15 @@ Desktop.ini
 *.bak
 *.tmp
 *.temp
+
+# Temporary build scripts (to be removed after consolidation)
+cleanup-and-finalize-windows.sh
+create-fixed-release.sh
+create-windows-release-with-fixes.sh
+manual-rebuild.sh
+rebuild-windows-fixed.sh
+rebuild-windows-step-by-step.sh
+test-windows-fixes.sh
 
 # Test and development files
 *.log
