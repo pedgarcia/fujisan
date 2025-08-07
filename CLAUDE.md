@@ -51,6 +51,25 @@ Fujisan uses Git format-patch files for reliable patching:
 - Use `apply-patches.sh` which auto-detects Git repos and uses appropriate commands
 - Patches add essential libatari800 API functions for disk management and activity monitoring
 
+### Windows Cross-Compilation (from macOS/Linux)
+```bash
+# Prerequisites: Install Podman or Docker
+# macOS: brew install podman (or docker)
+# Linux: sudo apt install podman (or docker)
+
+# 1. Build Windows executable using MinGW container
+./scripts/build-windows-cross.sh
+# Note: Script uses Podman by default. For Docker, edit the script 
+# and replace 'podman' with 'docker'
+
+# 2. Create Windows release package with all dependencies
+./create-windows-release-with-audio.sh
+# This script also uses Podman; replace with Docker if needed
+
+# The complete Windows release will be in build-windows/
+# Includes Qt5 DLLs, audio plugins, and platform plugins
+```
+
 ### Clean Build
 ```bash
 # Clean out-of-source build
@@ -58,6 +77,9 @@ rm -rf build/
 
 # Clean in-source build artifacts
 rm -rf CMakeCache.txt CMakeFiles/ Makefile cmake_install.cmake Fujisan_autogen/
+
+# Clean Windows cross-compilation
+rm -rf build-cross-windows/ build-windows/
 ```
 
 ## Code Architecture
@@ -142,6 +164,29 @@ Fujisan includes comprehensive FujiNet-PC network connectivity:
 - Test NetSIO/FujiNet connectivity with FujiNet-PC running on port 9997
 - Verify local disk priority over network devices
 
-## Build and Release Memories
+## Build and Release Organization
 
-- macOS build and DMG will be done locally
+### Platform-Specific Build Folders
+- **macOS**: `build/` (native build) → DMG creation done locally
+- **Windows**: `build-windows/` (cross-compiled release package with all DLLs)
+- **Linux**: `build/` (native build)
+
+### Windows Release Package Structure
+```
+build-windows/
+├── Fujisan.exe           # Main executable
+├── Qt5*.dll             # Qt framework libraries
+├── lib*.dll             # System libraries
+├── platforms/           # Qt platform plugins
+│   └── qwindows.dll
+├── audio/               # Qt audio plugins
+│   └── qtaudio_windows.dll
+└── mediaservice/        # Qt media service plugins
+    └── qtmedia_audioengine.dll
+```
+
+### Build Artifacts (.gitignore)
+- `build/` - Native build directory
+- `build-cross-windows/` - Windows cross-compilation temp directory
+- `build-windows/` - Windows release package
+- `*.exe`, `*.dll` - Binary files 

@@ -101,7 +101,17 @@ if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
 elseif(CMAKE_CROSSCOMPILING AND WIN32)
     # Cross-compilation for Windows (using MinGW on Linux with full autotools)
     message(STATUS "Configuring for Windows cross-compilation with autotools")
-    set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libatari800-simple.sh <SOURCE_DIR>)
+    
+    # Check if FujiNet support is requested
+    option(ENABLE_FUJINET "Enable FujiNet/NetSIO support in Windows build" OFF)
+    if(ENABLE_FUJINET)
+        message(STATUS "FujiNet/NetSIO support enabled for Windows build")
+        set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libatari800-fujinet.sh <SOURCE_DIR>)
+    else()
+        message(STATUS "Using standard Windows build (FujiNet disabled)")
+        set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libatari800-simple.sh <SOURCE_DIR>)
+    endif()
+    
     set(ATARI800_BUILD_COMMAND echo "Build completed by configure script")
 else()
     # Unix/macOS: Use native tools
