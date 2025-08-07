@@ -155,9 +155,9 @@ build_windows() {
     # Clean Windows build directory
     rm -rf build-cross-windows/
     
-    # Use the consolidated Windows build script
-    if [[ -f "$SCRIPT_DIR/create-windows-release-with-audio.sh" ]]; then
-        "$SCRIPT_DIR/create-windows-release-with-audio.sh"
+    # Use the simplified Windows build script
+    if [[ -f "$SCRIPT_DIR/scripts/build-windows-simple.sh" ]]; then
+        "$SCRIPT_DIR/scripts/build-windows-simple.sh"
         
         # Package into zip for distribution
         if [[ -d "build-windows" ]]; then

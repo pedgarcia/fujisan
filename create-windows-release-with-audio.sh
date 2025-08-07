@@ -1,24 +1,72 @@
 #!/bin/bash
-# Create complete Windows release with disk LED and audio fixes
+# Create complete Windows release package
 
 set -e
-echo "=== Creating Windows Release with Disk LED and Audio Fixes ==="
+echo "=== Creating Windows Release Package ==="
 
-cd /Users/pgarcia/dev/atari/fujisan
+# Get the script directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 
-RELEASE_DIR="windows-release-complete"
+# First build the Windows executable
+echo "Building Windows executable..."
+if [[ -f "scripts/build-windows-simple.sh" ]]; then
+    ./scripts/build-windows-simple.sh
+elif [[ -f "scripts/build-windows-cross.sh" ]]; then
+    ./scripts/build-windows-cross.sh
+else
+    echo "Error: Windows build script not found"
+    exit 1
+fi
+
+RELEASE_DIR="build-windows"
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 
 # Copy the newly built executable
-echo "Copying Fujisan.exe with disk LED fixes..."
-cp build-cross-windows/Fujisan.exe "$RELEASE_DIR/"
+echo "Copying Fujisan.exe..."
+if [[ -f "build-cross-windows/Fujisan.exe" ]]; then
+    cp build-cross-windows/Fujisan.exe "$RELEASE_DIR/"
+elif [[ -f "build-cross-windows/fujisan.exe" ]]; then
+    cp build-cross-windows/fujisan.exe "$RELEASE_DIR/Fujisan.exe"
+else
+    echo "Error: Fujisan.exe not found in build-cross-windows/"
+    echo "Contents of build-cross-windows:"
+    ls -la build-cross-windows/ 2>/dev/null || echo "Directory not found"
+    exit 1
+fi
 
-# Copy all DLLs and dependencies from original release
-echo "Copying Windows dependencies..."
-cp windows-release/*.dll "$RELEASE_DIR/" 2>/dev/null || true
-cp -r windows-release/platforms "$RELEASE_DIR/" 2>/dev/null || true
-cp -r windows-release/images "$RELEASE_DIR/" 2>/dev/null || true
+# Extract Qt and system DLLs from container
+echo "Extracting Qt libraries and dependencies..."
+podman run --rm -v $(pwd):/mnt maxrd2/arch-mingw bash -c "
+    # Qt5 Core libraries
+    cp /usr/x86_64-w64-mingw32/bin/Qt5Core.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/Qt5Gui.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/Qt5Widgets.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/Qt5Multimedia.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/Qt5Network.dll /mnt/$RELEASE_DIR/
+    
+    # System libraries
+    cp /usr/x86_64-w64-mingw32/bin/libgcc_s_seh-1.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libstdc++-6.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libwinpthread-1.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/zlib1.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libpcre2-16-0.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libharfbuzz-0.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libpng16-16.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libfreetype-6.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libglib-2.0-0.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libintl-8.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libiconv-2.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libpcre-1.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libbz2-1.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libgraphite2.dll /mnt/$RELEASE_DIR/
+    cp /usr/x86_64-w64-mingw32/bin/libssp-0.dll /mnt/$RELEASE_DIR/
+    
+    # Qt platform plugin (required)
+    mkdir -p /mnt/$RELEASE_DIR/platforms
+    cp /usr/x86_64-w64-mingw32/lib/qt/plugins/platforms/qwindows.dll /mnt/$RELEASE_DIR/platforms/
+"
 
 # Create audio and mediaservice plugin directories
 echo "Setting up Qt audio plugins..."
@@ -34,20 +82,16 @@ podman run --rm -v $(pwd):/mnt maxrd2/arch-mingw bash -c "
 
 # Create README
 cat > "$RELEASE_DIR/README.txt" << 'EOF'
-Fujisan - Modern Atari Emulator for Windows (COMPLETE RELEASE)
-================================================================
-
-This Windows build includes ALL fixes:
-
-WHAT'S FIXED:
-✓ Disk activity LEDs now work correctly during disk I/O operations
-✓ Audio output now works properly with Windows audio backend
-✓ All Qt multimedia plugins included for proper sound support
+Fujisan - Modern Atari Emulator for Windows
+=============================================
 
 FEATURES:
-- Drive LEDs light up when reading/writing to disk images
-- Full audio support for Atari sound (POKEY chip emulation)
-- Real-time disk activity monitoring integrated with SIO operations
+- Full Atari 400/800/XL/XE emulation
+- Drive activity LED indicators
+- Audio support with POKEY chip emulation
+- Drag and drop disk/cartridge loading
+- TCP server for remote control
+- Debugger with breakpoints and memory inspection
 - Windows audio backend properly configured
 
 HOW TO TEST:
@@ -65,12 +109,12 @@ Build date: $(date)
 EOF
 
 echo ""
-echo "✓ Complete Windows release package created: $RELEASE_DIR/"
+echo "✓ Windows release package created: $RELEASE_DIR/"
 echo ""
 echo "Contents:"
 ls -la "$RELEASE_DIR/"
 echo ""
-echo "Audio plugins:"
-ls -la "$RELEASE_DIR/audio/" "$RELEASE_DIR/mediaservice/" 2>/dev/null || true
+echo "Plugin directories:"
+ls -la "$RELEASE_DIR/audio/" "$RELEASE_DIR/mediaservice/" "$RELEASE_DIR/platforms/" 2>/dev/null || true
 echo ""
-echo "Both disk LEDs and audio should now work! Test by loading games/demos with sound."
+echo "Package ready for distribution!"
