@@ -599,6 +599,37 @@ void AtariEmulator::processFrame()
         int soundBufferLen = libatari800_get_sound_buffer_len();
         
         if (soundBuffer && soundBufferLen > 0) {
+#ifdef Q_OS_WIN
+            // Windows: Check audio state and available buffer space
+            if (m_audioOutput->state() == QAudio::ActiveState || 
+                m_audioOutput->state() == QAudio::IdleState) {
+                
+                int bytesFree = m_audioOutput->bytesFree();
+                
+                // Only write if we have enough buffer space
+                if (bytesFree >= soundBufferLen) {
+                    qint64 bytesWritten = m_audioDevice->write(reinterpret_cast<const char*>(soundBuffer), soundBufferLen);
+                    
+                    // If write failed completely, reset audio
+                    if (bytesWritten <= 0 && m_audioOutput->error() != QAudio::NoError) {
+                        qDebug() << "Windows audio error, resetting...";
+                        m_audioOutput->reset();
+                        m_audioDevice = m_audioOutput->start();
+                    }
+                } else {
+                    // Skip this frame's audio to prevent buffer overflow
+                    static int skipCount = 0;
+                    if (++skipCount % 100 == 0) {
+                        qDebug() << "Windows: Skipping audio frames due to full buffer";
+                    }
+                }
+            } else if (m_audioOutput->state() == QAudio::StoppedState) {
+                // Restart audio if it stopped
+                qDebug() << "Windows audio stopped, restarting...";
+                m_audioDevice = m_audioOutput->start();
+            }
+#else
+            // macOS/Linux: Original behavior
             qint64 bytesWritten = m_audioDevice->write(reinterpret_cast<const char*>(soundBuffer), soundBufferLen);
             // Only log incomplete writes if they're significantly incomplete (less than 90%)
             if (bytesWritten < soundBufferLen * 0.9) {
@@ -608,6 +639,7 @@ void AtariEmulator::processFrame()
                     qDebug() << "Audio underrun #" << underrunCount << ":" << bytesWritten << "of" << soundBufferLen << "bytes";
                 }
             }
+#endif
         }
     }
     
@@ -1119,8 +1151,24 @@ void AtariEmulator::setupAudio()
     
     // Create and start audio output
     m_audioOutput = new QAudioOutput(format, this);
-    // Increase buffer size to reduce underruns (44100 Hz * 2 bytes * 2 channels * 0.1 sec = ~17KB)
-    m_audioOutput->setBufferSize(16384); 
+    
+    // Platform-specific audio configuration
+#ifdef Q_OS_WIN
+    // Windows needs larger buffers, especially in VMs and on ARM
+    // Use 200ms buffer to prevent underruns and noise
+    int bufferSize = (frequency * channels * sampleSize * 200) / 1000; // 200ms buffer
+    m_audioOutput->setBufferSize(bufferSize);
+    
+    // Set notification interval for smoother playback
+    m_audioOutput->setNotifyInterval(50); // 50ms chunks
+    
+    qDebug() << "Windows: Using audio buffer size:" << bufferSize << "bytes";
+#else
+    // macOS/Linux can use smaller buffers
+    m_audioOutput->setBufferSize(16384);
+    m_audioOutput->setNotifyInterval(20);
+#endif
+    
     m_audioDevice = m_audioOutput->start();
     
     if (m_audioDevice) {
