@@ -136,8 +136,9 @@ mkdir -p "$DIST_DIR"
 echo_step "Building Container Image"
 cd "$PROJECT_ROOT"
 
-echo_info "Building Ubuntu 24.04 based container..."
+echo_info "Building Ubuntu 24.04 based container for x86_64..."
 $CONTAINER_RUNTIME build \
+    --platform linux/amd64 \
     -f docker/Dockerfile.ubuntu-24.04 \
     -t fujisan-linux-builder:ubuntu24 \
     . || {
@@ -158,8 +159,11 @@ BUILD_TARBALL="$4"
 
 echo "Building Fujisan version $VERSION..."
 
+# Copy source to writable location
+cp -r /build/fujisan /tmp/fujisan-build
+cd /tmp/fujisan-build
+
 # Configure CMake
-cd /build/fujisan
 mkdir -p build-release
 cd build-release
 
@@ -342,8 +346,9 @@ chmod +x "$LINUX_BUILD_DIR/build-in-container.sh"
 # Run build in container
 echo_step "Building Fujisan in Container"
 
-echo_info "Running build for version $VERSION..."
+echo_info "Running build for version $VERSION on x86_64..."
 $CONTAINER_RUNTIME run --rm \
+    --platform linux/amd64 \
     -v "$PROJECT_ROOT:/build/fujisan:ro" \
     -v "$LINUX_BUILD_DIR:/output" \
     -e VERSION="$VERSION" \
