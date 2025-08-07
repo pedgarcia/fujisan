@@ -1,0 +1,147 @@
+# Dockerfile.ubuntu-build - Build Fujisan for Linux
+#
+# Multi-stage build for creating Linux binaries and AppImage
+#
+
+# Build stage
+FROM ubuntu:22.04 AS builder
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    # Build tools
+    build-essential \
+    cmake \
+    git \
+    autoconf \
+    automake \
+    pkg-config \
+    # Qt5 development packages
+    qtbase5-dev \
+    qtmultimedia5-dev \
+    libqt5opengl5-dev \
+    # Additional libraries
+    libpulse-dev \
+    libasound2-dev \
+    libgl1-mesa-dev \
+    # Tools for AppImage
+    wget \
+    file \
+    fuse \
+    libfuse2 \
+    desktop-file-utils \
+    appstream \
+    # Clean up
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Copy source code
+COPY . /build/fujisan/
+
+# Build Fujisan
+WORKDIR /build/fujisan
+RUN mkdir -p build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=/usr \
+          .. && \
+    make -j$(nproc) && \
+    make install DESTDIR=/build/AppDir
+
+# Create AppDir structure for AppImage
+RUN mkdir -p /build/AppDir/usr/share/applications && \
+    mkdir -p /build/AppDir/usr/share/icons/hicolor/256x256/apps && \
+    mkdir -p /build/AppDir/usr/share/metainfo
+
+# Create desktop file
+RUN cat > /build/AppDir/usr/share/applications/fujisan.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Fujisan
+Comment=Atari 8-bit Computer Emulator
+Exec=fujisan
+Icon=fujisan
+Categories=Game;Emulator;
+Terminal=false
+StartupNotify=true
+EOF
+
+# Create AppStream metadata
+RUN cat > /build/AppDir/usr/share/metainfo/com.8bitrelics.fujisan.appdata.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.8bitrelics.fujisan</id>
+  <name>Fujisan</name>
+  <summary>Atari 8-bit Computer Emulator</summary>
+  <description>
+    <p>Fujisan is a modern Qt5-based frontend for the Atari800 emulator that provides
+    a native desktop experience with full keyboard support, machine configuration,
+    and authentic Atari behavior.</p>
+  </description>
+  <launchable type="desktop-id">fujisan.desktop</launchable>
+  <url type="homepage">https://github.com/atari800/fujisan</url>
+  <metadata_license>MIT</metadata_license>
+  <project_license>GPL-2.0+</project_license>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Fujisan main window</caption>
+      <image>https://github.com/atari800/fujisan/raw/main/images/screenshot1.png</image>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="1.0.0" date="2024-08-06"/>
+  </releases>
+</component>
+EOF
+
+# Copy icon if it exists
+RUN if [ -f /build/fujisan/Fujisan.png ]; then \
+        cp /build/fujisan/Fujisan.png /build/AppDir/usr/share/icons/hicolor/256x256/apps/fujisan.png; \
+    elif [ -f /build/fujisan/images/fujisanlogo.png ]; then \
+        cp /build/fujisan/images/fujisanlogo.png /build/AppDir/usr/share/icons/hicolor/256x256/apps/fujisan.png; \
+    fi
+
+# Create AppRun script
+RUN cat > /build/AppDir/AppRun << 'EOF'
+#!/bin/bash
+SELF=$(readlink -f "$0")
+HERE=${SELF%/*}
+export PATH="${HERE}/usr/bin:${PATH}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="${HERE}/usr/lib/qt5/plugins"
+export QML2_IMPORT_PATH="${HERE}/usr/lib/qt5/qml"
+exec "${HERE}/usr/bin/fujisan" "$@"
+EOF
+
+RUN chmod +x /build/AppDir/AppRun
+
+# Download linuxdeploy and plugins for AppImage creation
+RUN cd /build && \
+    wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage && \
+    wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage && \
+    wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage && \
+    chmod +x *.AppImage && \
+    # Extract AppImages since we can't run them with FUSE in Docker
+    ./linuxdeploy-x86_64.AppImage --appimage-extract && \
+    ./linuxdeploy-plugin-qt-x86_64.AppImage --appimage-extract && \
+    ./appimagetool-x86_64.AppImage --appimage-extract
+
+# Final output stage
+FROM ubuntu:22.04 AS output
+
+# Copy built artifacts
+COPY --from=builder /build/fujisan/build/Fujisan /output/fujisan
+COPY --from=builder /build/AppDir /output/AppDir/
+
+# Also prepare for AppImage creation (to be done outside container if FUSE not available)
+COPY --from=builder /build/squashfs-root /output/tools/linuxdeploy/
+COPY --from=builder /build/squashfs-root /output/tools/linuxdeploy-qt/
+COPY --from=builder /build/squashfs-root /output/tools/appimagetool/
+
+WORKDIR /output
+
+# Default command shows what was built
+CMD ["ls", "-la", "/output/"]

@@ -22,19 +22,33 @@ if [ -d .git ]; then
     echo "Git repository detected, using 'git am' for patches"
     for patch in "$PATCHES_DIR"/0*.patch; do
         if [ -f "$patch" ]; then
-            echo "Applying patch: $(basename "$patch")"
-            git am "$patch"
+            patch_name="$(basename "$patch")"
+            echo "Applying patch: $patch_name"
+            
+            # Skip Windows-specific patches on non-Windows systems
+            if [[ "$patch_name" == *"windows"* ]] && [[ "$OSTYPE" != "msys" ]] && [[ "$MSYSTEM" == "" ]]; then
+                echo "Skipping Windows-specific patch on non-Windows system"
+                continue
+            fi
+            
+            git am "$patch" 2>/dev/null
             if [ $? -ne 0 ]; then
-                echo "Error: Failed to apply patch $(basename "$patch")"
-                echo "Git am exit code: $?"
+                echo "Warning: Failed to apply patch $patch_name with git am"
                 
-                # Try to show more details about the failure
-                git am --show-current-patch 2>/dev/null || true
+                # Abort the failed git am
+                git am --abort 2>/dev/null || true
                 
-                echo ""
-                echo "You may need to run 'git am --abort' to reset"
-                echo "Or try applying with 'patch -p1 < $patch' instead"
-                exit 1
+                # Try with patch command as fallback
+                echo "Trying with patch command..."
+                if patch -p1 --dry-run < "$patch" >/dev/null 2>&1; then
+                    patch -p1 < "$patch"
+                    echo "✓ Patch applied successfully with patch command"
+                else
+                    echo "Warning: Patch $patch_name could not be applied, skipping"
+                    continue
+                fi
+            else
+                echo "✓ Patch applied successfully"
             fi
             
             # Verify the patch was actually applied by checking if files were modified

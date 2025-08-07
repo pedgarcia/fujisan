@@ -51,6 +51,28 @@ Fujisan uses Git format-patch files for reliable patching:
 - Use `apply-patches.sh` which auto-detects Git repos and uses appropriate commands
 - Patches add essential libatari800 API functions for disk management and activity monitoring
 
+### macOS Universal Binary Build
+```bash
+# Prerequisites: Install Qt5 for both architectures
+# ARM64 (Apple Silicon):
+brew install qt@5
+
+# x86_64 (Intel) - requires Rosetta:
+arch -x86_64 /usr/local/bin/brew install qt@5
+
+# Build universal binary with universal Qt frameworks
+./scripts/build-universal-macos-complete.sh
+
+# Options:
+#   --clean       Clean build directories before starting
+#   --skip-arm64  Skip ARM64 build (use existing)
+#   --skip-x86_64 Skip x86_64 build (use existing)
+#   --sign        Sign the application (requires certificates)
+
+# Output: dist/Fujisan-{version}-universal.dmg
+# The DMG contains a universal app bundle that runs natively on both Intel and Apple Silicon Macs
+```
+
 ### Windows Cross-Compilation (from macOS/Linux)
 ```bash
 # Prerequisites: Install Podman or Docker
@@ -167,7 +189,12 @@ Fujisan includes comprehensive FujiNet-PC network connectivity:
 ## Build and Release Organization
 
 ### Platform-Specific Build Folders
-- **macOS**: `build/` (native build) → DMG creation done locally
+- **macOS**: 
+  - `build/` - Native single-architecture build
+  - `build-arm64/` - ARM64 build for universal binary
+  - `build-x86_64/` - x86_64 build for universal binary
+  - `build-universal/` - Universal binary with both architectures
+  - `dist/` - Final DMG distribution files
 - **Windows**: `build-windows/` (cross-compiled release package with all DLLs)
 - **Linux**: `build/` (native build)
 
@@ -187,6 +214,11 @@ build-windows/
 
 ### Build Artifacts (.gitignore)
 - `build/` - Native build directory
+- `build-arm64/` - macOS ARM64 build directory
+- `build-x86_64/` - macOS x86_64 build directory
+- `build-universal/` - macOS universal binary directory
 - `build-cross-windows/` - Windows cross-compilation temp directory
 - `build-windows/` - Windows release package
-- `*.exe`, `*.dll` - Binary files 
+- `dist/` - Distribution files (DMGs, etc.)
+- `*.exe`, `*.dll` - Binary files
+- `*.dmg` - macOS disk images 

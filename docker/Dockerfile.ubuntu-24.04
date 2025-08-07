@@ -1,0 +1,54 @@
+# Dockerfile for building Fujisan on Ubuntu 24.04
+# Based on the working GitHub Actions workflow
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies (matching GitHub Actions)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libtool \
+    autoconf \
+    automake \
+    libgl1-mesa-dev \
+    libglu1-mesa-dev \
+    libxrandr-dev \
+    libxss-dev \
+    libxcursor-dev \
+    libxinerama-dev \
+    libxi-dev \
+    libxext-dev \
+    libxfixes-dev \
+    libxrender-dev \
+    libxcb1-dev \
+    libx11-xcb-dev \
+    libxcb-glx0-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libxcb-dri2-0-dev \
+    libxcb-dri3-dev \
+    libxcb-present-dev \
+    libxcb-sync-dev \
+    libxshmfence-dev \
+    libasound2-dev \
+    libpulse-dev \
+    file \
+    wget \
+    fuse \
+    # Qt5 packages
+    qtbase5-dev \
+    qtmultimedia5-dev \
+    libqt5multimedia5-plugins \
+    libqt5network5 \
+    qt5-qmake \
+    qtbase5-dev-tools \
+    # For .deb package creation
+    dpkg-dev \
+    fakeroot \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
