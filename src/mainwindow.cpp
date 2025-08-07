@@ -529,12 +529,12 @@ void MainWindow::createProfileToolbarSection()
         "QPushButton {"
         "    font-size: 9px;"
         "    font-weight: bold;"
-        "    padding: 1px 4px;"
+        "    padding: 2px 4px;"
         "    margin: 0px;"
         "    min-width: 50px;"
         "    max-width: 80px;"  // Increased for longer text
-        "    min-height: 10px;"
-        "    max-height: 12px;"
+        "    min-height: 16px;"  // Increased from 10px to prevent clipping
+        "    max-height: 18px;"  // Increased from 12px
         "}";
     m_loadProfileButton->setStyleSheet(profileButtonStyle);
     m_loadProfileButton->setToolTip("Load selected profile");
@@ -614,6 +614,22 @@ void MainWindow::createLogoSection()
     } else {
         // Scale logo to appropriate toolbar size (max 40px height for better visibility)
         QPixmap scaledLogo = logoPixmap.scaled(QSize(80, 40), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        
+        // Check if we're in dark mode and invert the logo if needed
+#ifdef Q_OS_MAC
+        // On macOS, check if dark mode is active
+        QPalette palette = QApplication::palette();
+        QColor windowColor = palette.color(QPalette::Window);
+        bool isDarkMode = windowColor.lightness() < 128;
+        
+        if (isDarkMode) {
+            // Invert the logo for dark mode
+            QImage img = scaledLogo.toImage();
+            img.invertPixels();
+            scaledLogo = QPixmap::fromImage(img);
+        }
+#endif
+        
         logoLabel->setPixmap(scaledLogo);
         logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
         logoLabel->setContentsMargins(6, 2, 10, 2);
@@ -1160,6 +1176,22 @@ void MainWindow::showAbout()
     if (logoLoaded) {
         // Scale logo to fit nicely in the dialog
         QPixmap scaledLogo = logo.scaled(300, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        
+        // Check if we're in dark mode and invert the logo if needed
+#ifdef Q_OS_MAC
+        // On macOS, check if dark mode is active
+        QPalette palette = QApplication::palette();
+        QColor windowColor = palette.color(QPalette::Window);
+        bool isDarkMode = windowColor.lightness() < 128;
+        
+        if (isDarkMode) {
+            // Invert the logo for dark mode
+            QImage img = scaledLogo.toImage();
+            img.invertPixels();
+            scaledLogo = QPixmap::fromImage(img);
+        }
+#endif
+        
         logoLabel->setPixmap(scaledLogo);
         logoLabel->setAlignment(Qt::AlignCenter);
     } else {
@@ -1256,11 +1288,6 @@ void MainWindow::createMediaPeripheralsDock()
         "QPushButton {"
         "    margin: 0px;"
         "    padding: 0px;"
-        "    border: 1px solid gray;"
-        "}"
-        "QPushButton:checked {"
-        "    background-color: lightblue;"
-        "    border: 1px solid blue;"
         "}"
     );
 
@@ -1418,23 +1445,17 @@ void MainWindow::createMediaPeripheralsDock()
     QPushButton* warmBootButton = new QPushButton("WARM", this);
     QPushButton* inverseButton = new QPushButton("INVERSE", this);
 
-    // Style console buttons - wide and short
+    // Style console buttons - wide and short, no hardcoded colors for dark mode compatibility
     QString buttonStyle =
         "QPushButton {"
         "    font-size: 9px;"
         "    font-weight: bold;"
-        "    padding: 1px 4px;"
+        "    padding: 2px 4px;"  // Increased padding to prevent text clipping
         "    margin: 0px;"
-        "    border: 1px solid gray;"
-        "    background-color: #f0f0f0;"
         "    min-width: 50px;"
         "    max-width: 60px;"
-        "    min-height: 10px;"
-        "    max-height: 12px;"
-        "}"
-        "QPushButton:pressed {"
-        "    background-color: #d0d0d0;"
-        "    border: 1px solid black;"
+        "    min-height: 14px;"  // Increased to prevent text clipping
+        "    max-height: 16px;"  // Increased to prevent text clipping
         "}";
 
     m_startButton->setStyleSheet(buttonStyle);
