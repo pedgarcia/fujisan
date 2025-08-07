@@ -14,7 +14,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Output directory
 LINUX_BUILD_DIR="${PROJECT_ROOT}/build-linux"
-DIST_DIR="${PROJECT_ROOT}/dist"
+DIST_DIR="${PROJECT_ROOT}/dist/linux"
 
 # Version
 VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null || echo "v1.0.0-dev")}"

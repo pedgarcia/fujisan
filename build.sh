@@ -27,8 +27,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 
-# Single output directory for ALL platforms
+# Output directories for each platform
 DIST_DIR="${PROJECT_ROOT}/dist"
+MACOS_DIST_DIR="${DIST_DIR}/macos"
+WINDOWS_DIST_DIR="${DIST_DIR}/windows"
+LINUX_DIST_DIR="${DIST_DIR}/linux"
 
 # Version
 VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null || echo "v1.0.0-dev")}"
@@ -75,11 +78,14 @@ Examples:
 Output:
   All builds output to: dist/
   
-  macOS:   Fujisan-{version}-arm64.dmg
-           Fujisan-{version}-x86_64.dmg
-  Windows: Fujisan-{version}-windows.zip
-  Linux:   fujisan-{version}-linux-x64.tar.gz
-           fujisan_{version}_amd64.deb
+  dist/macos/
+    - Fujisan-{version}-arm64.dmg
+    - Fujisan-{version}-x86_64.dmg
+  dist/windows/
+    - Fujisan-{version}-windows.zip
+  dist/linux/
+    - fujisan-{version}-linux-x64.tar.gz
+    - fujisan_{version}_amd64.deb
 
 EOF
 }
@@ -155,10 +161,11 @@ build_windows() {
         # Package into zip for distribution
         if [[ -d "build-windows" ]]; then
             echo_info "Creating Windows distribution package..."
+            mkdir -p "$WINDOWS_DIST_DIR"
             cd build-windows
-            zip -r "$DIST_DIR/Fujisan-${VERSION_CLEAN}-windows.zip" * -x "*.log"
+            zip -r "$WINDOWS_DIST_DIR/Fujisan-${VERSION_CLEAN}-windows.zip" * -x "*.log"
             cd ..
-            echo_success "Created: dist/Fujisan-${VERSION_CLEAN}-windows.zip"
+            echo_success "Created: dist/windows/Fujisan-${VERSION_CLEAN}-windows.zip"
             
             # Clean up build directory after packaging
             rm -rf build-windows/
@@ -228,8 +235,8 @@ if [[ -z "$PLATFORM" ]]; then
     exit 0
 fi
 
-# Create dist directory
-mkdir -p "$DIST_DIR"
+# Create dist directories
+mkdir -p "$MACOS_DIST_DIR" "$WINDOWS_DIST_DIR" "$LINUX_DIST_DIR"
 
 # Clean if requested
 if [[ "$CLEAN" == "true" ]]; then
@@ -287,8 +294,26 @@ echo ""
 echo_step "Build Summary"
 echo_success "Build complete for: $PLATFORM"
 echo ""
-echo "Distribution files in: $DIST_DIR/"
-ls -lh "$DIST_DIR" 2>/dev/null | grep -E "\.(dmg|zip|tar\.gz|deb)$" || echo "  (no distribution files found)"
+echo "Distribution files:"
+
+# Show macOS files if they exist
+if [[ -d "$MACOS_DIST_DIR" ]] && ls "$MACOS_DIST_DIR"/*.dmg >/dev/null 2>&1; then
+    echo "  macOS (dist/macos/):"
+    ls -lh "$MACOS_DIST_DIR"/*.dmg 2>/dev/null | awk '{print "    - "$9" ("$5")"}'
+fi
+
+# Show Windows files if they exist
+if [[ -d "$WINDOWS_DIST_DIR" ]] && ls "$WINDOWS_DIST_DIR"/*.zip >/dev/null 2>&1; then
+    echo "  Windows (dist/windows/):"
+    ls -lh "$WINDOWS_DIST_DIR"/*.zip 2>/dev/null | awk '{print "    - "$9" ("$5")"}'
+fi
+
+# Show Linux files if they exist
+if [[ -d "$LINUX_DIST_DIR" ]] && ls "$LINUX_DIST_DIR"/*.{deb,tar.gz} >/dev/null 2>&1; then
+    echo "  Linux (dist/linux/):"
+    ls -lh "$LINUX_DIST_DIR"/*.{deb,tar.gz} 2>/dev/null | awk '{print "    - "$9" ("$5")"}'
+fi
+
 echo ""
 echo "To build for other platforms, run:"
 echo "  $0 [platform] --clean"

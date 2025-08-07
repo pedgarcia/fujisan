@@ -22,7 +22,7 @@ echo ""
 # Build directories
 ARM64_BUILD_DIR="${PROJECT_ROOT}/build-arm64"
 X86_64_BUILD_DIR="${PROJECT_ROOT}/build-x86_64"
-DIST_DIR="${PROJECT_ROOT}/dist"
+DIST_DIR="${PROJECT_ROOT}/dist/macos"
 
 # Qt paths
 QT_ARM64_PATH="/opt/homebrew/opt/qt@5"
