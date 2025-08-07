@@ -45,6 +45,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_mediaPeripheralsDock(nullptr)
     , m_mediaPeripheralsDockWidget(nullptr)
     , m_mediaToggleButton(nullptr)
+    , m_logoLabel(nullptr)
 {
     setWindowTitle("Fujisan");
     setMinimumSize(800, 600);
@@ -524,18 +525,67 @@ void MainWindow::createProfileToolbarSection()
 
     // Add load button to the same row as the profile dropdown
     m_loadProfileButton = new QPushButton("LOAD");
-    // Apply console button style (wider for state buttons)
-    QString profileButtonStyle =
+    
+    // Create adaptive button style using system palette colors for dark mode compatibility
+    QPalette pal = QApplication::palette();
+    QColor buttonColor = pal.color(QPalette::Button);
+    QColor windowColor = pal.color(QPalette::Window);
+    
+    // Check if we're in dark mode
+    bool isDarkMode = windowColor.lightness() < 128;
+    
+    // Explicitly set text color based on theme
+    QColor buttonTextColor;
+    if (isDarkMode) {
+        buttonTextColor = QColor(255, 255, 255);  // White text for dark mode
+    } else {
+        buttonTextColor = QColor(0, 0, 0);  // Black text for light mode
+    }
+    
+    // Create slightly lighter/darker versions for hover and pressed states
+    QColor buttonHoverColor;
+    QColor buttonPressedColor;
+    QColor borderColor;
+    
+    if (isDarkMode) {
+        // Dark mode: make hover lighter and pressed even lighter
+        buttonHoverColor = buttonColor.lighter(120);
+        buttonPressedColor = buttonColor.lighter(140);
+        borderColor = buttonColor.lighter(150);
+    } else {
+        // Light mode: make hover darker and pressed even darker
+        buttonHoverColor = buttonColor.darker(110);
+        buttonPressedColor = buttonColor.darker(120);
+        borderColor = buttonColor.darker(150);
+    }
+    
+    QString profileButtonStyle = QString(
         "QPushButton {"
         "    font-size: 9px;"
         "    font-weight: bold;"
         "    padding: 2px 4px;"
         "    margin: 0px;"
+        "    border: 1px solid %1;"
+        "    background-color: %2;"
+        "    color: %3;"
         "    min-width: 50px;"
         "    max-width: 80px;"  // Increased for longer text
         "    min-height: 16px;"  // Increased from 10px to prevent clipping
         "    max-height: 18px;"  // Increased from 12px
-        "}";
+        "}"
+        "QPushButton:hover {"
+        "    background-color: %4;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: %5;"
+        "    border: 1px solid %6;"
+        "}").arg(borderColor.name())
+            .arg(buttonColor.name())
+            .arg(buttonTextColor.name())
+            .arg(buttonHoverColor.name())
+            .arg(buttonPressedColor.name())
+            .arg(borderColor.darker(120).name());
+    
     m_loadProfileButton->setStyleSheet(profileButtonStyle);
     m_loadProfileButton->setToolTip("Load selected profile");
     topLayout->addWidget(m_loadProfileButton, 0, Qt::AlignVCenter);
@@ -550,12 +600,12 @@ void MainWindow::createProfileToolbarSection()
     
     // Add quick save/load buttons
     m_quickSaveButton = new QPushButton("STATE SAVE");
-    m_quickSaveButton->setStyleSheet(profileButtonStyle);  // Use same style
+    m_quickSaveButton->setStyleSheet(profileButtonStyle);  // Use same adaptive style
     m_quickSaveButton->setToolTip("Quick Save State (Shift+F5)");
     bottomLayout->addWidget(m_quickSaveButton);
     
     m_quickLoadButton = new QPushButton("STATE LOAD");
-    m_quickLoadButton->setStyleSheet(profileButtonStyle);  // Use same style
+    m_quickLoadButton->setStyleSheet(profileButtonStyle);  // Use same adaptive style
     m_quickLoadButton->setToolTip("Quick Load State (Shift+F9)");
     bottomLayout->addWidget(m_quickLoadButton);
 
@@ -577,7 +627,7 @@ void MainWindow::createProfileToolbarSection()
 void MainWindow::createLogoSection()
 {
     // Create logo label
-    QLabel* logoLabel = new QLabel();
+    m_logoLabel = new QLabel();
     
     // Try to load Fujisan logo from multiple paths
     QStringList imagePaths = {
@@ -608,34 +658,18 @@ void MainWindow::createLogoSection()
     
     if (!logoLoaded) {
         // Create a simple text-based logo as fallback
-        logoLabel->setText("FUJISAN");
-        logoLabel->setStyleSheet("font-weight: bold; font-size: 12px; margin: 0 8px;");
-        logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
+        m_logoLabel->setText("FUJISAN");
+        m_logoLabel->setStyleSheet("font-weight: bold; font-size: 12px; margin: 0 8px;");
+        m_logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
     } else {
-        // Scale logo to appropriate toolbar size (max 40px height for better visibility)
-        QPixmap scaledLogo = logoPixmap.scaled(QSize(80, 40), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        
-        // Check if we're in dark mode and invert the logo if needed
-#ifdef Q_OS_MAC
-        // On macOS, check if dark mode is active
-        QPalette palette = QApplication::palette();
-        QColor windowColor = palette.color(QPalette::Window);
-        bool isDarkMode = windowColor.lightness() < 128;
-        
-        if (isDarkMode) {
-            // Invert the logo for dark mode
-            QImage img = scaledLogo.toImage();
-            img.invertPixels();
-            scaledLogo = QPixmap::fromImage(img);
-        }
-#endif
-        
-        logoLabel->setPixmap(scaledLogo);
-        logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
-        logoLabel->setContentsMargins(6, 2, 10, 2);
+        // Store original pixmap and update based on theme
+        m_logoLabel->setProperty("originalPixmap", logoPixmap);
+        updateToolbarLogo();
+        m_logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
+        m_logoLabel->setContentsMargins(6, 2, 10, 2);
     }
     
-    m_toolBar->addWidget(logoLabel);
+    m_toolBar->addWidget(m_logoLabel);
 }
 
 void MainWindow::createEmulatorWidget()
@@ -1055,6 +1089,147 @@ void MainWindow::updateToolbarFromSettings()
              << "Swapped:" << (m_emulator ? m_emulator->isJoysticksSwapped() : false);
 }
 
+void MainWindow::updateToolbarLogo()
+{
+    if (!m_logoLabel) return;
+    
+    // Check if we have a logo pixmap stored
+    QVariant pixmapVariant = m_logoLabel->property("originalPixmap");
+    if (pixmapVariant.isNull()) return;
+    
+    QPixmap originalPixmap = pixmapVariant.value<QPixmap>();
+    if (originalPixmap.isNull()) return;
+    
+    // Scale logo to appropriate toolbar size
+    QPixmap scaledLogo = originalPixmap.scaled(QSize(80, 40), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    
+    // Check if we're in dark mode
+    QPalette palette = QApplication::palette();
+    QColor windowColor = palette.color(QPalette::Window);
+    bool isDarkMode = windowColor.lightness() < 128;
+    
+    if (isDarkMode) {
+        // Invert the logo for dark mode
+        QImage img = scaledLogo.toImage();
+        img.invertPixels();
+        scaledLogo = QPixmap::fromImage(img);
+    }
+    
+    m_logoLabel->setPixmap(scaledLogo);
+}
+
+void MainWindow::updateToolbarButtonStyles()
+{
+    // Get current palette colors
+    QPalette pal = QApplication::palette();
+    QColor buttonColor = pal.color(QPalette::Button);
+    QColor windowColor = pal.color(QPalette::Window);
+    
+    // Check if we're in dark mode
+    bool isDarkMode = windowColor.lightness() < 128;
+    
+    // Explicitly set text color based on theme
+    QColor buttonTextColor;
+    if (isDarkMode) {
+        buttonTextColor = QColor(255, 255, 255);  // White text for dark mode
+    } else {
+        buttonTextColor = QColor(0, 0, 0);  // Black text for light mode
+    }
+    
+    // Create slightly lighter/darker versions for hover and pressed states
+    QColor buttonHoverColor;
+    QColor buttonPressedColor;
+    QColor borderColor;
+    
+    if (isDarkMode) {
+        // Dark mode: make hover lighter and pressed even lighter
+        buttonHoverColor = buttonColor.lighter(120);
+        buttonPressedColor = buttonColor.lighter(140);
+        borderColor = buttonColor.lighter(150);
+    } else {
+        // Light mode: make hover darker and pressed even darker
+        buttonHoverColor = buttonColor.darker(110);
+        buttonPressedColor = buttonColor.darker(120);
+        borderColor = buttonColor.darker(150);
+    }
+    
+    // Create button style for console and system buttons
+    QString buttonStyle = QString(
+        "QPushButton {"
+        "    font-size: 9px;"
+        "    font-weight: bold;"
+        "    padding: 2px 4px;"
+        "    margin: 0px;"
+        "    border: 1px solid %1;"
+        "    background-color: %2;"
+        "    color: %3;"
+        "    min-width: 50px;"
+        "    max-width: 60px;"
+        "    min-height: 14px;"
+        "    max-height: 16px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: %4;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: %5;"
+        "    border: 1px solid %6;"
+        "}").arg(borderColor.name())
+            .arg(buttonColor.name())
+            .arg(buttonTextColor.name())
+            .arg(buttonHoverColor.name())
+            .arg(buttonPressedColor.name())
+            .arg(borderColor.darker(120).name());
+    
+    // Apply style to console buttons if they exist
+    if (m_startButton) m_startButton->setStyleSheet(buttonStyle);
+    if (m_selectButton) m_selectButton->setStyleSheet(buttonStyle);
+    if (m_optionButton) m_optionButton->setStyleSheet(buttonStyle);
+    if (m_breakButton) m_breakButton->setStyleSheet(buttonStyle);
+    
+    // Apply to other buttons that may exist in the dock
+    QList<QPushButton*> allButtons = findChildren<QPushButton*>();
+    for (QPushButton* button : allButtons) {
+        QString text = button->text();
+        if (text == "COLD" || text == "WARM" || text == "INVERSE") {
+            button->setStyleSheet(buttonStyle);
+        }
+    }
+    
+    // Create profile button style (slightly wider for longer text)
+    QString profileButtonStyle = QString(
+        "QPushButton {"
+        "    font-size: 9px;"
+        "    font-weight: bold;"
+        "    padding: 2px 4px;"
+        "    margin: 0px;"
+        "    border: 1px solid %1;"
+        "    background-color: %2;"
+        "    color: %3;"
+        "    min-width: 50px;"
+        "    max-width: 80px;"
+        "    min-height: 16px;"
+        "    max-height: 18px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: %4;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: %5;"
+        "    border: 1px solid %6;"
+        "}").arg(borderColor.name())
+            .arg(buttonColor.name())
+            .arg(buttonTextColor.name())
+            .arg(buttonHoverColor.name())
+            .arg(buttonPressedColor.name())
+            .arg(borderColor.darker(120).name());
+    
+    // Apply style to profile buttons if they exist
+    if (m_loadProfileButton) m_loadProfileButton->setStyleSheet(profileButtonStyle);
+    if (m_quickSaveButton) m_quickSaveButton->setStyleSheet(profileButtonStyle);
+    if (m_quickLoadButton) m_quickLoadButton->setStyleSheet(profileButtonStyle);
+}
+
 void MainWindow::toggleFullscreen()
 {
     if (m_isInCustomFullscreen) {
@@ -1178,8 +1353,6 @@ void MainWindow::showAbout()
         QPixmap scaledLogo = logo.scaled(300, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         
         // Check if we're in dark mode and invert the logo if needed
-#ifdef Q_OS_MAC
-        // On macOS, check if dark mode is active
         QPalette palette = QApplication::palette();
         QColor windowColor = palette.color(QPalette::Window);
         bool isDarkMode = windowColor.lightness() < 128;
@@ -1190,7 +1363,6 @@ void MainWindow::showAbout()
             img.invertPixels();
             scaledLogo = QPixmap::fromImage(img);
         }
-#endif
         
         logoLabel->setPixmap(scaledLogo);
         logoLabel->setAlignment(Qt::AlignCenter);
@@ -1445,18 +1617,65 @@ void MainWindow::createMediaPeripheralsDock()
     QPushButton* warmBootButton = new QPushButton("WARM", this);
     QPushButton* inverseButton = new QPushButton("INVERSE", this);
 
-    // Style console buttons - wide and short, no hardcoded colors for dark mode compatibility
-    QString buttonStyle =
+    // Style console buttons - use system palette colors for dark mode compatibility
+    QPalette pal = QApplication::palette();
+    QColor buttonColor = pal.color(QPalette::Button);
+    QColor windowColor = pal.color(QPalette::Window);
+    
+    // Check if we're in dark mode
+    bool isDarkMode = windowColor.lightness() < 128;
+    
+    // Explicitly set text color based on theme
+    QColor buttonTextColor;
+    if (isDarkMode) {
+        buttonTextColor = QColor(255, 255, 255);  // White text for dark mode
+    } else {
+        buttonTextColor = QColor(0, 0, 0);  // Black text for light mode
+    }
+    
+    // Create slightly lighter/darker versions for hover and pressed states
+    QColor buttonHoverColor;
+    QColor buttonPressedColor;
+    QColor borderColor;
+    
+    if (isDarkMode) {
+        // Dark mode: make hover lighter and pressed even lighter
+        buttonHoverColor = buttonColor.lighter(120);
+        buttonPressedColor = buttonColor.lighter(140);
+        borderColor = buttonColor.lighter(150);
+    } else {
+        // Light mode: make hover darker and pressed even darker
+        buttonHoverColor = buttonColor.darker(110);
+        buttonPressedColor = buttonColor.darker(120);
+        borderColor = buttonColor.darker(150);
+    }
+    
+    QString buttonStyle = QString(
         "QPushButton {"
         "    font-size: 9px;"
         "    font-weight: bold;"
-        "    padding: 2px 4px;"  // Increased padding to prevent text clipping
+        "    padding: 2px 4px;"
         "    margin: 0px;"
+        "    border: 1px solid %1;"
+        "    background-color: %2;"
+        "    color: %3;"
         "    min-width: 50px;"
         "    max-width: 60px;"
-        "    min-height: 14px;"  // Increased to prevent text clipping
-        "    max-height: 16px;"  // Increased to prevent text clipping
-        "}";
+        "    min-height: 14px;"
+        "    max-height: 16px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: %4;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: %5;"
+        "    border: 1px solid %6;"
+        "}").arg(borderColor.name())
+            .arg(buttonColor.name())
+            .arg(buttonTextColor.name())
+            .arg(buttonHoverColor.name())
+            .arg(buttonPressedColor.name())
+            .arg(borderColor.darker(120).name());
 
     m_startButton->setStyleSheet(buttonStyle);
     m_selectButton->setStyleSheet(buttonStyle);
@@ -2297,6 +2516,18 @@ void MainWindow::closeEvent(QCloseEvent *event)
         m_emulator->shutdown();
     }
     event->accept();
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    QMainWindow::changeEvent(event);
+    
+    if (event->type() == QEvent::PaletteChange) {
+        // Update the toolbar logo when the theme changes
+        updateToolbarLogo();
+        // Update button styles for the new theme
+        updateToolbarButtonStyles();
+    }
 }
 
 void MainWindow::refreshProfileList()

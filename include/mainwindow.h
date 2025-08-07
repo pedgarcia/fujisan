@@ -50,6 +50,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *object, QEvent *event) override;
+    void changeEvent(QEvent *event) override;
 
 private slots:
     void loadRom();
@@ -120,6 +121,8 @@ private:
     void createMediaPeripheralsDock();
     void restartEmulator();
     void updateToolbarFromSettings();
+    void updateToolbarLogo();
+    void updateToolbarButtonStyles();
     void loadInitialSettings();
     void loadAndApplyMediaSettings();
     void saveDiskToSettings(int driveNumber, const QString& diskPath, bool readOnly = false);
@@ -177,6 +180,9 @@ private:
     QPushButton* m_quickSaveButton;
     QPushButton* m_quickLoadButton;
     ConfigurationProfileManager* m_profileManager;
+    
+    // Logo toolbar section
+    QLabel* m_logoLabel;
 
     // Menu actions
     QAction* m_loadRomAction;
