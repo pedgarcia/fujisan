@@ -14,6 +14,7 @@
 #include <QApplication>
 #include <QMetaObject>
 #include <QTimer>
+#include <QThread>
 #include <QFileInfo>
 #include <QSettings>
 #include <QStandardPaths>
@@ -60,6 +61,15 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_audioOutput(nullptr)
     , m_audioDevice(nullptr)
     , m_audioEnabled(true)
+    , m_dspBufferBytes(0)
+    , m_dspWritePos(0)
+    , m_dspReadPos(0)
+    , m_callbackTick(0)
+    , m_avgGap(0.0)
+    , m_targetDelay(0)
+    , m_sampleRate(44100)
+    , m_bytesPerSample(4)
+    , m_fragmentSize(1024)
     , m_printerEnabled(false)
     , m_fujinet_restart_pending(false)
     , m_fujinet_restart_delay(0)
@@ -75,6 +85,9 @@ AtariEmulator::AtariEmulator(QObject *parent)
     // Set up the global instance pointer for the callback
     s_emulatorInstance = this;
     
+    // Use PreciseTimer for more accurate frame timing
+    // This might help with audio synchronization issues
+    m_frameTimer->setTimerType(Qt::PreciseTimer);
     connect(m_frameTimer, &QTimer::timeout, this, &AtariEmulator::processFrame);
 }
 
@@ -184,9 +197,10 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     // Add audio configuration
     if (m_audioEnabled) {
         argList << "-sound";
-        argList << "-dsprate" << "44100";
+        argList << "-dsprate" << "44100";  // Back to 44100Hz 
         argList << "-audio16";
         argList << "-volume" << "80";
+        // Don't use -sound-quality as it might not be recognized
         argList << "-speaker";  // Enable console speaker (keyboard clicks, boot beeps)
     } else {
         argList << "-nosound";
@@ -593,53 +607,109 @@ void AtariEmulator::processFrame()
     
     // Disk I/O monitoring is now handled by libatari800 callback
     
-    // Handle audio output
+    // Handle audio output with double buffering (inspired by Atari800MacX)
     if (m_audioEnabled && m_audioOutput && m_audioDevice) {
         unsigned char* soundBuffer = libatari800_get_sound_buffer();
         int soundBufferLen = libatari800_get_sound_buffer_len();
         
+        // Safety check for buffer initialization
+        if (m_dspBufferBytes == 0 || m_dspBuffer.isEmpty()) {
+            return;  // Audio not properly initialized yet
+        }
+        
         if (soundBuffer && soundBufferLen > 0) {
-#ifdef Q_OS_WIN
-            // Windows: Check audio state and available buffer space
-            if (m_audioOutput->state() == QAudio::ActiveState || 
-                m_audioOutput->state() == QAudio::IdleState) {
-                
-                int bytesFree = m_audioOutput->bytesFree();
-                
-                // Only write if we have enough buffer space
-                if (bytesFree >= soundBufferLen) {
-                    qint64 bytesWritten = m_audioDevice->write(reinterpret_cast<const char*>(soundBuffer), soundBufferLen);
-                    
-                    // If write failed completely, reset audio
-                    if (bytesWritten <= 0 && m_audioOutput->error() != QAudio::NoError) {
-                        qDebug() << "Windows audio error, resetting...";
-                        m_audioOutput->reset();
-                        m_audioDevice = m_audioOutput->start();
-                    }
+            // Write to DSP buffer (producer side)
+            int gap = m_dspWritePos - m_dspReadPos;
+            
+            // Handle wrap-around
+            if (gap < 0) {
+                gap += m_dspBufferBytes;
+            }
+            
+            // Simple overflow prevention - only write if there's room
+            // The mismatch between generation (1472) and consumption (~940) means
+            // we need to occasionally skip frames to prevent overflow
+            
+            // Check if we have room for this frame
+            if (gap + soundBufferLen > m_dspBufferBytes - 512) {
+                // Buffer too full, skip this frame
+                static int skipCount = 0;
+                if (++skipCount % 100 == 1) {
+                    qDebug() << "Buffer full - skipping frame. Gap:" << gap;
+                }
+            } else {
+                // Write to DSP buffer
+                int newPos = m_dspWritePos + soundBufferLen;
+                if (newPos / m_dspBufferBytes == m_dspWritePos / m_dspBufferBytes) {
+                    // No wrap
+                    memcpy(m_dspBuffer.data() + (m_dspWritePos % m_dspBufferBytes), 
+                           soundBuffer, soundBufferLen);
                 } else {
-                    // Skip this frame's audio to prevent buffer overflow
-                    static int skipCount = 0;
-                    if (++skipCount % 100 == 0) {
-                        qDebug() << "Windows: Skipping audio frames due to full buffer";
-                    }
+                    // Wraps around
+                    int firstPartSize = m_dspBufferBytes - (m_dspWritePos % m_dspBufferBytes);
+                    memcpy(m_dspBuffer.data() + (m_dspWritePos % m_dspBufferBytes), 
+                           soundBuffer, firstPartSize);
+                    memcpy(m_dspBuffer.data(), 
+                           soundBuffer + firstPartSize, soundBufferLen - firstPartSize);
                 }
-            } else if (m_audioOutput->state() == QAudio::StoppedState) {
-                // Restart audio if it stopped
-                qDebug() << "Windows audio stopped, restarting...";
-                m_audioDevice = m_audioOutput->start();
+                m_dspWritePos = newPos % (m_dspBufferBytes * 2);
             }
-#else
-            // macOS/Linux: Original behavior
-            qint64 bytesWritten = m_audioDevice->write(reinterpret_cast<const char*>(soundBuffer), soundBufferLen);
-            // Only log incomplete writes if they're significantly incomplete (less than 90%)
-            if (bytesWritten < soundBufferLen * 0.9) {
-                static int underrunCount = 0;
-                underrunCount++;
-                if (underrunCount % 100 == 1) { // Log every 100th underrun to reduce spam
-                    qDebug() << "Audio underrun #" << underrunCount << ":" << bytesWritten << "of" << soundBufferLen << "bytes";
+            
+            // Keep positions normalized
+            while (m_dspWritePos >= m_dspBufferBytes && m_dspReadPos >= m_dspBufferBytes) {
+                m_dspWritePos -= m_dspBufferBytes;
+                m_dspReadPos -= m_dspBufferBytes;
+            }
+            
+            // Write from DSP buffer to audio device (consumer side)
+            int available = m_dspWritePos - m_dspReadPos;
+            if (available < 0) {
+                available += m_dspBufferBytes;
+            }
+            
+            int bytesFree = m_audioOutput->bytesFree();
+            
+            // More aggressive writing - write as much as possible to keep buffer from filling
+            int toWrite = qMin(available, bytesFree);
+            
+            // Always write if we have data and space
+            if (toWrite > 0) {
+                // Read from DSP buffer and write to audio device
+                int newReadPos = m_dspReadPos + toWrite;
+                if (newReadPos / m_dspBufferBytes == m_dspReadPos / m_dspBufferBytes) {
+                    // No wrap
+                    m_audioDevice->write(
+                        m_dspBuffer.data() + (m_dspReadPos % m_dspBufferBytes), 
+                        toWrite
+                    );
+                } else {
+                    // Wraps around
+                    int firstPartSize = m_dspBufferBytes - (m_dspReadPos % m_dspBufferBytes);
+                    m_audioDevice->write(
+                        m_dspBuffer.data() + (m_dspReadPos % m_dspBufferBytes), 
+                        firstPartSize
+                    );
+                    m_audioDevice->write(
+                        m_dspBuffer.data(), 
+                        toWrite - firstPartSize
+                    );
                 }
+                m_dspReadPos = newReadPos % (m_dspBufferBytes * 2);
             }
-#endif
+            
+            // Log double buffer stats periodically
+            static int frameCount = 0;
+            if (++frameCount % 100 == 0) {
+                int gap = m_dspWritePos - m_dspReadPos;
+                if (gap < 0) gap += m_dspBufferBytes;
+                
+                int percentFull = (m_dspBufferBytes > 0) ? (gap * 100 / m_dspBufferBytes) : 0;
+                qDebug() << "DSP Buffer - Gap:" << gap << "bytes"
+                         << "(" << percentFull << "%)"
+                         << "| Available:" << available
+                         << "| Written:" << toWrite
+                         << "| Target delay:" << (m_targetDelay * m_bytesPerSample) << "bytes";
+            }
         }
     }
     
@@ -1122,18 +1192,19 @@ unsigned char AtariEmulator::convertQtKeyToAtari(int key, Qt::KeyboardModifiers 
 
 void AtariEmulator::setupAudio()
 {
-    qDebug() << "Setting up audio output...";
+    qDebug() << "Setting up double-buffered audio output (inspired by Atari800MacX)...";
     
     // Get audio parameters from libatari800
-    int frequency = libatari800_get_sound_frequency();
+    m_sampleRate = libatari800_get_sound_frequency();
     int channels = libatari800_get_num_sound_channels();
     int sampleSize = libatari800_get_sound_sample_size();
+    m_bytesPerSample = channels * sampleSize;
     
-    qDebug() << "Audio config - Frequency:" << frequency << "Hz, Channels:" << channels << "Sample size:" << sampleSize << "bytes";
+    qDebug() << "Audio config - Frequency:" << m_sampleRate << "Hz, Channels:" << channels << "Sample size:" << sampleSize << "bytes";
     
     // Setup Qt audio format
     QAudioFormat format;
-    format.setSampleRate(frequency);
+    format.setSampleRate(m_sampleRate);
     format.setChannelCount(channels);
     format.setSampleSize(sampleSize * 8); // Convert bytes to bits
     format.setCodec("audio/pcm");
@@ -1149,30 +1220,73 @@ void AtariEmulator::setupAudio()
     
     qDebug() << "Using audio format - Rate:" << format.sampleRate() << "Channels:" << format.channelCount() << "Sample size:" << format.sampleSize();
     
-    // Create and start audio output
+    // Calculate fragment size and buffer parameters (like Atari800MacX)
+    m_fragmentSize = 512; // Smaller fragments for more responsive audio
+    int fragmentBytes = m_fragmentSize * m_bytesPerSample;
+    
+    // Set up DSP buffer to handle the rate mismatch
+    // We generate 1472 bytes/frame but Qt consumes ~940 bytes/call
+    // This means we accumulate ~532 bytes per frame (36% excess)
+    // Buffer needs to be large enough to absorb this while we wait for consumption
+    int targetDelayMs = 40;  // Larger delay for stability
+    m_targetDelay = (m_sampleRate * targetDelayMs) / 1000;  // Convert to samples
+    // Use a larger buffer to handle the accumulation
+    int dspBufferSamples = m_fragmentSize * 10;  // Large buffer to handle rate mismatch
+    m_dspBufferBytes = dspBufferSamples * m_bytesPerSample;
+    
+    // Initialize the DSP buffer
+    m_dspBuffer.resize(m_dspBufferBytes);
+    m_dspBuffer.fill(0);
+    
+    // Initialize positions
+    m_dspReadPos = 0;
+    m_dspWritePos = m_targetDelay * m_bytesPerSample;  // Start with target delay
+    m_callbackTick = 0;
+    m_avgGap = 0.0;
+    
+    qDebug() << "Double buffer configuration:";
+    qDebug() << "  Fragment size:" << m_fragmentSize << "samples (" << fragmentBytes << "bytes)";
+    qDebug() << "  DSP buffer fragments:" << DSP_BUFFER_FRAGS;
+    qDebug() << "  Target delay:" << targetDelayMs << "ms (" << m_targetDelay << "samples)";
+    qDebug() << "  DSP buffer size:" << m_dspBufferBytes << "bytes";
+    qDebug() << "  Initial write pos:" << m_dspWritePos << "read pos:" << m_dspReadPos;
+    
+    // Create and configure audio output
     m_audioOutput = new QAudioOutput(format, this);
     
-    // Platform-specific audio configuration
-#ifdef Q_OS_WIN
-    // Windows needs larger buffers, especially in VMs and on ARM
-    // Use 200ms buffer to prevent underruns and noise
-    int bufferSize = (frequency * channels * sampleSize * 200) / 1000; // 200ms buffer
-    m_audioOutput->setBufferSize(bufferSize);
+    // Set Qt buffer size smaller to force more frequent reads
+    // This helps maintain steady consumption
+    m_audioOutput->setBufferSize(2048);  // Small buffer for frequent reads
     
-    // Set notification interval for smoother playback
-    m_audioOutput->setNotifyInterval(50); // 50ms chunks
+    // Set notification interval to match frame rate
+    int notifyMs = (m_videoSystem == "-ntsc") ? 16 : 20;  // 60Hz or 50Hz
+    m_audioOutput->setNotifyInterval(notifyMs);
     
-    qDebug() << "Windows: Using audio buffer size:" << bufferSize << "bytes";
-#else
-    // macOS/Linux can use smaller buffers
-    m_audioOutput->setBufferSize(16384);
-    m_audioOutput->setNotifyInterval(20);
-#endif
+    // Set category to Game for lower latency
+    m_audioOutput->setCategory("game");
+    
+    // Set volume to ensure audio is active
+    m_audioOutput->setVolume(1.0);
+    
+    qDebug() << "Qt Audio configuration:";
+    qDebug() << "  Buffer size:" << m_audioOutput->bufferSize() << "bytes";
+    qDebug() << "  Period size:" << m_audioOutput->periodSize() << "samples";
+    qDebug() << "  Notify interval:" << m_audioOutput->notifyInterval() << "ms";
+    
+    // Connect notify signal for audio callback timing
+    connect(m_audioOutput, &QAudioOutput::notify, this, [this]() {
+        // Update callback tick for gap estimation
+        m_callbackTick = QDateTime::currentMSecsSinceEpoch();
+    });
     
     m_audioDevice = m_audioOutput->start();
     
     if (m_audioDevice) {
-        qDebug() << "Audio output started successfully";
+        qDebug() << "Double-buffered audio output started successfully";
+        
+        // Test what we actually get from libatari800
+        int testBufferLen = libatari800_get_sound_buffer_len();
+        qDebug() << "Actual sound buffer length from libatari800:" << testBufferLen << "bytes per frame";
     } else {
         qDebug() << "Failed to start audio output";
         m_audioEnabled = false;
@@ -1191,6 +1305,9 @@ void AtariEmulator::enableAudio(bool enabled)
             delete m_audioOutput;
             m_audioOutput = nullptr;
             m_audioDevice = nullptr;
+            // Clear DSP buffer positions
+            m_dspReadPos = 0;
+            m_dspWritePos = m_targetDelay * m_bytesPerSample;  // Reset to target delay
         }
         
         qDebug() << "Audio" << (enabled ? "enabled" : "disabled");
@@ -2293,3 +2410,5 @@ QString AtariEmulator::getQuickSaveStatePath() const
     }
     return dir.filePath("quicksave.a8s");
 }
+
+// Double buffering audio implementation (inspired by Atari800MacX)

@@ -73,6 +73,7 @@ cp /usr/x86_64-w64-mingw32/bin/Qt5Network.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/libgcc_s_seh-1.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/libstdc++-6.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/libwinpthread-1.dll build-windows/
+cp /usr/x86_64-w64-mingw32/bin/libssp-0.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/zlib1.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/libpcre2-16-0.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/libharfbuzz-0.dll build-windows/

@@ -26,7 +26,8 @@ if [ -d .git ]; then
             echo "Applying patch: $patch_name"
             
             # Skip Windows-specific patches on non-Windows systems
-            if [[ "$patch_name" == *"windows"* ]] && [[ "$OSTYPE" != "msys" ]] && [[ "$MSYSTEM" == "" ]]; then
+            # Allow Windows patches when cross-compiling (CC contains mingw)
+            if [[ "$patch_name" == *"windows"* ]] && [[ "$OSTYPE" != "msys" ]] && [[ "$MSYSTEM" == "" ]] && [[ "$CC" != *"mingw"* ]]; then
                 echo "Skipping Windows-specific patch on non-Windows system"
                 continue
             fi

@@ -284,6 +284,19 @@ private:
     QIODevice* m_audioDevice;
     bool m_audioEnabled;
     
+    // Double buffering for audio (inspired by Atari800MacX)
+    static const int DSP_BUFFER_FRAGS = 5;  // Number of fragments in DSP buffer
+    QByteArray m_dspBuffer;
+    int m_dspBufferBytes;
+    int m_dspWritePos;
+    int m_dspReadPos;
+    int m_callbackTick;  // Time when callback occurred
+    double m_avgGap;     // Average gap for speed adjustment
+    int m_targetDelay;   // Target delay in samples
+    int m_sampleRate;
+    int m_bytesPerSample;
+    int m_fragmentSize;  // Size of each audio fragment
+    
     // Printer components
     bool m_printerEnabled;
     std::function<void(const QString&)> m_printerOutputCallback;

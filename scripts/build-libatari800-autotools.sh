@@ -24,7 +24,8 @@ if [ -d "fujisan-patches" ] && [ -f "fujisan-patches/apply-patches.sh" ]; then
     echo "Applying Fujisan patches for API functions..."
     cd fujisan-patches
     chmod +x apply-patches.sh
-    ./apply-patches.sh || echo "Patches may already be applied"
+    # Set ATARI800_SRC_PATH for the patch script (we're already in it, so use parent dir)
+    ATARI800_SRC_PATH="$(dirname $(pwd))" ./apply-patches.sh || echo "Patches may already be applied"
     cd ..
 else
     echo "Warning: Fujisan patches not found - some API functions may be missing"
@@ -87,9 +88,24 @@ echo "=== Configuration completed ==="
 
 # Apply Windows-specific fixes for ULONG type conflicts
 echo "Applying Windows-specific fixes..."
+# First, ensure ULONG is defined correctly in atari.h
 sed -i 's/#include <windows\.h>/#include <windows.h>\n\/* Force atari800 ULONG definition to override Windows *\/\n#ifdef ULONG\n#undef ULONG\n#endif\n#define ULONG unsigned int/g' src/atari.h
-sed -i '/^ULONG ANTIC_lookup_gtia9\[16\];$/d' src/antic.c  
-sed -i '/^ULONG ANTIC_lookup_gtia11\[16\];$/d' src/antic.c
+
+# Instead of deleting the ANTIC_lookup_gtia definitions, we need to ensure they use the correct ULONG type
+# Check if the lines exist and if so, make sure they're using the right type
+if grep -q '^ULONG ANTIC_lookup_gtia9\[16\];$' src/antic.c; then
+    echo "ANTIC_lookup_gtia arrays already defined with ULONG type"
+else
+    # If they're defined with a different type or missing, ensure they exist
+    if ! grep -q 'ANTIC_lookup_gtia9\[16\]' src/antic.c; then
+        echo "Adding ANTIC_lookup_gtia9 definition..."
+        echo "ULONG ANTIC_lookup_gtia9[16];" >> src/antic.c
+    fi
+    if ! grep -q 'ANTIC_lookup_gtia11\[16\]' src/antic.c; then
+        echo "Adding ANTIC_lookup_gtia11 definition..."
+        echo "ULONG ANTIC_lookup_gtia11[16];" >> src/antic.c
+    fi
+fi
 
 # Build libatari800
 echo "Building libatari800..."
