@@ -781,21 +781,21 @@ void AtariEmulator::processFrame()
                 m_dspReadPos = newReadPos % (m_dspBufferBytes * 2);
             }
             
-            // Log double buffer stats periodically
-            static int frameCount = 0;
-            if (++frameCount % 100 == 0) {
-                int gap = m_dspWritePos - m_dspReadPos;
-                if (gap < 0) gap += m_dspBufferBytes;
-                
-                int percentFull = (m_dspBufferBytes > 0) ? (gap * 100 / m_dspBufferBytes) : 0;
-                qDebug() << "DSP Buffer - Gap:" << gap << "bytes"
-                         << "(" << percentFull << "%)"
-                         << "| Available:" << available
-                         << "| Written:" << toWrite
-                         << "| Speed:" << QString::number(m_currentSpeed, 'f', 3)
-                         << "| AvgGap:" << QString::number(m_avgGap, 'f', 1)
-                         << "| Target delay:" << (m_targetDelay * m_bytesPerSample) << "bytes";
-            }
+            // Log double buffer stats periodically (commented out for production)
+            // static int frameCount = 0;
+            // if (++frameCount % 100 == 0) {
+            //     int gap = m_dspWritePos - m_dspReadPos;
+            //     if (gap < 0) gap += m_dspBufferBytes;
+            //     
+            //     int percentFull = (m_dspBufferBytes > 0) ? (gap * 100 / m_dspBufferBytes) : 0;
+            //     qDebug() << "DSP Buffer - Gap:" << gap << "bytes"
+            //              << "(" << percentFull << "%)"
+            //              << "| Available:" << available
+            //              << "| Written:" << toWrite
+            //              << "| Speed:" << QString::number(m_currentSpeed, 'f', 3)
+            //              << "| AvgGap:" << QString::number(m_avgGap, 'f', 1)
+            //              << "| Target delay:" << (m_targetDelay * m_bytesPerSample) << "bytes";
+            // }
         }
     }
     
