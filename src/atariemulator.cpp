@@ -65,7 +65,7 @@ AtariEmulator::AtariEmulator(QObject *parent)
     : QObject(parent)
     , m_frameTimer(new QTimer(this))
 #ifdef HAVE_SDL2_AUDIO
-    , m_audioBackend(SDL2Audio)  // Default to SDL2 if available
+    , m_audioBackend(QtAudio)  // Qt audio works better than SDL2 currently
     , m_sdl2Audio(nullptr)
 #else
     , m_audioBackend(QtAudio)     // Fall back to Qt
@@ -79,6 +79,8 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_callbackTick(0)
     , m_avgGap(0.0)
     , m_targetDelay(0)
+    , m_currentSpeed(1.0)
+    , m_targetSpeed(1.0)
     , m_sampleRate(44100)
     , m_bytesPerSample(4)
     , m_fragmentSize(1024)
@@ -216,7 +218,18 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     // Add audio configuration
     if (m_audioEnabled) {
         argList << "-sound";
-        argList << "-dsprate" << "44100";  // Back to 44100Hz 
+        
+        // Get audio frequency from settings (use same organization as settings dialog)
+        QSettings settings("8bitrelics", "Fujisan");
+        int audioFreq = settings.value("audio/frequency", 44100).toInt();
+        argList << "-dsprate" << QString::number(audioFreq);
+        qDebug() << "*** AUDIO CONFIGURATION ***";
+        qDebug() << "Using audio sample rate:" << audioFreq << "Hz";
+        qDebug() << "Expected bytes/frame at" << audioFreq << "Hz:" << (audioFreq * 2 / 60) << "bytes";
+        
+        // At 22050Hz, we generate half the data:
+        // 22050 * 2 bytes / 59.92fps = 736 bytes/frame (instead of 1472)
+        
         argList << "-audio16";
         argList << "-volume" << "80";
         // Don't use -sound-quality as it might not be recognized
@@ -373,8 +386,24 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     }
     
     
-    // Audio is enabled by default for libatari800
-    qDebug() << "Audio enabled for emulator";
+    // Audio configuration
+    if (m_audioEnabled) {
+        argList << "-sound";
+        
+        // Get audio frequency from settings (use same organization as settings dialog)
+        QSettings settings("8bitrelics", "Fujisan");
+        int audioFreq = settings.value("audio/frequency", 44100).toInt();
+        argList << "-dsprate" << QString::number(audioFreq);
+        qDebug() << "*** AUDIO CONFIGURATION ***";
+        qDebug() << "Using audio sample rate:" << audioFreq << "Hz";
+        qDebug() << "Expected bytes/frame at" << audioFreq << "Hz:" << (audioFreq * 2 / 60) << "bytes";
+        
+        argList << "-audio16";
+        argList << "-volume" << "80";
+        argList << "-speaker";  // Enable console speaker
+    } else {
+        argList << "-nosound";
+    }
     
     // Add OS and BASIC ROM configuration based on Altirra OS setting
     if (m_altirraOSEnabled) {
@@ -639,37 +668,23 @@ void AtariEmulator::processFrame()
             int currentLevel = (m_sdl2WritePos - m_sdl2ReadPos + SDL2_BUFFER_SIZE) % SDL2_BUFFER_SIZE;
             int availableSpace = SDL2_BUFFER_SIZE - currentLevel - 1;
             
-            // Write frames normally, skip only when critically full
-            if (currentLevel > 10000) {
-                // Buffer is critically full, skip this frame
-                static int skipCount = 0;
-                skipCount++;
-                if (skipCount <= 5 || skipCount % 100 == 0) {
-                    qDebug() << "SDL2 buffer critically full:" << currentLevel << "bytes, skipping frame (count:" << skipCount << ")";
-                }
-            } else if (availableSpace >= soundBufferLen) {
-                // Normal case - copy data to ring buffer
+            // Simple buffer management - SDL2 buffer now matches frame size
+            // At 22050Hz: we produce 735 bytes, SDL2 consumes 736 bytes
+            // At 44100Hz: we produce 1470 bytes, SDL2 consumes 1472 bytes
+            // This should maintain balance without skipping
+            
+            if (availableSpace >= soundBufferLen) {
+                // Write the audio data
                 for (int i = 0; i < soundBufferLen; i++) {
                     m_sdl2AudioBuffer[m_sdl2WritePos] = soundBuffer[i];
                     m_sdl2WritePos = (m_sdl2WritePos + 1) % SDL2_BUFFER_SIZE;
                 }
             } else {
-                // Emergency overflow - this shouldn't happen with dynamic adjustment
-                static int overflowCount = 0;
-                overflowCount++;
-                
-                // Skip oldest data to make room
-                int skipBytes = soundBufferLen;
-                m_sdl2ReadPos = (m_sdl2ReadPos + skipBytes) % SDL2_BUFFER_SIZE;
-                
-                // Write the new data
-                for (int i = 0; i < soundBufferLen; i++) {
-                    m_sdl2AudioBuffer[m_sdl2WritePos] = soundBuffer[i];
-                    m_sdl2WritePos = (m_sdl2WritePos + 1) % SDL2_BUFFER_SIZE;
-                }
-                
-                if (overflowCount <= 10 || overflowCount % 100 == 0) {
-                    qDebug() << "SDL2 EMERGENCY OVERFLOW - buffer management failed (count:" << overflowCount << ")";
+                // Buffer full - this should be rare with matched sizes
+                static int skipCount = 0;
+                skipCount++;
+                if (skipCount <= 10 || skipCount % 100 == 0) {
+                    qDebug() << "Buffer full, skipped frame #" << skipCount << "(level:" << currentLevel << "bytes)";
                 }
             }
         }
@@ -694,16 +709,17 @@ void AtariEmulator::processFrame()
                 gap += m_dspBufferBytes;
             }
             
-            // Simple overflow prevention - only write if there's room
-            // The mismatch between generation (1472) and consumption (~940) means
-            // we need to occasionally skip frames to prevent overflow
+            // Update emulation speed based on buffer level (Atari800MacX approach)
+            updateEmulationSpeed();
             
-            // Check if we have room for this frame
+            // With dynamic speed adjustment, we should never need to skip frames
+            // Always write the audio data
             if (gap + soundBufferLen > m_dspBufferBytes - 512) {
-                // Buffer too full, skip this frame
+                // Buffer too full - this should be rare with speed adjustment
                 static int skipCount = 0;
                 if (++skipCount % 100 == 1) {
-                    qDebug() << "Buffer full - skipping frame. Gap:" << gap;
+                    qDebug() << "Buffer full despite speed adjustment. Gap:" << gap 
+                             << "Speed:" << m_currentSpeed;
                 }
             } else {
                 // Write to DSP buffer
@@ -776,6 +792,8 @@ void AtariEmulator::processFrame()
                          << "(" << percentFull << "%)"
                          << "| Available:" << available
                          << "| Written:" << toWrite
+                         << "| Speed:" << QString::number(m_currentSpeed, 'f', 3)
+                         << "| AvgGap:" << QString::number(m_avgGap, 'f', 1)
                          << "| Target delay:" << (m_targetDelay * m_bytesPerSample) << "bytes";
             }
         }
@@ -1269,7 +1287,23 @@ void AtariEmulator::setupAudio()
         int channels = libatari800_get_num_sound_channels();
         int sampleSize = libatari800_get_sound_sample_size();
         
-        qDebug() << "Audio config - Frequency:" << sampleRate << "Hz, Channels:" << channels << "Sample size:" << sampleSize << "bytes";
+        qDebug() << "\n=== SDL2 AUDIO INITIALIZATION ===";
+        qDebug() << "libatari800 reports:";
+        qDebug() << "  Frequency:" << sampleRate << "Hz";
+        qDebug() << "  Channels:" << channels;
+        qDebug() << "  Sample size:" << sampleSize << "bytes";
+        
+        // Get actual sound buffer to see real size
+        unsigned char* testBuffer = libatari800_get_sound_buffer();
+        int actualBufferLen = libatari800_get_sound_buffer_len();
+        qDebug() << "  Actual buffer length per frame:" << actualBufferLen << "bytes";
+        
+        // Calculate expected bytes per frame based on sample rate
+        // At 44100Hz: 44100 * 2 / 59.92 = 1472 bytes/frame
+        // At 22050Hz: 22050 * 2 / 59.92 = 736 bytes/frame  
+        int bytesPerFrame = (sampleRate * sampleSize * channels) / 60;  // Approximate
+        qDebug() << "  Calculated bytes per frame:" << bytesPerFrame << "(approx)";
+        qDebug() << "==================================\n";
         
         // Create SDL2 audio backend if not created
         if (!m_sdl2Audio) {
@@ -1282,19 +1316,20 @@ void AtariEmulator::setupAudio()
         m_sdl2WritePos = 0;
         m_sdl2ReadPos = 0;
         
-        // Set target buffer level for low latency while avoiding underruns
-        // Start conservatively and let it stabilize
-        m_sdl2TargetBufferLevel = 3000;  // About 2 frames worth
+        // Set target buffer level based on sample rate
+        // Lower sample rates need proportionally smaller buffers
+        m_sdl2TargetBufferLevel = bytesPerFrame * 3;  // About 3 frames worth
         m_sdl2BufferLevelAccum = 0;
         m_sdl2BufferLevelCount = 0;
         
-        // Fill buffer with silence initially to prevent underruns at start
-        // The actual audio data will come from processFrame()
-        for (int i = 0; i < m_sdl2TargetBufferLevel; i++) {
+        // Minimal prefill to prevent initial underruns
+        // Don't overfill as it contributes to accumulation
+        int prefillBytes = 1024;  // Just 1 SDL callback worth
+        for (int i = 0; i < prefillBytes; i++) {
             m_sdl2AudioBuffer[m_sdl2WritePos] = 0;
             m_sdl2WritePos = (m_sdl2WritePos + 1) % SDL2_BUFFER_SIZE;
         }
-        qDebug() << "SDL2 buffer initialized with silence (target level:" << m_sdl2TargetBufferLevel << "bytes)";
+        qDebug() << "SDL2 buffer initialized with" << prefillBytes << "bytes (target level:" << m_sdl2TargetBufferLevel << "bytes)";
         
         // Initialize SDL2 audio
         if (m_sdl2Audio->initialize(sampleRate, channels, sampleSize)) {
@@ -1314,9 +1349,8 @@ void AtariEmulator::setupAudio()
                     int avgLevel = m_sdl2BufferLevelAccum / m_sdl2BufferLevelCount;
                     float percentFull = (float)avgLevel / (float)m_sdl2TargetBufferLevel * 100.0f;
                     
-                    // Report buffer level periodically for monitoring
-                    // Always report in adaptive mode to monitor behavior
-                    if (m_sdl2AdaptiveMode || percentFull < 50.0f || percentFull > 200.0f) {
+                    // Only report when significantly off target to reduce log spam
+                    if (percentFull < 70.0f || percentFull > 150.0f) {
                         qDebug() << "SDL2 buffer:" << avgLevel << "bytes (" << percentFull << "% of target)";
                     }
                     
@@ -1914,6 +1948,75 @@ void AtariEmulator::stepOneFrame()
         qDebug() << "Stepped one frame - PC:" << QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
     } else {
         qDebug() << "Cannot step frame - emulation not paused";
+    }
+}
+
+double AtariEmulator::calculateSpeedAdjustment()
+{
+    // Calculate buffer gap similar to Atari800MacX
+    int gap = 0;
+    
+    if (m_audioBackend == QtAudio && m_audioEnabled && m_audioOutput) {
+        // Calculate how much data is buffered
+        int bufferedBytes = (m_dspWritePos - m_dspReadPos + m_dspBufferBytes) % m_dspBufferBytes;
+        int bufferedSamples = bufferedBytes / m_bytesPerSample;
+        
+        // Calculate gap from target delay
+        gap = m_targetDelay - bufferedSamples;
+        
+        // Update smoothed average gap
+        m_avgGap = m_avgGap * (1.0 - SPEED_ADJUSTMENT_ALPHA) + gap * SPEED_ADJUSTMENT_ALPHA;
+        
+        // Calculate speed adjustment based on gap
+        // Positive gap = buffer running low, speed up
+        // Negative gap = buffer too full, slow down
+        double speedAdjustment = 0.0;
+        
+        if (m_avgGap > 50) {
+            // Buffer very low, speed up significantly
+            speedAdjustment = 0.05;
+        } else if (m_avgGap > 20) {
+            // Buffer low, speed up slightly
+            speedAdjustment = 0.02;
+        } else if (m_avgGap < -50) {
+            // Buffer very full, slow down significantly
+            speedAdjustment = -0.05;
+        } else if (m_avgGap < -20) {
+            // Buffer full, slow down slightly
+            speedAdjustment = -0.02;
+        }
+        
+        return speedAdjustment;
+    }
+    
+    return 0.0;
+}
+
+void AtariEmulator::updateEmulationSpeed()
+{
+    if (!m_audioEnabled || m_audioBackend != QtAudio) {
+        m_currentSpeed = 1.0;
+        return;
+    }
+    
+    // Calculate speed adjustment
+    double adjustment = calculateSpeedAdjustment();
+    
+    // Update target speed
+    m_targetSpeed = 1.0 + adjustment;
+    
+    // Clamp to reasonable range (95% to 105%)
+    m_targetSpeed = qBound(0.95, m_targetSpeed, 1.05);
+    
+    // Smooth transition to target speed
+    m_currentSpeed = m_currentSpeed * 0.9 + m_targetSpeed * 0.1;
+    
+    // Apply speed to frame timer
+    if (m_frameTimer) {
+        // Adjust frame interval based on speed
+        // Faster speed = shorter frame interval
+        float adjustedFrameTime = m_frameTimeMs / m_currentSpeed;
+        m_frameTimer->setInterval(static_cast<int>(adjustedFrameTime));
     }
 }
 

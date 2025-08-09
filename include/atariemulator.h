@@ -252,6 +252,10 @@ public:
     void resumeEmulation();
     bool isEmulationPaused() const;
     void stepOneFrame();
+    
+    // Dynamic speed adjustment for audio sync
+    double calculateSpeedAdjustment();
+    void updateEmulationSpeed();
 
 public slots:
     void processFrame();
@@ -307,12 +311,17 @@ private:
     int m_dspBufferBytes;
     int m_dspWritePos;
     int m_dspReadPos;
-    int m_callbackTick;  // Time when callback occurred
+    qint64 m_callbackTick;  // Time when callback occurred
     double m_avgGap;     // Average gap for speed adjustment
     int m_targetDelay;   // Target delay in samples
     int m_sampleRate;
     int m_bytesPerSample;
     int m_fragmentSize;  // Size of each audio fragment
+    
+    // Dynamic speed adjustment (like Atari800MacX)
+    double m_currentSpeed;  // Current emulation speed (0.95 to 1.05)
+    double m_targetSpeed;   // Target speed based on buffer level
+    static constexpr double SPEED_ADJUSTMENT_ALPHA = 0.1;  // Smoothing factor
     
 #ifdef HAVE_SDL2_AUDIO
     // SDL2 Audio backend
