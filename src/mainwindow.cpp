@@ -1080,6 +1080,17 @@ void MainWindow::updateToolbarFromSettings()
         m_kbdJoy0Check->setEnabled(joystickEnabled);
         m_kbdJoy1Check->setEnabled(joystickEnabled);
         m_joystickSwapWidget->setEnabled(joystickEnabled);
+        
+        // Apply the effective joystick state to the emulator
+        // Only enable keyboard joysticks if main joystick support is enabled
+        m_emulator->setKbdJoy0Enabled(joystickEnabled && kbdJoy0Saved);
+        m_emulator->setKbdJoy1Enabled(joystickEnabled && kbdJoy1Saved);
+        m_emulator->setJoysticksSwapped(swapJoysticks);
+        
+        qDebug() << "Applied effective joystick state - MainJoystick:" << joystickEnabled
+                 << "Joy0:" << (joystickEnabled && kbdJoy0Saved)
+                 << "Joy1:" << (joystickEnabled && kbdJoy1Saved)
+                 << "Swap:" << swapJoysticks;
     }
 
     qDebug() << "Toolbar updated - Machine:" << machineType << "BASIC:" << m_emulator->isBasicEnabled()

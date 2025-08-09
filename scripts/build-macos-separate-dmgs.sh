@@ -254,10 +254,12 @@ if [[ "$SKIP_X86_64" == "false" ]]; then
     # Build if needed
     if [[ ! -f "Fujisan.app/Contents/MacOS/Fujisan" ]] || [[ "$CLEAN_BUILD" == "true" ]]; then
         echo_info "Configuring with CMake..."
+        # Disable SDL2 for x86_64 build as it's likely not installed
         cmake -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_OSX_ARCHITECTURES=x86_64 \
               -DCMAKE_PREFIX_PATH="$QT_X86_64_PATH" \
               -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+              -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
               "$PROJECT_ROOT"
         
         echo_info "Building..."

@@ -66,11 +66,16 @@ bool SDL2AudioBackend::initialize(int sampleRate, int channels, int sampleSize)
         return false;
     }
     
-    // Use 1024 samples for good SDL2 performance (power of 2)
-    // At 44100Hz: 1024 samples = 2048 bytes = ~23.2ms latency
-    // We generate 1472 bytes/frame, SDL consumes 2048 bytes/callback
-    // This means SDL consumes faster than we produce, preventing accumulation
-    desired.samples = 1024;
+    // Use power-of-2 buffer sizes for better SDL2 performance
+    // Smaller buffers = lower latency but more CPU usage
+    if (sampleRate <= 22050) {
+        desired.samples = 256;  // At 22050Hz: ~11.6ms
+    } else if (sampleRate <= 44100) {
+        desired.samples = 512;  // At 44100Hz: ~11.6ms
+    } else {
+        desired.samples = 512;  // At 48000Hz: ~10.7ms
+    }
+    qDebug() << "SDL2 using" << desired.samples << "samples for" << sampleRate << "Hz";
     
     // Set callback
     desired.callback = sdlAudioCallback;

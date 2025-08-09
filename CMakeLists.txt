@@ -58,9 +58,12 @@ find_package(SDL2 QUIET)
 if(SDL2_FOUND)
     message(STATUS "SDL2 found - SDL2 audio backend will be available")
     set(HAVE_SDL2_AUDIO ON)
+    # Store SDL2 libraries for later use
+    set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
 else()
     message(STATUS "SDL2 not found - using Qt audio backend only")
     set(HAVE_SDL2_AUDIO OFF)
+    set(SDL2_LIBRARIES "")
 endif()
 
 # ============================================================================
@@ -328,8 +331,16 @@ target_link_libraries(${PROJECT_NAME}
     Qt5::Multimedia
     Qt5::Network
     -lm
-    $<$<BOOL:${HAVE_SDL2_AUDIO}>:SDL2::SDL2>
 )
+
+# Link SDL2 only if available
+if(HAVE_SDL2_AUDIO)
+    if(TARGET SDL2::SDL2)
+        target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+    elseif(SDL2_LIBRARIES)
+        target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+    endif()
+endif()
 
 # Platform-specific linking and resources
 if(APPLE)

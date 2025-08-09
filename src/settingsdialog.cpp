@@ -1381,6 +1381,10 @@ void SettingsDialog::createInputConfigTab()
         m_joystick2Hat->setEnabled(enabled);
         m_joystick3Hat->setEnabled(enabled);
         m_joyDistinct->setEnabled(enabled);
+        // Also disable keyboard joystick emulation when main joystick is disabled
+        m_kbdJoy0Enabled->setEnabled(enabled);
+        m_kbdJoy1Enabled->setEnabled(enabled);
+        m_swapJoysticks->setEnabled(enabled);
     });
     
     // Add both columns to main layout
@@ -2187,7 +2191,8 @@ void SettingsDialog::loadSettings()
     m_ntscTintSlider->blockSignals(false);
     
     // Load Input Configuration
-    m_joystickEnabled->setChecked(settings.value("input/joystickEnabled", true).toBool());
+    bool mainJoystickEnabled = settings.value("input/joystickEnabled", true).toBool();
+    m_joystickEnabled->setChecked(mainJoystickEnabled);
     m_joystick0Hat->setChecked(settings.value("input/joystick0Hat", false).toBool());
     m_joystick1Hat->setChecked(settings.value("input/joystick1Hat", false).toBool());
     m_joystick2Hat->setChecked(settings.value("input/joystick2Hat", false).toBool());
@@ -2200,6 +2205,16 @@ void SettingsDialog::loadSettings()
     m_mouseDevice->setText(settings.value("input/mouseDevice", "").toString());
     m_keyboardToggle->setChecked(settings.value("input/keyboardToggle", false).toBool());
     m_keyboardLeds->setChecked(settings.value("input/keyboardLeds", false).toBool());
+    
+    // Enable/disable dependent controls based on main joystick state
+    m_joystick0Hat->setEnabled(mainJoystickEnabled);
+    m_joystick1Hat->setEnabled(mainJoystickEnabled);
+    m_joystick2Hat->setEnabled(mainJoystickEnabled);
+    m_joystick3Hat->setEnabled(mainJoystickEnabled);
+    m_joyDistinct->setEnabled(mainJoystickEnabled);
+    m_kbdJoy0Enabled->setEnabled(mainJoystickEnabled);
+    m_kbdJoy1Enabled->setEnabled(mainJoystickEnabled);
+    m_swapJoysticks->setEnabled(mainJoystickEnabled);
     
     // Load Media Configuration
     // Floppy Disks
@@ -2624,16 +2639,21 @@ void SettingsDialog::applySettings()
     
     // Apply joystick settings immediately (no restart needed)
     if (m_emulator) {
+        bool mainJoystickEnabled = m_joystickEnabled->isChecked();
         bool joy0Enabled = m_kbdJoy0Enabled->isChecked();
         bool joy1Enabled = m_kbdJoy1Enabled->isChecked();
         bool swapped = m_swapJoysticks->isChecked();
         
         // Apply joystick settings directly for immediate effect
-        m_emulator->setKbdJoy0Enabled(joy0Enabled);
-        m_emulator->setKbdJoy1Enabled(joy1Enabled);
+        // Only enable keyboard joysticks if main joystick support is enabled
+        m_emulator->setKbdJoy0Enabled(mainJoystickEnabled && joy0Enabled);
+        m_emulator->setKbdJoy1Enabled(mainJoystickEnabled && joy1Enabled);
         m_emulator->setJoysticksSwapped(swapped);
         
-        qDebug() << "Applied joystick settings live - Joy0:" << joy0Enabled << "Joy1:" << joy1Enabled << "Swap:" << swapped;
+        qDebug() << "Applied joystick settings live - MainJoystick:" << mainJoystickEnabled 
+                 << "Joy0:" << (mainJoystickEnabled && joy0Enabled) 
+                 << "Joy1:" << (mainJoystickEnabled && joy1Enabled) 
+                 << "Swap:" << swapped;
     }
     
     saveSettings();
