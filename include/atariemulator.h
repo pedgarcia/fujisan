@@ -23,6 +23,12 @@
 #include <functional>
 #include <QSet>
 #include <QJsonObject>
+#include <QMutex>
+
+#ifdef HAVE_SDL2_AUDIO
+// Forward declaration to avoid including SDL headers here
+class SDL2AudioBackend;
+#endif
 
 extern "C" {
     // Temporarily undefine potentially conflicting macros
@@ -160,6 +166,14 @@ public:
     bool isAudioEnabled() const { return m_audioEnabled; }
     void setVolume(float volume);
     
+    // Audio backend selection
+    enum AudioBackend {
+        QtAudio,
+        SDL2Audio
+    };
+    void setAudioBackend(AudioBackend backend);
+    AudioBackend getAudioBackend() const { return m_audioBackend; }
+    
     void handleKeyPress(QKeyEvent* event);
     void handleKeyRelease(QKeyEvent* event);
     bool handleJoystickKeyboardEmulation(QKeyEvent* event);
@@ -280,6 +294,9 @@ private:
     QSet<int> m_mountedDrives;
     
     // Audio components
+    AudioBackend m_audioBackend;
+    
+    // Qt Audio backend
     QAudioOutput* m_audioOutput;
     QIODevice* m_audioDevice;
     bool m_audioEnabled;
@@ -296,6 +313,25 @@ private:
     int m_sampleRate;
     int m_bytesPerSample;
     int m_fragmentSize;  // Size of each audio fragment
+    
+#ifdef HAVE_SDL2_AUDIO
+    // SDL2 Audio backend
+    SDL2AudioBackend* m_sdl2Audio;
+    
+    // SDL2 audio ring buffer
+    QByteArray m_sdl2AudioBuffer;
+    int m_sdl2WritePos;
+    int m_sdl2ReadPos;
+    QMutex m_sdl2AudioMutex;
+    static const int SDL2_BUFFER_SIZE = 32768;  // 32KB ring buffer for better stability
+    
+    // Dynamic buffer management
+    int m_sdl2TargetBufferLevel;  // Target amount of data to maintain in buffer
+    int m_sdl2BufferLevelAccum;   // Accumulator for averaging buffer level
+    int m_sdl2BufferLevelCount;   // Count for averaging
+    int m_sdl2FrameSkipCounter;   // Counter for periodic frame skipping
+    bool m_sdl2AdaptiveMode;      // Whether to use adaptive timing
+#endif
     
     // Printer components
     bool m_printerEnabled;

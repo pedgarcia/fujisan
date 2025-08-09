@@ -53,6 +53,16 @@ endif()
 # Find Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
+# Find SDL2 for audio backend
+find_package(SDL2 QUIET)
+if(SDL2_FOUND)
+    message(STATUS "SDL2 found - SDL2 audio backend will be available")
+    set(HAVE_SDL2_AUDIO ON)
+else()
+    message(STATUS "SDL2 not found - using Qt audio backend only")
+    set(HAVE_SDL2_AUDIO OFF)
+endif()
+
 # ============================================================================
 # BUILD LIBATARI800 AS EXTERNAL PROJECT
 # ============================================================================
@@ -193,6 +203,7 @@ set(SOURCES
     src/mainwindow.cpp
     src/emulatorwidget.cpp
     src/atariemulator.cpp
+    $<$<BOOL:${HAVE_SDL2_AUDIO}>:src/sdl2audiobackend.cpp>
     src/toggleswitch.cpp
     src/settingsdialog.cpp
     src/disasm6502.cpp
@@ -215,6 +226,7 @@ set(HEADERS
     include/mainwindow.h
     include/emulatorwidget.h
     include/atariemulator.h
+    $<$<BOOL:${HAVE_SDL2_AUDIO}>:include/sdl2audiobackend.h>
     include/toggleswitch.h
     include/settingsdialog.h
     include/configurationprofile.h
@@ -246,6 +258,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${ATARI800_SOURCE_DIR}/src/libatari800
     ${ATARI800_SOURCE_DIR}/src
+    $<$<BOOL:${HAVE_SDL2_AUDIO}>:${SDL2_INCLUDE_DIRS}>
 )
 
 # ============================================================================
@@ -292,6 +305,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     SCREENSHOTS
     # Remove dependency on runtime ATARI800_SRC_PATH
     EMBEDDED_LIBATARI800
+    $<$<BOOL:${HAVE_SDL2_AUDIO}>:HAVE_SDL2_AUDIO>
 )
 
 # Add architecture-specific definitions for macOS
@@ -314,6 +328,7 @@ target_link_libraries(${PROJECT_NAME}
     Qt5::Multimedia
     Qt5::Network
     -lm
+    $<$<BOOL:${HAVE_SDL2_AUDIO}>:SDL2::SDL2>
 )
 
 # Platform-specific linking and resources

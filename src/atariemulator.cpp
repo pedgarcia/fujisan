@@ -21,8 +21,14 @@
 #include <QDir>
 #include <QDateTime>
 #include <QFile>
+#include <QMutex>
+#include <QMutexLocker>
 #include <cstring>  // for memset
 #include <vector>   // for std::vector
+
+#ifdef HAVE_SDL2_AUDIO
+#include "sdl2audiobackend.h"
+#endif
 
 extern "C" {
 #ifdef NETSIO
@@ -58,6 +64,12 @@ static void diskActivityCallback(int drive, int operation) {
 AtariEmulator::AtariEmulator(QObject *parent)
     : QObject(parent)
     , m_frameTimer(new QTimer(this))
+#ifdef HAVE_SDL2_AUDIO
+    , m_audioBackend(SDL2Audio)  // Default to SDL2 if available
+    , m_sdl2Audio(nullptr)
+#else
+    , m_audioBackend(QtAudio)     // Fall back to Qt
+#endif
     , m_audioOutput(nullptr)
     , m_audioDevice(nullptr)
     , m_audioEnabled(true)
@@ -99,6 +111,13 @@ AtariEmulator::~AtariEmulator()
         libatari800_set_disk_activity_callback(nullptr);
     }
     shutdown();
+    
+#ifdef HAVE_SDL2_AUDIO
+    if (m_sdl2Audio) {
+        delete m_sdl2Audio;
+        m_sdl2Audio = nullptr;
+    }
+#endif
 }
 
 bool AtariEmulator::initialize()
@@ -607,7 +626,56 @@ void AtariEmulator::processFrame()
     
     // Disk I/O monitoring is now handled by libatari800 callback
     
-    // Handle audio output with double buffering (inspired by Atari800MacX)
+#ifdef HAVE_SDL2_AUDIO
+    // For SDL2 audio, we need to get the audio data here and put it in the ring buffer
+    if (m_audioBackend == SDL2Audio && m_sdl2Audio && m_sdl2Audio->isInitialized()) {
+        unsigned char* soundBuffer = libatari800_get_sound_buffer();
+        int soundBufferLen = libatari800_get_sound_buffer_len();
+        
+        if (soundBuffer && soundBufferLen > 0) {
+            QMutexLocker locker(&m_sdl2AudioMutex);
+            
+            // Calculate current buffer level
+            int currentLevel = (m_sdl2WritePos - m_sdl2ReadPos + SDL2_BUFFER_SIZE) % SDL2_BUFFER_SIZE;
+            int availableSpace = SDL2_BUFFER_SIZE - currentLevel - 1;
+            
+            // Write frames normally, skip only when critically full
+            if (currentLevel > 10000) {
+                // Buffer is critically full, skip this frame
+                static int skipCount = 0;
+                skipCount++;
+                if (skipCount <= 5 || skipCount % 100 == 0) {
+                    qDebug() << "SDL2 buffer critically full:" << currentLevel << "bytes, skipping frame (count:" << skipCount << ")";
+                }
+            } else if (availableSpace >= soundBufferLen) {
+                // Normal case - copy data to ring buffer
+                for (int i = 0; i < soundBufferLen; i++) {
+                    m_sdl2AudioBuffer[m_sdl2WritePos] = soundBuffer[i];
+                    m_sdl2WritePos = (m_sdl2WritePos + 1) % SDL2_BUFFER_SIZE;
+                }
+            } else {
+                // Emergency overflow - this shouldn't happen with dynamic adjustment
+                static int overflowCount = 0;
+                overflowCount++;
+                
+                // Skip oldest data to make room
+                int skipBytes = soundBufferLen;
+                m_sdl2ReadPos = (m_sdl2ReadPos + skipBytes) % SDL2_BUFFER_SIZE;
+                
+                // Write the new data
+                for (int i = 0; i < soundBufferLen; i++) {
+                    m_sdl2AudioBuffer[m_sdl2WritePos] = soundBuffer[i];
+                    m_sdl2WritePos = (m_sdl2WritePos + 1) % SDL2_BUFFER_SIZE;
+                }
+                
+                if (overflowCount <= 10 || overflowCount % 100 == 0) {
+                    qDebug() << "SDL2 EMERGENCY OVERFLOW - buffer management failed (count:" << overflowCount << ")";
+                }
+            }
+        }
+    } else
+#endif
+    // Handle Qt audio output with double buffering (inspired by Atari800MacX)
     if (m_audioEnabled && m_audioOutput && m_audioDevice) {
         unsigned char* soundBuffer = libatari800_get_sound_buffer();
         int soundBufferLen = libatari800_get_sound_buffer_len();
@@ -1192,7 +1260,114 @@ unsigned char AtariEmulator::convertQtKeyToAtari(int key, Qt::KeyboardModifiers 
 
 void AtariEmulator::setupAudio()
 {
-    qDebug() << "Setting up double-buffered audio output (inspired by Atari800MacX)...";
+#ifdef HAVE_SDL2_AUDIO
+    if (m_audioBackend == SDL2Audio) {
+        qDebug() << "Setting up SDL2 audio backend for low latency...";
+        
+        // Get audio parameters from libatari800
+        int sampleRate = libatari800_get_sound_frequency();
+        int channels = libatari800_get_num_sound_channels();
+        int sampleSize = libatari800_get_sound_sample_size();
+        
+        qDebug() << "Audio config - Frequency:" << sampleRate << "Hz, Channels:" << channels << "Sample size:" << sampleSize << "bytes";
+        
+        // Create SDL2 audio backend if not created
+        if (!m_sdl2Audio) {
+            m_sdl2Audio = new SDL2AudioBackend(this);
+        }
+        
+        // Initialize ring buffer with prefill for stability
+        m_sdl2AudioBuffer.resize(SDL2_BUFFER_SIZE);
+        m_sdl2AudioBuffer.fill(0);
+        m_sdl2WritePos = 0;
+        m_sdl2ReadPos = 0;
+        
+        // Set target buffer level for low latency while avoiding underruns
+        // Start conservatively and let it stabilize
+        m_sdl2TargetBufferLevel = 3000;  // About 2 frames worth
+        m_sdl2BufferLevelAccum = 0;
+        m_sdl2BufferLevelCount = 0;
+        
+        // Fill buffer with silence initially to prevent underruns at start
+        // The actual audio data will come from processFrame()
+        for (int i = 0; i < m_sdl2TargetBufferLevel; i++) {
+            m_sdl2AudioBuffer[m_sdl2WritePos] = 0;
+            m_sdl2WritePos = (m_sdl2WritePos + 1) % SDL2_BUFFER_SIZE;
+        }
+        qDebug() << "SDL2 buffer initialized with silence (target level:" << m_sdl2TargetBufferLevel << "bytes)";
+        
+        // Initialize SDL2 audio
+        if (m_sdl2Audio->initialize(sampleRate, channels, sampleSize)) {
+            // Set the audio callback to read from our ring buffer
+            m_sdl2Audio->setAudioCallback([this](unsigned char* stream, int len) {
+                QMutexLocker locker(&m_sdl2AudioMutex);
+                
+                // Calculate available data in ring buffer
+                int availableData = (m_sdl2WritePos - m_sdl2ReadPos + SDL2_BUFFER_SIZE) % SDL2_BUFFER_SIZE;
+                
+                // Track buffer level for monitoring
+                m_sdl2BufferLevelAccum += availableData;
+                m_sdl2BufferLevelCount++;
+                
+                // Report average buffer level periodically
+                if (m_sdl2BufferLevelCount >= 100) {
+                    int avgLevel = m_sdl2BufferLevelAccum / m_sdl2BufferLevelCount;
+                    float percentFull = (float)avgLevel / (float)m_sdl2TargetBufferLevel * 100.0f;
+                    
+                    // Report buffer level periodically for monitoring
+                    // Always report in adaptive mode to monitor behavior
+                    if (m_sdl2AdaptiveMode || percentFull < 50.0f || percentFull > 200.0f) {
+                        qDebug() << "SDL2 buffer:" << avgLevel << "bytes (" << percentFull << "% of target)";
+                    }
+                    
+                    m_sdl2BufferLevelAccum = 0;
+                    m_sdl2BufferLevelCount = 0;
+                }
+                
+                if (availableData >= len) {
+                    // We have enough data
+                    for (int i = 0; i < len; i++) {
+                        stream[i] = m_sdl2AudioBuffer[m_sdl2ReadPos];
+                        m_sdl2ReadPos = (m_sdl2ReadPos + 1) % SDL2_BUFFER_SIZE;
+                    }
+                } else if (availableData > 0) {
+                    // Partial data available - underrun
+                    int i;
+                    for (i = 0; i < availableData; i++) {
+                        stream[i] = m_sdl2AudioBuffer[m_sdl2ReadPos];
+                        m_sdl2ReadPos = (m_sdl2ReadPos + 1) % SDL2_BUFFER_SIZE;
+                    }
+                    // Fill rest with silence
+                    memset(stream + i, 0, len - i);
+                    
+                    static int underrunCount = 0;
+                    underrunCount++;
+                    if (underrunCount <= 10 || underrunCount % 100 == 0) {
+                        qDebug() << "SDL2 audio UNDERRUN - only" << availableData << "of" << len << "bytes available (count:" << underrunCount << ")";
+                    }
+                } else {
+                    // No data, provide silence
+                    memset(stream, 0, len);
+                    
+                    static int silenceCount = 0;
+                    silenceCount++;
+                    if (silenceCount <= 10 || silenceCount % 100 == 0) {
+                        qDebug() << "SDL2 audio buffer EMPTY - no data available (count:" << silenceCount << ")";
+                    }
+                }
+            });
+            
+            qDebug() << "SDL2 audio backend initialized with latency:" << m_sdl2Audio->getLatencyMs() << "ms";
+            return;
+        } else {
+            qDebug() << "Failed to initialize SDL2 audio, falling back to Qt audio";
+            m_audioBackend = QtAudio;
+        }
+    }
+#endif
+
+    // Qt audio backend setup (original double-buffered implementation)
+    qDebug() << "Setting up Qt double-buffered audio output...";
     
     // Get audio parameters from libatari800
     m_sampleRate = libatari800_get_sound_frequency();
@@ -1298,16 +1473,34 @@ void AtariEmulator::enableAudio(bool enabled)
     if (m_audioEnabled != enabled) {
         m_audioEnabled = enabled;
         
-        if (enabled && !m_audioOutput) {
-            setupAudio();
-        } else if (!enabled && m_audioOutput) {
-            m_audioOutput->stop();
-            delete m_audioOutput;
-            m_audioOutput = nullptr;
-            m_audioDevice = nullptr;
-            // Clear DSP buffer positions
-            m_dspReadPos = 0;
-            m_dspWritePos = m_targetDelay * m_bytesPerSample;  // Reset to target delay
+        if (enabled) {
+#ifdef HAVE_SDL2_AUDIO
+            if (m_audioBackend == SDL2Audio) {
+                if (!m_sdl2Audio || !m_sdl2Audio->isInitialized()) {
+                    setupAudio();
+                } else {
+                    m_sdl2Audio->resume();
+                }
+            } else
+#endif
+            if (!m_audioOutput) {
+                setupAudio();
+            }
+        } else {
+#ifdef HAVE_SDL2_AUDIO
+            if (m_audioBackend == SDL2Audio && m_sdl2Audio) {
+                m_sdl2Audio->pause();
+            } else
+#endif
+            if (m_audioOutput) {
+                m_audioOutput->stop();
+                delete m_audioOutput;
+                m_audioOutput = nullptr;
+                m_audioDevice = nullptr;
+                // Clear DSP buffer positions
+                m_dspReadPos = 0;
+                m_dspWritePos = m_targetDelay * m_bytesPerSample;  // Reset to target delay
+            }
         }
         
         qDebug() << "Audio" << (enabled ? "enabled" : "disabled");
@@ -1316,10 +1509,39 @@ void AtariEmulator::enableAudio(bool enabled)
 
 void AtariEmulator::setVolume(float volume)
 {
+#ifdef HAVE_SDL2_AUDIO
+    if (m_audioBackend == SDL2Audio && m_sdl2Audio) {
+        m_sdl2Audio->setVolume(volume);
+        qDebug() << "SDL2 audio volume set to:" << volume;
+    } else
+#endif
     if (m_audioOutput) {
         m_audioOutput->setVolume(qBound(0.0f, volume, 1.0f));
-        qDebug() << "Audio volume set to:" << volume;
+        qDebug() << "Qt audio volume set to:" << volume;
     }
+}
+
+void AtariEmulator::setAudioBackend(AudioBackend backend)
+{
+#ifdef HAVE_SDL2_AUDIO
+    if (m_audioBackend != backend) {
+        // Stop current audio
+        if (m_audioEnabled) {
+            enableAudio(false);
+        }
+        
+        m_audioBackend = backend;
+        qDebug() << "Audio backend changed to:" << (backend == SDL2Audio ? "SDL2" : "Qt");
+        
+        // Restart audio with new backend
+        if (m_audioEnabled) {
+            enableAudio(true);
+        }
+    }
+#else
+    Q_UNUSED(backend)
+    m_audioBackend = QtAudio;
+#endif
 }
 
 void AtariEmulator::setKbdJoy0Enabled(bool enabled)
