@@ -139,8 +139,10 @@ $CONTAINER_RUNTIME run --rm \
         mkdir -p build
         cd build
         
-        # Configure
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        # Configure (disable SDL2 for container build)
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
+              ..
         
         # Build
         make -j\$(nproc)

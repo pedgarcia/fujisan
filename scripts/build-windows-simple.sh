@@ -30,13 +30,14 @@ rm -rf build-cross-windows
 mkdir -p build-cross-windows
 cd build-cross-windows
 
-# Configure with CMake
+# Configure with CMake (disable SDL2 for Windows)
 echo "Configuring..."
 x86_64-w64-mingw32-cmake \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=Windows \
     -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
     -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ \
+    -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
     ..
 
 # Build

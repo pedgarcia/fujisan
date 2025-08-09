@@ -71,6 +71,7 @@ podman run --rm \
         x86_64-w64-mingw32-cmake \
             -DCMAKE_TOOLCHAIN_FILE=mingw-toolchain.cmake \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
             -DFUJISAN_VERSION=dev-cross \
             ..
         

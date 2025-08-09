@@ -101,6 +101,9 @@ extern "C" {
     // State save functions
     #include "statesav.h"
     
+    // Disk activity callback function
+    extern void libatari800_set_disk_activity_callback(void (*callback)(int drive, int operation));
+    
     // Restore string macro if it was defined
     #ifdef TEMP_STRING_BACKUP
     #define string TEMP_STRING_BACKUP
