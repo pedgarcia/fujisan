@@ -1430,14 +1430,21 @@ void AtariEmulator::setupAudio()
     qDebug() << "Using audio format - Rate:" << format.sampleRate() << "Channels:" << format.channelCount() << "Sample size:" << format.sampleSize();
     
     // Calculate fragment size and buffer parameters (like Atari800MacX)
+#ifdef _WIN32
+    // Windows needs larger buffers due to higher audio latency
+    m_fragmentSize = 1024; // Larger fragments for Windows (~23ms at 44100Hz)
+    int targetDelayMs = 60;  // More headroom for Windows audio system
+#else
+    // macOS/Linux can use smaller buffers for lower latency
     m_fragmentSize = 512; // Smaller fragments for more responsive audio
+    int targetDelayMs = 40;  // Original delay for macOS/Linux
+#endif
     int fragmentBytes = m_fragmentSize * m_bytesPerSample;
     
     // Set up DSP buffer to handle the rate mismatch
     // We generate 1472 bytes/frame but Qt consumes ~940 bytes/call
     // This means we accumulate ~532 bytes per frame (36% excess)
     // Buffer needs to be large enough to absorb this while we wait for consumption
-    int targetDelayMs = 40;  // Larger delay for stability
     m_targetDelay = (m_sampleRate * targetDelayMs) / 1000;  // Convert to samples
     // Use a larger buffer to handle the accumulation
     int dspBufferSamples = m_fragmentSize * 10;  // Large buffer to handle rate mismatch
@@ -1463,16 +1470,28 @@ void AtariEmulator::setupAudio()
     // Create and configure audio output
     m_audioOutput = new QAudioOutput(format, this);
     
-    // Set Qt buffer size smaller to force more frequent reads
-    // This helps maintain steady consumption
+    // Set Qt buffer size - Windows needs larger buffers
+#ifdef _WIN32
+    // Windows needs larger buffer to prevent underruns
+    m_audioOutput->setBufferSize(8192);  // Larger buffer for Windows stability
+    qDebug() << "Using Windows-optimized audio buffer: 8192 bytes";
+#else
+    // macOS/Linux can use smaller buffer for lower latency
     m_audioOutput->setBufferSize(2048);  // Small buffer for frequent reads
+#endif
     
     // Set notification interval to match frame rate
     int notifyMs = (m_videoSystem == "-ntsc") ? 16 : 20;  // 60Hz or 50Hz
     m_audioOutput->setNotifyInterval(notifyMs);
     
-    // Set category to Game for lower latency
+    // Set category for optimal performance
+#ifdef _WIN32
+    // Windows: Use media category for better compatibility
+    m_audioOutput->setCategory("media");
+#else
+    // macOS/Linux: Use game category for lower latency
     m_audioOutput->setCategory("game");
+#endif
     
     // Set volume to ensure audio is active
     m_audioOutput->setVolume(1.0);
@@ -1972,6 +1991,23 @@ double AtariEmulator::calculateSpeedAdjustment()
         // Negative gap = buffer too full, slow down
         double speedAdjustment = 0.0;
         
+#ifdef _WIN32
+        // Windows: Use gentler speed adjustments to avoid audio artifacts
+        if (m_avgGap > 100) {
+            // Buffer very low, speed up moderately
+            speedAdjustment = 0.03;
+        } else if (m_avgGap > 40) {
+            // Buffer low, speed up slightly
+            speedAdjustment = 0.015;
+        } else if (m_avgGap < -100) {
+            // Buffer very full, slow down moderately
+            speedAdjustment = -0.03;
+        } else if (m_avgGap < -40) {
+            // Buffer full, slow down slightly
+            speedAdjustment = -0.015;
+        }
+#else
+        // macOS/Linux: Original more aggressive adjustments
         if (m_avgGap > 50) {
             // Buffer very low, speed up significantly
             speedAdjustment = 0.05;
@@ -1985,6 +2021,7 @@ double AtariEmulator::calculateSpeedAdjustment()
             // Buffer full, slow down slightly
             speedAdjustment = -0.02;
         }
+#endif
         
         return speedAdjustment;
     }
@@ -2009,7 +2046,13 @@ void AtariEmulator::updateEmulationSpeed()
     m_targetSpeed = qBound(0.95, m_targetSpeed, 1.05);
     
     // Smooth transition to target speed
+#ifdef _WIN32
+    // Windows: Smoother transition to avoid audio artifacts
+    m_currentSpeed = m_currentSpeed * 0.95 + m_targetSpeed * 0.05;
+#else
+    // macOS/Linux: Faster transition for more responsive adjustment
     m_currentSpeed = m_currentSpeed * 0.9 + m_targetSpeed * 0.1;
+#endif
     
     // Apply speed to frame timer
     if (m_frameTimer) {
