@@ -903,7 +903,7 @@ void AtariEmulator::dismountDiskImage(int driveNumber)
     }
     
     // Actually dismount from libatari800 core
-    libatari800_dismount_disk_image(driveNumber);
+    libatari800_unmount_disk(driveNumber);
     
     // Clear Fujisan internal state
     m_diskImages[driveNumber - 1].clear();

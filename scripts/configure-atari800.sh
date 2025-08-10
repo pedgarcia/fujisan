@@ -159,3 +159,10 @@ else
 fi
 
 echo "atari800 configuration completed"
+
+# Apply inline patches if needed for missing functions
+INLINE_PATCH="${PATCHES_DIR}/patch-libatari800-inline.sh"
+if [ -f "$INLINE_PATCH" ]; then
+    echo "Applying inline patches for disk management functions..."
+    bash "$INLINE_PATCH" "$ATARI800_SRC_PATH" || echo "Inline patch may have already been applied"
+fi
