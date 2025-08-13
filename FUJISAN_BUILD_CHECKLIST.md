@@ -74,6 +74,19 @@ After configure step, verify patches were applied:
 
 ## Post-Build Testing
 
+### Code Signing Verification (macOS Distribution Builds)
+- [ ] DMGs created with `--sign` flag
+- [ ] Developer ID Application certificate detected automatically
+- [ ] Hardened runtime enabled on all binaries
+- [ ] All frameworks and plugins signed
+- [ ] No ad-hoc signatures in distribution build
+
+```bash
+# Verify signing
+codesign --verify --deep --strict dist/macos/Fujisan-*-arm64.dmg
+codesign --display --verbose=2 /Volumes/Fujisan*/Fujisan.app
+```
+
 ### Disk LED Activity
 - [ ] Mount a disk image
 - [ ] Observe LED turns on during disk activity
@@ -95,6 +108,12 @@ After configure step, verify patches were applied:
 - [ ] macOS x86_64 builds and runs
 - [ ] Windows .exe created successfully
 - [ ] Linux binary/packages created
+
+### Distribution Readiness (macOS)
+- [ ] DMGs signed with Developer ID (not ad-hoc)
+- [ ] Notarization successful
+- [ ] DMGs stapled with notarization
+- [ ] No security warnings when opening on clean Mac
 
 ## Common Issues and Solutions
 
@@ -120,14 +139,20 @@ After configure step, verify patches were applied:
 ## Build Commands Quick Reference
 
 ```bash
-# macOS both architectures
+# macOS both architectures (development)
 ./build.sh macos
 
-# macOS ARM64 only
+# macOS both architectures (distribution)
+./build.sh macos --sign
+
+# macOS ARM64 only (development)
 ./scripts/build-macos-separate-dmgs.sh --skip-x86_64
 
-# macOS x86_64 only  
-./scripts/build-macos-separate-dmgs.sh --skip-arm64
+# macOS ARM64 only (distribution)
+./scripts/build-macos-separate-dmgs.sh --skip-x86_64 --sign
+
+# macOS x86_64 only (distribution)
+./scripts/build-macos-separate-dmgs.sh --skip-arm64 --sign
 
 # Windows
 ./build.sh windows
@@ -135,8 +160,11 @@ After configure step, verify patches were applied:
 # Linux
 ./build.sh linux
 
-# All platforms
-./build.sh all
+# All platforms (with macOS signing)
+./build.sh all --sign
+
+# Notarize signed DMGs
+./scripts/sign-and-notarize-dmgs.sh --skip-signing
 ```
 
 ## Maintenance Notes

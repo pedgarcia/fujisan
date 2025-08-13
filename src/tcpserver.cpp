@@ -522,6 +522,37 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
                         "Failed to load XEX file: " + validatedPath);
         }
         
+    } else if (subCommand == "load_xex_no_run") {
+        // Load XEX executable file without running it
+        QString path = params["path"].toString();
+        
+        QString validatedPath = validateAndNormalizePath(path);
+        if (validatedPath.isEmpty()) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "File not found or invalid path: " + path);
+            return;
+        }
+        
+        // Use the new loadXexWithoutRunning method
+        bool success = m_emulator->loadXexWithoutRunning(validatedPath);
+        
+        if (success) {
+            QJsonObject result;
+            result["path"] = validatedPath;
+            result["loaded"] = true;
+            result["ready_to_run"] = true;
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["path"] = validatedPath;
+            eventData["loaded_without_running"] = true;
+            sendEventToAllClients("xex_loaded_no_run", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Failed to load XEX file: " + validatedPath);
+        }
+        
     } else if (subCommand == "enable_drive") {
         // Enable specified drive
         int drive = params["drive"].toInt();
@@ -1470,6 +1501,46 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
         }
         
         result["disassembly"] = disassembly;
+        sendResponse(client, requestId, true, result);
+        
+    } else if (subCommand == "run_loaded_xex") {
+        // Run a previously loaded XEX file
+        if (!m_emulator->hasLoadedXex()) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "No XEX file loaded. Use media.load_xex_no_run first");
+            return;
+        }
+        
+        bool success = m_emulator->runLoadedXex();
+        
+        if (success) {
+            QJsonObject result;
+            result["running"] = true;
+            result["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["running"] = true;
+            eventData["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+            sendEventToAllClients("xex_started", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Failed to run loaded XEX");
+        }
+        
+    } else if (subCommand == "clear_loaded_xex") {
+        // Clear any loaded XEX from memory
+        m_emulator->clearLoadedXex();
+        
+        QJsonObject result;
+        result["cleared"] = true;
+        sendResponse(client, requestId, true, result);
+        
+    } else if (subCommand == "get_xex_status") {
+        // Get status of loaded XEX
+        QJsonObject result;
+        result["has_loaded_xex"] = m_emulator->hasLoadedXex();
         sendResponse(client, requestId, true, result);
         
     } else {

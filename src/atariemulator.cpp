@@ -23,6 +23,7 @@
 #include <QFile>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QByteArray>
 #include <cstring>  // for memset
 #include <vector>   // for std::vector
 
@@ -39,6 +40,10 @@ extern "C" {
 // Printer support functions
 void ESC_PatchOS(void);
 void Devices_UpdatePatches(void);
+
+// Access to CPU registers for XEX loading
+extern unsigned char CPU_regS;
+extern unsigned short CPU_regPC;
 }
 
 // Static callback function for libatari800 disk activity
@@ -87,6 +92,10 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_printerEnabled(false)
     , m_fujinet_restart_pending(false)
     , m_fujinet_restart_delay(0)
+    , m_xexLoaded(false)
+    , m_xexEntryPoint(0)
+    , m_xexInitAddr(0)
+    , m_xexRunAddr(0)
 {
     libatari800_clear_input_array(&m_currentInput);
     
@@ -1737,6 +1746,62 @@ int AtariEmulator::getCurrentEmulationSpeed() const
 {
     // Return the current emulation speed percentage
     return Atari800_turbo_speed;
+}
+
+bool AtariEmulator::loadXexWithoutRunning(const QString& filename)
+{
+    // Use the new libatari800 API function
+    bool success = libatari800_load_xex_no_run(filename.toUtf8().constData());
+    
+    if (!success) {
+        m_xexLoaded = false;
+        qDebug() << "Failed to initiate XEX load:" << filename;
+        return false;
+    }
+    
+    // The loading happens asynchronously during boot, so we need to run frames
+    // until the loading is complete
+    qDebug() << "Initiated XEX load, waiting for completion...";
+    
+    // Run frames until the XEX is actually loaded (max 100 frames = ~1.6 seconds)
+    int maxFrames = 100;
+    for (int i = 0; i < maxFrames; i++) {
+        // Run one frame
+        processFrame();
+        
+        // Check if the XEX is now loaded
+        if (libatari800_has_loaded_xex()) {
+            m_xexLoaded = true;
+            qDebug() << "XEX loaded successfully without running after" << i+1 << "frames:" << filename;
+            return true;
+        }
+    }
+    
+    // Loading timed out
+    m_xexLoaded = false;
+    qDebug() << "XEX loading timed out:" << filename;
+    return false;
+}
+
+bool AtariEmulator::runLoadedXex()
+{
+    if (!m_xexLoaded) {
+        qDebug() << "No XEX loaded to run";
+        return false;
+    }
+    
+    // Use the new libatari800 API function to run the loaded XEX
+    bool success = libatari800_run_loaded_xex();
+    
+    if (success) {
+        qDebug() << "XEX execution started successfully";
+        // Clear the loaded flag since we're running it now
+        m_xexLoaded = false;
+    } else {
+        qDebug() << "Failed to run loaded XEX";
+    }
+    
+    return success;
 }
 
 void AtariEmulator::injectCharacter(char ch)

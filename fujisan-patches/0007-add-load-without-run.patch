@@ -1,0 +1,181 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Development
+Date: Mon, 12 Aug 2025 00:00:00 -0000
+Subject: [PATCH] Add load-without-run functionality for XEX files
+
+This patch adds the ability to load XEX files without automatically
+executing them, which is essential for debuggers to set breakpoints
+before program execution begins.
+
+New features:
+- BINLOAD_no_run flag to prevent auto-execution after loading
+- BINLOAD_LoaderNoRun() function to load without running
+- libatari800_load_xex_no_run() API function
+- libatari800_run_loaded_xex() API function to trigger execution
+
+---
+ src/binload.c               | 38 ++++++++++++++++++++++++++++++++++++--
+ src/binload.h               |  7 +++++++
+ src/libatari800/api.c       | 35 +++++++++++++++++++++++++++++++++++
+ src/libatari800/libatari800.h |  6 ++++++
+ 4 files changed, 84 insertions(+), 2 deletions(-)
+
+diff --git a/src/binload.c b/src/binload.c
+index 1111111..2222222 100644
+--- a/src/binload.c
++++ b/src/binload.c
+@@ -53,6 +53,10 @@ static int init2e3 = FALSE;
+ /* Indicates that we are currently not during loading of a segment. */
+ static int segfinished = TRUE;
+ int BINLOAD_pause_loading;
++/* Flag to prevent automatic execution after loading */
++int BINLOAD_no_run = FALSE;
++/* Stores whether a program is loaded but not yet run */
++int BINLOAD_loaded_not_run = FALSE;
+ 
+ /* Read a word from file */
+ static int read_word(void)
+@@ -125,8 +129,19 @@ static void loader_cont(void)
+ 			byte = fgetc(BINLOAD_bin_file);
+ 			if (byte == EOF) {
+ 				fclose(BINLOAD_bin_file);
+ 				BINLOAD_bin_file = NULL;
+-				CPU_regPC = MEMORY_dGetWordAligned(0x2e0);
+-				if (MEMORY_dGetByte(0x2e3) != 0xd7) {
++				
++				/* Check if we should prevent auto-execution */
++				if (BINLOAD_no_run) {
++					BINLOAD_no_run = FALSE;  /* Reset flag for next load */
++					BINLOAD_loaded_not_run = TRUE;  /* Mark as loaded but not run */
++					/* Return to OS without running the loaded program */
++					CPU_regPC = 0xE477;  /* Atari OS Coldstart address */
++					return;
++				}
++				
++				/* Normal execution path */
++				CPU_regPC = MEMORY_dGetWordAligned(0x2e0);  /* RUNAD */
++				if (MEMORY_dGetByte(0x2e3) != 0xd7) {  /* Check INITAD flag */
+ 					/* run INIT routine which RTSes directly to RUN routine */
+ 					CPU_regPC--;
+ 					MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC >> 8);		/* high */
+@@ -223,6 +238,25 @@ int BINLOAD_Loader(const char *filename)
+ 	return FALSE;
+ }
+ 
++/* Load BIN file without executing it, returns TRUE if ok */
++int BINLOAD_LoaderNoRun(const char *filename)
++{
++	BINLOAD_no_run = TRUE;  /* Set flag to prevent execution */
++	return BINLOAD_Loader(filename);
++}
++
++/* Run a previously loaded XEX file */
++int BINLOAD_RunLoadedXex(void)
++{
++	if (!BINLOAD_loaded_not_run) {
++		return FALSE;  /* No XEX loaded or already running */
++	}
++	
++	BINLOAD_loaded_not_run = FALSE;
++	/* Jump to the run address */
++	CPU_regPC = MEMORY_dGetWordAligned(0x2e0);  /* RUNAD */
++	return TRUE;
++}
++
+ #endif /* BASIC */
+ 
+ void BINLOAD_Initialise(void)
+diff --git a/src/binload.h b/src/binload.h
+index 3333333..4444444 100644
+--- a/src/binload.h
++++ b/src/binload.h
+@@ -7,6 +7,7 @@
+ extern FILE *BINLOAD_bin_file;
+ 
+ int BINLOAD_Loader(const char *filename);
++int BINLOAD_LoaderNoRun(const char *filename);
+ extern int BINLOAD_start_binloading;
+ extern int BINLOAD_loading_basic;
+ 
+@@ -19,6 +20,12 @@ extern int BINLOAD_wait_active;
+ /* Set it to TRUE to pause the current loading of a DOS file. */
+ extern int BINLOAD_pause_loading;
+ 
++/* Set to TRUE to prevent automatic execution after loading */
++extern int BINLOAD_no_run;
++
++/* Indicates that a program is loaded but not yet run */
++extern int BINLOAD_loaded_not_run;
++int BINLOAD_RunLoadedXex(void);
+ 
+ #define BINLOAD_LOADING_BASIC_SAVED              1
+ #define BINLOAD_LOADING_BASIC_LISTED             2
+diff --git a/src/libatari800/api.c b/src/libatari800/api.c
+index 5555555..6666666 100644
+--- a/src/libatari800/api.c
++++ b/src/libatari800/api.c
+@@ -18,6 +18,7 @@
+ #include "screen.h"
+ #include "colours.h"
+ #include "sound.h"
++#include "binload.h"
+ 
+ extern Sound_setup_t Sound_desired;
+ 
+@@ -282,4 +283,38 @@ UBYTE *libatari800_get_main_memory_ptr()
+ 	return MEMORY_mem;
+ }
+ 
++/* Load an XEX file without executing it */
++int libatari800_load_xex_no_run(const char *filename)
++{
++#ifdef BASIC
++	return FALSE;  /* Not supported in BASIC version */
++#else
++	if (!filename) {
++		return FALSE;
++	}
++	
++	/* Use the new LoaderNoRun function */
++	return BINLOAD_LoaderNoRun(filename);
++#endif
++}
++
++/* Run a previously loaded XEX file */
++int libatari800_run_loaded_xex(void)
++{
++#ifdef BASIC
++	return FALSE;  /* Not supported in BASIC version */
++#else
++	return BINLOAD_RunLoadedXex();
++#endif
++}
++
++/* Check if an XEX is loaded but not yet run */
++int libatari800_has_loaded_xex(void)
++{
++#ifdef BASIC
++	return FALSE;  /* Not supported in BASIC version */
++#else
++	return BINLOAD_loaded_not_run;
++#endif
++}
++
+ /* vim: set noet:ts=8:sw=8:sts=8: */
+diff --git a/src/libatari800/libatari800.h b/src/libatari800/libatari800.h
+index 7777777..8888888 100644
+--- a/src/libatari800/libatari800.h
++++ b/src/libatari800/libatari800.h
+@@ -280,6 +280,12 @@ statesav_tags_t *libatari800_get_statesav_tags();
+ 
+ /* Get pointer to main memory array */
+ UBYTE *libatari800_get_main_memory_ptr();
++
++/* Load XEX file without executing it */
++int libatari800_load_xex_no_run(const char *filename);
++/* Run a previously loaded XEX file */
++int libatari800_run_loaded_xex(void);
++/* Check if an XEX is loaded but not yet run */
++int libatari800_has_loaded_xex(void);
+ 
+ #endif /* LIBATARI800_LIBATARI800_H_ */

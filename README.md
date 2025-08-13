@@ -100,6 +100,9 @@ brew install cmake
 # Install autotools for building atari800
 brew install autoconf automake
 
+# For Intel Macs, also install x86_64 version for universal builds
+arch -x86_64 /usr/local/bin/brew install qt@5
+
 # Add Qt5 to PATH (if needed)
 export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
 ```
@@ -133,31 +136,32 @@ sudo dnf install qt5-qtbase-devel cmake gcc-c++
 2. **Install CMake**: Download from [cmake.org](https://cmake.org/download/)
 3. **Install Visual Studio 2019+** (for MSVC) or **MinGW** (for GCC)
 
-### Build Steps
+### Quick Build with Unified Script
 
-#### **Step 1: Set Environment Variable**
+The easiest way to build Fujisan:
+
+```bash
+# Development build (ad-hoc signing)
+./build.sh macos
+
+# Distribution build (Developer ID signing)
+./build.sh macos --sign
+
+# Cross-platform build
+./build.sh all
+```
+
+### Manual Build Steps
+
+If you prefer to build manually or need to customize the process:
+
+#### **Step 1: Set Environment Variable (Optional)**
 ```bash
 export ATARI800_SRC_PATH=/path/to/atari800-src
 ```
-**Note**: This environment variable needs to be set in each terminal session or shell where you run the build commands. If you get "environment variable not set" errors, set it again in your current shell.
+**Note**: If not set, CMake will automatically download and build atari800 source.
 
-#### **Step 2: Apply Fujisan Patches to Atari800**
-```bash
-cd fujisan/patches
-./apply-patches.sh
-```
-
-#### **Step 3: Build libatari800**
-```bash
-cd $ATARI800_SRC_PATH
-./autogen.sh              # Generate configure script (requires autoconf/automake)
-./configure --target=libatari800
-make
-```
-
-**Note**: If you get errors about missing auxiliary files when running `./configure`, make sure you've run `./autogen.sh` first.
-
-#### **Step 4: Build Fujisan**
+#### **Step 2: Build Fujisan**
 
 **Important**: We recommend out-of-source builds to keep the source directory clean. If you previously built in-source, clean up first:
 ```bash
@@ -175,10 +179,10 @@ cd /path/to/fujisan
 mkdir -p build
 cd build
 
-# Configure with CMake (ATARI800_SRC_PATH must be set)
-ATARI800_SRC_PATH=/path/to/atari800-src cmake ..
-# OR for macOS with Homebrew Qt5:
-# ATARI800_SRC_PATH=/path/to/atari800-src CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake ..
+# Configure with CMake
+cmake ..
+# OR specify Qt5 path explicitly:
+# CMAKE_PREFIX_PATH="/opt/homebrew/opt/qt@5" cmake ..
 
 # Build
 make
@@ -302,6 +306,39 @@ rm -rf CMakeCache.txt CMakeFiles/ Makefile cmake_install.cmake Fujisan_autogen/
 # Remove compiled binary
 rm -f Fujisan fujisan Fujisan.exe
 ```
+
+### Code Signing and Distribution (macOS)
+
+For distributing macOS applications, you need to sign them with a Developer ID certificate:
+
+#### **Prerequisites for Distribution**
+1. **Apple Developer Account** with Developer ID Application certificate
+2. **Certificate installed** in Keychain Access
+3. **App-specific password** for notarization
+
+#### **Building for Distribution**
+```bash
+# Build and sign with Developer ID
+./build.sh macos --sign
+
+# This creates signed DMGs ready for notarization:
+# dist/macos/Fujisan-{version}-arm64.dmg
+# dist/macos/Fujisan-{version}-x86_64.dmg
+```
+
+#### **Notarization Process**
+```bash
+# Set up notarization credentials (one-time setup)
+xcrun notarytool store-credentials "fujisan-notarization" \
+    --apple-id "your-apple-id@example.com" \
+    --team-id "YOUR_TEAM_ID" \
+    --password "your-app-specific-password"
+
+# Notarize the signed DMGs
+./scripts/sign-and-notarize-dmgs.sh --skip-signing
+```
+
+**Note**: For development and testing, use `./build.sh macos` without `--sign` for ad-hoc signing.
 
 ### Running
 ```bash

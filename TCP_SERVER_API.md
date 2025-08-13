@@ -229,6 +229,44 @@ echo '{
 
 **Note:** To clear XEX programs from memory, use `system.cold_boot`.
 
+#### `media.load_xex_no_run`
+
+Load an Atari executable file (.xex format) into memory without executing it. This allows you to set breakpoints before running the program.
+
+```bash
+echo '{
+  "command": "media.load_xex_no_run",
+  "params": {"path": "/path/to/program.xex"}
+}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "path": "/path/to/program.xex",
+    "loaded": true,
+    "ready_to_run": true
+  }
+}
+```
+
+**Event sent to all clients:**
+```json
+{
+  "type": "event",
+  "event": "xex_loaded_no_run",
+  "data": {
+    "path": "/path/to/program.xex",
+    "loaded_without_running": true
+  }
+}
+```
+
+**Note:** After loading, use `debug.run_loaded_xex` to start execution.
+
 ### System Commands
 
 Control emulator execution and system state.
@@ -761,6 +799,78 @@ Example response:
 }
 ```
 
+#### `debug.run_loaded_xex`
+
+Start execution of a previously loaded XEX file. Use this after `media.load_xex_no_run` to begin program execution.
+
+```bash
+echo '{"command": "debug.run_loaded_xex"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "running": true,
+    "pc": "$2000"
+  }
+}
+```
+
+**Event sent to all clients:**
+```json
+{
+  "type": "event",
+  "event": "xex_started",
+  "data": {
+    "running": true,
+    "pc": "$2000"
+  }
+}
+```
+
+**Note:** Returns an error if no XEX has been loaded with `media.load_xex_no_run`.
+
+#### `debug.clear_loaded_xex`
+
+Clear any XEX file that was loaded but not yet run.
+
+```bash
+echo '{"command": "debug.clear_loaded_xex"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "cleared": true
+  }
+}
+```
+
+#### `debug.get_xex_status`
+
+Check if there is a loaded XEX file waiting to be run.
+
+```bash
+echo '{"command": "debug.get_xex_status"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "has_loaded_xex": true
+  }
+}
+```
+
 ### Config Commands
 
 Manage emulator configuration settings.
@@ -1040,6 +1150,26 @@ echo '{"command": "debug.add_breakpoint", "params": {"address": 1536}}' | nc loc
 echo '{"command": "system.resume"}' | nc localhost 6502
 
 # Monitor for breakpoint hit...
+```
+
+### Debugging with Breakpoints
+
+```bash
+#!/bin/bash
+# Load XEX without running, set breakpoints, then run
+
+# Load XEX file without executing
+echo '{"command": "media.load_xex_no_run", "params": {"path": "/path/to/debug.xex"}}' | nc localhost 6502
+
+# Set breakpoints at critical addresses
+echo '{"command": "debug.add_breakpoint", "params": {"address": 8192}}' | nc localhost 6502
+echo '{"command": "debug.add_breakpoint", "params": {"address": 8256}}' | nc localhost 6502
+
+# Now start execution - will stop at breakpoints
+echo '{"command": "debug.run_loaded_xex"}' | nc localhost 6502
+
+# Continue execution when ready
+echo '{"command": "debug.resume"}' | nc localhost 6502
 ```
 
 ### Development Workflow

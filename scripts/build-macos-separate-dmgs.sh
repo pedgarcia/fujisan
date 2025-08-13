@@ -59,6 +59,8 @@ CLEAN_BUILD=false
 SKIP_ARM64=false
 SKIP_X86_64=false
 SKIP_DMG=false
+SIGN_BUILD=false
+DEVELOPER_ID=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -78,15 +80,26 @@ while [[ $# -gt 0 ]]; do
             SKIP_DMG=true
             shift
             ;;
+        --sign)
+            SIGN_BUILD=true
+            shift
+            ;;
+        --developer-id)
+            DEVELOPER_ID="$2"
+            SIGN_BUILD=true
+            shift 2
+            ;;
         --help)
             echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
-            echo "  --clean       Clean build directories before starting"
-            echo "  --skip-arm64  Skip ARM64 build"
-            echo "  --skip-x86_64 Skip x86_64 build"
-            echo "  --skip-dmg    Skip DMG creation"
-            echo "  --help        Show this help message"
+            echo "  --clean              Clean build directories before starting"
+            echo "  --skip-arm64         Skip ARM64 build"
+            echo "  --skip-x86_64        Skip x86_64 build"
+            echo "  --skip-dmg           Skip DMG creation"
+            echo "  --sign               Sign with Developer ID Application certificate"
+            echo "  --developer-id ID    Specify Developer ID certificate name"
+            echo "  --help               Show this help message"
             echo ""
             echo "Output:"
             echo "  dist/Fujisan-{version}-arm64.dmg   - Apple Silicon DMG"
@@ -126,6 +139,106 @@ fi
 
 # Create directories
 mkdir -p "$ARM64_BUILD_DIR" "$X86_64_BUILD_DIR" "$DIST_DIR"
+
+# Function to find Developer ID certificate
+find_developer_id() {
+    if [[ -n "$DEVELOPER_ID" ]]; then
+        echo "$DEVELOPER_ID"
+        return
+    fi
+    
+    echo_info "Looking for Developer ID Application certificate..."
+    
+    # Get certificate hash (more reliable than name)
+    local cert_hash="ZC4PGBX6D6"  # Use Team ID as fallback
+    
+    # Try to get actual hash first
+    local actual_hash=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk '{print $2}')
+    
+    if [[ -n "$actual_hash" ]]; then
+        # Test if the hash works
+        if codesign --verify --sign "$actual_hash" /dev/null 2>/dev/null; then
+            cert_hash="$actual_hash"
+        fi
+    fi
+    
+    if [[ -z "$cert_hash" ]]; then
+        echo_error "No Developer ID Application certificate found"
+        echo_info "Available certificates:"
+        security find-identity -v -p codesigning
+        echo_info "Install a Developer ID Application certificate or run without --sign"
+        exit 1
+    fi
+    
+    # Get the friendly name for display
+    local cert_name=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+    
+    echo_success "Found certificate: $cert_name"
+    echo_info "Using certificate hash: $cert_hash"
+    
+    # Return the hash (which codesign prefers)
+    echo "$cert_hash"
+}
+
+# Function to sign app bundle with hardened runtime
+sign_app_bundle() {
+    local app_path="$1"
+    local dev_id="$2"
+    
+    echo_info "Signing app bundle with hardened runtime: $(basename "$app_path")"
+    
+    # Create entitlements for hardened runtime
+    local entitlements="/tmp/fujisan_entitlements.plist"
+    cat > "$entitlements" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
+EOF
+    
+    # Sign all frameworks and libraries first
+    if [[ -d "$app_path/Contents/Frameworks" ]]; then
+        find "$app_path/Contents/Frameworks" -name "*.dylib" -o -name "*.framework" | while read framework; do
+            codesign --force --timestamp --options runtime --sign "$dev_id" "$framework" 2>/dev/null || true
+        done
+    fi
+    
+    # Sign plugins
+    if [[ -d "$app_path/Contents/PlugIns" ]]; then
+        find "$app_path/Contents/PlugIns" -name "*.dylib" | while read plugin; do
+            codesign --force --timestamp --options runtime --sign "$dev_id" "$plugin" 2>/dev/null || true
+        done
+    fi
+    
+    # Sign the main executable
+    codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$dev_id" "$app_path/Contents/MacOS/Fujisan"
+    
+    # Sign the entire app bundle
+    codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$dev_id" "$app_path"
+    
+    # Clean up
+    rm -f "$entitlements"
+    
+    # Verify the signature
+    codesign --verify --deep --strict --verbose=2 "$app_path"
+    
+    # Check for hardened runtime
+    if codesign --display --verbose=2 "$app_path" 2>&1 | grep -q "runtime"; then
+        echo_success "Hardened runtime enabled"
+    else
+        echo_error "Hardened runtime not detected"
+    fi
+    
+    echo_success "App bundle signed: $(basename "$app_path")"
+}
 
 # Function to create DMG
 create_dmg() {
@@ -212,9 +325,14 @@ if [[ "$SKIP_ARM64" == "false" ]]; then
     mkdir -p "Fujisan.app/Contents/Resources/images"
     cp -r "$PROJECT_ROOT/images/"*.png "Fujisan.app/Contents/Resources/images/" 2>/dev/null || true
     
-    # Sign
-    echo_info "Signing app..."
-    codesign --force --deep --sign - "Fujisan.app"
+    # Sign with Developer ID or ad-hoc
+    if [[ "$SIGN_BUILD" == "true" ]]; then
+        local dev_id=$(find_developer_id)
+        sign_app_bundle "Fujisan.app" "$dev_id"
+    else
+        echo_info "Ad-hoc signing app..."
+        codesign --force --deep --sign - "Fujisan.app"
+    fi
     
     # Verify
     echo_info "Verifying ARM64 build..."
@@ -277,9 +395,14 @@ if [[ "$SKIP_X86_64" == "false" ]]; then
     mkdir -p "Fujisan.app/Contents/Resources/images"
     cp -r "$PROJECT_ROOT/images/"*.png "Fujisan.app/Contents/Resources/images/" 2>/dev/null || true
     
-    # Sign
-    echo_info "Signing app..."
-    codesign --force --deep --sign - "Fujisan.app"
+    # Sign with Developer ID or ad-hoc
+    if [[ "$SIGN_BUILD" == "true" ]]; then
+        local dev_id=$(find_developer_id)
+        sign_app_bundle "Fujisan.app" "$dev_id"
+    else
+        echo_info "Ad-hoc signing app..."
+        codesign --force --deep --sign - "Fujisan.app"
+    fi
     
     # Verify
     echo_info "Verifying x86_64 build..."
@@ -325,6 +448,14 @@ fi
 
 echo ""
 echo "Distribution files are in: $DIST_DIR"
+if [[ "$SIGN_BUILD" == "true" ]]; then
+    echo "DMGs are signed with Developer ID and ready for notarization!"
+    echo "Next step: Run ./scripts/sign-and-notarize-dmgs.sh --skip-signing"
+else
+    echo "DMGs use ad-hoc signing (for development only)"
+    echo "For distribution: Rebuild with --sign and notarize"
+fi
+
 echo ""
 echo "Users should download:"
 echo "  • Apple Silicon Macs (M1/M2/M3): Fujisan-${PROJECT_VERSION}-arm64.dmg"

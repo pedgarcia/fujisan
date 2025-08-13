@@ -96,3 +96,6 @@ Fujisan_autogen/
 # Executable (case variations)
 Fujisan
 fujisan
+
+# Release instructions (contains sensitive Apple Developer info)
+RELEASE_INSTRUCTIONS.md

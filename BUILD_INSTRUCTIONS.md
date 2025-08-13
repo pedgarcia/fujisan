@@ -20,10 +20,12 @@ The easiest way to build Fujisan for any platform:
 
 ```bash
 # Build for specific platform
-./build.sh macos          # Both Intel and ARM64 DMGs
+./build.sh macos          # Both Intel and ARM64 DMGs (ad-hoc signed)
+./build.sh macos --sign   # Both Intel and ARM64 DMGs (Developer ID signed)
 ./build.sh windows        # Windows ZIP package
 ./build.sh linux          # Linux DEB and tarball
 ./build.sh all            # All platforms
+./build.sh all --sign     # All platforms with macOS signing
 
 # Options
 ./build.sh macos --clean  # Clean build
@@ -31,11 +33,11 @@ The easiest way to build Fujisan for any platform:
 
 # All outputs go to dist/
 ls dist/
-# Fujisan-1.2.0-arm64.dmg
-# Fujisan-1.2.0-x86_64.dmg  
-# Fujisan-1.2.0-windows.zip
-# fujisan-1.2.0-linux-x64.tar.gz
-# fujisan_1.2.0_amd64.deb
+# macos/Fujisan-1.2.0-arm64.dmg
+# macos/Fujisan-1.2.0-x86_64.dmg  
+# windows/Fujisan-1.2.0-windows.zip
+# linux/fujisan-1.2.0-linux-x64.tar.gz
+# linux/fujisan_1.2.0_amd64.deb
 ```
 
 ## Prerequisites
@@ -149,28 +151,65 @@ Each DMG contains:
 - Applications folder shortcut for easy installation
 - README.txt with installation instructions
 
-### Code Signing
+### Code Signing and Distribution
 
-To sign the apps with an Apple Developer certificate:
+#### Development vs Distribution Builds
+
+**Development builds** (default):
+```bash
+./build.sh macos
+# Creates ad-hoc signed DMGs for testing
+```
+
+**Distribution builds** (for public release):
+```bash
+./build.sh macos --sign
+# Creates Developer ID signed DMGs ready for notarization
+```
+
+#### Prerequisites for Distribution
+
+1. **Apple Developer Account** with active membership
+2. **Developer ID Application certificate** (not Apple Development)
+3. **Certificate installed** in Keychain Access
+4. **App-specific password** for notarization
+
+#### Setting up Distribution Signing
 
 ```bash
 # 1. Check available signing identities
 security find-identity -v -p codesigning
 
-# 2. Sign both apps
-./scripts/sign-macos-apps.sh
+# You should see both:
+# "Apple Development: Your Name (TEAMID)" - for development
+# "Developer ID Application: Your Name (TEAMID)" - for distribution
 
-# This will:
-# - Create entitlements file with proper permissions for emulation
-# - Sign all frameworks and libraries
-# - Sign the main application bundle
-# - Verify the signature
+# 2. Build with automatic certificate detection
+./build.sh macos --sign
+
+# 3. Or specify certificate explicitly
+./scripts/build-macos-separate-dmgs.sh --developer-id "Developer ID Application: Your Name (TEAMID)"
 ```
 
-For distribution, you need:
-- **Development Certificate**: For testing on your own Mac
-- **Developer ID Application**: For direct distribution (outside App Store)
-- **Apple Distribution**: For Mac App Store
+#### Notarization Process
+
+```bash
+# 1. Set up notarization credentials (one-time)
+xcrun notarytool store-credentials "fujisan-notarization" \
+    --apple-id "your-apple-id@example.com" \
+    --team-id "YOUR_TEAM_ID" \
+    --password "your-app-specific-password"
+
+# 2. Notarize signed DMGs
+./scripts/sign-and-notarize-dmgs.sh --skip-signing
+
+# 3. DMGs are now ready for public distribution
+```
+
+#### Certificate Types
+- **Apple Development**: For testing on your own devices
+- **Developer ID Application**: For direct distribution (required for notarization)
+- **Apple Distribution**: For Mac App Store (not used by Fujisan)
 
 ## Windows Cross-Compilation
 

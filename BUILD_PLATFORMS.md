@@ -16,8 +16,14 @@ Fujisan supports three build environments:
 # Install dependencies
 brew install cmake qt@5
 
-# Full build with code signing and DMG
-./scripts/build-macos-release.sh
+# Development build (ad-hoc signing)
+./build.sh macos
+
+# Distribution build (Developer ID signing)
+./build.sh macos --sign
+
+# Clean build
+./build.sh macos --clean --sign
 ```
 
 ### Linux
@@ -437,15 +443,15 @@ spctl --assess --type execute Fujisan.app
 
 **macOS Developers:**
 ```bash
-# Development build
-mkdir build && cd build
-cmake .. && make -j4
+# Quick development build
+./build.sh macos
 
 # Test changes
-./Fujisan.app/Contents/MacOS/Fujisan
+open dist/macos/Fujisan-*-arm64.dmg  # Mount and test
 
-# Create release when ready
-./scripts/build-macos-release.sh
+# Create signed release when ready
+./build.sh macos --sign
+./scripts/sign-and-notarize-dmgs.sh --skip-signing
 ```
 
 **Linux Developers:**
@@ -458,9 +464,10 @@ podman run -it -v "$(pwd):/work" ubuntu:22.04
 **Cross-platform Testing:**
 ```bash
 # Test all platforms
-./scripts/build-macos-release.sh        # macOS
-./scripts/build-linux-container.sh      # Linux  
-./scripts/build-windows-cross.sh        # Windows
+./build.sh macos --sign                 # macOS
+./build.sh linux                        # Linux  
+./build.sh windows                      # Windows
+./build.sh all --sign                   # All platforms
 ```
 
 ### CI/CD Integration
@@ -474,13 +481,16 @@ All build scripts support automation:
 Example GitHub Actions:
 ```yaml
 - name: Build macOS
-  run: ./scripts/build-macos-release.sh --skip-notarize
+  run: ./build.sh macos --sign
   
 - name: Build Windows  
-  run: ./scripts/build-windows-cross.sh
+  run: ./build.sh windows
   
 - name: Build Linux
-  run: ./scripts/build-linux-container.sh
+  run: ./build.sh linux
+  
+- name: Build All Platforms
+  run: ./build.sh all --sign
 ```
 
 ---

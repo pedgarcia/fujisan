@@ -247,6 +247,12 @@ public:
     
     // Direct input injection for paste functionality
     void injectCharacter(char ch);
+    
+    // XEX loading without execution
+    bool loadXexWithoutRunning(const QString& filename);
+    bool runLoadedXex();
+    bool hasLoadedXex() const { return m_xexLoaded; }
+    void clearLoadedXex() { m_xexLoaded = false; m_xexEntryPoint = 0; }
     void injectAKey(int akeyCode);  // For raw AKEY code injection
     void clearInput();
     
@@ -355,6 +361,12 @@ private:
     
     // Current profile name for state saves
     QString m_currentProfileName;
+    
+    // XEX loading state
+    bool m_xexLoaded;
+    unsigned short m_xexEntryPoint;
+    unsigned short m_xexInitAddr;
+    unsigned short m_xexRunAddr;
 };
 
 #endif // ATARIEMULATOR_H
