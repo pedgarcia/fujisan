@@ -229,44 +229,6 @@ echo '{
 
 **Note:** To clear XEX programs from memory, use `system.cold_boot`.
 
-#### `media.load_xex_no_run`
-
-Load an Atari executable file (.xex format) into memory without executing it. This allows you to set breakpoints before running the program.
-
-```bash
-echo '{
-  "command": "media.load_xex_no_run",
-  "params": {"path": "/path/to/program.xex"}
-}' | nc localhost 6502
-```
-
-**Response:**
-```json
-{
-  "type": "response",
-  "status": "success",
-  "result": {
-    "path": "/path/to/program.xex",
-    "loaded": true,
-    "ready_to_run": true
-  }
-}
-```
-
-**Event sent to all clients:**
-```json
-{
-  "type": "event",
-  "event": "xex_loaded_no_run",
-  "data": {
-    "path": "/path/to/program.xex",
-    "loaded_without_running": true
-  }
-}
-```
-
-**Note:** After loading, use `debug.run_loaded_xex` to start execution.
-
 ### System Commands
 
 Control emulator execution and system state.
@@ -672,6 +634,8 @@ echo '{"command": "input.get_joystick_stream_status"}' | nc localhost 6502
 
 Control debugging features, breakpoints, and memory access.
 
+**Note:** Fujisan implements instruction-level breakpoint precision. When breakpoints are active, the emulator executes in 500-cycle chunks (approximately 280 microseconds at 1.79MHz) instead of full frames, providing 60x better breakpoint precision than frame-level debugging.
+
 #### `debug.get_registers`
 
 Get current CPU register values.
@@ -759,13 +723,138 @@ Remove all breakpoints.
 echo '{"command": "debug.clear_breakpoints"}' | nc localhost 6502
 ```
 
+#### `debug.list_breakpoints` / `debug.get_breakpoints`
+
+Get list of all current breakpoints.
+
+```bash
+echo '{"command": "debug.list_breakpoints"}' | nc localhost 6502
+# or
+echo '{"command": "debug.get_breakpoints"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "breakpoints": ["$2000", "$200A", "$200F"],
+    "count": 3
+  }
+}
+```
+
+#### `debug.pause`
+
+Pause emulation for debugging. Returns current PC value.
+
+```bash
+echo '{"command": "debug.pause"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "paused": true,
+    "pc": "$2000"
+  }
+}
+```
+
+#### `debug.resume`
+
+Resume emulation after pause or breakpoint hit.
+
+```bash
+echo '{"command": "debug.resume"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "resumed": true
+  }
+}
+```
+
 #### `debug.step`
 
-Single-step execution (one frame).
+Single-step execution (one frame). Executes approximately 7,000-10,000 instructions.
 
 ```bash
 echo '{"command": "debug.step"}' | nc localhost 6502
 ```
+
+#### `debug.step_instruction`
+
+Single-instruction stepping for precise debugging. Executes exactly one 6502 CPU instruction.
+
+```bash
+echo '{"command": "debug.step_instruction"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "stepped": true,
+    "pc": "$2001",
+    "instruction_level": true
+  }
+}
+```
+
+**Notes:**
+- Requires emulation to be paused first
+- Advances PC by the exact instruction size (1-3 bytes)
+- Much more precise than `debug.step` for debugging
+- Ideal for IDE integration and breakpoint debugging
+
+#### `debug.load_xex_for_debug`
+
+Load an XEX file and pause after loading completes, ready for debugging. The emulator steps through frames to ensure the XEX is fully loaded into memory before pausing. This allows setting breakpoints before program execution begins.
+
+```bash
+echo '{
+  "command": "debug.load_xex_for_debug",
+  "params": {"path": "/path/to/program.xex"}
+}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "path": "/path/to/program.xex",
+    "loaded": true,
+    "entry_point": "$2000",
+    "paused_after_load": true
+  }
+}
+```
+
+**Event Sent:**
+```json
+{
+  "type": "event",
+  "event": "xex_loaded_for_debug",
+  "data": {
+    "path": "/path/to/program.xex",
+    "entry_point": "$2000"
+  }
+}
+```
+
+**Notes:** 
+- The emulator runs for up to 120 frames (2 seconds) to complete the loading process
+- Entry point is detected from RUNAD vector ($2E0-$2E1) or INITAD vector ($2E2-$2E3)
+- After loading, the emulator is paused with the program in memory
+- You can now set breakpoints and use `debug.resume` to start execution
 
 #### `debug.disassemble`
 
@@ -1156,19 +1245,19 @@ echo '{"command": "system.resume"}' | nc localhost 6502
 
 ```bash
 #!/bin/bash
-# Load XEX without running, set breakpoints, then run
+# Debug workflow - load program and set breakpoints before execution
 
-# Load XEX file without executing
-echo '{"command": "media.load_xex_no_run", "params": {"path": "/path/to/debug.xex"}}' | nc localhost 6502
+# Load XEX file for debugging (loads completely then pauses)
+echo '{"command": "debug.load_xex_for_debug", "params": {"path": "/path/to/debug.xex"}}' | nc localhost 6502
 
-# Set breakpoints at critical addresses
+# Wait a moment for loading to complete
+sleep 1
+
+# Set breakpoints at critical addresses while paused
 echo '{"command": "debug.add_breakpoint", "params": {"address": 8192}}' | nc localhost 6502
 echo '{"command": "debug.add_breakpoint", "params": {"address": 8256}}' | nc localhost 6502
 
-# Now start execution - will stop at breakpoints
-echo '{"command": "debug.run_loaded_xex"}' | nc localhost 6502
-
-# Continue execution when ready
+# Resume execution - will stop at breakpoints
 echo '{"command": "debug.resume"}' | nc localhost 6502
 ```
 

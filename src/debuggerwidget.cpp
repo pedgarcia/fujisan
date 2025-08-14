@@ -862,10 +862,7 @@ void DebuggerWidget::onMemoryAddressChanged()
 
 void DebuggerWidget::refreshDebugInfo()
 {
-    // Check breakpoints first (only when running)
-    if (m_isRunning) {
-        checkBreakpoints();
-    }
+    // Breakpoint checking is now handled by the core emulator
     
     updateCPUState();
     updateMemoryView();
@@ -884,16 +881,12 @@ void DebuggerWidget::stepSingleInstruction()
         return;
     }
     
-    // For instruction-level stepping, we need to execute until the PC changes
-    // Since libatari800 only supports frame-level stepping, we'll use a simple approach:
-    // Execute one frame and check if PC advanced by one instruction
-    
     unsigned short startPC = CPU_regPC;
     unsigned char opcode = MEMORY_mem[startPC];
     int instructionSize = getInstructionSize(opcode);
     
-    // Execute one frame (this is the limitation of libatari800)
-    m_emulator->stepOneFrame();
+    // Execute exactly one CPU instruction using the new libatari800 function
+    m_emulator->stepOneInstruction();
     
     qDebug() << QString("Step Into: PC $%1 -> PC $%2 (expected size: %3)")
                 .arg(startPC, 4, 16, QChar('0')).toUpper()
@@ -976,47 +969,38 @@ void DebuggerWidget::onBreakpointSelectionChanged()
 
 void DebuggerWidget::addBreakpoint(unsigned short address)
 {
-    if (m_breakpoints.contains(address)) {
-        qDebug() << QString("Breakpoint already exists at $%1").arg(address, 4, 16, QChar('0')).toUpper();
-        return;
-    }
-    
-    m_breakpoints.insert(address);
+    // Use core emulator breakpoint management
+    m_emulator->addBreakpoint(address);
+    // Keep local copy for UI
+    m_breakpoints = m_emulator->getBreakpoints();
     updateBreakpointList();
     saveBreakpoints();
-    
-    qDebug() << QString("Added breakpoint at $%1").arg(address, 4, 16, QChar('0')).toUpper();
 }
 
 void DebuggerWidget::removeBreakpoint(unsigned short address)
 {
-    if (!m_breakpoints.contains(address)) {
-        return;
-    }
-    
-    m_breakpoints.remove(address);
+    // Use core emulator breakpoint management
+    m_emulator->removeBreakpoint(address);
+    // Keep local copy for UI
+    m_breakpoints = m_emulator->getBreakpoints();
     updateBreakpointList();
     saveBreakpoints();
-    
-    qDebug() << QString("Removed breakpoint at $%1").arg(address, 4, 16, QChar('0')).toUpper();
 }
 
 void DebuggerWidget::clearAllBreakpoints()
 {
-    if (m_breakpoints.isEmpty()) {
-        return;
-    }
-    
+    // Use core emulator breakpoint management
+    m_emulator->clearAllBreakpoints();
+    // Keep local copy for UI
     m_breakpoints.clear();
     updateBreakpointList();
     saveBreakpoints();
-    
-    qDebug() << "Cleared all breakpoints";
 }
 
 bool DebuggerWidget::hasBreakpoint(unsigned short address) const
 {
-    return m_breakpoints.contains(address);
+    // Use core emulator breakpoint check
+    return m_emulator->hasBreakpoint(address);
 }
 
 void DebuggerWidget::updateBreakpointList()
@@ -1075,23 +1059,10 @@ void DebuggerWidget::loadBreakpoints()
     }
 }
 
+// Breakpoint checking is now handled by the core emulator in AtariEmulator::checkBreakpoints()
+// This method is kept for potential future use but is currently not called
 void DebuggerWidget::checkBreakpoints()
 {
-    if (m_breakpoints.isEmpty() || !m_emulator) {
-        return;
-    }
-    
-    unsigned short currentPC = CPU_regPC;
-    
-    // Only check if PC has changed to avoid repeated breaks
-    if (currentPC != m_lastPC) {
-        m_lastPC = currentPC;
-        
-        if (m_breakpoints.contains(currentPC)) {
-            qDebug() << QString("BREAKPOINT HIT at $%1 - pausing execution").arg(currentPC, 4, 16, QChar('0')).toUpper();
-            
-            // Pause execution
-            onPauseClicked();
-        }
-    }
+    // This functionality has been moved to the core emulator
+    // to ensure breakpoints work consistently across all interfaces (TCP, Debug window)
 }

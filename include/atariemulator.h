@@ -44,6 +44,8 @@ extern "C" {
     // Access cold/warm start functions
     extern void Atari800_Coldstart(void);
     extern void Atari800_Warmstart(void);
+    // Binary loading status
+    extern int BINLOAD_start_binloading;
     // Disk mounting functions
     extern int libatari800_mount_disk_image(int diskno, const char *filename, int readonly);
     // Memory access
@@ -103,6 +105,9 @@ extern "C" {
     
     // Disk activity callback function
     extern void libatari800_set_disk_activity_callback(void (*callback)(int drive, int operation));
+    
+    // Single-instruction stepping for debugger
+    extern void libatari800_step_instruction(void);
     
     // Restore string macro if it was defined
     #ifdef TEMP_STRING_BACKUP
@@ -248,11 +253,9 @@ public:
     // Direct input injection for paste functionality
     void injectCharacter(char ch);
     
-    // XEX loading without execution
-    bool loadXexWithoutRunning(const QString& filename);
-    bool runLoadedXex();
-    bool hasLoadedXex() const { return m_xexLoaded; }
-    void clearLoadedXex() { m_xexLoaded = false; m_xexEntryPoint = 0; }
+    // XEX loading for debugging - loads and sets entry point breakpoint
+    bool loadXexForDebug(const QString& filename);
+    
     void injectAKey(int akeyCode);  // For raw AKEY code injection
     void clearInput();
     
@@ -261,6 +264,16 @@ public:
     void resumeEmulation();
     bool isEmulationPaused() const;
     void stepOneFrame();
+    void stepOneInstruction();
+    
+    // Breakpoint management - core debugging support
+    void addBreakpoint(unsigned short address);
+    void removeBreakpoint(unsigned short address);
+    void clearAllBreakpoints();
+    bool hasBreakpoint(unsigned short address) const;
+    QSet<unsigned short> getBreakpoints() const;
+    void setBreakpointsEnabled(bool enabled);
+    bool areBreakpointsEnabled() const;
     
     // Dynamic speed adjustment for audio sync
     double calculateSpeedAdjustment();
@@ -274,6 +287,15 @@ signals:
     void diskIOStart(int driveNumber, bool isWriting);   // Turn LED ON
     void diskIOEnd(int driveNumber);                     // Turn LED OFF
     void frameReady();
+    void xexLoadedForDebug(unsigned short entryPoint);
+    
+    // Core debugging signals
+    void breakpointHit(unsigned short address);
+    void breakpointAdded(unsigned short address);
+    void breakpointRemoved(unsigned short address);
+    void breakpointsCleared();
+    void executionPaused();
+    void executionResumed();
 
 private:
     unsigned char convertQtKeyToAtari(int key, Qt::KeyboardModifiers modifiers);
@@ -299,6 +321,12 @@ private:
     
     // Debug/execution state
     bool m_emulationPaused = false;
+    
+    // Core breakpoint management
+    QSet<unsigned short> m_breakpoints;
+    bool m_breakpointsEnabled = true;
+    unsigned short m_lastPC = 0xFFFF;  // Track last PC for breakpoint detection
+    void checkBreakpoints();  // Internal breakpoint checking
     
     // Disk drive tracking
     QString m_diskImages[8]; // Paths for D1: through D8:
@@ -362,11 +390,12 @@ private:
     // Current profile name for state saves
     QString m_currentProfileName;
     
-    // XEX loading state
-    bool m_xexLoaded;
-    unsigned short m_xexEntryPoint;
-    unsigned short m_xexInitAddr;
-    unsigned short m_xexRunAddr;
+    // Partial frame execution for precise breakpoints
+    bool m_usePartialFrameExecution;
+    int m_cyclesThisFrame;
+    static constexpr int CYCLES_PER_FRAME = 29833;  // NTSC: 29833, PAL: 35568
+    static constexpr int BREAKPOINT_CHECK_CHUNK = 500;  // Check every 500 cycles
+    
 };
 
 #endif // ATARIEMULATOR_H

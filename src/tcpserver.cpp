@@ -522,37 +522,6 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
                         "Failed to load XEX file: " + validatedPath);
         }
         
-    } else if (subCommand == "load_xex_no_run") {
-        // Load XEX executable file without running it
-        QString path = params["path"].toString();
-        
-        QString validatedPath = validateAndNormalizePath(path);
-        if (validatedPath.isEmpty()) {
-            sendResponse(client, requestId, false, QJsonValue(), 
-                        "File not found or invalid path: " + path);
-            return;
-        }
-        
-        // Use the new loadXexWithoutRunning method
-        bool success = m_emulator->loadXexWithoutRunning(validatedPath);
-        
-        if (success) {
-            QJsonObject result;
-            result["path"] = validatedPath;
-            result["loaded"] = true;
-            result["ready_to_run"] = true;
-            sendResponse(client, requestId, true, result);
-            
-            // Send event to all clients
-            QJsonObject eventData;
-            eventData["path"] = validatedPath;
-            eventData["loaded_without_running"] = true;
-            sendEventToAllClients("xex_loaded_no_run", eventData);
-        } else {
-            sendResponse(client, requestId, false, QJsonValue(), 
-                        "Failed to load XEX file: " + validatedPath);
-        }
-        
     } else if (subCommand == "enable_drive") {
         // Enable specified drive
         int drive = params["drive"].toInt();
@@ -1322,7 +1291,8 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
             return;
         }
         
-        m_debugger->addBreakpoint((unsigned short)address);
+        // Use core emulator breakpoint management
+        m_emulator->addBreakpoint((unsigned short)address);
         
         QJsonObject result;
         result["address"] = QString("$%1").arg(address, 4, 16, QChar('0')).toUpper();
@@ -1345,7 +1315,8 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
             return;
         }
         
-        m_debugger->removeBreakpoint((unsigned short)address);
+        // Use core emulator breakpoint management
+        m_emulator->removeBreakpoint((unsigned short)address);
         
         QJsonObject result;
         result["address"] = QString("$%1").arg(address, 4, 16, QChar('0')).toUpper();
@@ -1358,12 +1329,15 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
         eventData["address"] = QString("$%1").arg(address, 4, 16, QChar('0')).toUpper();
         sendEventToAllClients("breakpoint_removed", eventData);
         
-    } else if (subCommand == "list_breakpoints") {
-        // List all current breakpoints
+    } else if (subCommand == "list_breakpoints" || subCommand == "get_breakpoints") {
+        // List all current breakpoints from core emulator
         QJsonArray breakpoints;
         
-        // Note: This would require adding a method to DebuggerWidget to expose breakpoints
-        // For now, we'll provide a basic response
+        QSet<unsigned short> bps = m_emulator->getBreakpoints();
+        for (unsigned short addr : bps) {
+            breakpoints.append(QString("$%1").arg(addr, 4, 16, QChar('0')).toUpper());
+        }
+        
         QJsonObject result;
         result["breakpoints"] = breakpoints;
         result["count"] = breakpoints.size();
@@ -1371,8 +1345,8 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
         sendResponse(client, requestId, true, result);
         
     } else if (subCommand == "clear_breakpoints") {
-        // Clear all breakpoints
-        m_debugger->clearAllBreakpoints();
+        // Clear all breakpoints using core emulator
+        m_emulator->clearAllBreakpoints();
         
         QJsonObject result;
         result["cleared"] = true;
@@ -1424,7 +1398,7 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
         }
         
     } else if (subCommand == "step") {
-        // Single step execution (step one frame)
+        // Single step execution (step one frame for compatibility)
         if (m_emulator->isEmulationPaused()) {
             m_emulator->stepOneFrame();
             
@@ -1438,6 +1412,29 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
             QJsonObject eventData;
             eventData["stepped"] = true;
             eventData["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+            sendEventToAllClients("debug_stepped", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Emulation must be paused to step");
+        }
+        
+    } else if (subCommand == "step_instruction") {
+        // Single-instruction stepping (precise debugging)
+        if (m_emulator->isEmulationPaused()) {
+            m_emulator->stepOneInstruction();
+            
+            QJsonObject result;
+            result["stepped"] = true;
+            result["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+            result["instruction_level"] = true;
+            
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["stepped"] = true;
+            eventData["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+            eventData["instruction_level"] = true;
             sendEventToAllClients("debug_stepped", eventData);
         } else {
             sendResponse(client, requestId, false, QJsonValue(), 
@@ -1503,45 +1500,51 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
         result["disassembly"] = disassembly;
         sendResponse(client, requestId, true, result);
         
-    } else if (subCommand == "run_loaded_xex") {
-        // Run a previously loaded XEX file
-        if (!m_emulator->hasLoadedXex()) {
+    } else if (subCommand == "load_xex_for_debug") {
+        // Load XEX file with automatic entry point breakpoint
+        QString path = params["path"].toString();
+        
+        QString validatedPath = validateAndNormalizePath(path);
+        if (validatedPath.isEmpty()) {
             sendResponse(client, requestId, false, QJsonValue(), 
-                        "No XEX file loaded. Use media.load_xex_no_run first");
+                        "File not found or invalid path: " + path);
             return;
         }
         
-        bool success = m_emulator->runLoadedXex();
+        bool success = m_emulator->loadXexForDebug(validatedPath);
         
         if (success) {
+            // Get the entry point from memory (already detected by loadXexForDebug)
+            unsigned char* mem = libatari800_get_main_memory_ptr();
+            unsigned short entryPoint = 0;
+            if (mem) {
+                entryPoint = mem[0x2E0] | (mem[0x2E1] << 8);
+                if (entryPoint == 0 || entryPoint == 0xFFFF) {
+                    entryPoint = mem[0x2E2] | (mem[0x2E3] << 8);
+                }
+                // If still no valid entry point, use current PC
+                if (entryPoint == 0 || entryPoint == 0xFFFF) {
+                    extern unsigned short CPU_regPC;
+                    entryPoint = CPU_regPC;
+                }
+            }
+            
             QJsonObject result;
-            result["running"] = true;
-            result["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+            result["path"] = validatedPath;
+            result["loaded"] = true;
+            result["entry_point"] = QString("$%1").arg(entryPoint, 4, 16, QChar('0')).toUpper();
+            result["paused_after_load"] = true;  // More accurate than "paused_at_entry"
             sendResponse(client, requestId, true, result);
             
             // Send event to all clients
             QJsonObject eventData;
-            eventData["running"] = true;
-            eventData["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
-            sendEventToAllClients("xex_started", eventData);
+            eventData["path"] = validatedPath;
+            eventData["entry_point"] = QString("$%1").arg(entryPoint, 4, 16, QChar('0')).toUpper();
+            sendEventToAllClients("xex_loaded_for_debug", eventData);
         } else {
             sendResponse(client, requestId, false, QJsonValue(), 
-                        "Failed to run loaded XEX");
+                        "Failed to load XEX file for debug: " + validatedPath);
         }
-        
-    } else if (subCommand == "clear_loaded_xex") {
-        // Clear any loaded XEX from memory
-        m_emulator->clearLoadedXex();
-        
-        QJsonObject result;
-        result["cleared"] = true;
-        sendResponse(client, requestId, true, result);
-        
-    } else if (subCommand == "get_xex_status") {
-        // Get status of loaded XEX
-        QJsonObject result;
-        result["has_loaded_xex"] = m_emulator->hasLoadedXex();
-        sendResponse(client, requestId, true, result);
         
     } else {
         sendResponse(client, requestId, false, QJsonValue(), 

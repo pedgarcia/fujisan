@@ -92,10 +92,8 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_printerEnabled(false)
     , m_fujinet_restart_pending(false)
     , m_fujinet_restart_delay(0)
-    , m_xexLoaded(false)
-    , m_xexEntryPoint(0)
-    , m_xexInitAddr(0)
-    , m_xexRunAddr(0)
+    , m_usePartialFrameExecution(false)
+    , m_cyclesThisFrame(0)
 {
     libatari800_clear_input_array(&m_currentInput);
     
@@ -660,7 +658,49 @@ void AtariEmulator::processFrame()
         //          << " option=" << (int)m_currentInput.option << " ***";
     }
     
-    libatari800_next_frame(&m_currentInput);
+    // Determine if we should use partial frame execution for precise breakpoints
+    m_usePartialFrameExecution = m_breakpointsEnabled && !m_breakpoints.isEmpty() && !m_emulationPaused;
+    
+    if (m_usePartialFrameExecution) {
+        // Execute frame in small chunks for precise breakpoint detection
+        extern int libatari800_execute_cycles(int target_cycles);
+        m_cyclesThisFrame = 0;
+        
+        // Execute frame in chunks, checking breakpoints after each chunk
+        while (m_cyclesThisFrame < CYCLES_PER_FRAME && !m_emulationPaused) {
+            int remaining = CYCLES_PER_FRAME - m_cyclesThisFrame;
+            int toExecute = qMin(BREAKPOINT_CHECK_CHUNK, remaining);
+            
+            // Execute a small chunk of cycles
+            int executed = libatari800_execute_cycles(toExecute);
+            m_cyclesThisFrame += executed;
+            
+            // Check for breakpoints after this chunk
+            checkBreakpoints();
+            
+            // Safety check: if we couldn't execute cycles, break out
+            if (executed == 0) {
+                break;
+            }
+        }
+        
+        // If we're still not paused, complete any remaining frame processing
+        if (!m_emulationPaused && m_cyclesThisFrame < CYCLES_PER_FRAME) {
+            // Execute any remaining cycles to complete the frame
+            int remaining = CYCLES_PER_FRAME - m_cyclesThisFrame;
+            if (remaining > 0) {
+                libatari800_execute_cycles(remaining);
+            }
+        }
+    } else {
+        // Normal full-frame execution for maximum performance
+        libatari800_next_frame(&m_currentInput);
+        
+        // Check breakpoints once after the frame (legacy behavior)
+        if (m_breakpointsEnabled && !m_breakpoints.isEmpty()) {
+            checkBreakpoints();
+        }
+    }
     
     // Disk I/O monitoring is now handled by libatari800 callback
     
@@ -809,6 +849,9 @@ void AtariEmulator::processFrame()
     }
     
     // Don't clear input here - let it persist until key release
+    
+    // Check breakpoints after frame execution
+    checkBreakpoints();
     
     emit frameReady();
 }
@@ -1748,60 +1791,101 @@ int AtariEmulator::getCurrentEmulationSpeed() const
     return Atari800_turbo_speed;
 }
 
-bool AtariEmulator::loadXexWithoutRunning(const QString& filename)
+
+bool AtariEmulator::loadXexForDebug(const QString& filename)
 {
-    // Use the new libatari800 API function
-    bool success = libatari800_load_xex_no_run(filename.toUtf8().constData());
-    
-    if (!success) {
-        m_xexLoaded = false;
-        qDebug() << "Failed to initiate XEX load:" << filename;
+    // Start the XEX loading process
+    if (!libatari800_reboot_with_file(filename.toUtf8().constData())) {
+        qDebug() << "Failed to load XEX file for debug:" << filename;
         return false;
     }
     
-    // The loading happens asynchronously during boot, so we need to run frames
-    // until the loading is complete
-    qDebug() << "Initiated XEX load, waiting for completion...";
+    // Get memory pointer for checking vectors
+    unsigned char* mem = libatari800_get_main_memory_ptr();
+    if (!mem) {
+        qDebug() << "Failed to get memory pointer";
+        return false;
+    }
     
-    // Run frames until the XEX is actually loaded (max 100 frames = ~1.6 seconds)
-    int maxFrames = 100;
-    for (int i = 0; i < maxFrames; i++) {
-        // Run one frame
+    // Step frames until loading completes (max 120 frames = 2 seconds at 60fps)
+    const int maxFrames = 120;
+    int framesProcessed = 0;
+    bool loadingComplete = false;
+    
+    qDebug() << "Stepping frames to complete XEX loading...";
+    
+    while (framesProcessed < maxFrames) {
+        // Process one frame to advance the loading
         processFrame();
+        framesProcessed++;
         
-        // Check if the XEX is now loaded
-        if (libatari800_has_loaded_xex()) {
-            m_xexLoaded = true;
-            qDebug() << "XEX loaded successfully without running after" << i+1 << "frames:" << filename;
-            return true;
+        // Check if loading has completed
+        // BINLOAD_start_binloading is set to TRUE when loading starts and FALSE when done
+        if (!BINLOAD_start_binloading) {
+            // Also verify RUNAD or INITAD is set
+            unsigned short runad = mem[0x2E0] | (mem[0x2E1] << 8);
+            unsigned short initad = mem[0x2E2] | (mem[0x2E3] << 8);
+            
+            if ((runad != 0x0000 && runad != 0xFFFF) || 
+                (initad != 0x0000 && initad != 0xFFFF)) {
+                loadingComplete = true;
+                qDebug() << "XEX loading complete after" << framesProcessed << "frames";
+                break;
+            }
+        }
+        
+        // For initial frames, BINLOAD_start_binloading might not be set yet
+        // So also check if vectors become valid
+        if (framesProcessed > 10) {
+            unsigned short runad = mem[0x2E0] | (mem[0x2E1] << 8);
+            unsigned short initad = mem[0x2E2] | (mem[0x2E3] << 8);
+            
+            if ((runad != 0x0000 && runad != 0xFFFF) || 
+                (initad != 0x0000 && initad != 0xFFFF)) {
+                // Vectors are set, check if we're past the loader
+                if (CPU_regPC < 0xD000 || CPU_regPC >= 0xE000) {
+                    // PC is not in ROM loader area, likely done
+                    loadingComplete = true;
+                    qDebug() << "XEX loading detected via vectors after" << framesProcessed << "frames";
+                    break;
+                }
+            }
         }
     }
     
-    // Loading timed out
-    m_xexLoaded = false;
-    qDebug() << "XEX loading timed out:" << filename;
-    return false;
-}
-
-bool AtariEmulator::runLoadedXex()
-{
-    if (!m_xexLoaded) {
-        qDebug() << "No XEX loaded to run";
-        return false;
-    }
+    // Pause execution now that loading is complete (or timeout)
+    pauseEmulation();
     
-    // Use the new libatari800 API function to run the loaded XEX
-    bool success = libatari800_run_loaded_xex();
+    // Read the entry point vectors
+    unsigned short runad = mem[0x2E0] | (mem[0x2E1] << 8);
+    unsigned short initad = mem[0x2E2] | (mem[0x2E3] << 8);
     
-    if (success) {
-        qDebug() << "XEX execution started successfully";
-        // Clear the loaded flag since we're running it now
-        m_xexLoaded = false;
+    // Determine the entry point
+    unsigned short entryPoint;
+    if (runad != 0x0000 && runad != 0xFFFF) {
+        entryPoint = runad;
+        qDebug() << "Using RUNAD entry point:" << QString("$%1").arg(entryPoint, 4, 16, QChar('0')).toUpper();
+    } else if (initad != 0x0000 && initad != 0xFFFF) {
+        entryPoint = initad;
+        qDebug() << "Using INITAD entry point:" << QString("$%1").arg(entryPoint, 4, 16, QChar('0')).toUpper();
     } else {
-        qDebug() << "Failed to run loaded XEX";
+        // Fallback to current PC if no vectors set (shouldn't happen)
+        entryPoint = CPU_regPC;
+        qDebug() << "Warning: No RUNAD/INITAD, using PC:" << QString("$%1").arg(entryPoint, 4, 16, QChar('0')).toUpper();
     }
     
-    return success;
+    if (!loadingComplete) {
+        qDebug() << "Warning: XEX loading may not be complete (timeout after" << framesProcessed << "frames)";
+    }
+    
+    qDebug() << QString("XEX loaded for debug. Entry point: $%1, Current PC: $%2")
+                .arg(entryPoint, 4, 16, QChar('0'))
+                .arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+    
+    // Emit signal for debugger widget to handle (could set a temporary breakpoint)
+    emit xexLoadedForDebug(entryPoint);
+    
+    return true;
 }
 
 void AtariEmulator::injectCharacter(char ch)
@@ -2006,6 +2090,7 @@ void AtariEmulator::pauseEmulation()
     if (!m_emulationPaused) {
         m_frameTimer->stop();
         m_emulationPaused = true;
+        emit executionPaused();
         qDebug() << "Emulation paused";
     }
 }
@@ -2015,6 +2100,9 @@ void AtariEmulator::resumeEmulation()
     if (m_emulationPaused) {
         m_frameTimer->start();
         m_emulationPaused = false;
+        // Reset last PC when resuming to avoid missing breakpoints
+        m_lastPC = 0xFFFF;
+        emit executionResumed();
         qDebug() << "Emulation resumed";
     }
 }
@@ -2032,6 +2120,21 @@ void AtariEmulator::stepOneFrame()
         qDebug() << "Stepped one frame - PC:" << QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
     } else {
         qDebug() << "Cannot step frame - emulation not paused";
+    }
+}
+
+void AtariEmulator::stepOneInstruction()
+{
+    if (m_emulationPaused) {
+        // Execute exactly one CPU instruction using the new libatari800 function
+        libatari800_step_instruction();
+        
+        // Check breakpoints after instruction execution
+        checkBreakpoints();
+        
+        qDebug() << "Stepped one instruction - PC:" << QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+    } else {
+        qDebug() << "Cannot step instruction - emulation not paused";
     }
 }
 
@@ -2842,6 +2945,74 @@ QString AtariEmulator::getQuickSaveStatePath() const
         dir.mkpath(".");
     }
     return dir.filePath("quicksave.a8s");
+}
+
+// Breakpoint management - core debugging support
+void AtariEmulator::addBreakpoint(unsigned short address)
+{
+    if (!m_breakpoints.contains(address)) {
+        m_breakpoints.insert(address);
+        emit breakpointAdded(address);
+        qDebug() << QString("Core: Added breakpoint at $%1").arg(address, 4, 16, QChar('0')).toUpper();
+    }
+}
+
+void AtariEmulator::removeBreakpoint(unsigned short address)
+{
+    if (m_breakpoints.remove(address)) {
+        emit breakpointRemoved(address);
+        qDebug() << QString("Core: Removed breakpoint at $%1").arg(address, 4, 16, QChar('0')).toUpper();
+    }
+}
+
+void AtariEmulator::clearAllBreakpoints()
+{
+    if (!m_breakpoints.isEmpty()) {
+        m_breakpoints.clear();
+        emit breakpointsCleared();
+        qDebug() << "Core: Cleared all breakpoints";
+    }
+}
+
+bool AtariEmulator::hasBreakpoint(unsigned short address) const
+{
+    return m_breakpoints.contains(address);
+}
+
+QSet<unsigned short> AtariEmulator::getBreakpoints() const
+{
+    return m_breakpoints;
+}
+
+void AtariEmulator::setBreakpointsEnabled(bool enabled)
+{
+    m_breakpointsEnabled = enabled;
+    qDebug() << "Core: Breakpoints" << (enabled ? "enabled" : "disabled");
+}
+
+bool AtariEmulator::areBreakpointsEnabled() const
+{
+    return m_breakpointsEnabled;
+}
+
+void AtariEmulator::checkBreakpoints()
+{
+    if (!m_breakpointsEnabled || m_breakpoints.isEmpty() || m_emulationPaused) {
+        return;
+    }
+    
+    unsigned short currentPC = CPU_regPC;
+    
+    // Only check if PC has changed (avoid repeated triggers at same address)
+    if (currentPC != m_lastPC) {
+        m_lastPC = currentPC;
+        
+        if (m_breakpoints.contains(currentPC)) {
+            qDebug() << QString("Core: BREAKPOINT HIT at $%1 - pausing execution").arg(currentPC, 4, 16, QChar('0')).toUpper();
+            pauseEmulation();
+            emit breakpointHit(currentPC);
+        }
+    }
 }
 
 // Double buffering audio implementation (inspired by Atari800MacX)
