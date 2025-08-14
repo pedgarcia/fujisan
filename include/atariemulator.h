@@ -296,6 +296,7 @@ signals:
     void breakpointsCleared();
     void executionPaused();
     void executionResumed();
+    void debugStepped();
 
 private:
     unsigned char convertQtKeyToAtari(int key, Qt::KeyboardModifiers modifiers);

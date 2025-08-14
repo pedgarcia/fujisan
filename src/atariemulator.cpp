@@ -2118,6 +2118,7 @@ void AtariEmulator::stepOneFrame()
         // Execute one frame manually when paused
         processFrame();
         qDebug() << "Stepped one frame - PC:" << QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+        emit debugStepped();
     } else {
         qDebug() << "Cannot step frame - emulation not paused";
     }
@@ -2133,6 +2134,7 @@ void AtariEmulator::stepOneInstruction()
         checkBreakpoints();
         
         qDebug() << "Stepped one instruction - PC:" << QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+        emit debugStepped();
     } else {
         qDebug() << "Cannot step instruction - emulation not paused";
     }

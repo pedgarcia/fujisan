@@ -786,12 +786,14 @@ Single-step execution (one frame). Executes approximately 7,000-10,000 instructi
 echo '{"command": "debug.step"}' | nc localhost 6502
 ```
 
-#### `debug.step_instruction`
+#### `debug.step_instruction` / `debug.step_into`
 
-Single-instruction stepping for precise debugging. Executes exactly one 6502 CPU instruction.
+Single-instruction stepping for precise debugging. Executes exactly one 6502 CPU instruction. Both commands are aliases and perform the same operation.
 
 ```bash
 echo '{"command": "debug.step_instruction"}' | nc localhost 6502
+# or
+echo '{"command": "debug.step_into"}' | nc localhost 6502
 ```
 
 **Response:**
@@ -811,7 +813,37 @@ echo '{"command": "debug.step_instruction"}' | nc localhost 6502
 - Requires emulation to be paused first
 - Advances PC by the exact instruction size (1-3 bytes)
 - Much more precise than `debug.step` for debugging
+- Will step INTO subroutines when encountering JSR instructions
 - Ideal for IDE integration and breakpoint debugging
+
+#### `debug.step_over`
+
+Step over subroutine calls. When encountering a JSR (Jump to Subroutine) instruction, executes the entire subroutine and returns to the instruction following the JSR. For non-JSR instructions, behaves like `step_into`.
+
+```bash
+echo '{"command": "debug.step_over"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "stepped": true,
+    "pc": "$2004",
+    "step_over": true
+  }
+}
+```
+
+**Notes:**
+- Requires emulation to be paused first
+- When at JSR ($20): executes entire subroutine using instruction-level stepping
+- When not at JSR: executes single instruction like `step_into`
+- Uses instruction-level stepping internally (not frame stepping)
+- Safety limit of 10,000 instructions prevents infinite loops
+- Ideal for debugging without diving into subroutine implementation
 
 #### `debug.load_xex_for_debug`
 

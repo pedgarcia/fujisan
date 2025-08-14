@@ -261,6 +261,17 @@ void DebuggerWidget::connectSignals()
     connect(m_removeBreakpointButton, &QPushButton::clicked, this, &DebuggerWidget::onRemoveBreakpointClicked);
     connect(m_clearBreakpointsButton, &QPushButton::clicked, this, &DebuggerWidget::clearAllBreakpoints);
     connect(m_breakpointListWidget, &QListWidget::itemSelectionChanged, this, &DebuggerWidget::onBreakpointSelectionChanged);
+    
+    // Connect to emulator debugging signals
+    if (m_emulator) {
+        connect(m_emulator, &AtariEmulator::breakpointHit, this, &DebuggerWidget::onEmulatorBreakpointHit);
+        connect(m_emulator, &AtariEmulator::breakpointAdded, this, &DebuggerWidget::onEmulatorBreakpointAdded);
+        connect(m_emulator, &AtariEmulator::breakpointRemoved, this, &DebuggerWidget::onEmulatorBreakpointRemoved);
+        connect(m_emulator, &AtariEmulator::breakpointsCleared, this, &DebuggerWidget::onEmulatorBreakpointsCleared);
+        connect(m_emulator, &AtariEmulator::executionPaused, this, &DebuggerWidget::onEmulatorExecutionPaused);
+        connect(m_emulator, &AtariEmulator::executionResumed, this, &DebuggerWidget::onEmulatorExecutionResumed);
+        connect(m_emulator, &AtariEmulator::debugStepped, this, &DebuggerWidget::onEmulatorDebugStepped);
+    }
 }
 
 void DebuggerWidget::updateCPUState()
@@ -904,35 +915,43 @@ void DebuggerWidget::stepOverSubroutine()
     unsigned char opcode = MEMORY_mem[currentPC];
     
     if (isSubroutineCall(opcode)) {
-        // This is a JSR instruction - set breakpoint at return address
-        m_stepOverBreakPC = currentPC + 3;  // JSR is 3 bytes
+        // This is a JSR instruction - execute it and then run until return address
+        unsigned short returnAddress = currentPC + 3;  // JSR is 3 bytes
         
-        qDebug() << QString("Step Over: JSR at $%1, setting break at $%2")
+        qDebug() << QString("Step Over: JSR at $%1, target return at $%2")
                     .arg(currentPC, 4, 16, QChar('0')).toUpper()
-                    .arg(m_stepOverBreakPC, 4, 16, QChar('0')).toUpper();
+                    .arg(returnAddress, 4, 16, QChar('0')).toUpper();
         
-        // Execute frames until we reach the breakpoint
-        int maxFrames = 1000; // Safety limit
-        int frameCount = 0;
+        // Execute the JSR instruction first
+        m_emulator->stepOneInstruction();
         
-        while (frameCount < maxFrames && CPU_regPC != m_stepOverBreakPC) {
-            m_emulator->stepOneFrame();
-            frameCount++;
+        // Now we're inside the subroutine, step until we reach the return address
+        // Use a safety limit to prevent infinite loops
+        int maxSteps = 10000;  // Maximum instructions to execute
+        int stepCount = 0;
+        
+        while (CPU_regPC != returnAddress && stepCount < maxSteps) {
+            m_emulator->stepOneInstruction();
+            stepCount++;
             
-            // Update display every 10 frames to show progress
-            if (frameCount % 10 == 0) {
+            // Update display periodically for long subroutines
+            if (stepCount % 100 == 0) {
                 refreshDebugInfo();
-                QCoreApplication::processEvents(); // Allow UI updates
+                QCoreApplication::processEvents();
             }
         }
         
-        if (frameCount >= maxFrames) {
-            qDebug() << "Step Over: Timeout reached, subroutine may not return";
+        if (stepCount >= maxSteps) {
+            qDebug() << QString("Step Over: Timeout after %1 steps, subroutine may not return")
+                        .arg(stepCount);
         } else {
-            qDebug() << QString("Step Over: Completed after %1 frames, PC at $%2")
-                        .arg(frameCount)
+            qDebug() << QString("Step Over: Completed after %1 steps, PC at $%2")
+                        .arg(stepCount)
                         .arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
         }
+        
+        // Refresh the display
+        refreshDebugInfo();
     } else {
         // Not a subroutine call, just step one instruction
         stepSingleInstruction();
@@ -1065,4 +1084,105 @@ void DebuggerWidget::checkBreakpoints()
 {
     // This functionality has been moved to the core emulator
     // to ensure breakpoints work consistently across all interfaces (TCP, Debug window)
+}
+
+// Handler for when a breakpoint is hit
+void DebuggerWidget::onEmulatorBreakpointHit(unsigned short address)
+{
+    qDebug() << QString("Debugger: Breakpoint hit at $%1").arg(address, 4, 16, QChar('0')).toUpper();
+    
+    // Update the UI to reflect the paused state (handled by onEmulatorExecutionPaused)
+    // Refresh debug info to show current state
+    refreshDebugInfo();
+}
+
+// Handler for when a breakpoint is added (e.g., from TCP)
+void DebuggerWidget::onEmulatorBreakpointAdded(unsigned short address)
+{
+    qDebug() << QString("Debugger: Breakpoint added at $%1").arg(address, 4, 16, QChar('0')).toUpper();
+    
+    // Update our local breakpoint list from the emulator
+    m_breakpoints = m_emulator->getBreakpoints();
+    updateBreakpointList();
+    
+    // Refresh disassembly to show new breakpoint indicator
+    updateDisassemblyView();
+}
+
+// Handler for when a breakpoint is removed (e.g., from TCP)
+void DebuggerWidget::onEmulatorBreakpointRemoved(unsigned short address)
+{
+    qDebug() << QString("Debugger: Breakpoint removed at $%1").arg(address, 4, 16, QChar('0')).toUpper();
+    
+    // Update our local breakpoint list from the emulator
+    m_breakpoints = m_emulator->getBreakpoints();
+    updateBreakpointList();
+    
+    // Refresh disassembly to remove breakpoint indicator
+    updateDisassemblyView();
+}
+
+// Handler for when all breakpoints are cleared (e.g., from TCP)
+void DebuggerWidget::onEmulatorBreakpointsCleared()
+{
+    qDebug() << "Debugger: All breakpoints cleared";
+    
+    // Clear our local breakpoint list
+    m_breakpoints.clear();
+    updateBreakpointList();
+    
+    // Refresh disassembly to remove breakpoint indicators
+    updateDisassemblyView();
+}
+
+// Handler for when execution is paused (e.g., from TCP or breakpoint hit)
+void DebuggerWidget::onEmulatorExecutionPaused()
+{
+    qDebug() << "Debugger: Execution paused";
+    
+    // Update internal state
+    m_isRunning = false;
+    
+    // Update button states
+    if (m_stepIntoButton && m_stepOverButton && m_runButton && m_pauseButton) {
+        m_stepIntoButton->setEnabled(true);
+        m_stepOverButton->setEnabled(true);
+        m_runButton->setEnabled(true);
+        m_pauseButton->setEnabled(false);
+    }
+    
+    // Stop the refresh timer
+    m_refreshTimer->stop();
+    
+    // Immediately refresh the debug info to show current state
+    refreshDebugInfo();
+}
+
+// Handler for when execution is resumed (e.g., from TCP)
+void DebuggerWidget::onEmulatorExecutionResumed()
+{
+    qDebug() << "Debugger: Execution resumed";
+    
+    // Update internal state
+    m_isRunning = true;
+    
+    // Update button states
+    if (m_stepIntoButton && m_stepOverButton && m_runButton && m_pauseButton) {
+        m_stepIntoButton->setEnabled(false);
+        m_stepOverButton->setEnabled(false);
+        m_runButton->setEnabled(false);
+        m_pauseButton->setEnabled(true);
+    }
+    
+    // Start the refresh timer for continuous updates
+    m_refreshTimer->start();
+}
+
+// Handler for when a debug step occurs (from TCP or UI)
+void DebuggerWidget::onEmulatorDebugStepped()
+{
+    qDebug() << "Debugger: Step executed";
+    
+    // Immediately refresh all debug information
+    refreshDebugInfo();
 }

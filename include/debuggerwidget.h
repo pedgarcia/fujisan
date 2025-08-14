@@ -51,6 +51,15 @@ public slots:
 
 private slots:
     void refreshDebugInfo();
+    
+    // Emulator signal handlers
+    void onEmulatorBreakpointHit(unsigned short address);
+    void onEmulatorBreakpointAdded(unsigned short address);
+    void onEmulatorBreakpointRemoved(unsigned short address);
+    void onEmulatorBreakpointsCleared();
+    void onEmulatorExecutionPaused();
+    void onEmulatorExecutionResumed();
+    void onEmulatorDebugStepped();
 
 private:
     void setupUI();

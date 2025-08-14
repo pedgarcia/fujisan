@@ -21,6 +21,7 @@
 #include <QBuffer>
 #include <QImageReader>
 #include <QDateTime>
+#include <QThread>
 
 extern "C" {
     // Access to CPU registers for debug commands
@@ -1418,8 +1419,9 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
                         "Emulation must be paused to step");
         }
         
-    } else if (subCommand == "step_instruction") {
+    } else if (subCommand == "step_instruction" || subCommand == "step_into") {
         // Single-instruction stepping (precise debugging)
+        // step_into is an alias for step_instruction - both step into subroutines naturally
         if (m_emulator->isEmulationPaused()) {
             m_emulator->stepOneInstruction();
             
@@ -1435,6 +1437,72 @@ void TCPServer::handleDebugCommand(QTcpSocket* client, const QJsonObject& reques
             eventData["stepped"] = true;
             eventData["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
             eventData["instruction_level"] = true;
+            sendEventToAllClients("debug_stepped", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Emulation must be paused to step");
+        }
+        
+    } else if (subCommand == "step_over") {
+        // Step over subroutine calls
+        if (m_emulator->isEmulationPaused()) {
+            unsigned short currentPC = CPU_regPC;
+            unsigned char opcode = MEMORY_mem[currentPC];
+            
+            // Check if this is a JSR instruction (0x20)
+            if (opcode == 0x20) {
+                // JSR instruction - use instruction-level stepping to execute subroutine
+                unsigned short returnAddress = currentPC + 3;  // JSR is 3 bytes
+                
+                qDebug() << QString("TCP step_over: JSR at $%1, target return at $%2")
+                            .arg(currentPC, 4, 16, QChar('0')).toUpper()
+                            .arg(returnAddress, 4, 16, QChar('0')).toUpper();
+                
+                // Execute the JSR instruction first
+                m_emulator->stepOneInstruction();
+                
+                // Now we're inside the subroutine, step until we reach the return address
+                // Use a safety limit to prevent infinite loops
+                int maxSteps = 10000;  // Maximum instructions to execute
+                int stepCount = 0;
+                
+                while (CPU_regPC != returnAddress && stepCount < maxSteps) {
+                    m_emulator->stepOneInstruction();
+                    stepCount++;
+                    
+                    // Process events periodically for long subroutines
+                    if (stepCount % 100 == 0) {
+                        QCoreApplication::processEvents();
+                    }
+                }
+                
+                if (stepCount >= maxSteps) {
+                    qDebug() << QString("TCP step_over: Timeout after %1 steps, subroutine may not return")
+                                .arg(stepCount);
+                } else {
+                    qDebug() << QString("TCP step_over: Completed after %1 steps, PC=$%2")
+                                .arg(stepCount)
+                                .arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+                }
+            } else {
+                // Not a JSR, just step one instruction
+                m_emulator->stepOneInstruction();
+                qDebug() << QString("TCP step_over: Not JSR (opcode=$%1), single step")
+                            .arg(opcode, 2, 16, QChar('0')).toUpper();
+            }
+            
+            QJsonObject result;
+            result["stepped"] = true;
+            result["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+            result["step_over"] = true;
+            
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["stepped"] = true;
+            eventData["pc"] = QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+            eventData["step_over"] = true;
             sendEventToAllClients("debug_stepped", eventData);
         } else {
             sendResponse(client, requestId, false, QJsonValue(), 
