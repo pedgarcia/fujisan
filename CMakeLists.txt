@@ -139,10 +139,14 @@ ExternalProject_Add(atari800_external
     SOURCE_DIR ${ATARI800_SOURCE_DIR}
     BINARY_DIR ${ATARI800_BINARY_DIR}
     
-    # Apply Fujisan patches during configure step
+    # Apply Fujisan patches during patch step
+    # First copy the patches directory, then apply them
     PATCH_COMMAND ${CMAKE_COMMAND} -E copy_directory 
                   "${CMAKE_CURRENT_SOURCE_DIR}/patches" 
                   "<SOURCE_DIR>/fujisan-patches"
+          COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> 
+                  ${CMAKE_COMMAND} -E env ATARI800_SRC_PATH=<SOURCE_DIR>
+                  bash fujisan-patches/apply-patches.sh
     
     CONFIGURE_COMMAND ${ATARI800_CONFIGURE_COMMAND}
     

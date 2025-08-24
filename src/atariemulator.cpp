@@ -661,39 +661,13 @@ void AtariEmulator::processFrame()
     // Determine if we should use partial frame execution for precise breakpoints
     m_usePartialFrameExecution = m_breakpointsEnabled && !m_breakpoints.isEmpty() && !m_emulationPaused;
     
-    if (m_usePartialFrameExecution) {
-        // Execute frame in small chunks for precise breakpoint detection
-        extern int libatari800_execute_cycles(int target_cycles);
-        m_cyclesThisFrame = 0;
-        
-        // Execute frame in chunks, checking breakpoints after each chunk
-        while (m_cyclesThisFrame < CYCLES_PER_FRAME && !m_emulationPaused) {
-            int remaining = CYCLES_PER_FRAME - m_cyclesThisFrame;
-            int toExecute = qMin(BREAKPOINT_CHECK_CHUNK, remaining);
-            
-            // Execute a small chunk of cycles
-            int executed = libatari800_execute_cycles(toExecute);
-            m_cyclesThisFrame += executed;
-            
-            // Check for breakpoints after this chunk
-            checkBreakpoints();
-            
-            // Safety check: if we couldn't execute cycles, break out
-            if (executed == 0) {
-                break;
-            }
-        }
-        
-        // If we're still not paused, complete any remaining frame processing
-        if (!m_emulationPaused && m_cyclesThisFrame < CYCLES_PER_FRAME) {
-            // Execute any remaining cycles to complete the frame
-            int remaining = CYCLES_PER_FRAME - m_cyclesThisFrame;
-            if (remaining > 0) {
-                libatari800_execute_cycles(remaining);
-            }
-        }
+    // For now, disable partial frame execution since it requires patches
+    // We'll use frame-level execution with breakpoint checking after each frame
+    // This is less precise but works with standard libatari800
+    if (false && m_usePartialFrameExecution) {
+        // Partial frame execution disabled - requires patches
     } else {
-        // Normal full-frame execution for maximum performance
+        // Normal full-frame execution
         libatari800_next_frame(&m_currentInput);
         
         // Check breakpoints once after the frame (legacy behavior)
@@ -2127,13 +2101,21 @@ void AtariEmulator::stepOneFrame()
 void AtariEmulator::stepOneInstruction()
 {
     if (m_emulationPaused) {
-        // Execute exactly one CPU instruction using the new libatari800 function
-        libatari800_step_instruction();
+        // Without patches, we can't do true single-instruction stepping
+        // We'll use frame stepping as an approximation
+        // This executes many instructions but is the best we can do without patches
+        unsigned short startPC = CPU_regPC;
         
-        // Check breakpoints after instruction execution
+        // Execute one frame
+        // This will execute thousands of instructions, but it's all we have
+        libatari800_next_frame(&m_currentInput);
+        
+        // Check breakpoints after execution
         checkBreakpoints();
         
-        qDebug() << "Stepped one instruction - PC:" << QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+        qDebug() << QString("Stepped from PC $%1 to $%2 (frame-based, not single instruction)")
+                    .arg(startPC, 4, 16, QChar('0')).toUpper()
+                    .arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
         emit debugStepped();
     } else {
         qDebug() << "Cannot step instruction - emulation not paused";
