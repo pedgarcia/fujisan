@@ -272,7 +272,10 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         if (!m_osRomPath.isEmpty()) {
             if (machineType == "-5200") {
                 argList << "-5200_rom" << m_osRomPath;
+            } else if (machineType == "-atari") {
+                argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
             } else {
+                // For XL/XE machines
                 argList << "-xlxe_rom" << m_osRomPath;
             }
         } else {
@@ -416,13 +419,8 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     if (m_altirraOSEnabled) {
         qDebug() << "Using built-in Altirra OS ROMs";
         
-        // Use built-in Altirra OS
-        if (machineType == "-xl") {
-            // For 800XL, explicitly set rev. 2 for better compatibility
-            argList << "-xl-rev" << "2";
-        } else {
-            argList << "-xl-rev" << "altirra";
-        }
+        // Use built-in Altirra OS for all machine types
+        argList << "-xl-rev" << "altirra";
         
         if (basicEnabled) {
             argList << "-basic-rev" << "altirra";
@@ -435,7 +433,15 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         qDebug() << "Using original Atari OS ROMs from user settings";
         
         if (!m_osRomPath.isEmpty()) {
-            argList << "-osrom" << m_osRomPath;
+            // Use the correct parameter based on machine type
+            if (machineType == "-5200") {
+                argList << "-5200_rom" << m_osRomPath;
+            } else if (machineType == "-atari") {
+                argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
+            } else {
+                // For XL/XE machines
+                argList << "-xlxe_rom" << m_osRomPath;
+            }
             qDebug() << "Adding OS ROM path:" << m_osRomPath;
         } else {
             qDebug() << "Warning: No OS ROM path specified, emulator may not start properly";
