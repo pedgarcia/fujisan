@@ -868,6 +868,19 @@ void MainWindow::restartEmulator()
     qDebug() << "Applying input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
     qDebug() << "Special devices - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
 
+    // Load ROM paths BEFORE initialization
+    QString machineType = m_emulator->getMachineType();
+    QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
+    QString osRomPath = settings.value(osRomKey, "").toString();
+    QString basicRomPath = settings.value("machine/basicRom", "").toString();
+    
+    // Set ROM paths in the emulator before initialization
+    m_emulator->setOSRomPath(osRomPath);
+    m_emulator->setBasicRomPath(basicRomPath);
+    
+    qDebug() << "ROM paths for restart - OS:" << osRomPath << "BASIC:" << basicRomPath;
+    qDebug() << "Altirra OS enabled:" << m_emulator->isAltirraOSEnabled();
+
     if (m_emulator->initializeWithNetSIOConfig(m_emulator->isBasicEnabled(),
                                              m_emulator->getMachineType(),
                                              m_emulator->getVideoSystem(),
@@ -2073,6 +2086,20 @@ void MainWindow::loadInitialSettings()
     qDebug() << "Input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
     qDebug() << "Special devices - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
 
+    // Load ROM paths BEFORE initialization
+    QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
+    QString osRomPath = settings.value(osRomKey, "").toString();
+    QString basicRomPath = settings.value("machine/basicRom", "").toString();
+
+    // Set emulator settings before initialization
+    m_emulator->setAltirraOSEnabled(altirraOSEnabled);
+    m_emulator->setOSRomPath(osRomPath);
+    m_emulator->setBasicRomPath(basicRomPath);
+    m_emulator->enableAudio(audioEnabled);
+    
+    qDebug() << "ROM paths - OS:" << osRomPath << "BASIC:" << basicRomPath;
+    qDebug() << "Altirra OS enabled:" << altirraOSEnabled;
+
     // Initialize emulator with loaded settings including display and input options
     if (!m_emulator->initializeWithNetSIOConfig(basicEnabled, machineType, videoSystem, artifactMode,
                                                horizontalArea, verticalArea, horizontalShift, verticalShift,
@@ -2083,10 +2110,6 @@ void MainWindow::loadInitialSettings()
         QApplication::quit();
         return;
     }
-
-    // Set additional settings
-    m_emulator->setAltirraOSEnabled(altirraOSEnabled);
-    m_emulator->enableAudio(audioEnabled);
     
     // Ensure keyboard joystick state is properly applied after initialization
     // This is needed because the initial state from command line args might not match
@@ -2094,16 +2117,6 @@ void MainWindow::loadInitialSettings()
     m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
     m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
     qDebug() << "Applied keyboard joystick state after init - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
-
-    // Load ROM paths
-    QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
-    QString osRomPath = settings.value(osRomKey, "").toString();
-    QString basicRomPath = settings.value("machine/basicRom", "").toString();
-
-    m_emulator->setOSRomPath(osRomPath);
-    m_emulator->setBasicRomPath(basicRomPath);
-
-    qDebug() << "ROM paths - OS:" << osRomPath << "BASIC:" << basicRomPath;
 
     // Load and apply media settings (disk images, etc.)
     loadAndApplyMediaSettings();
