@@ -1,6 +1,10 @@
 #!/bin/bash
 # Apply Fujisan patches to atari800 source
 
+# Set non-interactive mode for git
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASK_YESNO=false
+
 if [ -z "$ATARI800_SRC_PATH" ]; then
     echo "Error: ATARI800_SRC_PATH environment variable not set"
     echo "Please set it to your atari800 source directory"
@@ -25,7 +29,12 @@ fi
 
 # Check if this is a git repository
 if [ -d .git ]; then
-    echo "Git repository detected, using 'git am' for patches"
+    echo "Git repository detected, using patch commands instead of git am to avoid hangs"
+    
+    # Configure git to avoid interactive prompts
+    git config user.email "build@fujisan.local" 2>/dev/null || true
+    git config user.name "Fujisan Build" 2>/dev/null || true
+    
     for patch in "$PATCHES_DIR"/0*.patch; do
         if [ -f "$patch" ]; then
             patch_name="$(basename "$patch")"
@@ -38,11 +47,8 @@ if [ -d .git ]; then
                 continue
             fi
             
-            # Try git apply first (more reliable than git am for patches)
-            if git apply --check "$patch" 2>/dev/null; then
-                git apply "$patch"
-                echo "✓ Patch applied successfully with git apply"
-            elif patch -p1 --dry-run < "$patch" >/dev/null 2>&1; then
+            # Use patch command directly to avoid git hanging issues
+            if patch -p1 --dry-run < "$patch" >/dev/null 2>&1; then
                 patch -p1 < "$patch"
                 echo "✓ Patch applied successfully with patch command"
             else

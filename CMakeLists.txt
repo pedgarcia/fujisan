@@ -144,9 +144,7 @@ ExternalProject_Add(atari800_external
     PATCH_COMMAND ${CMAKE_COMMAND} -E copy_directory 
                   "${CMAKE_CURRENT_SOURCE_DIR}/patches" 
                   "<SOURCE_DIR>/fujisan-patches"
-          COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> 
-                  ${CMAKE_COMMAND} -E env ATARI800_SRC_PATH=<SOURCE_DIR>
-                  bash fujisan-patches/apply-patches.sh
+          COMMAND bash -c "cd <SOURCE_DIR> && export ATARI800_SRC_PATH=<SOURCE_DIR> && export GIT_TERMINAL_PROMPT=0 && bash fujisan-patches/apply-patches.sh || true"
     
     CONFIGURE_COMMAND ${ATARI800_CONFIGURE_COMMAND}
     
