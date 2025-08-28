@@ -138,13 +138,10 @@ private:
     
     // 80-Column Cards
     QCheckBox* m_xep80Enabled;
-    QCheckBox* m_af80Enabled;
-    QCheckBox* m_bit3Enabled;
     
     // PBI Extensions
     QCheckBox* m_atari1400Enabled;
     QCheckBox* m_atari1450Enabled;
-    QCheckBox* m_proto80Enabled;
     
     // Voice Synthesis
     QCheckBox* m_voiceboxEnabled;

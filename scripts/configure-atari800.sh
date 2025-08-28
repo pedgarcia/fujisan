@@ -155,10 +155,19 @@ if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]] || [[ "$OS" == "Windows_N
     exit 0
 else
     # Unix/macOS: Use full configuration
+    # Build libatari800 library (minimal version - XEP80 will use internal fonts)
     ./configure --target=libatari800 --enable-netsio
 fi
 
 echo "atari800 configuration completed"
+
+# Force enable XEP80 for libatari800
+FORCE_XEP80_SCRIPT="$SCRIPT_DIR/../patches/force-xep80-fat.sh"
+if [ -f "$FORCE_XEP80_SCRIPT" ]; then
+    echo "Forcing XEP80 support..."
+    chmod +x "$FORCE_XEP80_SCRIPT"
+    "$FORCE_XEP80_SCRIPT" "$ATARI800_SRC_PATH"
+fi
 
 # Apply inline patches if needed for missing functions
 INLINE_PATCH="${PATCHES_DIR}/patch-libatari800-inline.sh"

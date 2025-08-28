@@ -151,6 +151,8 @@ ExternalProject_Add(atari800_external
     CONFIGURE_COMMAND ${ATARI800_CONFIGURE_COMMAND}
     
     BUILD_COMMAND ${ATARI800_BUILD_COMMAND}
+        COMMAND ${CMAKE_COMMAND} -E echo "Adding XEP80 support to libatari800..."
+        COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> bash fujisan-patches/force-xep80-fat.sh <SOURCE_DIR>
     
     # No install step needed, we'll link directly to the library
     INSTALL_COMMAND ""
@@ -300,6 +302,23 @@ if(APPLE)
         target_sources(${PROJECT_NAME} PRIVATE ${ICON_FILE})
     else()
         message(WARNING "App icon not found: ${ICON_FILE}")
+    endif()
+    
+    # Copy ROMs to bundle if they exist
+    set(ROMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/roms")
+    if(EXISTS ${ROMS_DIR})
+        file(GLOB_RECURSE ROM_FILES "${ROMS_DIR}/*.rom" "${ROMS_DIR}/*.ROM")
+        foreach(ROM_FILE ${ROM_FILES})
+            file(RELATIVE_PATH REL_PATH "${CMAKE_CURRENT_SOURCE_DIR}" "${ROM_FILE}")
+            get_filename_component(REL_DIR "${REL_PATH}" DIRECTORY)
+            set_source_files_properties(${ROM_FILE} PROPERTIES
+                MACOSX_PACKAGE_LOCATION "Resources/${REL_DIR}"
+            )
+            target_sources(${PROJECT_NAME} PRIVATE ${ROM_FILE})
+        endforeach()
+        if(ROM_FILES)
+            message(STATUS "Found ROM files to bundle: ${ROM_FILES}")
+        endif()
     endif()
 endif()
 

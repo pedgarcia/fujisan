@@ -145,11 +145,8 @@ struct ConfigurationProfile {
     
     // Hardware Extensions
     bool xep80Enabled = false;
-    bool af80Enabled = false;
-    bool bit3Enabled = false;
     bool atari1400Enabled = false;
     bool atari1450Enabled = false;
-    bool proto80Enabled = false;
     bool voiceboxEnabled = false;
     bool sioAcceleration = true;
     

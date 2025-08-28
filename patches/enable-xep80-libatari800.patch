@@ -1,0 +1,14 @@
+diff --git a/configure.ac b/configure.ac
+index 1234567..abcdefg 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -700,6 +700,14 @@ if test "$enable_target" = "libatari800"; then
++    dnl Force enable XEP80 and other 80-column devices for libatari800
++    want_xep80_emulation=yes
++    AC_DEFINE(XEP80_EMULATION,1,[Define to enable XEP80 emulation])
++    AC_DEFINE(AF80,1,[Define to enable Austin Franklin 80 column card])
++    AC_DEFINE(BIT3,1,[Define to enable Bit 3 Full View 80 column card]) 
++    AC_DEFINE(PROTO80,1,[Define to enable PRC's PROTO80 emulation])
++    OBJS="$OBJS xep80.o xep80_fonts.o af80.o af80_fonts.o bit3.o proto80.o"
++    AC_MSG_RESULT([XEP80 and 80-column hardware enabled for libatari800])
+ fi

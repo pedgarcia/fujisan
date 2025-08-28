@@ -431,17 +431,11 @@ void SettingsDialog::createHardwareTab()
     QGroupBox* displayGroup = new QGroupBox("80-Column Cards");
     QVBoxLayout* displayLayout = new QVBoxLayout(displayGroup);
     
-    m_xep80Enabled = new QCheckBox("XEP80");
-    m_xep80Enabled->setToolTip("Enable XEP80 80-column display interface");
+    m_xep80Enabled = new QCheckBox("XEP80 80-Column Display (Hardware Only)");
+    m_xep80Enabled->setToolTip("Enable XEP80 80-column display adapter hardware emulation.\n"
+                               "Note: Display output is not yet visible in this version.\n"
+                               "The XEP80 hardware will be emulated but you won't see the 80-column display.");
     displayLayout->addWidget(m_xep80Enabled);
-    
-    m_af80Enabled = new QCheckBox("Austin Franklin 80");
-    m_af80Enabled->setToolTip("Enable Austin Franklin 80-column display board");
-    displayLayout->addWidget(m_af80Enabled);
-    
-    m_bit3Enabled = new QCheckBox("Bit3 Full View 80");
-    m_bit3Enabled->setToolTip("Enable Bit3 Full View 80-column display board");
-    displayLayout->addWidget(m_bit3Enabled);
     
     rightColumn->addWidget(displayGroup);
     
@@ -457,9 +451,6 @@ void SettingsDialog::createHardwareTab()
     m_atari1450Enabled->setToolTip("Enable Atari 1450XLD built-in disk drive");
     pbiLayout->addWidget(m_atari1450Enabled);
     
-    m_proto80Enabled = new QCheckBox("Proto 80-Column");
-    m_proto80Enabled->setToolTip("Enable prototype 80-column board for 1090");
-    pbiLayout->addWidget(m_proto80Enabled);
     
     // Voice Synthesis
     m_voiceboxEnabled = new QCheckBox("Voicebox");
@@ -713,8 +704,10 @@ void SettingsDialog::createVideoDisplayTab()
     fitScreenRow->addWidget(m_fitScreen);
     displayCol3->addLayout(fitScreenRow);
     
-    m_show80Column = new QCheckBox("Enable 80-Column Display");
-    m_show80Column->setToolTip("Show 80-column text mode (requires compatible software)");
+    m_show80Column = new QCheckBox("Enable 80-Column Display (Not Yet Implemented)");
+    m_show80Column->setToolTip("This option is not yet functional.\n"
+                               "80-column display output is not visible in this version.\n"
+                               "See Hardware > 80-Column Cards for XEP80 hardware emulation.");
     displayCol3->addWidget(m_show80Column);
     
     m_vSyncEnabled = new QCheckBox("Enable Vertical Sync");
@@ -2027,13 +2020,10 @@ void SettingsDialog::loadSettings()
     
     // 80-Column Cards
     m_xep80Enabled->setChecked(settings.value("hardware/xep80", false).toBool());
-    m_af80Enabled->setChecked(settings.value("hardware/af80", false).toBool());
-    m_bit3Enabled->setChecked(settings.value("hardware/bit3", false).toBool());
     
     // PBI Extensions
     m_atari1400Enabled->setChecked(settings.value("hardware/atari1400", false).toBool());
     m_atari1450Enabled->setChecked(settings.value("hardware/atari1450", false).toBool());
-    m_proto80Enabled->setChecked(settings.value("hardware/proto80", false).toBool());
     
     // Load Audio Configuration
     m_soundEnabled->setChecked(settings.value("audio/enabled", true).toBool());
@@ -2377,13 +2367,10 @@ void SettingsDialog::saveSettings()
     
     // 80-Column Cards
     settings.setValue("hardware/xep80", m_xep80Enabled->isChecked());
-    settings.setValue("hardware/af80", m_af80Enabled->isChecked());
-    settings.setValue("hardware/bit3", m_bit3Enabled->isChecked());
     
     // PBI Extensions
     settings.setValue("hardware/atari1400", m_atari1400Enabled->isChecked());
     settings.setValue("hardware/atari1450", m_atari1450Enabled->isChecked());
-    settings.setValue("hardware/proto80", m_proto80Enabled->isChecked());
     
     // Save Audio Configuration
     settings.setValue("audio/enabled", m_soundEnabled->isChecked());
@@ -2629,12 +2616,21 @@ void SettingsDialog::applySettings()
     // Check which settings require emulator restart vs live updates
     bool needsRestart = false;
     
+    QSettings settings;
+    
     // Check for changes that require emulator restart
     if (m_machineTypeCombo->currentData().toString() != m_emulator->getMachineType() ||
         m_videoSystemCombo->currentData().toString() != m_emulator->getVideoSystem() ||
         m_basicEnabledCheck->isChecked() != m_emulator->isBasicEnabled() ||
         m_altirraOSCheck->isChecked() != m_emulator->isAltirraOSEnabled()) {
         needsRestart = true;
+    }
+    
+    // Check if 80-column hardware settings have changed
+    if (m_xep80Enabled->isChecked() != settings.value("hardware/xep80", false).toBool() ||
+        m_show80Column->isChecked() != settings.value("video/show80Column", false).toBool()) {
+        needsRestart = true;
+        qDebug() << "80-column hardware settings changed - restart required";
     }
     
     // Apply joystick settings immediately (no restart needed)
@@ -2662,19 +2658,27 @@ void SettingsDialog::applySettings()
         // Full restart needed for machine/video/OS settings
         m_emulator->shutdown();
         
-        // Get artifact settings from UI
+        // Get display settings from UI
         QString artifactMode = m_artifactingMode->currentData().toString();
+        QString horizontalArea = m_horizontalArea->currentData().toString();
+        QString verticalArea = m_verticalArea->currentData().toString();
+        int horizontalShift = m_horizontalShift->value();
+        int verticalShift = m_verticalShift->value();
+        QString fitScreen = m_fitScreen->currentData().toString();
+        bool show80Column = m_show80Column->isChecked();
+        bool vSyncEnabled = m_vSyncEnabled->isChecked();
         
         if (m_emulator->initializeWithInputConfig(
                 m_emulator->isBasicEnabled(), 
                 m_emulator->getMachineType(), 
                 m_emulator->getVideoSystem(),
                 artifactMode,
-                "tv", "tv", 0, 0, "both", false, false,
+                horizontalArea, verticalArea, horizontalShift, verticalShift,
+                fitScreen, show80Column, vSyncEnabled,
                 m_kbdJoy0Enabled->isChecked(),
                 m_kbdJoy1Enabled->isChecked(),
                 m_swapJoysticks->isChecked())) {
-            qDebug() << "Emulator restarted with new settings";
+            qDebug() << "Emulator restarted with new settings including display config";
             
             // Reapply media settings after restart
             applyMediaSettings();
@@ -2813,13 +2817,10 @@ void SettingsDialog::restoreDefaults()
     
     // 80-Column Cards defaults
     m_xep80Enabled->setChecked(false);
-    m_af80Enabled->setChecked(false);
-    m_bit3Enabled->setChecked(false);
     
     // PBI Extensions defaults
     m_atari1400Enabled->setChecked(false);
     m_atari1450Enabled->setChecked(false);
-    m_proto80Enabled->setChecked(false);
     
     // Audio Configuration defaults
     m_soundEnabled->setChecked(true);
@@ -3107,11 +3108,8 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     
     // Hardware Extensions
     profile.xep80Enabled = m_xep80Enabled->isChecked();
-    profile.af80Enabled = m_af80Enabled->isChecked();
-    profile.bit3Enabled = m_bit3Enabled->isChecked();
     profile.atari1400Enabled = m_atari1400Enabled->isChecked();
     profile.atari1450Enabled = m_atari1450Enabled->isChecked();
-    profile.proto80Enabled = m_proto80Enabled->isChecked();
     profile.voiceboxEnabled = m_voiceboxEnabled->isChecked();
     profile.sioAcceleration = m_sioAcceleration->isChecked();
     
@@ -3347,11 +3345,8 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     
     // Hardware Extensions
     m_xep80Enabled->setChecked(profile.xep80Enabled);
-    m_af80Enabled->setChecked(profile.af80Enabled);
-    m_bit3Enabled->setChecked(profile.bit3Enabled);
     m_atari1400Enabled->setChecked(profile.atari1400Enabled);
     m_atari1450Enabled->setChecked(profile.atari1450Enabled);
-    m_proto80Enabled->setChecked(profile.proto80Enabled);
     m_voiceboxEnabled->setChecked(profile.voiceboxEnabled);
     m_sioAcceleration->setChecked(profile.sioAcceleration);
     

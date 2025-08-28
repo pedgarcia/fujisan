@@ -1,0 +1,13 @@
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -500,6 +500,10 @@
+ @WITH_SOUND_LIBATARI800_TRUE@	libatari800/sound.c
+ @CONFIGURE_TARGET_LIBATARI800_TRUE@noinst_PROGRAMS = libatari800_test$(EXEEXT) guess_settings$(EXEEXT) $(am__EXEEXT_4) $(am__EXEEXT_5)
+ @CONFIGURE_TARGET_LIBATARI800_TRUE@libatari800_test_SOURCES = libatari800/libatari800_test.c
++# Add 80-column hardware support to libatari800
++@CONFIGURE_TARGET_LIBATARI800_TRUE@@WANT_XEP80_EMULATION_TRUE@libatari800_a_SOURCES += xep80.c xep80.h xep80_fonts.c xep80_fonts.h
++@CONFIGURE_TARGET_LIBATARI800_TRUE@@WANT_AF80_TRUE@libatari800_a_SOURCES += af80.c af80.h af80_fonts.c af80_fonts.h  
++@CONFIGURE_TARGET_LIBATARI800_TRUE@@WANT_BIT3_TRUE@libatari800_a_SOURCES += bit3.c bit3.h
+ @CONFIGURE_TARGET_LIBATARI800_TRUE@libatari800_test_CFLAGS = -Ilibatari800
+ @CONFIGURE_TARGET_LIBATARI800_TRUE@libatari800_test_LDADD = libatari800.a
+ @CONFIGURE_TARGET_LIBATARI800_TRUE@guess_settings_SOURCES = libatari800/guess_settings.c

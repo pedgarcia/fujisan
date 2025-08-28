@@ -1,0 +1,52 @@
+--- a/src/cfg.c
++++ b/src/cfg.c
+@@ -88,12 +88,14 @@
+ #ifdef PROTO80
+ int PROTO80_enabled = FALSE;
+ #endif
++#undef XEP80_EMULATION
+ #ifdef XEP80_EMULATION
+ int XEP80_enabled = FALSE;
+ int XEP80_port = 1;
+ #endif
++#undef AF80
+ #ifdef AF80
+ int AF80_enabled = FALSE;
+ #endif
++#undef BIT3
+ #ifdef BIT3
+ int BIT3_enabled = FALSE;
+--- a/src/atari.c
++++ b/src/atari.c
+@@ -1485,9 +1485,11 @@ int Atari800_Initialise(int *argc, char *argv[])
+ 	if (!PBIEXPAND_Initialise(argc, argv))
+ 		return FALSE;
+ #endif
++#undef XEP80_EMULATION
+ #ifdef XEP80_EMULATION
+ 	if (!XEP80_Initialise(argc, argv))
+ 		return FALSE;
+ #endif
++#undef AF80
+ #ifdef AF80
+ 	if (!AF80_Initialise(argc, argv))
+--- a/src/pia.c
++++ b/src/pia.c
+@@ -60,6 +60,7 @@
+ #include "votraxsnd.h"
+ #endif
+ 
++#undef XEP80_EMULATION
+ #ifdef XEP80_EMULATION
+ #include "xep80.h"
+ #endif
+--- a/src/statesav.c
++++ b/src/statesav.c
+@@ -70,6 +70,7 @@
+ #include "votraxsnd.h"
+ #endif
+ 
++#undef XEP80_EMULATION
+ #ifdef XEP80_EMULATION
+ #include "xep80.h"
+ #endif

@@ -180,11 +180,8 @@ QJsonObject ConfigurationProfile::toJson() const {
     // Hardware Extensions
     QJsonObject hardwareConfig;
     hardwareConfig["xep80Enabled"] = xep80Enabled;
-    hardwareConfig["af80Enabled"] = af80Enabled;
-    hardwareConfig["bit3Enabled"] = bit3Enabled;
     hardwareConfig["atari1400Enabled"] = atari1400Enabled;
     hardwareConfig["atari1450Enabled"] = atari1450Enabled;
-    hardwareConfig["proto80Enabled"] = proto80Enabled;
     hardwareConfig["voiceboxEnabled"] = voiceboxEnabled;
     hardwareConfig["sioAcceleration"] = sioAcceleration;
     json["hardwareConfig"] = hardwareConfig;
@@ -375,11 +372,8 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
     if (json.contains("hardwareConfig") && json["hardwareConfig"].isObject()) {
         QJsonObject hardwareConfig = json["hardwareConfig"].toObject();
         xep80Enabled = hardwareConfig["xep80Enabled"].toBool(false);
-        af80Enabled = hardwareConfig["af80Enabled"].toBool(false);
-        bit3Enabled = hardwareConfig["bit3Enabled"].toBool(false);
         atari1400Enabled = hardwareConfig["atari1400Enabled"].toBool(false);
         atari1450Enabled = hardwareConfig["atari1450Enabled"].toBool(false);
-        proto80Enabled = hardwareConfig["proto80Enabled"].toBool(false);
         voiceboxEnabled = hardwareConfig["voiceboxEnabled"].toBool(false);
         sioAcceleration = hardwareConfig["sioAcceleration"].toBool(true);
     }

@@ -17,6 +17,12 @@ cd "$ATARI800_SRC_PATH" || exit 1
 
 echo "Applying patches to atari800 source at: $ATARI800_SRC_PATH"
 
+# Apply XEP80 internal fonts patch first if it exists
+if [ -f "$PATCHES_DIR/xep80-internal-fonts.patch" ]; then
+    echo "Applying XEP80 internal fonts patch..."
+    patch -p1 < "$PATCHES_DIR/xep80-internal-fonts.patch" 2>/dev/null || echo "XEP80 patch may have already been applied"
+fi
+
 # Check if this is a git repository
 if [ -d .git ]; then
     echo "Git repository detected, using 'git am' for patches"

@@ -12,10 +12,12 @@
 #include "atariemulator.h"
 #include <QDebug>
 #include <QApplication>
+#include <QCoreApplication>
 #include <QMetaObject>
 #include <QTimer>
 #include <QThread>
 #include <QFileInfo>
+#include <QFile>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QDir>
@@ -25,6 +27,7 @@
 #include <QMutexLocker>
 #include <QByteArray>
 #include <cstring>  // for memset
+#include <cstdlib>  // for setenv
 #include <vector>   // for std::vector
 
 #ifdef HAVE_SDL2_AUDIO
@@ -217,7 +220,10 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     // if (horizontalShift != 0) argList << "-horiz-shift" << QString::number(horizontalShift);
     // if (verticalShift != 0) argList << "-vert-shift" << QString::number(verticalShift);
     // argList << "-fit-screen" << fitScreen;
-    // if (show80Column) argList << "-80column"; else argList << "-no-80column";
+    if (show80Column) {
+        argList << "-80column";
+        qDebug() << "Enabling 80-column display mode";
+    }
     // if (vSyncEnabled) argList << "-vsync"; else argList << "-no-vsync";
     
     qDebug() << "=== END SCREEN DISPLAY CONFIGURATION ===";
@@ -288,6 +294,30 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
             argList << "-basic";  // Actually enable BASIC mode
         } else {
             argList << "-nobasic";
+        }
+    }
+    
+    // Add 80-column hardware support
+    // Note: XEP80 hardware emulation works but display output is not yet visible
+    // TODO: Implement XEP80 display widget to show 80-column output (see TODO_XEP80.md)
+    QSettings settings;
+    if (settings.value("hardware/xep80", false).toBool()) {
+        argList << "-xep80";
+        qDebug() << "Enabling XEP80 80-column hardware (display not yet visible)";
+        
+        // Check for XEP80 character set ROM in bundle resources first
+        QString bundleRomPath = QCoreApplication::applicationDirPath() + "/../Resources/roms/80column/xep80_charset.rom";
+        QString xep80CharsetPath = settings.value("hardware/xep80CharsetPath", "").toString();
+        
+        if (QFile::exists(bundleRomPath)) {
+            setenv("XEP80_CHARSET", bundleRomPath.toUtf8().constData(), 1);
+            qDebug() << "Using bundled XEP80 charset ROM from:" << bundleRomPath;
+        } else if (!xep80CharsetPath.isEmpty() && QFile::exists(xep80CharsetPath)) {
+            setenv("XEP80_CHARSET", xep80CharsetPath.toUtf8().constData(), 1);
+            qDebug() << "Using user-specified XEP80 charset ROM from:" << xep80CharsetPath;
+        } else {
+            // With our patch, XEP80 will work with internal fonts
+            qDebug() << "XEP80 will use internal fonts (no external charset ROM found)";
         }
     }
     
@@ -457,6 +487,30 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     if (netSIOEnabled) {
         argList << "-netsio";
         qDebug() << "Adding NetSIO command line argument: -netsio";
+    }
+    
+    // Add 80-column hardware support
+    // Note: XEP80 hardware emulation works but display output is not yet visible
+    // TODO: Implement XEP80 display widget to show 80-column output (see TODO_XEP80.md)
+    QSettings settings;
+    if (settings.value("hardware/xep80", false).toBool()) {
+        argList << "-xep80";
+        qDebug() << "Enabling XEP80 80-column hardware (display not yet visible)";
+        
+        // Check for XEP80 character set ROM in bundle resources first
+        QString bundleRomPath = QCoreApplication::applicationDirPath() + "/../Resources/roms/80column/xep80_charset.rom";
+        QString xep80CharsetPath = settings.value("hardware/xep80CharsetPath", "").toString();
+        
+        if (QFile::exists(bundleRomPath)) {
+            setenv("XEP80_CHARSET", bundleRomPath.toUtf8().constData(), 1);
+            qDebug() << "Using bundled XEP80 charset ROM from:" << bundleRomPath;
+        } else if (!xep80CharsetPath.isEmpty() && QFile::exists(xep80CharsetPath)) {
+            setenv("XEP80_CHARSET", xep80CharsetPath.toUtf8().constData(), 1);
+            qDebug() << "Using user-specified XEP80 charset ROM from:" << xep80CharsetPath;
+        } else {
+            // With our patch, XEP80 will work with internal fonts
+            qDebug() << "XEP80 will use internal fonts (no external charset ROM found)";
+        }
     }
     
     // Initialize printer support - DISABLED (P: device not working in atari800 core)

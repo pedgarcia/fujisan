@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Build System
+Date: Mon, 26 Aug 2025 12:00:00 -0500
+Subject: [PATCH] Add XEP80 and 80-column hardware support to libatari800
+
+This patch modifies the build system to include XEP80, AF80, Bit3, and Proto80
+80-column display hardware emulation in the libatari800 library build.
+
+---
+ src/Makefile.am | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 1234567..abcdefg 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -31,7 +31,17 @@ libatari800_a_SOURCES = \
+ 	libatari800/input.c libatari800/input.h \
+ 	libatari800/video.c libatari800/video.h \
+ 	libatari800/statesav.c libatari800/statesav.h \
+-	libatari800/sound.c libatari800/sound.h
++	libatari800/sound.c libatari800/sound.h \
++	xep80.c xep80.h \
++	xep80_fonts.c xep80_fonts.h \
++	af80.c af80.h \
++	af80_fonts.c af80_fonts.h \
++	bit3.c bit3.h \
++	proto80.c proto80.h
++
++# Force enable 80-column hardware for libatari800
++libatari800_a_CPPFLAGS = $(AM_CPPFLAGS) -DXEP80_EMULATION -DAF80 -DBIT3 -DPROTO80
++
+ noinst_PROGRAMS += libatari800_test guess_settings
+ libatari800_test_SOURCES = libatari800/libatari800_test.c
+ libatari800_test_CFLAGS = -Ilibatari800
+-- 
+2.39.0

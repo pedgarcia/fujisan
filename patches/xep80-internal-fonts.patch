@@ -1,0 +1,20 @@
+diff --git a/src/xep80_fonts.c b/src/xep80_fonts.c
+index 1234567..abcdefg 100644
+--- a/src/xep80_fonts.c
++++ b/src/xep80_fonts.c
+@@ -1876,8 +1876,13 @@ static void InitBlockFont(void)
+ int XEP80_FONTS_InitFonts(char const *charset_filename)
+ {
+ 
+-	if (!InitExternalFonts(charset_filename))
+-		return FALSE;
++	/* Try to load external fonts, but fall back to internal fonts if not available */
++	if (charset_filename && strlen(charset_filename) > 0) {
++		if (!InitExternalFonts(charset_filename)) {
++			/* External font not found, but we can continue with internal fonts */
++			Log_print("XEP80: External charset ROM not found, using internal fonts");
++		}
++	}
+ 	InitInternalFont();
+ 	InitBlockFont();
+ 

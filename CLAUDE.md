@@ -39,3 +39,4 @@ Fujisan is a modern Qt5-based frontend for the Atari800 emulator that provides a
 
 - I have podman installed. Do not try to install it - and I have a symlink docker -> podman, so you can still use docker name
 - when creating a binary for test, or even full builds remember the binary has to be signed and using this to avoid Qt5 conflicts (x86 and arm): /opt/homebrew/opt/qt@5/bin/macdeployqt Fujisan.app
+- when building Fujisan for mac always make sure it is signed and the qt5 libraries are for arm only - this is for development only
