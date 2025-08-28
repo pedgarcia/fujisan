@@ -21,6 +21,13 @@ cd "$ATARI800_SRC_PATH" || exit 1
 
 echo "Applying patches to atari800 source at: $ATARI800_SRC_PATH"
 
+# Check if we've already applied patches by looking for a marker file
+PATCH_MARKER="$ATARI800_SRC_PATH/.fujisan-patches-applied"
+if [ -f "$PATCH_MARKER" ]; then
+    echo "Patches have already been applied (marker file exists). Skipping."
+    exit 0
+fi
+
 # Apply XEP80 internal fonts patch first if it exists
 if [ -f "$PATCHES_DIR/xep80-internal-fonts.patch" ]; then
     echo "Applying XEP80 internal fonts patch..."
@@ -108,6 +115,10 @@ if [ -f "$INLINE_PATCH" ]; then
     echo "Applying inline patches for disk management functions..."
     bash "$INLINE_PATCH" "$ATARI800_SRC_PATH" || echo "Inline patch may have already been applied"
 fi
+
+# Create marker file to indicate patches have been applied
+touch "$PATCH_MARKER"
+echo "Created patch marker file: $PATCH_MARKER"
 
 echo ""
 echo "Now build libatari800 with:"

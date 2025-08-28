@@ -149,8 +149,6 @@ ExternalProject_Add(atari800_external
     CONFIGURE_COMMAND ${ATARI800_CONFIGURE_COMMAND}
     
     BUILD_COMMAND ${ATARI800_BUILD_COMMAND}
-        COMMAND ${CMAKE_COMMAND} -E echo "Adding XEP80 support to libatari800..."
-        COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> bash fujisan-patches/force-xep80-fat.sh <SOURCE_DIR>
     
     # No install step needed, we'll link directly to the library
     INSTALL_COMMAND ""
