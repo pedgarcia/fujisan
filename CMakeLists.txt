@@ -3,10 +3,35 @@
 # Licensed under the MIT License. See LICENSE file for details.
 
 cmake_minimum_required(VERSION 3.16)
-project(Fujisan VERSION 1.0.0)
+
+# Allow version to be overridden from command line
+if(NOT PROJECT_VERSION)
+    set(PROJECT_VERSION "1.0.0")
+endif()
+
+project(Fujisan VERSION ${PROJECT_VERSION})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Configure version header
+string(TIMESTAMP BUILD_DATE "%Y-%m-%d")
+execute_process(
+    COMMAND git rev-parse --short HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE BUILD_COMMIT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT BUILD_COMMIT)
+    set(BUILD_COMMIT "unknown")
+endif()
+
+configure_file(
+    "${CMAKE_SOURCE_DIR}/include/version.h.in"
+    "${CMAKE_BINARY_DIR}/include/version.h"
+    @ONLY
+)
 
 # Use C++14 on Windows to avoid potential SDK conflicts
 if(WIN32 AND MSVC)
@@ -263,6 +288,7 @@ add_dependencies(${PROJECT_NAME} atari800_external)
 # Include directories for Fujisan and atari800 headers
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_BINARY_DIR}/include  # For generated version.h
     ${ATARI800_SOURCE_DIR}/src/libatari800
     ${ATARI800_SOURCE_DIR}/src
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:${SDL2_INCLUDE_DIRS}>

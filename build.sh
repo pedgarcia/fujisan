@@ -356,6 +356,7 @@ build_macos_arm64() {
               -DCMAKE_OSX_ARCHITECTURES=arm64 \
               -DCMAKE_PREFIX_PATH="$QT_ARM64_PATH" \
               -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+              -DPROJECT_VERSION="$VERSION_CLEAN" \
               "$PROJECT_ROOT"
         
         echo_info "Building..."
@@ -432,6 +433,7 @@ build_macos_x86_64() {
               -DCMAKE_PREFIX_PATH="$QT_X86_64_PATH" \
               -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
               -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
+              -DPROJECT_VERSION="$VERSION_CLEAN" \
               "$PROJECT_ROOT"
         
         echo_info "Building..."

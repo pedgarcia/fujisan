@@ -10,6 +10,7 @@
 #endif
 
 #include "mainwindow.h"
+#include "version.h"  // For FUJISAN_FULL_VERSION_STRING
 #include <QApplication>
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -47,7 +48,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_mediaToggleButton(nullptr)
     , m_logoLabel(nullptr)
 {
-    setWindowTitle("Fujisan");
+    setWindowTitle(QString("Fujisan %1").arg(FUJISAN_VERSION));
     setMinimumSize(800, 600);
     resize(1280, 960);
 
@@ -1401,7 +1402,7 @@ void MainWindow::showAbout()
     layout->addWidget(logoLabel);
 
     // Title and version
-    QLabel* titleLabel = new QLabel("Fujisan v1.0.0");
+    QLabel* titleLabel = new QLabel(FUJISAN_FULL_VERSION_STRING);
     titleLabel->setAlignment(Qt::AlignCenter);
     QFont titleFont = titleLabel->font();
     titleFont.setPointSize(14);
