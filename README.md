@@ -79,13 +79,22 @@ I guess, the big difference is that Fujisan is a UI-based emulator that is avail
 
 ## Building
 
+For complete build instructions, see **[BUILD.md](BUILD.md)**.
+
+### Quick Start
+```bash
+# Build for macOS (both architectures)
+./build.sh macos
+
+# Build for all platforms
+./build.sh all
+```
+
 ### Prerequisites
 - **Qt5** (Core, Widgets, Gui modules)
 - **CMake 3.16+**
 - **C++17 compatible compiler**
-- **Atari800 source code** (download from https://github.com/atari800/atari800)
 - **autoconf** and **automake** (for building atari800)
-- **Environment variable**: `export ATARI800_SRC_PATH=/path/to/atari800-src`
 
 ### Platform-Specific Setup
 
