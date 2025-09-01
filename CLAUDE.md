@@ -34,6 +34,9 @@ Fujisan is a modern Qt5-based frontend for the Atari800 emulator that provides a
 # - fujisan_{version}_amd64.deb   (Debian/Ubuntu)
 ```
 
+* You will need to add the --version vX.Y.Z to all build commands using build.sh
+* Use the agent build-error-fixer when there are build errors
+
 ## Development Environment
 
 ### Container and Docker Management

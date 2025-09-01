@@ -443,15 +443,21 @@ void SettingsDialog::createHardwareTab()
     QVBoxLayout* displayLayout = new QVBoxLayout(displayGroup);
     
     m_xep80Enabled = new QCheckBox("XEP80");
-    m_xep80Enabled->setToolTip("Enable XEP80 80-column display interface");
+    m_xep80Enabled->setToolTip("Enable XEP80 80-column display interface (Currently disabled - needs more work)");
+    m_xep80Enabled->setChecked(false);
+    m_xep80Enabled->setEnabled(false);
     displayLayout->addWidget(m_xep80Enabled);
     
     m_af80Enabled = new QCheckBox("Austin Franklin 80");
-    m_af80Enabled->setToolTip("Enable Austin Franklin 80-column display board");
+    m_af80Enabled->setToolTip("Enable Austin Franklin 80-column display board (Currently disabled - needs more work)");
+    m_af80Enabled->setChecked(false);
+    m_af80Enabled->setEnabled(false);
     displayLayout->addWidget(m_af80Enabled);
     
     m_bit3Enabled = new QCheckBox("Bit3 Full View 80");
-    m_bit3Enabled->setToolTip("Enable Bit3 Full View 80-column display board");
+    m_bit3Enabled->setToolTip("Enable Bit3 Full View 80-column display board (Currently disabled - needs more work)");
+    m_bit3Enabled->setChecked(false);
+    m_bit3Enabled->setEnabled(false);
     displayLayout->addWidget(m_bit3Enabled);
     
     rightColumn->addWidget(displayGroup);
@@ -469,7 +475,9 @@ void SettingsDialog::createHardwareTab()
     pbiLayout->addWidget(m_atari1450Enabled);
     
     m_proto80Enabled = new QCheckBox("Proto 80-Column");
-    m_proto80Enabled->setToolTip("Enable prototype 80-column board for 1090");
+    m_proto80Enabled->setToolTip("Enable prototype 80-column board for 1090 (Currently disabled - needs more work)");
+    m_proto80Enabled->setChecked(false);
+    m_proto80Enabled->setEnabled(false);
     pbiLayout->addWidget(m_proto80Enabled);
     
     // Voice Synthesis
@@ -725,7 +733,9 @@ void SettingsDialog::createVideoDisplayTab()
     displayCol3->addLayout(fitScreenRow);
     
     m_show80Column = new QCheckBox("Enable 80-Column Display");
-    m_show80Column->setToolTip("Show 80-column text mode (requires compatible software)");
+    m_show80Column->setToolTip("Show 80-column text mode (Currently disabled - needs more work)");
+    m_show80Column->setChecked(false);
+    m_show80Column->setEnabled(false);
     displayCol3->addWidget(m_show80Column);
     
     m_vSyncEnabled = new QCheckBox("Enable Vertical Sync");
@@ -2047,15 +2057,25 @@ void SettingsDialog::loadSettings()
     m_stereoPokey->setChecked(settings.value("hardware/stereoPokey", false).toBool());
     m_sioAcceleration->setChecked(settings.value("hardware/sioAcceleration", true).toBool());
     
-    // 80-Column Cards
-    m_xep80Enabled->setChecked(settings.value("hardware/xep80", false).toBool());
-    m_af80Enabled->setChecked(settings.value("hardware/af80", false).toBool());
-    m_bit3Enabled->setChecked(settings.value("hardware/bit3", false).toBool());
+    // 80-Column Cards - Disabled until properly implemented
+    // m_xep80Enabled->setChecked(settings.value("hardware/xep80", false).toBool());
+    // m_af80Enabled->setChecked(settings.value("hardware/af80", false).toBool());
+    // m_bit3Enabled->setChecked(settings.value("hardware/bit3", false).toBool());
+    // Always keep them unchecked and disabled
+    m_xep80Enabled->setChecked(false);
+    m_xep80Enabled->setEnabled(false);
+    m_af80Enabled->setChecked(false);
+    m_af80Enabled->setEnabled(false);
+    m_bit3Enabled->setChecked(false);
+    m_bit3Enabled->setEnabled(false);
     
     // PBI Extensions
     m_atari1400Enabled->setChecked(settings.value("hardware/atari1400", false).toBool());
     m_atari1450Enabled->setChecked(settings.value("hardware/atari1450", false).toBool());
-    m_proto80Enabled->setChecked(settings.value("hardware/proto80", false).toBool());
+    // m_proto80Enabled->setChecked(settings.value("hardware/proto80", false).toBool());
+    // Always keep proto80 unchecked and disabled
+    m_proto80Enabled->setChecked(false);
+    m_proto80Enabled->setEnabled(false);
     
     // Load Audio Configuration
     m_soundEnabled->setChecked(settings.value("audio/enabled", true).toBool());
@@ -2133,7 +2153,10 @@ void SettingsDialog::loadSettings()
         }
     }
     
-    m_show80Column->setChecked(settings.value("video/show80Column", false).toBool());
+    // m_show80Column->setChecked(settings.value("video/show80Column", false).toBool());
+    // Always keep 80-column display unchecked and disabled
+    m_show80Column->setChecked(false);
+    m_show80Column->setEnabled(false);
     m_vSyncEnabled->setChecked(settings.value("video/vSyncEnabled", false).toBool());
     
     QString palBlending = settings.value("video/palBlending", "simple").toString();
@@ -2399,15 +2422,21 @@ void SettingsDialog::saveSettings()
     settings.setValue("hardware/stereoPokey", m_stereoPokey->isChecked());
     settings.setValue("hardware/sioAcceleration", m_sioAcceleration->isChecked());
     
-    // 80-Column Cards
-    settings.setValue("hardware/xep80", m_xep80Enabled->isChecked());
-    settings.setValue("hardware/af80", m_af80Enabled->isChecked());
-    settings.setValue("hardware/bit3", m_bit3Enabled->isChecked());
+    // 80-Column Cards - Disabled until properly implemented
+    // settings.setValue("hardware/xep80", m_xep80Enabled->isChecked());
+    // settings.setValue("hardware/af80", m_af80Enabled->isChecked());
+    // settings.setValue("hardware/bit3", m_bit3Enabled->isChecked());
+    // Always save as false
+    settings.setValue("hardware/xep80", false);
+    settings.setValue("hardware/af80", false);
+    settings.setValue("hardware/bit3", false);
     
     // PBI Extensions
     settings.setValue("hardware/atari1400", m_atari1400Enabled->isChecked());
     settings.setValue("hardware/atari1450", m_atari1450Enabled->isChecked());
-    settings.setValue("hardware/proto80", m_proto80Enabled->isChecked());
+    // settings.setValue("hardware/proto80", m_proto80Enabled->isChecked());
+    // Always save as false
+    settings.setValue("hardware/proto80", false);
     
     // Save Audio Configuration
     settings.setValue("audio/enabled", m_soundEnabled->isChecked());
@@ -2435,7 +2464,9 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/horizontalShift", m_horizontalShift->value());
     settings.setValue("video/verticalShift", m_verticalShift->value());
     settings.setValue("video/fitScreen", m_fitScreen->currentData().toString());
-    settings.setValue("video/show80Column", m_show80Column->isChecked());
+    // settings.setValue("video/show80Column", m_show80Column->isChecked());
+    // Always save as false
+    settings.setValue("video/show80Column", false);
     settings.setValue("video/vSyncEnabled", m_vSyncEnabled->isChecked());
     settings.setValue("video/palBlending", m_palBlending->currentData().toString());
     // FUTURE: Save universal scanlines settings (commented out - not working)
@@ -2685,12 +2716,44 @@ void SettingsDialog::applySettings()
     saveSettings();
     
     if (needsRestart) {
+        // Update emulator properties with new values BEFORE restart
+        QString machineType = m_machineTypeCombo->currentData().toString();
+        QString videoSystem = m_videoSystemCombo->currentData().toString();
+        bool basicEnabled = m_basicEnabledCheck->isChecked();
+        bool altirraOSEnabled = m_altirraOSCheck->isChecked();
+        bool altirraBASICEnabled = m_altirraBASICCheck->isChecked();
+        
+        // Get the OS ROM path for the current machine type
+        QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
+        QSettings settings("8bitrelics", "Fujisan");
+        QString osRomPath = settings.value(osRomKey, "").toString();
+        QString basicRomPath = settings.value("machine/basicRom", "").toString();
+        
+        // Set all the new values on the emulator object
+        m_emulator->setMachineType(machineType);
+        m_emulator->setVideoSystem(videoSystem);
+        m_emulator->setBasicEnabled(basicEnabled);
+        m_emulator->setAltirraOSEnabled(altirraOSEnabled);
+        m_emulator->setAltirraBASICEnabled(altirraBASICEnabled);
+        m_emulator->setOSRomPath(osRomPath);
+        m_emulator->setBasicRomPath(basicRomPath);
+        
+        qDebug() << "Updated emulator properties before restart:";
+        qDebug() << "  Machine type:" << machineType;
+        qDebug() << "  Video system:" << videoSystem;
+        qDebug() << "  Basic enabled:" << basicEnabled;
+        qDebug() << "  Altirra OS:" << altirraOSEnabled;
+        qDebug() << "  Altirra BASIC:" << altirraBASICEnabled;
+        qDebug() << "  OS ROM path:" << osRomPath;
+        qDebug() << "  BASIC ROM path:" << basicRomPath;
+        
         // Full restart needed for machine/video/OS settings
         m_emulator->shutdown();
         
         // Get artifact settings from UI
         QString artifactMode = m_artifactingMode->currentData().toString();
         
+        // Now initialize with the updated values from the emulator object
         if (m_emulator->initializeWithInputConfig(
                 m_emulator->isBasicEnabled(), 
                 m_emulator->getMachineType(), 
@@ -2752,7 +2815,8 @@ void SettingsDialog::triggerNetSIORestart(bool netSIOEnabled)
     int horizontalShift = m_horizontalShift->value();
     int verticalShift = m_verticalShift->value();
     QString fitScreen = m_fitScreen->currentData().toString();
-    bool show80Column = m_show80Column->isChecked();
+    // bool show80Column = m_show80Column->isChecked();
+    bool show80Column = false;  // Always false until properly implemented
     bool vSyncEnabled = m_vSyncEnabled->isChecked();
     bool kbdJoy0Enabled = m_emulator->isKbdJoy0Enabled();
     bool kbdJoy1Enabled = m_emulator->isKbdJoy1Enabled();
@@ -2839,15 +2903,19 @@ void SettingsDialog::restoreDefaults()
     m_stereoPokey->setChecked(false);
     m_sioAcceleration->setChecked(true);
     
-    // 80-Column Cards defaults
+    // 80-Column Cards defaults - Disabled until properly implemented
     m_xep80Enabled->setChecked(false);
+    m_xep80Enabled->setEnabled(false);
     m_af80Enabled->setChecked(false);
+    m_af80Enabled->setEnabled(false);
     m_bit3Enabled->setChecked(false);
+    m_bit3Enabled->setEnabled(false);
     
     // PBI Extensions defaults
     m_atari1400Enabled->setChecked(false);
     m_atari1450Enabled->setChecked(false);
     m_proto80Enabled->setChecked(false);
+    m_proto80Enabled->setEnabled(false);
     
     // Audio Configuration defaults
     m_soundEnabled->setChecked(true);
@@ -2876,7 +2944,8 @@ void SettingsDialog::restoreDefaults()
     m_horizontalShift->setValue(0);        // No shift
     m_verticalShift->setValue(0);          // No shift
     m_fitScreen->setCurrentIndex(2);       // Fit Both
-    m_show80Column->setChecked(false);     // Standard display
+    m_show80Column->setChecked(false);     // Standard display - Disabled until properly implemented
+    m_show80Column->setEnabled(false);
     m_vSyncEnabled->setChecked(false);     // VSync off (for performance)
     
     m_palBlending->setCurrentIndex(1);     // Simple
@@ -3057,7 +3126,8 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.horizontalShift = m_horizontalShift->value();
     profile.verticalShift = m_verticalShift->value();
     profile.fitScreen = m_fitScreen->currentData().toString();
-    profile.show80Column = m_show80Column->isChecked();
+    // profile.show80Column = m_show80Column->isChecked();
+    profile.show80Column = false;  // Always false until properly implemented
     profile.vSyncEnabled = m_vSyncEnabled->isChecked();
     
     // Color Settings
@@ -3135,12 +3205,17 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.printer.printerType = "Generic";
     
     // Hardware Extensions
-    profile.xep80Enabled = m_xep80Enabled->isChecked();
-    profile.af80Enabled = m_af80Enabled->isChecked();
-    profile.bit3Enabled = m_bit3Enabled->isChecked();
+    // 80-column options disabled until properly implemented
+    // profile.xep80Enabled = m_xep80Enabled->isChecked();
+    // profile.af80Enabled = m_af80Enabled->isChecked();
+    // profile.bit3Enabled = m_bit3Enabled->isChecked();
+    profile.xep80Enabled = false;
+    profile.af80Enabled = false;
+    profile.bit3Enabled = false;
     profile.atari1400Enabled = m_atari1400Enabled->isChecked();
     profile.atari1450Enabled = m_atari1450Enabled->isChecked();
-    profile.proto80Enabled = m_proto80Enabled->isChecked();
+    // profile.proto80Enabled = m_proto80Enabled->isChecked();
+    profile.proto80Enabled = false;
     profile.voiceboxEnabled = m_voiceboxEnabled->isChecked();
     profile.sioAcceleration = m_sioAcceleration->isChecked();
     
@@ -3247,7 +3322,10 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
         }
     }
     
-    m_show80Column->setChecked(profile.show80Column);
+    // m_show80Column->setChecked(profile.show80Column);
+    // Always keep disabled until properly implemented
+    m_show80Column->setChecked(false);
+    m_show80Column->setEnabled(false);
     m_vSyncEnabled->setChecked(profile.vSyncEnabled);
     
     // Color Settings - block individual slider signals to prevent visual bouncing
@@ -3376,12 +3454,21 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     onNetSIOToggled(m_netSIOEnabled->isChecked());
     
     // Hardware Extensions
-    m_xep80Enabled->setChecked(profile.xep80Enabled);
-    m_af80Enabled->setChecked(profile.af80Enabled);
-    m_bit3Enabled->setChecked(profile.bit3Enabled);
+    // 80-column options disabled until properly implemented
+    // m_xep80Enabled->setChecked(profile.xep80Enabled);
+    // m_af80Enabled->setChecked(profile.af80Enabled);
+    // m_bit3Enabled->setChecked(profile.bit3Enabled);
+    m_xep80Enabled->setChecked(false);
+    m_xep80Enabled->setEnabled(false);
+    m_af80Enabled->setChecked(false);
+    m_af80Enabled->setEnabled(false);
+    m_bit3Enabled->setChecked(false);
+    m_bit3Enabled->setEnabled(false);
     m_atari1400Enabled->setChecked(profile.atari1400Enabled);
     m_atari1450Enabled->setChecked(profile.atari1450Enabled);
-    m_proto80Enabled->setChecked(profile.proto80Enabled);
+    // m_proto80Enabled->setChecked(profile.proto80Enabled);
+    m_proto80Enabled->setChecked(false);
+    m_proto80Enabled->setEnabled(false);
     m_voiceboxEnabled->setChecked(profile.voiceboxEnabled);
     m_sioAcceleration->setChecked(profile.sioAcceleration);
     
