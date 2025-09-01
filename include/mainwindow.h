@@ -58,6 +58,7 @@ private slots:
     void warmBoot();
     void toggleBasic(bool enabled);
     void toggleAltirraOS(bool enabled);
+    void toggleAltirraBASIC(bool enabled);
     void onMachineTypeChanged(int index);
     void onVideoSystemToggled(bool isPAL);
     void onSpeedToggled(bool isFullSpeed);
@@ -190,6 +191,7 @@ private:
     QAction* m_warmBootAction;
     QAction* m_basicAction;
     QAction* m_altirraOSAction;
+    QAction* m_altirraBASICAction;
     QAction* m_settingsAction;
     QAction* m_exitAction;
     QAction* m_aboutAction;

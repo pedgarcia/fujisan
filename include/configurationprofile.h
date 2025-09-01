@@ -26,6 +26,7 @@ struct ConfigurationProfile {
     QString videoSystem = "-pal";
     bool basicEnabled = true;
     bool altirraOSEnabled = false;
+    bool altirraBASICEnabled = false;
     QString osRomPath;
     QString basicRomPath;
     

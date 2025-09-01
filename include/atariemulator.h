@@ -195,6 +195,9 @@ public:
     bool isAltirraOSEnabled() const { return m_altirraOSEnabled; }
     void setAltirraOSEnabled(bool enabled) { m_altirraOSEnabled = enabled; }
     
+    bool isAltirraBASICEnabled() const { return m_altirraBASICEnabled; }
+    void setAltirraBASICEnabled(bool enabled) { m_altirraBASICEnabled = enabled; }
+    
     QString getMachineType() const { return m_machineType; }
     void setMachineType(const QString& machineType) { m_machineType = machineType; }
     
@@ -306,6 +309,7 @@ private:
     
     bool m_basicEnabled = true;
     bool m_altirraOSEnabled = false;
+    bool m_altirraBASICEnabled = false;
     QString m_machineType = "-xl";
     QString m_videoSystem = "-pal";
     QString m_osRomPath;

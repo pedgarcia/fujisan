@@ -160,6 +160,12 @@ void MainWindow::createMenus()
     connect(m_altirraOSAction, &QAction::toggled, this, &MainWindow::toggleAltirraOS);
     systemMenu->addAction(m_altirraOSAction);
 
+    m_altirraBASICAction = new QAction("Use Altirra &BASIC", this);
+    m_altirraBASICAction->setCheckable(true);
+    m_altirraBASICAction->setChecked(m_emulator->isAltirraBASICEnabled());
+    connect(m_altirraBASICAction, &QAction::toggled, this, &MainWindow::toggleAltirraBASIC);
+    systemMenu->addAction(m_altirraBASICAction);
+
     systemMenu->addSeparator();
     
     // State save/load actions
@@ -189,8 +195,15 @@ void MainWindow::createMenus()
     
     systemMenu->addSeparator();
 
+#ifdef Q_OS_MACOS
+    // On macOS, use "Preferences" to match platform conventions
+    m_settingsAction = new QAction("&Preferences...", this);
+    m_settingsAction->setShortcut(QKeySequence::Preferences);
+#else
+    // On other platforms, use "Settings"
     m_settingsAction = new QAction("&Settings...", this);
     m_settingsAction->setShortcut(QKeySequence::Preferences);
+#endif
     connect(m_settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     systemMenu->addAction(m_settingsAction);
 
@@ -771,6 +784,14 @@ void MainWindow::toggleAltirraOS(bool enabled)
     restartEmulator();
 }
 
+void MainWindow::toggleAltirraBASIC(bool enabled)
+{
+    m_emulator->setAltirraBASICEnabled(enabled);
+    QString message = enabled ? "Altirra BASIC enabled - restarting..." : "Original Atari BASIC enabled - restarting...";
+    statusBar()->showMessage(message, 3000);
+    restartEmulator();
+}
+
 void MainWindow::onMachineTypeChanged(int index)
 {
     QString machineType;
@@ -1042,6 +1063,10 @@ void MainWindow::updateToolbarFromSettings()
     m_altirraOSAction->blockSignals(true);
     m_altirraOSAction->setChecked(m_emulator->isAltirraOSEnabled());
     m_altirraOSAction->blockSignals(false);
+
+    m_altirraBASICAction->blockSignals(true);
+    m_altirraBASICAction->setChecked(m_emulator->isAltirraBASICEnabled());
+    m_altirraBASICAction->blockSignals(false);
 
     // Video system state is now managed by the toolbar toggle widget only
 
@@ -2050,6 +2075,7 @@ void MainWindow::loadInitialSettings()
     QString videoSystem = settings.value("machine/videoSystem", "-pal").toString();
     bool basicEnabled = settings.value("machine/basicEnabled", true).toBool();
     bool altirraOSEnabled = settings.value("machine/altirraOS", false).toBool();
+    bool altirraBASICEnabled = settings.value("machine/altirraBASIC", false).toBool();
     bool audioEnabled = settings.value("audio/enabled", true).toBool();
     QString artifactMode = settings.value("video/artifacting", "none").toString();
 
@@ -2094,12 +2120,14 @@ void MainWindow::loadInitialSettings()
 
     // Set emulator settings before initialization
     m_emulator->setAltirraOSEnabled(altirraOSEnabled);
+    m_emulator->setAltirraBASICEnabled(altirraBASICEnabled);
     m_emulator->setOSRomPath(osRomPath);
     m_emulator->setBasicRomPath(basicRomPath);
     m_emulator->enableAudio(audioEnabled);
     
     qDebug() << "ROM paths - OS:" << osRomPath << "BASIC:" << basicRomPath;
     qDebug() << "Altirra OS enabled:" << altirraOSEnabled;
+    qDebug() << "Altirra BASIC enabled:" << altirraBASICEnabled;
 
     // Initialize emulator with loaded settings including display and input options
     if (!m_emulator->initializeWithNetSIOConfig(basicEnabled, machineType, videoSystem, artifactMode,

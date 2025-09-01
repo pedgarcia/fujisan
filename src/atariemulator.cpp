@@ -246,10 +246,11 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     }
     
     qDebug() << "Altirra OS enabled:" << m_altirraOSEnabled;
+    qDebug() << "Altirra BASIC enabled:" << m_altirraBASICEnabled;
     
+    // Configure OS ROM (Altirra or External)
     if (m_altirraOSEnabled) {
-        // Use built-in Altirra ROMs
-        qDebug() << "Using Altirra OS ROMs";
+        qDebug() << "Using built-in Altirra OS ROM";
         if (machineType == "-5200") {
             argList << "-5200-rev" << "altirra";
         } else if (machineType == "-atari") {
@@ -257,17 +258,8 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         } else {
             argList << "-xl-rev" << "altirra";
         }
-        
-        if (basicEnabled) {
-            argList << "-basic-rev" << "altirra";
-            argList << "-basic";  // Actually enable BASIC mode
-        } else {
-            argList << "-nobasic";
-        }
     } else {
-        // Use original Atari ROMs from user-specified paths or defaults
-        qDebug() << "Using original Atari OS ROMs from user settings";
-        
+        qDebug() << "Using external OS ROM from user settings";
         // Only add ROM paths if they are specified in settings
         if (!m_osRomPath.isEmpty()) {
             if (machineType == "-5200") {
@@ -281,17 +273,24 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         } else {
             qDebug() << "Warning: No OS ROM path specified, emulator may not start properly";
         }
-        
-        if (basicEnabled) {
+    }
+    
+    // Configure BASIC ROM (Altirra, External, or None)
+    if (basicEnabled) {
+        if (m_altirraBASICEnabled) {
+            qDebug() << "Using built-in Altirra BASIC ROM";
+            argList << "-basic-rev" << "altirra";
+        } else {
+            qDebug() << "Using external BASIC ROM";
             if (!m_basicRomPath.isEmpty()) {
                 argList << "-basic_rom" << m_basicRomPath;
             } else {
                 qDebug() << "Warning: No BASIC ROM path specified";
             }
-            argList << "-basic";  // Actually enable BASIC mode
-        } else {
-            argList << "-nobasic";
         }
+        argList << "-basic";  // Actually enable BASIC mode
+    } else {
+        argList << "-nobasic";
     }
     
     // Convert QStringList to char* array
@@ -415,23 +414,13 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         argList << "-nosound";
     }
     
-    // Add OS and BASIC ROM configuration based on Altirra OS setting
+    // Configure OS ROM (Altirra or External)
     if (m_altirraOSEnabled) {
-        qDebug() << "Using built-in Altirra OS ROMs";
-        
+        qDebug() << "Using built-in Altirra OS ROM";
         // Use built-in Altirra OS for all machine types
         argList << "-xl-rev" << "altirra";
-        
-        if (basicEnabled) {
-            argList << "-basic-rev" << "altirra";
-            argList << "-basic";  // Actually enable BASIC mode
-        } else {
-            argList << "-nobasic";
-        }
     } else {
-        // Use original Atari ROMs from user-specified paths or defaults
-        qDebug() << "Using original Atari OS ROMs from user settings";
-        
+        qDebug() << "Using external OS ROM from user settings";
         if (!m_osRomPath.isEmpty()) {
             // Use the correct parameter based on machine type
             if (machineType == "-5200") {
@@ -446,17 +435,24 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         } else {
             qDebug() << "Warning: No OS ROM path specified, emulator may not start properly";
         }
-        
-        if (basicEnabled) {
+    }
+    
+    // Configure BASIC ROM (Altirra, External, or None)
+    if (basicEnabled) {
+        if (m_altirraBASICEnabled) {
+            qDebug() << "Using built-in Altirra BASIC ROM";
+            argList << "-basic-rev" << "altirra";
+        } else {
+            qDebug() << "Using external BASIC ROM";
             if (!m_basicRomPath.isEmpty()) {
                 argList << "-basic_rom" << m_basicRomPath;
             } else {
                 qDebug() << "Warning: No BASIC ROM path specified";
             }
-            argList << "-basic";  // Actually enable BASIC mode
-        } else {
-            argList << "-nobasic";
         }
+        argList << "-basic";  // Actually enable BASIC mode
+    } else {
+        argList << "-nobasic";
     }
     
     // Add NetSIO support if enabled

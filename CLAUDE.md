@@ -10,7 +10,8 @@ Fujisan is a modern Qt5-based frontend for the Atari800 emulator that provides a
 
 ### Version Control Best Practices
 
-- don't commit and merge before we confirm the changes are good
+- don't commit and merge before I confirm the changes are good
+- use GH CLI (gh)
 
 ## Build System and Common Commands
 

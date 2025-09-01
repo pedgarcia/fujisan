@@ -22,8 +22,13 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     , m_videoSystemCombo(nullptr)
     , m_basicEnabledCheck(nullptr)
     , m_altirraOSCheck(nullptr)
+    , m_altirraBASICCheck(nullptr)
 {
+#ifdef Q_OS_MACOS
+    setWindowTitle("Preferences");
+#else
     setWindowTitle("Settings");
+#endif
     setModal(true);
     resize(850, 500);
     
@@ -32,6 +37,7 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     m_originalSettings.videoSystem = m_emulator->getVideoSystem();
     m_originalSettings.basicEnabled = m_emulator->isBasicEnabled();
     m_originalSettings.altirraOSEnabled = m_emulator->isAltirraOSEnabled();
+    m_originalSettings.altirraBASICEnabled = m_emulator->isAltirraBASICEnabled();
     
     // Store original NetSIO state for restart detection
     QSettings settings;
@@ -203,10 +209,15 @@ void SettingsDialog::createHardwareTab()
     
     systemLayout->addLayout(basicRomLayout);
     
-    m_altirraOSCheck = new QCheckBox("Use Altirra OS (built-in ROMs)");
-    m_altirraOSCheck->setToolTip("Use built-in Altirra OS ROMs instead of external ROM files");
+    m_altirraOSCheck = new QCheckBox("Use Altirra OS (built-in ROM)");
+    m_altirraOSCheck->setToolTip("Use built-in Altirra OS ROM instead of external ROM file");
     connect(m_altirraOSCheck, &QCheckBox::toggled, this, &SettingsDialog::onAltirraOSChanged);
     systemLayout->addWidget(m_altirraOSCheck);
+    
+    m_altirraBASICCheck = new QCheckBox("Use Altirra BASIC (built-in ROM)");
+    m_altirraBASICCheck->setToolTip("Use built-in Altirra BASIC ROM instead of external ROM file\nWorks with both Altirra OS and original Atari OS");
+    connect(m_altirraBASICCheck, &QCheckBox::toggled, this, &SettingsDialog::onAltirraBASICChanged);
+    systemLayout->addWidget(m_altirraBASICCheck);
     
     leftColumn->addWidget(systemGroup);
     
@@ -1891,11 +1902,20 @@ void SettingsDialog::onAltirraOSChanged()
 {
     bool altirraOSEnabled = m_altirraOSCheck->isChecked();
     
-    // Disable BASIC ROM controls when Altirra OS is enabled
-    // (since Altirra OS includes its own BASIC)
-    m_basicRomLabel->setEnabled(!altirraOSEnabled);
-    m_basicRomPath->setEnabled(!altirraOSEnabled);
-    m_basicRomBrowse->setEnabled(!altirraOSEnabled);
+    // Disable OS ROM controls when Altirra OS is enabled
+    m_osRomLabel->setEnabled(!altirraOSEnabled);
+    m_osRomPath->setEnabled(!altirraOSEnabled);
+    m_osRomBrowse->setEnabled(!altirraOSEnabled);
+}
+
+void SettingsDialog::onAltirraBASICChanged()
+{
+    bool altirraBASICEnabled = m_altirraBASICCheck->isChecked();
+    
+    // Disable BASIC ROM controls when Altirra BASIC is enabled
+    m_basicRomLabel->setEnabled(!altirraBASICEnabled);
+    m_basicRomPath->setEnabled(!altirraBASICEnabled);
+    m_basicRomBrowse->setEnabled(!altirraBASICEnabled);
 }
 
 void SettingsDialog::onNetSIOToggled(bool enabled)
@@ -1961,6 +1981,7 @@ void SettingsDialog::loadSettings()
     
     m_basicEnabledCheck->setChecked(settings.value("machine/basicEnabled", true).toBool());
     m_altirraOSCheck->setChecked(settings.value("machine/altirraOS", false).toBool());
+    m_altirraBASICCheck->setChecked(settings.value("machine/altirraBASIC", false).toBool());
     
     // Load Memory Configuration
     m_enable800RamCheck->setChecked(settings.value("machine/enable800Ram", false).toBool());
@@ -2018,8 +2039,9 @@ void SettingsDialog::loadSettings()
     // Update ROM labels based on machine type
     onMachineTypeChanged();
     
-    // Update BASIC ROM controls based on Altirra OS setting
+    // Update ROM controls based on Altirra settings
     onAltirraOSChanged();
+    onAltirraBASICChanged();
     
     // Load Hardware Extensions
     m_stereoPokey->setChecked(settings.value("hardware/stereoPokey", false).toBool());
@@ -2338,11 +2360,13 @@ void SettingsDialog::saveSettings()
     QString videoSystem = m_videoSystemCombo->currentData().toString();
     bool basicEnabled = m_basicEnabledCheck->isChecked();
     bool altirraOSEnabled = m_altirraOSCheck->isChecked();
+    bool altirraBASICEnabled = m_altirraBASICCheck->isChecked();
     
     settings.setValue("machine/type", machineType);
     settings.setValue("machine/videoSystem", videoSystem);
     settings.setValue("machine/basicEnabled", basicEnabled);
     settings.setValue("machine/altirraOS", altirraOSEnabled);
+    settings.setValue("machine/altirraBASIC", altirraBASICEnabled);
     
     // Save ROM paths
     QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
@@ -2537,6 +2561,7 @@ void SettingsDialog::saveSettings()
         m_emulator->setVideoSystem(videoSystem);
         m_emulator->setBasicEnabled(basicEnabled);
         m_emulator->setAltirraOSEnabled(altirraOSEnabled);
+        m_emulator->setAltirraBASICEnabled(altirraBASICEnabled);
         m_emulator->enableAudio(m_soundEnabled->isChecked());
         
         // Apply media configuration to emulator
@@ -2633,7 +2658,8 @@ void SettingsDialog::applySettings()
     if (m_machineTypeCombo->currentData().toString() != m_emulator->getMachineType() ||
         m_videoSystemCombo->currentData().toString() != m_emulator->getVideoSystem() ||
         m_basicEnabledCheck->isChecked() != m_emulator->isBasicEnabled() ||
-        m_altirraOSCheck->isChecked() != m_emulator->isAltirraOSEnabled()) {
+        m_altirraOSCheck->isChecked() != m_emulator->isAltirraOSEnabled() ||
+        m_altirraBASICCheck->isChecked() != m_emulator->isAltirraBASICEnabled()) {
         needsRestart = true;
     }
     
@@ -2776,13 +2802,15 @@ void SettingsDialog::restoreDefaults()
     m_machineTypeCombo->setCurrentIndex(2); // Atari 800XL (updated index due to new machines)
     m_videoSystemCombo->setCurrentIndex(0); // PAL
     m_basicEnabledCheck->setChecked(true);   // BASIC enabled
-    m_altirraOSCheck->setChecked(false);     // Use external ROMs
+    m_altirraOSCheck->setChecked(false);     // Use external OS ROM
+    m_altirraBASICCheck->setChecked(false);  // Use external BASIC ROM
     
     // ROM Configuration defaults
     m_osRomPath->clear();
     m_basicRomPath->clear();
     onMachineTypeChanged(); // Update ROM labels
-    onAltirraOSChanged(); // Update BASIC ROM controls
+    onAltirraOSChanged(); // Update OS ROM controls
+    onAltirraBASICChanged(); // Update BASIC ROM controls
     
     // Memory Configuration defaults
     m_enable800RamCheck->setChecked(false);
@@ -2990,6 +3018,7 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.videoSystem = m_videoSystemCombo->currentData().toString();
     profile.basicEnabled = m_basicEnabledCheck->isChecked();
     profile.altirraOSEnabled = m_altirraOSCheck->isChecked();
+    profile.altirraBASICEnabled = m_altirraBASICCheck->isChecked();
     profile.osRomPath = m_osRomPath->text();
     profile.basicRomPath = m_basicRomPath->text();
     
@@ -3140,6 +3169,7 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     
     m_basicEnabledCheck->setChecked(profile.basicEnabled);
     m_altirraOSCheck->setChecked(profile.altirraOSEnabled);
+    m_altirraBASICCheck->setChecked(profile.altirraBASICEnabled);
     m_osRomPath->setText(profile.osRomPath);
     m_basicRomPath->setText(profile.basicRomPath);
     

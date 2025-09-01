@@ -57,6 +57,7 @@ private slots:
     void browseCartridge2();
     void onMachineTypeChanged();
     void onAltirraOSChanged();
+    void onAltirraBASICChanged();
     void onNetSIOToggled(bool enabled);
     
     // Profile management slots
@@ -99,6 +100,7 @@ private:
     QComboBox* m_videoSystemCombo;
     QCheckBox* m_basicEnabledCheck;
     QCheckBox* m_altirraOSCheck;
+    QCheckBox* m_altirraBASICCheck;
     
     // Memory Configuration controls
     QCheckBox* m_enable800RamCheck;
@@ -279,6 +281,7 @@ private:
         QString videoSystem;
         bool basicEnabled;
         bool altirraOSEnabled;
+        bool altirraBASICEnabled;
         bool netSIOEnabled;  // Track NetSIO state for restart detection
         bool printerEnabled; // Track printer state for restart detection
         bool tcpServerEnabled; // Track TCP server state

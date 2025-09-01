@@ -35,6 +35,7 @@ QJsonObject ConfigurationProfile::toJson() const {
     machineConfig["videoSystem"] = videoSystem;
     machineConfig["basicEnabled"] = basicEnabled;
     machineConfig["altirraOSEnabled"] = altirraOSEnabled;
+    machineConfig["altirraBASICEnabled"] = altirraBASICEnabled;
     machineConfig["osRomPath"] = osRomPath;
     machineConfig["basicRomPath"] = basicRomPath;
     json["machineConfig"] = machineConfig;
@@ -210,6 +211,7 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
         videoSystem = machineConfig["videoSystem"].toString("-pal");
         basicEnabled = machineConfig["basicEnabled"].toBool(true);
         altirraOSEnabled = machineConfig["altirraOSEnabled"].toBool(false);
+        altirraBASICEnabled = machineConfig["altirraBASICEnabled"].toBool(false);
         osRomPath = machineConfig["osRomPath"].toString();
         basicRomPath = machineConfig["basicRomPath"].toString();
     }
