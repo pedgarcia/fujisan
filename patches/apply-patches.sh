@@ -33,11 +33,12 @@ if [ -d .git ]; then
             fi
             
             # Try git apply first (more reliable than git am for patches)
+            # Use --3way for better conflict resolution and avoid prompts
             if git apply --check "$patch" 2>/dev/null; then
-                git apply "$patch"
+                git apply --3way "$patch" </dev/null 2>/dev/null || git apply "$patch" </dev/null
                 echo "✓ Patch applied successfully with git apply"
-            elif patch -p1 --dry-run < "$patch" >/dev/null 2>&1; then
-                patch -p1 < "$patch"
+            elif patch -p1 --dry-run --force < "$patch" >/dev/null 2>&1; then
+                patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null
                 echo "✓ Patch applied successfully with patch command"
             else
                     # For critical patch 0003, apply manually
@@ -80,7 +81,8 @@ else
     for patch in "$PATCHES_DIR"/0*.patch; do
         if [ -f "$patch" ]; then
             echo "Applying patch: $(basename "$patch")"
-            patch -p1 < "$patch" || {
+            # Use force and no-backup-if-mismatch to avoid prompts
+            patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null || {
                 echo "Error: Failed to apply patch $(basename "$patch")"
                 exit 1
             }

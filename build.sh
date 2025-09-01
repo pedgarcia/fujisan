@@ -409,6 +409,9 @@ build_macos_arm64() {
         notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-arm64.dmg"
     fi
     
+    # Return to project root
+    cd "$PROJECT_ROOT"
+    
     echo_success "macOS ARM64 build complete"
 }
 
@@ -486,18 +489,30 @@ build_macos_x86_64() {
         notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-x86_64.dmg"
     fi
     
+    # Return to project root
+    cd "$PROJECT_ROOT"
+    
     echo_success "macOS x86_64 build complete"
 }
 
 # Build Windows
 build_windows() {
     echo_step "Building Windows"
+    echo_info "Starting Windows build function..."
+    echo_info "WINDOWS_DIST_DIR: $WINDOWS_DIST_DIR"
+    echo_info "VERSION_CLEAN: $VERSION_CLEAN"
+    
+    # Ensure we're in the project root
+    cd "$PROJECT_ROOT"
+    echo_info "Current directory: $(pwd)"
     
     # Check for Docker/Podman
     if command -v podman &> /dev/null; then
         CONTAINER_RUNTIME="podman"
+        echo_info "Using podman for Windows build"
     elif command -v docker &> /dev/null; then
         CONTAINER_RUNTIME="docker"
+        echo_info "Using docker for Windows build"
     else
         echo_error "Neither podman nor docker found. Install one to build for Windows."
         return 1
@@ -513,14 +528,37 @@ build_windows() {
         # Package into zip for distribution
         if [[ -d "build-windows" ]]; then
             echo_info "Creating Windows distribution package..."
-            mkdir -p "$WINDOWS_DIST_DIR"
-            cd build-windows
-            zip -r "$WINDOWS_DIST_DIR/Fujisan-${VERSION_CLEAN}-windows.zip" * -x "*.log"
-            cd ..
-            echo_success "Created: dist/windows/Fujisan-${VERSION_CLEAN}-windows.zip"
+            echo_info "Windows build directory contains:"
+            ls -la build-windows/ | head -10
             
-            # Clean up build directory after packaging
-            rm -rf build-windows/
+            mkdir -p "$WINDOWS_DIST_DIR"
+            echo_info "Creating zip in: $WINDOWS_DIST_DIR/Fujisan-${VERSION_CLEAN}-windows.zip"
+            
+            cd build-windows
+            if zip -r "$WINDOWS_DIST_DIR/Fujisan-${VERSION_CLEAN}-windows.zip" * -x "*.log"; then
+                cd ..
+                echo_success "Created: dist/windows/Fujisan-${VERSION_CLEAN}-windows.zip"
+            else
+                cd ..
+                echo_error "Failed to create zip file"
+                return 1
+            fi
+            
+            # Verify the zip was created
+            if [[ -f "$WINDOWS_DIST_DIR/Fujisan-${VERSION_CLEAN}-windows.zip" ]]; then
+                # Generate checksum
+                cd "$WINDOWS_DIST_DIR"
+                shasum -a 256 "Fujisan-${VERSION_CLEAN}-windows.zip" > "Fujisan-${VERSION_CLEAN}-windows.zip.sha256"
+                echo "  SHA256: $(awk '{print $1}' "Fujisan-${VERSION_CLEAN}-windows.zip.sha256")"
+                cd - > /dev/null
+                
+                # Clean up build directory after successful packaging
+                rm -rf build-windows/
+            else
+                echo_error "Failed to create Windows zip package"
+            fi
+        else
+            echo_error "Windows build directory not found"
         fi
     else
         echo_error "Windows build script not found"
@@ -533,6 +571,9 @@ build_windows() {
 # Build Linux
 build_linux() {
     echo_step "Building Linux"
+    
+    # Ensure we're in the project root
+    cd "$PROJECT_ROOT"
     
     # Use the Docker-based Linux build
     if [[ -f "$SCRIPT_DIR/scripts/build-linux-docker.sh" ]]; then
@@ -673,11 +714,12 @@ case $PLATFORM in
         build_linux
         ;;
     all)
-        # Detect current OS and build accordingly
+        # Build for macOS if on macOS
         if [[ "$OSTYPE" == "darwin"* ]]; then
             build_macos_arm64
             build_macos_x86_64
         fi
+        # Always build Windows and Linux (cross-platform builds)
         build_windows
         build_linux
         ;;
