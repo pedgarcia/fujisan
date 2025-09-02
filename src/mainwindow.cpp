@@ -2070,12 +2070,25 @@ void MainWindow::loadInitialSettings()
         qDebug() << "Settings value:" << settings.value("input/joystickEnabled", true).toBool();
     }
 
+    // Sync before reading to ensure we get fresh values from disk
+    settings.sync();
+    
+#ifdef Q_OS_MACOS
+    // Force refresh on macOS to avoid cached values
+    QSettings::setDefaultFormat(QSettings::NativeFormat);
+#endif
+    
     // Load saved settings or use defaults
     QString machineType = settings.value("machine/type", "-xl").toString();
     QString videoSystem = settings.value("machine/videoSystem", "-pal").toString();
     bool basicEnabled = settings.value("machine/basicEnabled", true).toBool();
     bool altirraOSEnabled = settings.value("machine/altirraOS", false).toBool();
     bool altirraBASICEnabled = settings.value("machine/altirraBASIC", false).toBool();
+    
+    qDebug() << "MainWindow loading settings - BASIC:" << basicEnabled 
+             << "Altirra OS:" << altirraOSEnabled 
+             << "Altirra BASIC:" << altirraBASICEnabled
+             << "Settings file:" << settings.fileName();
     bool audioEnabled = settings.value("audio/enabled", true).toBool();
     QString artifactMode = settings.value("video/artifacting", "none").toString();
 

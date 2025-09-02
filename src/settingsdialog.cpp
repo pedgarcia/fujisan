@@ -1989,9 +1989,26 @@ void SettingsDialog::loadSettings()
         }
     }
     
-    m_basicEnabledCheck->setChecked(settings.value("machine/basicEnabled", true).toBool());
-    m_altirraOSCheck->setChecked(settings.value("machine/altirraOS", false).toBool());
-    m_altirraBASICCheck->setChecked(settings.value("machine/altirraBASIC", false).toBool());
+    // Sync before reading to ensure we get fresh values from disk
+    settings.sync();
+    
+#ifdef Q_OS_MACOS
+    // Force refresh on macOS to avoid cached values
+    QSettings::setDefaultFormat(QSettings::NativeFormat);
+#endif
+    
+    bool basicEnabled = settings.value("machine/basicEnabled", true).toBool();
+    bool altirraOS = settings.value("machine/altirraOS", false).toBool();
+    bool altirraBASIC = settings.value("machine/altirraBASIC", false).toBool();
+    
+    qDebug() << "Loading settings - BASIC:" << basicEnabled 
+             << "Altirra OS:" << altirraOS 
+             << "Altirra BASIC:" << altirraBASIC
+             << "Settings file:" << settings.fileName();
+    
+    m_basicEnabledCheck->setChecked(basicEnabled);
+    m_altirraOSCheck->setChecked(altirraOS);
+    m_altirraBASICCheck->setChecked(altirraBASIC);
     
     // Load Memory Configuration
     m_enable800RamCheck->setChecked(settings.value("machine/enable800Ram", false).toBool());
@@ -2385,11 +2402,20 @@ void SettingsDialog::saveSettings()
     bool altirraOSEnabled = m_altirraOSCheck->isChecked();
     bool altirraBASICEnabled = m_altirraBASICCheck->isChecked();
     
+    qDebug() << "Saving settings - BASIC:" << basicEnabled 
+             << "Altirra OS:" << altirraOSEnabled 
+             << "Altirra BASIC:" << altirraBASICEnabled;
+    
     settings.setValue("machine/type", machineType);
     settings.setValue("machine/videoSystem", videoSystem);
     settings.setValue("machine/basicEnabled", basicEnabled);
     settings.setValue("machine/altirraOS", altirraOSEnabled);
     settings.setValue("machine/altirraBASIC", altirraBASICEnabled);
+    
+    // Log the actual saved values for debugging
+    qDebug() << "Settings path:" << settings.fileName();
+    qDebug() << "Verified saved values - BASIC:" << settings.value("machine/basicEnabled").toBool()
+             << "Altirra BASIC:" << settings.value("machine/altirraBASIC").toBool();
     
     // Save ROM paths
     QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
@@ -2546,6 +2572,30 @@ void SettingsDialog::saveSettings()
     // TCP Server Configuration
     settings.setValue("emulator/tcpServerEnabled", m_tcpServerEnabled->isChecked());
     settings.setValue("emulator/tcpServerPort", m_tcpServerPort->value());
+    
+    // Force sync to ensure settings are written to disk immediately
+    settings.sync();
+    
+#ifdef Q_OS_MACOS
+    // On macOS, QSettings uses CFPreferences which can have caching issues
+    // Force a complete flush of the preferences system
+    QSettings::setDefaultFormat(QSettings::NativeFormat);
+    
+    // Create a new QSettings instance to force reload from disk
+    {
+        QSettings verifySettings;
+        verifySettings.sync();
+        bool verifiedBASIC = verifySettings.value("machine/altirraBASIC").toBool();
+        qDebug() << "macOS: Verified altirraBASIC setting after flush:" << verifiedBASIC
+                 << "Expected:" << altirraBASICEnabled;
+        
+        if (verifiedBASIC != altirraBASICEnabled) {
+            qDebug() << "WARNING: Settings mismatch detected, forcing re-write";
+            verifySettings.setValue("machine/altirraBASIC", altirraBASICEnabled);
+            verifySettings.sync();
+        }
+    }
+#endif
     
     // Check if NetSIO setting has changed (requires emulator restart)
     bool currentNetSIOState = m_netSIOEnabled->isChecked();
