@@ -136,11 +136,11 @@ mkdir -p "$DIST_DIR"
 echo_step "Building Container Image"
 cd "$PROJECT_ROOT"
 
-echo_info "Building Ubuntu 24.04 based container for x86_64..."
+echo_info "Building Ubuntu 22.04 based container for x86_64..."
 $CONTAINER_RUNTIME build \
     --platform linux/amd64 \
-    -f docker/Dockerfile.ubuntu-24.04 \
-    -t fujisan-linux-builder:ubuntu24 \
+    -f docker/Dockerfile.ubuntu-22.04 \
+    -t fujisan-linux-builder:ubuntu22 \
     . || {
     echo_error "Failed to build container image"
     exit 1
@@ -197,8 +197,52 @@ mkdir -p fujisan-linux/usr/share/applications
 mkdir -p fujisan-linux/usr/share/pixmaps
 mkdir -p fujisan-linux/usr/share/doc/fujisan
 
-# Copy binary
-cp Fujisan fujisan-linux/usr/bin/fujisan
+# Create library directory for bundled libraries
+mkdir -p fujisan-linux/usr/lib/fujisan
+mkdir -p fujisan-linux/usr/lib/fujisan/plugins/platforms
+mkdir -p fujisan-linux/usr/lib/fujisan/plugins/audio
+mkdir -p fujisan-linux/usr/lib/fujisan/plugins/mediaservice
+mkdir -p fujisan-linux/usr/lib/fujisan/plugins/imageformats
+mkdir -p fujisan-linux/usr/lib/fujisan/plugins/xcbglintegrations
+
+# Copy binary to lib directory (real binary)
+cp Fujisan fujisan-linux/usr/lib/fujisan/Fujisan
+chmod 755 fujisan-linux/usr/lib/fujisan/Fujisan
+
+# Copy Qt libraries
+echo "Copying Qt libraries..."
+for lib in libQt5Core libQt5Gui libQt5Widgets libQt5Multimedia libQt5Network libQt5DBus libQt5XcbQpa; do
+    find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-linux/usr/lib/fujisan/ \; 2>/dev/null || true
+done
+
+# Copy Qt plugins
+echo "Copying Qt plugins..."
+# Platform plugin (required for GUI)
+find /usr/lib -path "*/qt5/plugins/platforms/libqxcb.so" -exec cp {} fujisan-linux/usr/lib/fujisan/plugins/platforms/ \; 2>/dev/null || true
+# Audio plugins
+find /usr/lib -path "*/qt5/plugins/audio/*.so" -exec cp {} fujisan-linux/usr/lib/fujisan/plugins/audio/ \; 2>/dev/null || true
+# Media service plugins
+find /usr/lib -path "*/qt5/plugins/mediaservice/*.so" -exec cp {} fujisan-linux/usr/lib/fujisan/plugins/mediaservice/ \; 2>/dev/null || true
+# Image format plugins
+find /usr/lib -path "*/qt5/plugins/imageformats/*.so" -exec cp {} fujisan-linux/usr/lib/fujisan/plugins/imageformats/ \; 2>/dev/null || true
+# XCB GL integrations
+find /usr/lib -path "*/qt5/plugins/xcbglintegrations/*.so" -exec cp {} fujisan-linux/usr/lib/fujisan/plugins/xcbglintegrations/ \; 2>/dev/null || true
+
+# Copy additional system libraries that Qt depends on
+echo "Copying system dependencies..."
+for lib in libxcb-xkb libxkbcommon-x11 libxkbcommon libicui18n libicuuc libicudata libmd4c libdouble-conversion libpcre2-16 libxcb-xinerama libxcb-xinput; do
+    find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-linux/usr/lib/fujisan/ \; 2>/dev/null || true
+done
+
+# Create wrapper script in /usr/bin
+cat > fujisan-linux/usr/bin/fujisan << 'WRAPPER_EOF'
+#!/bin/bash
+# Fujisan wrapper script
+export LD_LIBRARY_PATH="/usr/lib/fujisan:$LD_LIBRARY_PATH"
+export QT_PLUGIN_PATH="/usr/lib/fujisan/plugins:$QT_PLUGIN_PATH"
+export FUJISAN_IMAGES_PATH="/usr/share/fujisan/images"
+exec /usr/lib/fujisan/Fujisan "$@"
+WRAPPER_EOF
 chmod 755 fujisan-linux/usr/bin/fujisan
 
 # Create desktop file
@@ -226,9 +270,18 @@ fi
 [ -f "../README.md" ] && cp ../README.md fujisan-linux/usr/share/doc/fujisan/
 [ -f "../LICENSE" ] && cp ../LICENSE fujisan-linux/usr/share/doc/fujisan/
 
-# Copy images
+# Copy ALL images (including device status indicators)
 mkdir -p fujisan-linux/usr/share/fujisan/images
-cp ../images/*.png fujisan-linux/usr/share/fujisan/images/ 2>/dev/null || true
+echo "Copying image resources..."
+if [ -d "../images" ]; then
+    # Copy all PNG files
+    for img in ../images/*.png; do
+        if [ -f "$img" ]; then
+            cp "$img" fujisan-linux/usr/share/fujisan/images/
+            echo "  - Copied $(basename $img)"
+        fi
+    done
+fi
 
 # Create .deb package
 if [ "$BUILD_DEB" = "true" ]; then
@@ -257,7 +310,7 @@ Description: Modern Atari 8-bit Emulator
  .
  This package includes all necessary Qt5 libraries and libatari800
  for a complete, self-contained installation.
-Depends: libc6, libstdc++6, libgl1, libasound2, libqt5core5a, libqt5gui5, libqt5widgets5, libqt5multimedia5
+Depends: libc6, libstdc++6, libgl1, libasound2
 EOF
     
     # Set proper permissions
@@ -283,16 +336,48 @@ if [ "$BUILD_TARBALL" = "true" ]; then
     mkdir -p fujisan-portable/bin
     mkdir -p fujisan-portable/share/doc
     
-    # Copy binary
+    # Copy binary and libraries
     cp Fujisan fujisan-portable/bin/
+    
+    # Copy Qt libraries
+    mkdir -p fujisan-portable/lib
+    echo "Copying Qt libraries for portable package..."
+    for lib in libQt5Core libQt5Gui libQt5Widgets libQt5Multimedia libQt5Network libQt5DBus libQt5XcbQpa; do
+        find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-portable/lib/ \; 2>/dev/null || true
+    done
+    
+    # Copy system dependencies
+    for lib in libxcb-xkb libxkbcommon-x11 libxkbcommon libicui18n libicuuc libicudata libmd4c libdouble-conversion libpcre2-16 libxcb-xinerama libxcb-xinput; do
+        find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-portable/lib/ \; 2>/dev/null || true
+    done
+    
+    # Copy Qt plugins
+    mkdir -p fujisan-portable/plugins/platforms
+    mkdir -p fujisan-portable/plugins/audio
+    mkdir -p fujisan-portable/plugins/mediaservice
+    mkdir -p fujisan-portable/plugins/imageformats
+    mkdir -p fujisan-portable/plugins/xcbglintegrations
+    
+    find /usr/lib -path "*/qt5/plugins/platforms/libqxcb.so" -exec cp {} fujisan-portable/plugins/platforms/ \; 2>/dev/null || true
+    find /usr/lib -path "*/qt5/plugins/audio/*.so" -exec cp {} fujisan-portable/plugins/audio/ \; 2>/dev/null || true
+    find /usr/lib -path "*/qt5/plugins/mediaservice/*.so" -exec cp {} fujisan-portable/plugins/mediaservice/ \; 2>/dev/null || true
+    find /usr/lib -path "*/qt5/plugins/imageformats/*.so" -exec cp {} fujisan-portable/plugins/imageformats/ \; 2>/dev/null || true
+    find /usr/lib -path "*/qt5/plugins/xcbglintegrations/*.so" -exec cp {} fujisan-portable/plugins/xcbglintegrations/ \; 2>/dev/null || true
     
     # Copy documentation
     [ -f "../README.md" ] && cp ../README.md fujisan-portable/share/doc/
     [ -f "../LICENSE" ] && cp ../LICENSE fujisan-portable/share/doc/
     
-    # Copy images
-    mkdir -p fujisan-portable/share/images
-    cp ../images/*.png fujisan-portable/share/images/ 2>/dev/null || true
+    # Copy ALL images (including device status indicators)
+    mkdir -p fujisan-portable/images
+    echo "Copying image resources for portable package..."
+    if [ -d "../images" ]; then
+        for img in ../images/*.png; do
+            if [ -f "$img" ]; then
+                cp "$img" fujisan-portable/images/
+            fi
+        done
+    fi
     
     # Create run script
     cat > fujisan-portable/fujisan.sh << 'EOF'
@@ -300,6 +385,12 @@ if [ "$BUILD_TARBALL" = "true" ]; then
 # Fujisan Portable Launcher
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
+export QT_PLUGIN_PATH="$SCRIPT_DIR/plugins:$QT_PLUGIN_PATH"
+export FUJISAN_IMAGES_PATH="$SCRIPT_DIR/images"
+
+# Ensure xcb platform plugin can find its dependencies
+export QT_QPA_PLATFORM_PLUGIN_PATH="$SCRIPT_DIR/plugins/platforms"
+
 exec "$SCRIPT_DIR/bin/Fujisan" "$@"
 EOF
     chmod +x fujisan-portable/fujisan.sh
@@ -317,9 +408,11 @@ To run Fujisan:
 
 Requirements:
 - Linux x86_64
-- glibc 2.35+ (Ubuntu 22.04+, Debian 12+)
+- glibc 2.31+ (Ubuntu 20.04+, Debian 11+, RHEL/Rocky 8+)
 - Basic OpenGL support
-- Qt5 libraries (will use system ones if available)
+- X11 display server
+
+This package includes all required Qt5 libraries and plugins.
 
 For system-wide installation, use the .deb package instead.
 
@@ -362,7 +455,7 @@ $CONTAINER_RUNTIME run --rm \
     -v "$LINUX_BUILD_DIR:/output" \
     -e VERSION="$VERSION" \
     -e VERSION_CLEAN="$VERSION_CLEAN" \
-    fujisan-linux-builder:ubuntu24 \
+    fujisan-linux-builder:ubuntu22 \
     bash /output/build-in-container.sh "$VERSION" "$VERSION_CLEAN" "$BUILD_DEB" "$BUILD_TARBALL" || {
     echo_error "Build failed"
     exit 1
@@ -396,7 +489,7 @@ fi
 # Clean up container if not keeping
 if [[ "$KEEP_CONTAINER" == "false" ]]; then
     echo_info "Removing container image..."
-    $CONTAINER_RUNTIME rmi fujisan-linux-builder:ubuntu24 2>/dev/null || true
+    $CONTAINER_RUNTIME rmi fujisan-linux-builder:ubuntu22 2>/dev/null || true
 fi
 
 # Summary
