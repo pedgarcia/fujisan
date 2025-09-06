@@ -2638,6 +2638,14 @@ void SettingsDialog::saveSettings()
         m_originalSettings.printerEnabled = currentPrinterState;
     } else {
         // No NetSIO change - apply settings normally
+        qDebug() << "[SETTINGS] Applying settings without restart:";
+        qDebug() << "[SETTINGS]   Machine type:" << machineType;
+        qDebug() << "[SETTINGS]   Video system:" << videoSystem;
+        qDebug() << "[SETTINGS]   Basic enabled:" << basicEnabled;
+        qDebug() << "[SETTINGS]   Altirra OS:" << altirraOSEnabled;
+        qDebug() << "[SETTINGS]   Altirra BASIC:" << altirraBASICEnabled;
+        qDebug() << "[SETTINGS] NOTE: Only setting flags - emulator NOT reinitialized!";
+        
         m_emulator->setMachineType(machineType);
         m_emulator->setVideoSystem(videoSystem);
         m_emulator->setBasicEnabled(basicEnabled);
@@ -2735,6 +2743,23 @@ void SettingsDialog::applySettings()
     // Check which settings require emulator restart vs live updates
     bool needsRestart = false;
     
+    qDebug() << "[SETTINGS CHECK] Checking for changes that require restart:";
+    qDebug() << "[SETTINGS CHECK]   Machine: current=" << m_emulator->getMachineType() 
+             << " new=" << m_machineTypeCombo->currentData().toString() 
+             << " changed=" << (m_machineTypeCombo->currentData().toString() != m_emulator->getMachineType());
+    qDebug() << "[SETTINGS CHECK]   Video: current=" << m_emulator->getVideoSystem() 
+             << " new=" << m_videoSystemCombo->currentData().toString() 
+             << " changed=" << (m_videoSystemCombo->currentData().toString() != m_emulator->getVideoSystem());
+    qDebug() << "[SETTINGS CHECK]   BASIC: current=" << m_emulator->isBasicEnabled() 
+             << " new=" << m_basicEnabledCheck->isChecked() 
+             << " changed=" << (m_basicEnabledCheck->isChecked() != m_emulator->isBasicEnabled());
+    qDebug() << "[SETTINGS CHECK]   Altirra OS: current=" << m_emulator->isAltirraOSEnabled() 
+             << " new=" << m_altirraOSCheck->isChecked() 
+             << " changed=" << (m_altirraOSCheck->isChecked() != m_emulator->isAltirraOSEnabled());
+    qDebug() << "[SETTINGS CHECK]   Altirra BASIC: current=" << m_emulator->isAltirraBASICEnabled() 
+             << " new=" << m_altirraBASICCheck->isChecked() 
+             << " changed=" << (m_altirraBASICCheck->isChecked() != m_emulator->isAltirraBASICEnabled());
+    
     // Check for changes that require emulator restart
     if (m_machineTypeCombo->currentData().toString() != m_emulator->getMachineType() ||
         m_videoSystemCombo->currentData().toString() != m_emulator->getVideoSystem() ||
@@ -2742,6 +2767,9 @@ void SettingsDialog::applySettings()
         m_altirraOSCheck->isChecked() != m_emulator->isAltirraOSEnabled() ||
         m_altirraBASICCheck->isChecked() != m_emulator->isAltirraBASICEnabled()) {
         needsRestart = true;
+        qDebug() << "[SETTINGS CHECK] RESTART REQUIRED";
+    } else {
+        qDebug() << "[SETTINGS CHECK] No restart needed";
     }
     
     // Apply joystick settings immediately (no restart needed)
