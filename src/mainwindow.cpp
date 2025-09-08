@@ -131,6 +131,14 @@ void MainWindow::createMenus()
 
     fileMenu->addSeparator();
 
+    m_pauseAction = new QAction("&Pause", this);
+    m_pauseAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_P));
+    m_pauseAction->setCheckable(true);
+    connect(m_pauseAction, &QAction::triggered, this, &MainWindow::togglePause);
+    fileMenu->addAction(m_pauseAction);
+
+    fileMenu->addSeparator();
+
     m_exitAction = new QAction("E&xit", this);
     m_exitAction->setShortcut(QKeySequence::Quit);
     connect(m_exitAction, &QAction::triggered, this, &QWidget::close);
@@ -1236,6 +1244,7 @@ void MainWindow::updateToolbarButtonStyles()
     if (m_selectButton) m_selectButton->setStyleSheet(buttonStyle);
     if (m_optionButton) m_optionButton->setStyleSheet(buttonStyle);
     if (m_breakButton) m_breakButton->setStyleSheet(buttonStyle);
+    if (m_pauseButton) m_pauseButton->setStyleSheet(buttonStyle);
     
     // Apply to other buttons that may exist in the dock
     QList<QPushButton*> allButtons = findChildren<QPushButton*>();
@@ -1666,6 +1675,7 @@ void MainWindow::createMediaPeripheralsDock()
     QPushButton* coldBootButton = new QPushButton("COLD", this);
     QPushButton* warmBootButton = new QPushButton("WARM", this);
     QPushButton* inverseButton = new QPushButton("INVERSE", this);
+    m_pauseButton = new QPushButton("PAUSE", this);
 
     // Style console buttons - use system palette colors for dark mode compatibility
     QPalette pal = QApplication::palette();
@@ -1736,6 +1746,7 @@ void MainWindow::createMediaPeripheralsDock()
     coldBootButton->setStyleSheet(buttonStyle);
     warmBootButton->setStyleSheet(buttonStyle);
     inverseButton->setStyleSheet(buttonStyle);
+    m_pauseButton->setStyleSheet(buttonStyle);
 
     // Add tooltips
     m_startButton->setToolTip("START button (F2)");
@@ -1747,6 +1758,7 @@ void MainWindow::createMediaPeripheralsDock()
     coldBootButton->setToolTip("Cold boot (complete restart)");
     warmBootButton->setToolTip("Warm boot (soft reset)");
     inverseButton->setToolTip("INVERSE key (video inverse)");
+    m_pauseButton->setToolTip("Pause/Resume emulation");
 
     // Add buttons to layout (reordered: option, select, start, break)
     buttonsLayout->addWidget(m_optionButton);
@@ -1758,6 +1770,7 @@ void MainWindow::createMediaPeripheralsDock()
     systemButtonsLayout->addWidget(coldBootButton);
     systemButtonsLayout->addWidget(warmBootButton);
     systemButtonsLayout->addWidget(inverseButton);
+    systemButtonsLayout->addWidget(m_pauseButton);
 
     // Connect console button signals - send press event and delay release to allow one frame processing
     connect(m_startButton, &QPushButton::clicked, this, [this]() {
@@ -1827,6 +1840,8 @@ void MainWindow::createMediaPeripheralsDock()
         });
     });
     
+    // Connect pause button
+    connect(m_pauseButton, &QPushButton::clicked, this, &MainWindow::togglePause);
 
     // Create machine controls container (machine dropdown on top, toggles side by side below)
     QWidget* machineControlsContainer = new QWidget(this);
@@ -2897,5 +2912,22 @@ void MainWindow::applyProfileViaTCP(const ConfigurationProfile& profile)
         } else {
             qWarning() << "Profile not found in combo box:" << profile.name;
         }
+    }
+}
+
+void MainWindow::togglePause()
+{
+    if (m_emulator->isEmulationPaused()) {
+        m_emulator->resumeEmulation();
+        m_pauseButton->setText("PAUSE");
+        m_pauseAction->setText("&Pause");
+        m_pauseAction->setChecked(false);
+        statusBar()->showMessage("Emulation resumed", 2000);
+    } else {
+        m_emulator->pauseEmulation();
+        m_pauseButton->setText("RESUME");
+        m_pauseAction->setText("&Resume");
+        m_pauseAction->setChecked(true);
+        statusBar()->showMessage("Emulation paused", 2000);
     }
 }

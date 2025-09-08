@@ -71,6 +71,7 @@ private slots:
     void pasteText();
     void sendNextCharacter();
     void toggleMediaDock();
+    void togglePause();
     
     // State save/load slots
     void quickSaveState();
@@ -159,6 +160,7 @@ private:
     QPushButton* m_selectButton;
     QPushButton* m_optionButton;
     QPushButton* m_breakButton;
+    QPushButton* m_pauseButton;
 
     // Toolbar widgets
     ToggleSwitch* m_basicToggle;
@@ -189,6 +191,7 @@ private:
     QAction* m_loadRomAction;
     QAction* m_coldBootAction;
     QAction* m_warmBootAction;
+    QAction* m_pauseAction;
     QAction* m_basicAction;
     QAction* m_altirraOSAction;
     QAction* m_altirraBASICAction;
