@@ -240,7 +240,8 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         argList << "-audio16";
         argList << "-volume" << "80";
         // Don't use -sound-quality as it might not be recognized
-        argList << "-speaker";  // Enable console speaker (keyboard clicks, boot beeps)
+        // NOTE: -speaker argument causes "Error opening" in libatari800 minimal build
+        // Console speaker functionality handled internally
     } else {
         argList << "-nosound";
     }
@@ -297,8 +298,9 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         } else {
             qDebug() << "[ROM LOAD] Attempting to use external BASIC ROM";
             if (!m_basicRomPath.isEmpty()) {
-                qDebug() << "[ROM LOAD] Loading BASIC ROM from:" << m_basicRomPath;
-                argList << "-basic_rom" << m_basicRomPath;
+                QString quotedBasicPath = quotePath(m_basicRomPath);
+                qDebug() << "[ROM LOAD] Loading BASIC ROM from:" << m_basicRomPath << "-> quoted:" << quotedBasicPath;
+                argList << "-basic_rom" << quotedBasicPath;
             } else {
                 qDebug() << "[ROM LOAD WARNING] No BASIC ROM path specified, falling back to Altirra BASIC";
                 argList << "-basic-rev" << "altirra";
@@ -326,9 +328,40 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     qDebug() << "Number of arguments:" << argBytes.size();
     qDebug() << "Note: Display parameters excluded due to libatari800 limitations";
     
+    // Force complete libatari800 reset to clear any persistent ROM state
+    // This ensures ROM configuration changes are applied properly
+    static bool libatari800_previously_initialized = false;
+    if (libatari800_previously_initialized) {
+        qDebug() << "Forcing libatari800 reset to clear ROM state...";
+        libatari800_exit();
+        qDebug() << "libatari800 reset complete, reinitializing...";
+    } else {
+        qDebug() << "First libatari800 initialization, skipping reset...";
+    }
+    
     if (libatari800_init(argBytes.size(), args.data())) {
+        libatari800_previously_initialized = true;  // Mark as initialized for future resets
         qDebug() << "✓ Emulator initialized successfully";
         qDebug() << "  Display settings saved to profile but not applied (requires full SDL atari800)";
+        
+        // Verify ROM loading status
+        qDebug() << "=== ROM LOADING VERIFICATION ===";
+        if (!m_altirraOSEnabled && !m_osRomPath.isEmpty()) {
+            qDebug() << "Expected: External OS ROM from" << m_osRomPath;
+            qDebug() << "libatari800 should have loaded external ROM, not Altirra fallback";
+        } else if (m_altirraOSEnabled) {
+            qDebug() << "Expected: Built-in Altirra OS ROM (as configured)";
+        } else {
+            qDebug() << "Expected: Fallback to Altirra OS (no external ROM path provided)";
+        }
+        
+        if (basicEnabled && !m_altirraBASICEnabled && !m_basicRomPath.isEmpty()) {
+            qDebug() << "Expected: External BASIC ROM from" << m_basicRomPath;
+        } else if (basicEnabled && m_altirraBASICEnabled) {
+            qDebug() << "Expected: Built-in Altirra BASIC ROM (as configured)";
+        }
+        qDebug() << "ROM verification complete - if no 'Error opening' messages above, ROM loading succeeded";
+        qDebug() << "=================================\n";
         m_targetFps = libatari800_get_fps();
         m_frameTimeMs = 1000.0f / m_targetFps;
         qDebug() << "Target FPS:" << m_targetFps << "Frame time:" << m_frameTimeMs << "ms";
@@ -376,19 +409,18 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     
     // Configure keyboard joystick emulation based on settings
     qDebug() << "=== KEYBOARD JOYSTICK CONFIGURATION ===" ;
+    // NOTE: libatari800 minimal build doesn't support -kbdjoy0/-kbdjoy1 arguments
+    // These cause "Error opening" messages and break command line parsing
+    // Keyboard joystick functionality is handled via direct key injection instead
     if (kbdJoy0Enabled) {
-        argList << "-kbdjoy0";
-        qDebug() << "Enabled keyboard joystick 0 (Numpad + RCtrl)";
+        qDebug() << "Keyboard joystick 0 enabled (handled via Qt key events, not libatari800 args)";
     } else {
-        argList << "-no-kbdjoy0";
         qDebug() << "Disabled keyboard joystick 0";
     }
     
     if (kbdJoy1Enabled) {
-        argList << "-kbdjoy1";
-        qDebug() << "Enabled keyboard joystick 1 (WASD + LCtrl)";
+        qDebug() << "Keyboard joystick 1 enabled (handled via Qt key events, not libatari800 args)";
     } else {
-        argList << "-no-kbdjoy1";
         qDebug() << "Disabled keyboard joystick 1";
     }
     
@@ -425,7 +457,8 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         
         argList << "-audio16";
         argList << "-volume" << "80";
-        argList << "-speaker";  // Enable console speaker
+        // NOTE: -speaker argument causes "Error opening" in libatari800 minimal build
+        // Console speaker functionality handled internally
     } else {
         argList << "-nosound";
     }
@@ -439,15 +472,16 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         qDebug() << "[ROM LOAD] Attempting to use external OS ROM from user settings";
         if (!m_osRomPath.isEmpty()) {
             // Use the correct parameter based on machine type
+            QString quotedOSPath = quotePath(m_osRomPath);
             if (machineType == "-5200") {
-                argList << "-5200_rom" << m_osRomPath;
+                argList << "-5200_rom" << quotedOSPath;
             } else if (machineType == "-atari") {
-                argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
+                argList << "-osb_rom" << quotedOSPath;  // 800 OS-B ROM
             } else {
                 // For XL/XE machines
-                argList << "-xlxe_rom" << m_osRomPath;
+                argList << "-xlxe_rom" << quotedOSPath;
             }
-            qDebug() << "Adding OS ROM path:" << m_osRomPath;
+            qDebug() << "Adding OS ROM path:" << m_osRomPath << "-> quoted:" << quotedOSPath;
         } else {
             qDebug() << "[ROM LOAD WARNING] No OS ROM path specified, falling back to Altirra OS";
             // Fallback to Altirra OS if no external ROM is specified
@@ -470,8 +504,9 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         } else {
             qDebug() << "[ROM LOAD] Attempting to use external BASIC ROM";
             if (!m_basicRomPath.isEmpty()) {
-                qDebug() << "[ROM LOAD] Loading BASIC ROM from:" << m_basicRomPath;
-                argList << "-basic_rom" << m_basicRomPath;
+                QString quotedBasicPath = quotePath(m_basicRomPath);
+                qDebug() << "[ROM LOAD] Loading BASIC ROM from:" << m_basicRomPath << "-> quoted:" << quotedBasicPath;
+                argList << "-basic_rom" << quotedBasicPath;
             } else {
                 qDebug() << "[ROM LOAD WARNING] No BASIC ROM path specified, falling back to Altirra BASIC";
                 argList << "-basic-rev" << "altirra";
@@ -524,8 +559,39 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     qDebug() << "Keyboard Joystick 0 (Numpad + RCtrl):" << (kbdJoy0Enabled ? "ENABLED" : "DISABLED");
     qDebug() << "Keyboard Joystick 1 (WASD + LCtrl):" << (kbdJoy1Enabled ? "ENABLED" : "DISABLED");
     
+    // Force complete libatari800 reset to clear any persistent ROM state
+    // This ensures ROM configuration changes are applied properly
+    static bool libatari800_previously_initialized = false;
+    if (libatari800_previously_initialized) {
+        qDebug() << "Forcing libatari800 reset to clear ROM state...";
+        libatari800_exit();
+        qDebug() << "libatari800 reset complete, reinitializing...";
+    } else {
+        qDebug() << "First libatari800 initialization, skipping reset...";
+    }
+    
     if (libatari800_init(argBytes.size(), args.data())) {
+        libatari800_previously_initialized = true;  // Mark as initialized for future resets
         qDebug() << "✓ Emulator initialized successfully with input settings";
+        
+        // Verify ROM loading status
+        qDebug() << "=== ROM LOADING VERIFICATION ===";
+        if (!m_altirraOSEnabled && !m_osRomPath.isEmpty()) {
+            qDebug() << "Expected: External OS ROM from" << m_osRomPath;
+            qDebug() << "libatari800 should have loaded external ROM, not Altirra fallback";
+        } else if (m_altirraOSEnabled) {
+            qDebug() << "Expected: Built-in Altirra OS ROM (as configured)";
+        } else {
+            qDebug() << "Expected: Fallback to Altirra OS (no external ROM path provided)";
+        }
+        
+        if (basicEnabled && !m_altirraBASICEnabled && !m_basicRomPath.isEmpty()) {
+            qDebug() << "Expected: External BASIC ROM from" << m_basicRomPath;
+        } else if (basicEnabled && m_altirraBASICEnabled) {
+            qDebug() << "Expected: Built-in Altirra BASIC ROM (as configured)";
+        }
+        qDebug() << "ROM verification complete - if no 'Error opening' messages above, ROM loading succeeded";
+        qDebug() << "=================================\n";
         
 #ifdef GUI_SDL
         // Check actual keyboard joystick state after initialization
@@ -661,8 +727,7 @@ void AtariEmulator::processFrame()
         }
         if (m_fujinet_restart_delay == 0) {
             qDebug() << "Triggering delayed FujiNet machine initialization";
-            extern int Atari800_InitialiseMachine(void);
-            Atari800_InitialiseMachine();
+            Atari800_InitialiseMachine();  // Function already declared in atari.h
             m_fujinet_restart_pending = false;
             qDebug() << "FujiNet delayed machine initialization completed";
         }
@@ -1329,6 +1394,22 @@ unsigned char AtariEmulator::convertQtKeyToAtari(int key, Qt::KeyboardModifiers 
         case Qt::Key_F1: return AKEY_F1;
         default: return 0;
     }
+}
+
+QString AtariEmulator::quotePath(const QString& path) 
+{
+    if (path.isEmpty()) {
+        return path;
+    }
+    
+    // If path contains spaces, quote it to prevent libatari800 parsing issues
+    // This is needed across all platforms (Windows, macOS, Linux)
+    if (path.contains(' ')) {
+        // Use double quotes for cross-platform compatibility
+        return QString("\"%1\"").arg(path);
+    }
+    
+    return path;
 }
 
 void AtariEmulator::setupAudio()

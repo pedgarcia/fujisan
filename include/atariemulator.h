@@ -109,6 +109,9 @@ extern "C" {
     // Single-instruction stepping for debugger
     extern void libatari800_step_instruction(void);
     
+    // NOTE: libatari800_exit and Atari800_InitialiseMachine are already declared
+    // in libatari800.h and atari.h respectively, so we don't redeclare them here
+    
     // Restore string macro if it was defined
     #ifdef TEMP_STRING_BACKUP
     #define string TEMP_STRING_BACKUP
@@ -306,6 +309,7 @@ private:
     char getShiftedSymbol(int key, bool shiftPressed);
     void setupAudio();
     void triggerDiskActivity();
+    QString quotePath(const QString& path);  // Helper to quote paths with spaces
     
     bool m_basicEnabled = true;
     bool m_altirraOSEnabled = false;
