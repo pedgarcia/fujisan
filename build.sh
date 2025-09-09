@@ -523,7 +523,8 @@ build_windows() {
     
     # Use the simplified Windows build script
     if [[ -f "$SCRIPT_DIR/scripts/build-windows-simple.sh" ]]; then
-        "$SCRIPT_DIR/scripts/build-windows-simple.sh"
+        echo_info "Passing VERSION=$VERSION to Windows build script"
+        VERSION="$VERSION" "$SCRIPT_DIR/scripts/build-windows-simple.sh"
         
         # Package into zip for distribution
         if [[ -d "build-windows" ]]; then

@@ -19,6 +19,7 @@ podman run --rm \
     -v "$PROJECT_ROOT:/work" \
     --workdir="/work" \
     --platform linux/amd64 \
+    -e VERSION="$VERSION" \
     maxrd2/arch-mingw \
     bash -c '
 set -e
@@ -32,12 +33,26 @@ cd build-cross-windows
 
 # Configure with CMake (disable SDL2 for Windows)
 echo "Configuring..."
+
+# Get version from environment (passed from host)
+if [[ -n "$VERSION" ]]; then
+    echo "Using version from host environment: $VERSION"
+    VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+else
+    echo "ERROR: No VERSION environment variable provided from host"
+    echo "Falling back to default version..."
+    VERSION="v1.0.0-dev"
+    VERSION_CLEAN="1.0.0-dev"
+fi
+echo "Building version: $VERSION_CLEAN"
+
 x86_64-w64-mingw32-cmake \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=Windows \
     -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
     -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ \
     -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
+    -DPROJECT_VERSION="$VERSION_CLEAN" \
     ..
 
 # Build

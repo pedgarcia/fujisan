@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     
     app.setApplicationName("Fujisan");
     app.setApplicationVersion("1.0.0");
-    app.setOrganizationName("Atari800 Project");
+    app.setOrganizationName("8bitrelics");
     
     
     MainWindow window;

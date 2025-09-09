@@ -170,7 +170,7 @@ cd build-release
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/usr \
       -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
-      -DFUJISAN_VERSION="$VERSION" \
+      -DPROJECT_VERSION="$VERSION_CLEAN" \
       ..
 
 # Build

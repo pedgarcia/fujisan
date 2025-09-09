@@ -1826,18 +1826,10 @@ void MainWindow::createMediaPeripheralsDock()
     connect(coldBootButton, &QPushButton::clicked, this, &MainWindow::coldBoot);
     connect(warmBootButton, &QPushButton::clicked, this, &MainWindow::warmBoot);
     
-    // Connect inverse key - Atari 800 uses Ctrl+Shift+A for inverse video
+    // Connect inverse key - send AKEY_ATARI directly for inverse video toggle
     connect(inverseButton, &QPushButton::clicked, this, [this]() {
-        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_A, Qt::ControlModifier | Qt::ShiftModifier);
-        m_emulator->handleKeyPress(&pressEvent);
-        qDebug() << "*** INVERSE button clicked - Ctrl+Shift+A pressed ***";
-        
-        // Delay release by one frame
-        QTimer::singleShot(50, [this]() {
-            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_A, Qt::ControlModifier | Qt::ShiftModifier);
-            m_emulator->handleKeyRelease(&releaseEvent);
-            qDebug() << "*** INVERSE button Ctrl+Shift+A released ***";
-        });
+        m_emulator->injectAKey(AKEY_ATARI);
+        qDebug() << "*** INVERSE button clicked - AKEY_ATARI injected ***";
     });
     
     // Connect pause button
@@ -1982,7 +1974,7 @@ void MainWindow::createMediaPeripheralsDock()
     
     // Insert console and system buttons after the spacer but before the logo separator
     // The spacer is followed by logo separator and logo, so we insert at index 13
-    int insertIndex = 13;
+    int insertIndex = 12;
     
     m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex), consoleButtonsContainer);
     m_toolBar->insertSeparator(m_toolBar->actions().at(insertIndex + 1));
