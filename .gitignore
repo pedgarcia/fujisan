@@ -11,6 +11,9 @@ build-windows/
 build-linux/
 build-package/
 
+# Documentation (local development files)
+docs_local/
+
 # Distribution output directory (all platforms)
 dist/
 
@@ -99,3 +102,9 @@ fujisan
 
 # Release instructions (contains sensitive Apple Developer info)
 RELEASE_INSTRUCTIONS.md
+
+# Claude agents (local development configuration)
+.claude/agents/
+
+# Project configuration (contains personal settings)
+CLAUDE.md
