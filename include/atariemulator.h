@@ -30,6 +30,12 @@
 class SDL2AudioBackend;
 #endif
 
+#ifdef HAVE_SDL2_JOYSTICK
+// Forward declaration for joystick manager
+class SDL2JoystickManager;
+struct JoystickState;
+#endif
+
 extern "C" {
     // Temporarily undefine potentially conflicting macros
     #ifdef string
@@ -223,6 +229,19 @@ public:
     
     bool isJoysticksSwapped() const { return m_swapJoysticks; }
     void setJoysticksSwapped(bool swapped) { m_swapJoysticks = swapped; }
+
+#ifdef HAVE_SDL2_JOYSTICK
+    // Real joystick (SDL2) support
+    bool isRealJoysticksEnabled() const { return m_realJoysticksEnabled; }
+    void setRealJoysticksEnabled(bool enabled);
+    SDL2JoystickManager* getJoystickManager() const { return m_joystickManager; }
+
+    // Device assignment methods
+    void setJoystick1Device(const QString& device);
+    void setJoystick2Device(const QString& device);
+    QString getJoystick1Device() const { return m_joystick1AssignedDevice; }
+    QString getJoystick2Device() const { return m_joystick2AssignedDevice; }
+#endif
     
     float getTargetFPS() const { return m_targetFps; }
     float getFrameTimeMs() const { return m_frameTimeMs; }
@@ -386,6 +405,16 @@ private:
     int m_sdl2BufferLevelCount;   // Count for averaging
     int m_sdl2FrameSkipCounter;   // Counter for periodic frame skipping
     bool m_sdl2AdaptiveMode;      // Whether to use adaptive timing
+#endif
+
+#ifdef HAVE_SDL2_JOYSTICK
+    // SDL2 Joystick support
+    SDL2JoystickManager* m_joystickManager;
+    bool m_realJoysticksEnabled;
+
+    // Device assignment tracking
+    QString m_joystick1AssignedDevice;  // "keyboard", "none", or "sdl_X"
+    QString m_joystick2AssignedDevice;  // "keyboard", "none", or "sdl_X"
 #endif
     
     // Printer components

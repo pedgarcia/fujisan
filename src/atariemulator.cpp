@@ -31,6 +31,10 @@
 #include "sdl2audiobackend.h"
 #endif
 
+#ifdef HAVE_SDL2_JOYSTICK
+#include "sdl2joystickmanager.h"
+#endif
+
 extern "C" {
 #ifdef NETSIO
 #include "../src/netsio.h"
@@ -94,6 +98,12 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_fujinet_restart_delay(0)
     , m_usePartialFrameExecution(false)
     , m_cyclesThisFrame(0)
+#ifdef HAVE_SDL2_JOYSTICK
+    , m_joystickManager(nullptr)
+    , m_realJoysticksEnabled(false)
+    , m_joystick1AssignedDevice("keyboard")
+    , m_joystick2AssignedDevice("keyboard")
+#endif
 {
     libatari800_clear_input_array(&m_currentInput);
     
@@ -110,6 +120,16 @@ AtariEmulator::AtariEmulator(QObject *parent)
     // This might help with audio synchronization issues
     m_frameTimer->setTimerType(Qt::PreciseTimer);
     connect(m_frameTimer, &QTimer::timeout, this, &AtariEmulator::processFrame);
+
+#ifdef HAVE_SDL2_JOYSTICK
+    // Initialize SDL2 joystick manager
+    m_joystickManager = new SDL2JoystickManager(this);
+    if (m_joystickManager->initialize()) {
+        qDebug() << "SDL2 joystick subsystem initialized successfully";
+    } else {
+        qWarning() << "Failed to initialize SDL2 joystick subsystem";
+    }
+#endif
 }
 
 AtariEmulator::~AtariEmulator()
@@ -733,8 +753,55 @@ void AtariEmulator::processFrame()
         }
     }
 
+    // Process device-specific joystick input
+#ifdef HAVE_SDL2_JOYSTICK
+    if (m_joystickManager) {
+        // Process Joystick 1 based on assigned device
+        if (m_joystick1AssignedDevice.startsWith("sdl_")) {
+            // Extract SDL joystick index from device string (e.g., "sdl_0" -> 0)
+            bool ok;
+            int sdlIndex = m_joystick1AssignedDevice.mid(4).toInt(&ok);
+            if (ok) {
+                JoystickState joyState = m_joystickManager->getJoystickState(sdlIndex);
+                if (joyState.connected) {
+                    int targetJoy = m_swapJoysticks ? 1 : 0;  // Apply swapping
+                    if (targetJoy == 0) {
+                        m_currentInput.joy0 = joyState.stick;
+                        m_currentInput.trig0 = joyState.trigger ? 1 : 0;
+                    } else {
+                        m_currentInput.joy1 = joyState.stick;
+                        m_currentInput.trig1 = joyState.trigger ? 1 : 0;
+                    }
+                }
+            }
+        }
+        // Note: "keyboard" and "none" devices are handled by keyboard emulation/no input
+
+        // Process Joystick 2 based on assigned device
+        if (m_joystick2AssignedDevice.startsWith("sdl_")) {
+            // Extract SDL joystick index from device string (e.g., "sdl_1" -> 1)
+            bool ok;
+            int sdlIndex = m_joystick2AssignedDevice.mid(4).toInt(&ok);
+            if (ok) {
+                JoystickState joyState = m_joystickManager->getJoystickState(sdlIndex);
+                if (joyState.connected) {
+                    int targetJoy = m_swapJoysticks ? 0 : 1;  // Apply swapping
+                    if (targetJoy == 0) {
+                        m_currentInput.joy0 = joyState.stick;
+                        m_currentInput.trig0 = joyState.trigger ? 1 : 0;
+                    } else {
+                        m_currentInput.joy1 = joyState.stick;
+                        m_currentInput.trig1 = joyState.trigger ? 1 : 0;
+                    }
+                }
+            }
+        }
+        // Note: "keyboard" and "none" devices are handled by keyboard emulation/no input
+    }
+#endif
+
     // Send joystick values to libatari800
-    
+
     // Debug what we're sending to the emulator
     if (m_currentInput.keychar != 0) {
         // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)m_currentInput.keychar << "'" << QChar(m_currentInput.keychar) << "' ***";
@@ -3108,5 +3175,33 @@ void AtariEmulator::checkBreakpoints()
         }
     }
 }
+
+#ifdef HAVE_SDL2_JOYSTICK
+void AtariEmulator::setRealJoysticksEnabled(bool enabled)
+{
+    if (m_realJoysticksEnabled == enabled) {
+        return;
+    }
+
+    m_realJoysticksEnabled = enabled;
+
+    if (m_joystickManager) {
+        m_joystickManager->setEnabled(enabled);
+        qDebug() << "Real joysticks" << (enabled ? "enabled" : "disabled");
+    }
+}
+
+void AtariEmulator::setJoystick1Device(const QString& device)
+{
+    m_joystick1AssignedDevice = device;
+    qDebug() << "Joystick 1 device assigned:" << device;
+}
+
+void AtariEmulator::setJoystick2Device(const QString& device)
+{
+    m_joystick2AssignedDevice = device;
+    qDebug() << "Joystick 2 device assigned:" << device;
+}
+#endif
 
 // Double buffering audio implementation (inspired by Atari800MacX)

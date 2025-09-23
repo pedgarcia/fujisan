@@ -64,6 +64,7 @@ private slots:
     void onProfileChangeRequested(const QString& profileName);
     void onSaveCurrentProfile(const QString& profileName);
     void onLoadProfile(const QString& profileName);
+    void onJoystickDeviceChanged();
 
 private:
     void createHardwareTab();
@@ -79,6 +80,8 @@ private:
     void updateVideoSystemDependentControls();
     void setupFilePathTooltip(QLineEdit* lineEdit);
     void populateCartridgeTypes(QComboBox* combo);
+    void populateJoystickDevices();
+    void updateKeyboardMappingLabels();
     
     // Profile management
     ConfigurationProfile getCurrentUIState() const;
@@ -218,24 +221,18 @@ private:
     
     // Joystick Configuration
     QCheckBox* m_joystickEnabled;
-    QCheckBox* m_joystick0Hat;
-    QCheckBox* m_joystick1Hat;
-    QCheckBox* m_joystick2Hat;
-    QCheckBox* m_joystick3Hat;
-    QCheckBox* m_joyDistinct;
-    
-    // Keyboard Joystick Emulation
-    QCheckBox* m_kbdJoy0Enabled;
-    QCheckBox* m_kbdJoy1Enabled;
+    QComboBox* m_joystick1Device;
+    QComboBox* m_joystick2Device;
     QCheckBox* m_swapJoysticks;
-    
-    // Mouse Configuration
+
+    // Keyboard mapping labels (shown when "Keyboard" is selected)
+    QLabel* m_joystick1KeysLabel;
+    QLabel* m_joystick2KeysLabel;
+
+    // Mouse Configuration (hidden for future re-implementation)
+    QGroupBox* m_mouseGroup;
     QCheckBox* m_grabMouse;
     QLineEdit* m_mouseDevice;
-    
-    // Keyboard Configuration
-    QCheckBox* m_keyboardToggle;
-    QCheckBox* m_keyboardLeds;
     
     // Media Configuration controls
     QWidget* m_mediaTab;

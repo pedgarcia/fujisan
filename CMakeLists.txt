@@ -78,16 +78,18 @@ endif()
 # Find Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
-# Find SDL2 for audio backend
+# Find SDL2 for audio backend and joystick support
 find_package(SDL2 QUIET)
 if(SDL2_FOUND)
-    message(STATUS "SDL2 found - SDL2 audio backend will be available")
+    message(STATUS "SDL2 found - SDL2 audio backend and joystick support will be available")
     set(HAVE_SDL2_AUDIO ON)
+    set(HAVE_SDL2_JOYSTICK ON)
     # Store SDL2 libraries for later use
     set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
 else()
-    message(STATUS "SDL2 not found - using Qt audio backend only")
+    message(STATUS "SDL2 not found - using Qt audio backend only, no real joystick support")
     set(HAVE_SDL2_AUDIO OFF)
+    set(HAVE_SDL2_JOYSTICK OFF)
     set(SDL2_LIBRARIES "")
 endif()
 
@@ -236,6 +238,7 @@ set(SOURCES
     src/emulatorwidget.cpp
     src/atariemulator.cpp
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:src/sdl2audiobackend.cpp>
+    $<$<BOOL:${HAVE_SDL2_JOYSTICK}>:src/sdl2joystickmanager.cpp>
     src/toggleswitch.cpp
     src/settingsdialog.cpp
     src/disasm6502.cpp
@@ -259,6 +262,7 @@ set(HEADERS
     include/emulatorwidget.h
     include/atariemulator.h
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:include/sdl2audiobackend.h>
+    $<$<BOOL:${HAVE_SDL2_JOYSTICK}>:include/sdl2joystickmanager.h>
     include/toggleswitch.h
     include/settingsdialog.h
     include/configurationprofile.h
@@ -334,11 +338,12 @@ endif()
 # ============================================================================
 
 # Add compile definitions
-target_compile_definitions(${PROJECT_NAME} PRIVATE 
+target_compile_definitions(${PROJECT_NAME} PRIVATE
     SCREENSHOTS
     # Remove dependency on runtime ATARI800_SRC_PATH
     EMBEDDED_LIBATARI800
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:HAVE_SDL2_AUDIO>
+    $<$<BOOL:${HAVE_SDL2_JOYSTICK}>:HAVE_SDL2_JOYSTICK>
 )
 
 # Add architecture-specific definitions for macOS
@@ -363,8 +368,8 @@ target_link_libraries(${PROJECT_NAME}
     -lm
 )
 
-# Link SDL2 only if available
-if(HAVE_SDL2_AUDIO)
+# Link SDL2 only if available (for audio backend and/or joystick support)
+if(HAVE_SDL2_AUDIO OR HAVE_SDL2_JOYSTICK)
     if(TARGET SDL2::SDL2)
         target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
     elseif(SDL2_LIBRARIES)

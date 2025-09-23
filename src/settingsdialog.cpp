@@ -9,6 +9,10 @@
 #include <QDebug>
 #include <QFileDialog>
 
+#ifdef HAVE_SDL2_JOYSTICK
+#include "sdl2joystickmanager.h"
+#endif
+
 SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     : QDialog(parent)
     , m_emulator(emulator)
@@ -1290,127 +1294,98 @@ void SettingsDialog::createInputConfigTab()
     m_inputTab = new QWidget();
     m_tabWidget->addTab(m_inputTab, "Input Configuration");
     
-    // Create main horizontal layout
-    QHBoxLayout* mainLayout = new QHBoxLayout(m_inputTab);
-    
-    // Left column - Joystick Configuration
-    QVBoxLayout* leftColumn = new QVBoxLayout();
-    
-    // Joystick Configuration Group
+    // Create main vertical layout for full-width joystick configuration
+    QVBoxLayout* mainLayout = new QVBoxLayout(m_inputTab);
+
+    // Joystick Configuration Group (full width)
     QGroupBox* joystickGroup = new QGroupBox("Joystick Configuration");
     QVBoxLayout* joystickLayout = new QVBoxLayout(joystickGroup);
-    
+
     // Enable/Disable joysticks
     m_joystickEnabled = new QCheckBox("Enable Joystick Support");
-    m_joystickEnabled->setToolTip("Enable or disable joystick input (equivalent to -nojoystick)");
+    m_joystickEnabled->setToolTip("Enable or disable joystick input");
     m_joystickEnabled->setChecked(true); // Default enabled
     joystickLayout->addWidget(m_joystickEnabled);
-    
-    // Hat support for joysticks 0-3
-    QLabel* hatLabel = new QLabel("Hat Support:");
-    hatLabel->setStyleSheet("font-weight: bold; margin-top: 10px;");
-    joystickLayout->addWidget(hatLabel);
-    
-    m_joystick0Hat = new QCheckBox("Use hat of joystick 0 (-joy0hat)");
-    m_joystick0Hat->setToolTip("Use hat switch of joystick 0 for movement");
-    joystickLayout->addWidget(m_joystick0Hat);
-    
-    m_joystick1Hat = new QCheckBox("Use hat of joystick 1 (-joy1hat)");
-    m_joystick1Hat->setToolTip("Use hat switch of joystick 1 for movement");
-    joystickLayout->addWidget(m_joystick1Hat);
-    
-    m_joystick2Hat = new QCheckBox("Use hat of joystick 2 (-joy2hat)");
-    m_joystick2Hat->setToolTip("Use hat switch of joystick 2 for movement");
-    joystickLayout->addWidget(m_joystick2Hat);
-    
-    m_joystick3Hat = new QCheckBox("Use hat of joystick 3 (-joy3hat)");
-    m_joystick3Hat->setToolTip("Use hat switch of joystick 3 for movement");
-    joystickLayout->addWidget(m_joystick3Hat);
-    
-    // Distinct joysticks option
-    m_joyDistinct = new QCheckBox("One input device per emulated stick (-joy-distinct)");
-    m_joyDistinct->setToolTip("Use separate input devices for each emulated joystick");
-    joystickLayout->addWidget(m_joyDistinct);
-    
-    leftColumn->addWidget(joystickGroup);
-    
-    // Keyboard Joystick Emulation Group
-    QGroupBox* kbdJoyGroup = new QGroupBox("Keyboard Joystick Emulation");
-    QVBoxLayout* kbdJoyLayout = new QVBoxLayout(kbdJoyGroup);
-    
-    m_kbdJoy0Enabled = new QCheckBox("Enable joystick 0 keyboard emulation (-kbdjoy0)");
-    m_kbdJoy0Enabled->setToolTip("Allow keyboard keys to emulate joystick 0 (WASD, etc.)");
-    kbdJoyLayout->addWidget(m_kbdJoy0Enabled);
-    
-    m_kbdJoy1Enabled = new QCheckBox("Enable joystick 1 keyboard emulation (-kbdjoy1)");
-    m_kbdJoy1Enabled->setToolTip("Allow keyboard keys to emulate joystick 1");
-    kbdJoyLayout->addWidget(m_kbdJoy1Enabled);
-    
-    // Add some spacing
-    kbdJoyLayout->addSpacing(10);
-    
-    m_swapJoysticks = new QCheckBox("Swap joystick assignments (WASD becomes Joy0)");
-    m_swapJoysticks->setToolTip("When enabled: WASD controls Joy0, Numpad controls Joy1");
-    kbdJoyLayout->addWidget(m_swapJoysticks);
-    
-    leftColumn->addWidget(kbdJoyGroup);
-    leftColumn->addStretch();
-    
-    // Right column - Mouse and Keyboard Configuration
-    QVBoxLayout* rightColumn = new QVBoxLayout();
-    
-    // Mouse Configuration Group
-    QGroupBox* mouseGroup = new QGroupBox("Mouse Configuration");
-    QVBoxLayout* mouseLayout = new QVBoxLayout(mouseGroup);
-    
+
+    joystickLayout->addSpacing(10);
+
+    // Joystick device selection with keyboard mapping labels
+    QFormLayout* deviceLayout = new QFormLayout();
+
+    // Joystick 1 device and keyboard mapping
+    QHBoxLayout* joy1Layout = new QHBoxLayout();
+    m_joystick1Device = new QComboBox();
+    m_joystick1Device->setToolTip("Select input device for Joystick 1");
+    joy1Layout->addWidget(m_joystick1Device);
+
+    m_joystick1KeysLabel = new QLabel();
+    m_joystick1KeysLabel->setStyleSheet("QLabel { color: #666; font-style: italic; }");
+    m_joystick1KeysLabel->setVisible(false);
+    joy1Layout->addWidget(m_joystick1KeysLabel);
+    joy1Layout->addStretch();
+
+    deviceLayout->addRow("Joystick 1:", joy1Layout);
+
+    // Joystick 2 device and keyboard mapping
+    QHBoxLayout* joy2Layout = new QHBoxLayout();
+    m_joystick2Device = new QComboBox();
+    m_joystick2Device->setToolTip("Select input device for Joystick 2");
+    joy2Layout->addWidget(m_joystick2Device);
+
+    m_joystick2KeysLabel = new QLabel();
+    m_joystick2KeysLabel->setStyleSheet("QLabel { color: #666; font-style: italic; }");
+    m_joystick2KeysLabel->setVisible(false);
+    joy2Layout->addWidget(m_joystick2KeysLabel);
+    joy2Layout->addStretch();
+
+    deviceLayout->addRow("Joystick 2:", joy2Layout);
+
+    joystickLayout->addLayout(deviceLayout);
+    joystickLayout->addSpacing(10);
+
+    m_swapJoysticks = new QCheckBox("Swap joystick assignments");
+    m_swapJoysticks->setToolTip("Swap the assignments between Joystick 1 and Joystick 2");
+    joystickLayout->addWidget(m_swapJoysticks);
+
+    mainLayout->addWidget(joystickGroup);
+
+    // Mouse Configuration Group (hidden for future re-implementation)
+    m_mouseGroup = new QGroupBox("Mouse Configuration");
+    QVBoxLayout* mouseLayout = new QVBoxLayout(m_mouseGroup);
+
     m_grabMouse = new QCheckBox("Grab mouse (-grabmouse)");
     m_grabMouse->setToolTip("Prevent mouse from leaving emulator window");
     mouseLayout->addWidget(m_grabMouse);
-    
+
     // Mouse device setting
     QHBoxLayout* mouseDeviceLayout = new QHBoxLayout();
     QLabel* mouseDeviceLabel = new QLabel("Mouse Device:");
     mouseDeviceLayout->addWidget(mouseDeviceLabel);
-    
+
     m_mouseDevice = new QLineEdit();
     m_mouseDevice->setPlaceholderText("Default mouse device");
     m_mouseDevice->setToolTip("Specify custom mouse device (-mouse-device)");
     mouseDeviceLayout->addWidget(m_mouseDevice, 1);
-    
+
     mouseLayout->addLayout(mouseDeviceLayout);
-    rightColumn->addWidget(mouseGroup);
-    
-    // Keyboard Configuration Group
-    QGroupBox* keyboardGroup = new QGroupBox("Keyboard Configuration");
-    QVBoxLayout* keyboardLayout = new QVBoxLayout(keyboardGroup);
-    
-    m_keyboardToggle = new QCheckBox("Enable keyboard toggle functionality (-keyboardtoggle)");
-    m_keyboardToggle->setToolTip("Enable special keyboard toggle features");
-    keyboardLayout->addWidget(m_keyboardToggle);
-    
-    m_keyboardLeds = new QCheckBox("Enable keyboard LEDs (-keyboard-leds)");
-    m_keyboardLeds->setToolTip("Enable keyboard LED indicators (for Atari 1200XL)");
-    keyboardLayout->addWidget(m_keyboardLeds);
-    
-    rightColumn->addWidget(keyboardGroup);
-    rightColumn->addStretch();
-    
+
+    // Hide mouse configuration for now
+    m_mouseGroup->setVisible(false);
+    mainLayout->addWidget(m_mouseGroup);
+
+    mainLayout->addStretch();
+
     // Connect joystick enable/disable functionality
     connect(m_joystickEnabled, &QCheckBox::toggled, [this](bool enabled) {
-        m_joystick0Hat->setEnabled(enabled);
-        m_joystick1Hat->setEnabled(enabled);
-        m_joystick2Hat->setEnabled(enabled);
-        m_joystick3Hat->setEnabled(enabled);
-        m_joyDistinct->setEnabled(enabled);
-        // Also disable keyboard joystick emulation when main joystick is disabled
-        m_kbdJoy0Enabled->setEnabled(enabled);
-        m_kbdJoy1Enabled->setEnabled(enabled);
+        m_joystick1Device->setEnabled(enabled);
+        m_joystick2Device->setEnabled(enabled);
         m_swapJoysticks->setEnabled(enabled);
+        m_joystick1KeysLabel->setEnabled(enabled);
+        m_joystick2KeysLabel->setEnabled(enabled);
     });
-    
-    // Add both columns to main layout
-    mainLayout->addLayout(leftColumn, 1);
-    mainLayout->addLayout(rightColumn, 1);
+
+    // Initialize joystick device dropdowns
+    populateJoystickDevices();
 }
 
 void SettingsDialog::createMediaConfigTab()
@@ -2255,27 +2230,33 @@ void SettingsDialog::loadSettings()
     // Load Input Configuration
     bool mainJoystickEnabled = settings.value("input/joystickEnabled", true).toBool();
     m_joystickEnabled->setChecked(mainJoystickEnabled);
-    m_joystick0Hat->setChecked(settings.value("input/joystick0Hat", false).toBool());
-    m_joystick1Hat->setChecked(settings.value("input/joystick1Hat", false).toBool());
-    m_joystick2Hat->setChecked(settings.value("input/joystick2Hat", false).toBool());
-    m_joystick3Hat->setChecked(settings.value("input/joystick3Hat", false).toBool());
-    m_joyDistinct->setChecked(settings.value("input/joyDistinct", false).toBool());
-    m_kbdJoy0Enabled->setChecked(settings.value("input/kbdJoy0Enabled", true).toBool());  // Default true to match SDL default
-    m_kbdJoy1Enabled->setChecked(settings.value("input/kbdJoy1Enabled", false).toBool()); // Default false to match SDL default
-    m_swapJoysticks->setChecked(settings.value("input/swapJoysticks", false).toBool());   // Default false: Joy0=Numpad, Joy1=WASD
+
+    // Load joystick device assignments
+    QString joystick1Device = settings.value("input/joystick1Device", "keyboard").toString();
+    QString joystick2Device = settings.value("input/joystick2Device", "keyboard").toString();
+
+    // Set dropdown selections based on loaded settings
+    for (int i = 0; i < m_joystick1Device->count(); ++i) {
+        if (m_joystick1Device->itemData(i).toString() == joystick1Device) {
+            m_joystick1Device->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    for (int i = 0; i < m_joystick2Device->count(); ++i) {
+        if (m_joystick2Device->itemData(i).toString() == joystick2Device) {
+            m_joystick2Device->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    m_swapJoysticks->setChecked(settings.value("input/swapJoysticks", false).toBool());
     m_grabMouse->setChecked(settings.value("input/grabMouse", false).toBool());
     m_mouseDevice->setText(settings.value("input/mouseDevice", "").toString());
-    m_keyboardToggle->setChecked(settings.value("input/keyboardToggle", false).toBool());
-    m_keyboardLeds->setChecked(settings.value("input/keyboardLeds", false).toBool());
-    
+
     // Enable/disable dependent controls based on main joystick state
-    m_joystick0Hat->setEnabled(mainJoystickEnabled);
-    m_joystick1Hat->setEnabled(mainJoystickEnabled);
-    m_joystick2Hat->setEnabled(mainJoystickEnabled);
-    m_joystick3Hat->setEnabled(mainJoystickEnabled);
-    m_joyDistinct->setEnabled(mainJoystickEnabled);
-    m_kbdJoy0Enabled->setEnabled(mainJoystickEnabled);
-    m_kbdJoy1Enabled->setEnabled(mainJoystickEnabled);
+    m_joystick1Device->setEnabled(mainJoystickEnabled);
+    m_joystick2Device->setEnabled(mainJoystickEnabled);
     m_swapJoysticks->setEnabled(mainJoystickEnabled);
     
     // Load Media Configuration
@@ -2518,18 +2499,14 @@ void SettingsDialog::saveSettings()
     
     // Save Input Configuration
     settings.setValue("input/joystickEnabled", m_joystickEnabled->isChecked());
-    settings.setValue("input/joystick0Hat", m_joystick0Hat->isChecked());
-    settings.setValue("input/joystick1Hat", m_joystick1Hat->isChecked());
-    settings.setValue("input/joystick2Hat", m_joystick2Hat->isChecked());
-    settings.setValue("input/joystick3Hat", m_joystick3Hat->isChecked());
-    settings.setValue("input/joyDistinct", m_joyDistinct->isChecked());
-    settings.setValue("input/kbdJoy0Enabled", m_kbdJoy0Enabled->isChecked());
-    settings.setValue("input/kbdJoy1Enabled", m_kbdJoy1Enabled->isChecked());
+
+    // Save joystick device assignments
+    settings.setValue("input/joystick1Device", m_joystick1Device->currentData().toString());
+    settings.setValue("input/joystick2Device", m_joystick2Device->currentData().toString());
+
     settings.setValue("input/swapJoysticks", m_swapJoysticks->isChecked());
     settings.setValue("input/grabMouse", m_grabMouse->isChecked());
     settings.setValue("input/mouseDevice", m_mouseDevice->text());
-    settings.setValue("input/keyboardToggle", m_keyboardToggle->isChecked());
-    settings.setValue("input/keyboardLeds", m_keyboardLeds->isChecked());
     
     // Save Media Configuration
     // Floppy Disks
@@ -2775,19 +2752,23 @@ void SettingsDialog::applySettings()
     // Apply joystick settings immediately (no restart needed)
     if (m_emulator) {
         bool mainJoystickEnabled = m_joystickEnabled->isChecked();
-        bool joy0Enabled = m_kbdJoy0Enabled->isChecked();
-        bool joy1Enabled = m_kbdJoy1Enabled->isChecked();
         bool swapped = m_swapJoysticks->isChecked();
-        
-        // Apply joystick settings directly for immediate effect
-        // Only enable keyboard joysticks if main joystick support is enabled
-        m_emulator->setKbdJoy0Enabled(mainJoystickEnabled && joy0Enabled);
-        m_emulator->setKbdJoy1Enabled(mainJoystickEnabled && joy1Enabled);
+
+        // Apply joystick device settings
+        if (mainJoystickEnabled) {
+            onJoystickDeviceChanged(); // This handles the device-specific logic
+        } else {
+            // Disable all joystick input when main joystick is disabled
+            m_emulator->setKbdJoy0Enabled(false);
+            m_emulator->setKbdJoy1Enabled(false);
+#ifdef HAVE_SDL2_JOYSTICK
+            m_emulator->setRealJoysticksEnabled(false);
+#endif
+        }
+
         m_emulator->setJoysticksSwapped(swapped);
-        
-        qDebug() << "Applied joystick settings live - MainJoystick:" << mainJoystickEnabled 
-                 << "Joy0:" << (mainJoystickEnabled && joy0Enabled) 
-                 << "Joy1:" << (mainJoystickEnabled && joy1Enabled) 
+
+        qDebug() << "Applied joystick settings live - MainJoystick:" << mainJoystickEnabled
                  << "Swap:" << swapped;
     }
     
@@ -2838,8 +2819,8 @@ void SettingsDialog::applySettings()
                 m_emulator->getVideoSystem(),
                 artifactMode,
                 "tv", "tv", 0, 0, "both", false, false,
-                m_kbdJoy0Enabled->isChecked(),
-                m_kbdJoy1Enabled->isChecked(),
+                (m_joystick1Device->currentData().toString() == "keyboard"),
+                (m_joystick2Device->currentData().toString() == "keyboard"),
                 m_swapJoysticks->isChecked())) {
             qDebug() << "Emulator restarted with new settings";
             
@@ -3051,18 +3032,14 @@ void SettingsDialog::restoreDefaults()
     
     // Input Configuration defaults
     m_joystickEnabled->setChecked(true);     // Joystick enabled by default
-    m_joystick0Hat->setChecked(false);
-    m_joystick1Hat->setChecked(false);
-    m_joystick2Hat->setChecked(false);
-    m_joystick3Hat->setChecked(false);
-    m_joyDistinct->setChecked(false);
-    m_kbdJoy0Enabled->setChecked(true);  // Default true to match SDL default
-    m_kbdJoy1Enabled->setChecked(false); // Default false to match SDL default
+
+    // Set default joystick devices: J1=Keyboard, J2=Keyboard
+    m_joystick1Device->setCurrentIndex(0); // "Keyboard"
+    m_joystick2Device->setCurrentIndex(0); // "Keyboard"
+
     m_swapJoysticks->setChecked(false);  // Default false: Joy0=Numpad, Joy1=WASD
     m_grabMouse->setChecked(false);
     m_mouseDevice->clear();
-    m_keyboardToggle->setChecked(false);
-    m_keyboardLeds->setChecked(false);
     
     // Media Configuration defaults
     // Floppy Disks - all disabled by default
@@ -3223,18 +3200,21 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     
     // Input Configuration
     profile.joystickEnabled = m_joystickEnabled->isChecked();
-    profile.joystick0Hat = m_joystick0Hat->isChecked();
-    profile.joystick1Hat = m_joystick1Hat->isChecked();
-    profile.joystick2Hat = m_joystick2Hat->isChecked();
-    profile.joystick3Hat = m_joystick3Hat->isChecked();
-    profile.joyDistinct = m_joyDistinct->isChecked();
-    profile.kbdJoy0Enabled = m_kbdJoy0Enabled->isChecked();
-    profile.kbdJoy1Enabled = m_kbdJoy1Enabled->isChecked();
+    // Note: Old joystick hat/distinct settings are deprecated in favor of device selection
+    profile.joystick0Hat = false;
+    profile.joystick1Hat = false;
+    profile.joystick2Hat = false;
+    profile.joystick3Hat = false;
+    profile.joyDistinct = false;
+    // Convert device selection to keyboard emulation flags for profile compatibility
+    profile.kbdJoy0Enabled = (m_joystick1Device->currentData().toString() == "keyboard");
+    profile.kbdJoy1Enabled = (m_joystick2Device->currentData().toString() == "keyboard");
     profile.swapJoysticks = m_swapJoysticks->isChecked();
     profile.grabMouse = m_grabMouse->isChecked();
     profile.mouseDevice = m_mouseDevice->text();
-    profile.keyboardToggle = m_keyboardToggle->isChecked();
-    profile.keyboardLeds = m_keyboardLeds->isChecked();
+    // Note: Keyboard toggle/leds settings removed in new UI
+    profile.keyboardToggle = false;
+    profile.keyboardLeds = false;
     
     // Cartridge Configuration
     profile.primaryCartridge.enabled = m_cartridgeEnabledCheck->isChecked();
@@ -3461,18 +3441,28 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     
     // Input Configuration
     m_joystickEnabled->setChecked(profile.joystickEnabled);
-    m_joystick0Hat->setChecked(profile.joystick0Hat);
-    m_joystick1Hat->setChecked(profile.joystick1Hat);
-    m_joystick2Hat->setChecked(profile.joystick2Hat);
-    m_joystick3Hat->setChecked(profile.joystick3Hat);
-    m_joyDistinct->setChecked(profile.joyDistinct);
-    m_kbdJoy0Enabled->setChecked(profile.kbdJoy0Enabled);
-    m_kbdJoy1Enabled->setChecked(profile.kbdJoy1Enabled);
+    // Convert keyboard emulation flags back to device selection for compatibility
+    QString device1 = profile.kbdJoy0Enabled ? "keyboard" : "none";
+    QString device2 = profile.kbdJoy1Enabled ? "keyboard" : "none";
+
+    // Set dropdown selections based on profile data
+    for (int i = 0; i < m_joystick1Device->count(); ++i) {
+        if (m_joystick1Device->itemData(i).toString() == device1) {
+            m_joystick1Device->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    for (int i = 0; i < m_joystick2Device->count(); ++i) {
+        if (m_joystick2Device->itemData(i).toString() == device2) {
+            m_joystick2Device->setCurrentIndex(i);
+            break;
+        }
+    }
+
     m_swapJoysticks->setChecked(profile.swapJoysticks);
     m_grabMouse->setChecked(profile.grabMouse);
     m_mouseDevice->setText(profile.mouseDevice);
-    m_keyboardToggle->setChecked(profile.keyboardToggle);
-    m_keyboardLeds->setChecked(profile.keyboardLeds);
     
     // Cartridge Configuration
     m_cartridgeEnabledCheck->setChecked(profile.primaryCartridge.enabled);
@@ -3557,4 +3547,135 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     updateVideoSystemDependentControls();
     
     qDebug() << "Profile loaded to UI successfully";
+}
+
+void SettingsDialog::populateJoystickDevices()
+{
+    // Clear existing items
+    m_joystick1Device->clear();
+    m_joystick2Device->clear();
+
+    // Add standard options
+    m_joystick1Device->addItem("Keyboard", "keyboard");
+    m_joystick1Device->addItem("(No device)", "none");
+
+    m_joystick2Device->addItem("Keyboard", "keyboard");
+    m_joystick2Device->addItem("(No device)", "none");
+
+#ifdef HAVE_SDL2_JOYSTICK
+    // Add real joystick devices if SDL2 joystick manager is available
+    if (m_emulator && m_emulator->getJoystickManager()) {
+        QStringList joystickNames = m_emulator->getJoystickManager()->getConnectedJoystickNames();
+
+        for (int i = 0; i < joystickNames.size(); ++i) {
+            QString deviceId = QString("sdl_%1").arg(i);
+            m_joystick1Device->addItem(joystickNames[i], deviceId);
+            m_joystick2Device->addItem(joystickNames[i], deviceId);
+        }
+
+        qDebug() << "Populated joystick dropdowns with" << joystickNames.size() << "SDL devices";
+    }
+#endif
+
+    // Set defaults: J1 gets first real device or keyboard, J2 gets keyboard
+    bool hasRealDevice = m_joystick1Device->count() > 2; // More than "Keyboard" and "(No device)"
+
+    if (hasRealDevice) {
+        m_joystick1Device->setCurrentIndex(2); // First real device
+        m_joystick2Device->setCurrentIndex(0); // Keyboard
+    } else {
+        m_joystick1Device->setCurrentIndex(0); // Keyboard
+        m_joystick2Device->setCurrentIndex(0); // Keyboard
+    }
+
+    // Connect dropdown change signals
+    connect(m_joystick1Device, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &SettingsDialog::onJoystickDeviceChanged);
+    connect(m_joystick2Device, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &SettingsDialog::onJoystickDeviceChanged);
+
+    // Also connect to update keyboard mapping labels
+    connect(m_joystick1Device, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &SettingsDialog::updateKeyboardMappingLabels);
+    connect(m_joystick2Device, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &SettingsDialog::updateKeyboardMappingLabels);
+    connect(m_swapJoysticks, &QCheckBox::toggled,
+            this, &SettingsDialog::updateKeyboardMappingLabels);
+
+    // Initialize keyboard mapping labels
+    updateKeyboardMappingLabels();
+}
+
+void SettingsDialog::updateKeyboardMappingLabels()
+{
+    if (!m_joystick1Device || !m_joystick2Device) {
+        return;
+    }
+
+    QString device1 = m_joystick1Device->currentData().toString();
+    QString device2 = m_joystick2Device->currentData().toString();
+    bool swapped = m_swapJoysticks->isChecked();
+
+    // Determine keyboard mappings based on swap setting
+    // Normal (not swapped): J1=Numpad, J2=WASD
+    // Swapped: J1=WASD, J2=Numpad
+    QString joy1Keys, joy2Keys;
+
+    if (!swapped) {
+        // Normal: J1=Numpad, J2=WASD
+        joy1Keys = "Keys: ↑ ← ↓ → + RCtrl";
+        joy2Keys = "Keys: W A S D + Space";
+    } else {
+        // Swapped: J1=WASD, J2=Numpad
+        joy1Keys = "Keys: W A S D + Space";
+        joy2Keys = "Keys: ↑ ← ↓ → + RCtrl";
+    }
+
+    // Show/hide labels based on device selection
+    if (device1 == "keyboard") {
+        m_joystick1KeysLabel->setText(joy1Keys);
+        m_joystick1KeysLabel->setVisible(true);
+    } else {
+        m_joystick1KeysLabel->setVisible(false);
+    }
+
+    if (device2 == "keyboard") {
+        m_joystick2KeysLabel->setText(joy2Keys);
+        m_joystick2KeysLabel->setVisible(true);
+    } else {
+        m_joystick2KeysLabel->setVisible(false);
+    }
+}
+
+void SettingsDialog::onJoystickDeviceChanged()
+{
+    if (!m_emulator) {
+        return;
+    }
+
+    // Apply joystick device changes immediately
+    QString device1 = m_joystick1Device->currentData().toString();
+    QString device2 = m_joystick2Device->currentData().toString();
+
+    qDebug() << "Joystick devices changed - J1:" << device1 << "J2:" << device2;
+
+    // Enable keyboard emulation based on device selections
+    bool kbd1Enabled = (device1 == "keyboard");
+    bool kbd2Enabled = (device2 == "keyboard");
+
+    m_emulator->setKbdJoy0Enabled(kbd1Enabled);
+    m_emulator->setKbdJoy1Enabled(kbd2Enabled);
+
+#ifdef HAVE_SDL2_JOYSTICK
+    // Set device assignments for precise joystick control
+    m_emulator->setJoystick1Device(device1);
+    m_emulator->setJoystick2Device(device2);
+
+    // Enable real joysticks if any SDL device is selected
+    bool realJoysticksNeeded = device1.startsWith("sdl_") || device2.startsWith("sdl_");
+    m_emulator->setRealJoysticksEnabled(realJoysticksNeeded);
+
+    qDebug() << "Applied joystick settings - Kbd1:" << kbd1Enabled
+             << "Kbd2:" << kbd2Enabled << "Real:" << realJoysticksNeeded;
+#endif
 }
