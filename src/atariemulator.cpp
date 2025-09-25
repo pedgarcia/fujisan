@@ -29,6 +29,7 @@
 
 #ifdef HAVE_SDL2_AUDIO
 #include "sdl2audiobackend.h"
+#include "unifiedaudiobackend.h"
 #endif
 
 #ifdef HAVE_SDL2_JOYSTICK
@@ -73,11 +74,10 @@ static void diskActivityCallback(int drive, int operation) {
 AtariEmulator::AtariEmulator(QObject *parent)
     : QObject(parent)
     , m_frameTimer(new QTimer(this))
+    , m_audioBackend(QtAudio)  // Revert to Qt audio as default (unified backend needs debugging)
+    , m_unifiedAudio(nullptr)
 #ifdef HAVE_SDL2_AUDIO
-    , m_audioBackend(QtAudio)  // Qt audio works better than SDL2 currently
     , m_sdl2Audio(nullptr)
-#else
-    , m_audioBackend(QtAudio)     // Fall back to Qt
 #endif
     , m_audioOutput(nullptr)
     , m_audioDevice(nullptr)
@@ -140,7 +140,15 @@ AtariEmulator::~AtariEmulator()
         libatari800_set_disk_activity_callback(nullptr);
     }
     shutdown();
-    
+
+    // Clean up unified audio backend
+#ifdef HAVE_SDL2_AUDIO
+    if (m_unifiedAudio) {
+        delete m_unifiedAudio;
+        m_unifiedAudio = nullptr;
+    }
+#endif
+
 #ifdef HAVE_SDL2_AUDIO
     if (m_sdl2Audio) {
         delete m_sdl2Audio;
@@ -838,9 +846,41 @@ void AtariEmulator::processFrame()
     }
     
     // Disk I/O monitoring is now handled by libatari800 callback
-    
+
 #ifdef HAVE_SDL2_AUDIO
-    // For SDL2 audio, we need to get the audio data here and put it in the ring buffer
+    // Handle audio output based on backend type
+    if (m_audioBackend == UnifiedAudio && m_unifiedAudio && m_audioEnabled) {
+        // Unified Audio Backend - submit audio with priority classification
+        unsigned char* soundBuffer = libatari800_get_sound_buffer();
+        int soundBufferLen = libatari800_get_sound_buffer_len();
+
+        if (soundBuffer && soundBufferLen > 0) {
+            // For now, treat all audio as low priority (background music/game sounds)
+            // High priority would be for UI beeps, key clicks, etc.
+            // TODO: Implement audio classification based on sound source
+            UnifiedAudioBackend::AudioPriority priority = UnifiedAudioBackend::LOW_PRIORITY;
+
+            bool success = m_unifiedAudio->submitAudio(soundBuffer, soundBufferLen, priority);
+            if (!success) {
+                // Buffer overrun - this should be rare with the new architecture
+                static int overrunCount = 0;
+                if (++overrunCount % 100 == 1) {
+                    qDebug() << "Audio buffer overrun #" << overrunCount
+                             << "- buffer fill:" << m_unifiedAudio->getBufferFillPercent() << "%";
+                }
+            }
+
+            // Periodically check performance and adjust latency if needed
+            static int frameCount = 0;
+            if (++frameCount % 300 == 0) {  // Check every 300 frames (~5 seconds)
+                m_unifiedAudio->checkPerformanceAndAdjust();
+                m_unifiedAudio->adjustLatencyForPerformance();
+            }
+        }
+    }
+#endif
+#ifdef HAVE_SDL2_AUDIO
+    // Legacy SDL2 audio backend
     if (m_audioBackend == SDL2Audio && m_sdl2Audio && m_sdl2Audio->isInitialized()) {
         unsigned char* soundBuffer = libatari800_get_sound_buffer();
         int soundBufferLen = libatari800_get_sound_buffer_len();
@@ -893,19 +933,68 @@ void AtariEmulator::processFrame()
                 gap += m_dspBufferBytes;
             }
             
-            // Update emulation speed based on buffer level (Atari800MacX approach)
+            // Conditional speed adjustment - disabled for Windows due to Qt audio issues
+#ifndef _WIN32
             updateEmulationSpeed();
-            
-            // With dynamic speed adjustment, we should never need to skip frames
-            // Always write the audio data
-            if (gap + soundBufferLen > m_dspBufferBytes - 512) {
-                // Buffer too full - this should be rare with speed adjustment
-                static int skipCount = 0;
-                if (++skipCount % 100 == 1) {
-                    qDebug() << "Buffer full despite speed adjustment. Gap:" << gap 
-                             << "Speed:" << m_currentSpeed;
+#endif
+
+            // Platform-specific buffer management
+            int targetGap = m_targetDelay * m_bytesPerSample;  // Target buffer level
+
+#ifdef _WIN32
+            // Windows: Fix underrun issue - buffer is too empty, not too full!
+            // The drops are Qt audio underruns, not our frame drops
+
+            static int frameCount = 0;
+            frameCount++;
+
+            // Log underrun conditions (disabled - audio now stable)
+            // Underruns during window operations are expected/acceptable
+            /*
+            if (gap < targetGap * 0.5) {  // Buffer less than 50% of target
+                static int underrunCount = 0;
+                if (++underrunCount % 100 == 1) {
+                    qDebug() << QString("WINDOWS AUDIO UNDERRUN #%1: Frame %2, Gap: %3 (%4%), Target: %5 - Buffer too low!")
+                                .arg(underrunCount)
+                                .arg(frameCount)
+                                .arg(gap)
+                                .arg(targetGap > 0 ? (gap * 100 / targetGap) : 0)
+                                .arg(targetGap);
                 }
-            } else {
+            }
+            */
+
+            // Windows audio debug (disabled - audio now stable)
+            // Uncomment for troubleshooting if needed
+            /*
+            static int debugCount = 0;
+            if (++debugCount % 100 == 1) {
+                int available = m_dspWritePos - m_dspReadPos;
+                if (available < 0) available += m_dspBufferBytes;
+                int bytesFree = m_audioOutput ? m_audioOutput->bytesFree() : -1;
+                qDebug() << QString("WINDOWS AUDIO DEBUG #%1: Frame %2")
+                            .arg(debugCount).arg(frameCount);
+                qDebug() << QString("  WritePos: %1, ReadPos: %2, Available: %3")
+                            .arg(m_dspWritePos).arg(m_dspReadPos).arg(available);
+                qDebug() << QString("  SoundBufferLen: %1, BytesFree: %2, Gap: %3, Target: %4")
+                            .arg(soundBufferLen).arg(bytesFree).arg(gap).arg(targetGap);
+            }
+            */
+
+            // Always write audio data - we need MORE data, not less
+            // Never drop frames - the problem is underruns, not overruns
+#else
+            // macOS/Linux: Use adaptive system (keep original behavior)
+            if (gap > targetGap * 3) {
+                static int warnCount = 0;
+                if (++warnCount % 200 == 1) {
+                    qDebug() << "Audio buffer high #" << warnCount << "Gap:" << gap << "Target:" << targetGap << "- continuing to write";
+                }
+            }
+
+            // Always write audio data - use ring buffer overwrite if needed
+#endif
+            {
                 // Write to DSP buffer
                 int newPos = m_dspWritePos + soundBufferLen;
                 if (newPos / m_dspBufferBytes == m_dspWritePos / m_dspBufferBytes) {
@@ -936,12 +1025,24 @@ void AtariEmulator::processFrame()
             }
             
             int bytesFree = m_audioOutput->bytesFree();
-            
-            // More aggressive writing - write as much as possible to keep buffer from filling
+
+            // Platform-specific writing strategy
+#ifdef _WIN32
+            // Windows: Write in period-size chunks to match Qt's preferred rhythm
+            int periodSize = m_audioOutput->periodSize();
             int toWrite = qMin(available, bytesFree);
-            
-            // Always write if we have data and space
-            if (toWrite > 0) {
+
+            // Only write if we have at least a period-size worth of data
+            if (toWrite >= periodSize && available >= periodSize) {
+                // Round down to period-size multiple for optimal Qt performance
+                toWrite = (toWrite / periodSize) * periodSize;
+#else
+            // macOS/Linux: Aggressive writing for low latency
+            int toWrite = qMin(available, bytesFree);
+
+            // Always try to write if there's any space available
+            if (toWrite > 0 && available > 0) {
+#endif
                 // Read from DSP buffer and write to audio device
                 int newReadPos = m_dspReadPos + toWrite;
                 if (newReadPos / m_dspBufferBytes == m_dspReadPos / m_dspBufferBytes) {
@@ -1482,6 +1583,39 @@ QString AtariEmulator::quotePath(const QString& path)
 void AtariEmulator::setupAudio()
 {
 #ifdef HAVE_SDL2_AUDIO
+    // Unified Audio Backend (preferred when SDL2 is available)
+    if (m_audioBackend == UnifiedAudio) {
+        qDebug() << "Setting up Unified Audio Backend for optimal cross-platform performance...";
+
+        // Get audio parameters from libatari800
+        int sampleRate = libatari800_get_sound_frequency();
+        int channels = libatari800_get_num_sound_channels();
+        int sampleSize = libatari800_get_sound_sample_size();
+
+        qDebug() << "Audio parameters from libatari800:";
+        qDebug() << "  Sample rate:" << sampleRate << "Hz";
+        qDebug() << "  Channels:" << channels;
+        qDebug() << "  Sample size:" << sampleSize << "bytes";
+
+        // Create unified audio backend if not created
+        if (!m_unifiedAudio) {
+            m_unifiedAudio = new UnifiedAudioBackend(this);
+        }
+
+        // Initialize with optimal settings for each platform
+        if (m_unifiedAudio->initialize(sampleRate, channels, sampleSize)) {
+            qDebug() << "Unified Audio Backend initialized successfully";
+            qDebug() << "  Actual latency:" << m_unifiedAudio->getLatencyMs() << "ms";
+            qDebug() << "  Buffer size optimized for platform";
+            return;  // Successfully initialized, skip Qt audio setup
+        } else {
+            qWarning() << "Failed to initialize Unified Audio Backend, falling back to Qt audio";
+            m_audioBackend = QtAudio;
+            // Fall through to Qt audio setup
+        }
+    }
+#endif
+#ifdef HAVE_SDL2_AUDIO
     if (m_audioBackend == SDL2Audio) {
         qDebug() << "Setting up SDL2 audio backend for low latency...";
         
@@ -1595,16 +1729,18 @@ void AtariEmulator::setupAudio()
             });
             
             qDebug() << "SDL2 audio backend initialized with latency:" << m_sdl2Audio->getLatencyMs() << "ms";
-            return;
+            return;  // Successfully initialized, skip Qt audio setup
         } else {
             qDebug() << "Failed to initialize SDL2 audio, falling back to Qt audio";
             m_audioBackend = QtAudio;
+            // Fall through to Qt audio setup
         }
     }
 #endif
 
     // Qt audio backend setup (original double-buffered implementation)
-    qDebug() << "Setting up Qt double-buffered audio output...";
+    if (m_audioBackend == QtAudio) {
+        qDebug() << "Setting up Qt double-buffered audio output...";
     
     // Get audio parameters from libatari800
     m_sampleRate = libatari800_get_sound_frequency();
@@ -1634,9 +1770,9 @@ void AtariEmulator::setupAudio()
     
     // Calculate fragment size and buffer parameters (like Atari800MacX)
 #ifdef _WIN32
-    // Windows needs larger buffers due to higher audio latency
-    m_fragmentSize = 1024; // Larger fragments for Windows (~23ms at 44100Hz)
-    int targetDelayMs = 60;  // More headroom for Windows audio system
+    // Windows Qt audio works best with smaller buffer - add headroom for window operations
+    m_fragmentSize = 1024; // Larger fragments for better Qt audio stability (~23ms at 44100Hz)
+    int targetDelayMs = 30;   // Slight headroom for UI operations (drag/resize)
 #else
     // macOS/Linux can use smaller buffers for lower latency
     m_fragmentSize = 512; // Smaller fragments for more responsive audio
@@ -1650,7 +1786,11 @@ void AtariEmulator::setupAudio()
     // Buffer needs to be large enough to absorb this while we wait for consumption
     m_targetDelay = (m_sampleRate * targetDelayMs) / 1000;  // Convert to samples
     // Use a larger buffer to handle the accumulation
-    int dspBufferSamples = m_fragmentSize * 10;  // Large buffer to handle rate mismatch
+#ifdef _WIN32
+    int dspBufferSamples = m_fragmentSize * 20;  // Extra large buffer for Windows audio consumption
+#else
+    int dspBufferSamples = m_fragmentSize * 10;  // Standard buffer for macOS/Linux
+#endif
     m_dspBufferBytes = dspBufferSamples * m_bytesPerSample;
     
     // Initialize the DSP buffer
@@ -1659,7 +1799,12 @@ void AtariEmulator::setupAudio()
     
     // Initialize positions
     m_dspReadPos = 0;
+#ifdef _WIN32
+    // Windows works best with lower initial buffer matching the working pattern
+    m_dspWritePos = (m_targetDelay * 1.0) * m_bytesPerSample;  // Start with target delay (matches 15% pattern)
+#else
     m_dspWritePos = m_targetDelay * m_bytesPerSample;  // Start with target delay
+#endif
     m_callbackTick = 0;
     m_avgGap = 0.0;
     
@@ -1673,24 +1818,29 @@ void AtariEmulator::setupAudio()
     // Create and configure audio output
     m_audioOutput = new QAudioOutput(format, this);
     
-    // Set Qt buffer size - Windows needs larger buffers
+    // Use platform-optimized Qt buffer size
 #ifdef _WIN32
-    // Windows needs larger buffer to prevent underruns
-    m_audioOutput->setBufferSize(8192);  // Larger buffer for Windows stability
-    qDebug() << "Using Windows-optimized audio buffer: 8192 bytes";
+    m_audioOutput->setBufferSize(8192);  // Much larger buffer to slow down Qt audio consumption
+    qDebug() << "Using Windows high-latency Qt buffer: 8192 bytes";
 #else
-    // macOS/Linux can use smaller buffer for lower latency
-    m_audioOutput->setBufferSize(2048);  // Small buffer for frequent reads
+    m_audioOutput->setBufferSize(2048);  // Balanced buffer for macOS/Linux
+    qDebug() << "Using balanced Qt buffer for stable audio: 2048 bytes";
 #endif
     
-    // Set notification interval to match frame rate
+    // Set notification interval
+#ifdef _WIN32
+    // Windows: Use much larger interval to slow down Qt audio processing
+    int notifyMs = 50;  // Process audio chunks less frequently
+#else
+    // macOS/Linux: Match frame rate for responsiveness
     int notifyMs = (m_videoSystem == "-ntsc") ? 16 : 20;  // 60Hz or 50Hz
+#endif
     m_audioOutput->setNotifyInterval(notifyMs);
     
     // Set category for optimal performance
 #ifdef _WIN32
-    // Windows: Use media category for better compatibility
-    m_audioOutput->setCategory("media");
+    // Windows: Use music category for higher latency/buffering
+    m_audioOutput->setCategory("music");
 #else
     // macOS/Linux: Use game category for lower latency
     m_audioOutput->setCategory("game");
@@ -1722,6 +1872,7 @@ void AtariEmulator::setupAudio()
         qDebug() << "Failed to start audio output";
         m_audioEnabled = false;
     }
+    }  // End of QtAudio backend setup
 }
 
 void AtariEmulator::enableAudio(bool enabled)
@@ -1731,24 +1882,38 @@ void AtariEmulator::enableAudio(bool enabled)
         
         if (enabled) {
 #ifdef HAVE_SDL2_AUDIO
+            if (m_audioBackend == UnifiedAudio) {
+                if (!m_unifiedAudio) {
+                    setupAudio();
+                } else {
+                    m_unifiedAudio->resume();
+                }
+            }
+#endif
+#ifdef HAVE_SDL2_AUDIO
             if (m_audioBackend == SDL2Audio) {
                 if (!m_sdl2Audio || !m_sdl2Audio->isInitialized()) {
                     setupAudio();
                 } else {
                     m_sdl2Audio->resume();
                 }
-            } else
+            }
 #endif
-            if (!m_audioOutput) {
+            if (!m_audioOutput && m_audioBackend == QtAudio) {
                 setupAudio();
             }
         } else {
 #ifdef HAVE_SDL2_AUDIO
+            if (m_audioBackend == UnifiedAudio && m_unifiedAudio) {
+                m_unifiedAudio->pause();
+            }
+#endif
+#ifdef HAVE_SDL2_AUDIO
             if (m_audioBackend == SDL2Audio && m_sdl2Audio) {
                 m_sdl2Audio->pause();
-            } else
+            }
 #endif
-            if (m_audioOutput) {
+            if (m_audioOutput && m_audioBackend == QtAudio) {
                 m_audioOutput->stop();
                 delete m_audioOutput;
                 m_audioOutput = nullptr;
@@ -1766,12 +1931,18 @@ void AtariEmulator::enableAudio(bool enabled)
 void AtariEmulator::setVolume(float volume)
 {
 #ifdef HAVE_SDL2_AUDIO
+    if (m_audioBackend == UnifiedAudio && m_unifiedAudio) {
+        m_unifiedAudio->setVolume(volume);
+        qDebug() << "Unified audio volume set to:" << volume;
+    }
+#endif
+#ifdef HAVE_SDL2_AUDIO
     if (m_audioBackend == SDL2Audio && m_sdl2Audio) {
         m_sdl2Audio->setVolume(volume);
         qDebug() << "SDL2 audio volume set to:" << volume;
-    } else
+    }
 #endif
-    if (m_audioOutput) {
+    if (m_audioOutput && m_audioBackend == QtAudio) {
         m_audioOutput->setVolume(qBound(0.0f, volume, 1.0f));
         qDebug() << "Qt audio volume set to:" << volume;
     }
@@ -2321,17 +2492,17 @@ double AtariEmulator::calculateSpeedAdjustment()
         double speedAdjustment = 0.0;
         
 #ifdef _WIN32
-        // Windows: Use gentler speed adjustments to avoid audio artifacts
-        if (m_avgGap > 100) {
+        // Windows: Use gentler speed adjustments with larger buffer thresholds
+        if (m_avgGap > 150) {
             // Buffer very low, speed up moderately
             speedAdjustment = 0.03;
-        } else if (m_avgGap > 40) {
+        } else if (m_avgGap > 60) {
             // Buffer low, speed up slightly
             speedAdjustment = 0.015;
-        } else if (m_avgGap < -100) {
+        } else if (m_avgGap < -150) {
             // Buffer very full, slow down moderately
             speedAdjustment = -0.03;
-        } else if (m_avgGap < -40) {
+        } else if (m_avgGap < -60) {
             // Buffer full, slow down slightly
             speedAdjustment = -0.015;
         }

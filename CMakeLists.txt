@@ -78,16 +78,16 @@ endif()
 # Find Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
-# Find SDL2 for audio backend and joystick support
+# Find SDL2 for unified audio backend and joystick support (optional)
 find_package(SDL2 QUIET)
 if(SDL2_FOUND)
-    message(STATUS "SDL2 found - SDL2 audio backend and joystick support will be available")
+    message(STATUS "SDL2 found - Unified audio backend and joystick support will be available")
     set(HAVE_SDL2_AUDIO ON)
     set(HAVE_SDL2_JOYSTICK ON)
     # Store SDL2 libraries for later use
     set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
 else()
-    message(STATUS "SDL2 not found - using Qt audio backend only, no real joystick support")
+    message(STATUS "SDL2 not found - using Qt audio backend only, no unified audio backend or real joystick support")
     set(HAVE_SDL2_AUDIO OFF)
     set(HAVE_SDL2_JOYSTICK OFF)
     set(SDL2_LIBRARIES "")
@@ -237,6 +237,7 @@ set(SOURCES
     src/mainwindow.cpp
     src/emulatorwidget.cpp
     src/atariemulator.cpp
+    $<$<BOOL:${HAVE_SDL2_AUDIO}>:src/unifiedaudiobackend.cpp>
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:src/sdl2audiobackend.cpp>
     $<$<BOOL:${HAVE_SDL2_JOYSTICK}>:src/sdl2joystickmanager.cpp>
     src/toggleswitch.cpp
@@ -261,6 +262,7 @@ set(HEADERS
     include/mainwindow.h
     include/emulatorwidget.h
     include/atariemulator.h
+    $<$<BOOL:${HAVE_SDL2_AUDIO}>:include/unifiedaudiobackend.h>
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:include/sdl2audiobackend.h>
     $<$<BOOL:${HAVE_SDL2_JOYSTICK}>:include/sdl2joystickmanager.h>
     include/toggleswitch.h
@@ -368,7 +370,7 @@ target_link_libraries(${PROJECT_NAME}
     -lm
 )
 
-# Link SDL2 only if available (for audio backend and/or joystick support)
+# Link SDL2 only if available (for unified audio backend and/or joystick support)
 if(HAVE_SDL2_AUDIO OR HAVE_SDL2_JOYSTICK)
     if(TARGET SDL2::SDL2)
         target_link_libraries(${PROJECT_NAME} SDL2::SDL2)

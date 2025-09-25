@@ -30,6 +30,9 @@
 class SDL2AudioBackend;
 #endif
 
+// Forward declaration for unified audio backend
+class UnifiedAudioBackend;
+
 #ifdef HAVE_SDL2_JOYSTICK
 // Forward declaration for joystick manager
 class SDL2JoystickManager;
@@ -185,8 +188,9 @@ public:
     
     // Audio backend selection
     enum AudioBackend {
-        QtAudio,
-        SDL2Audio
+        QtAudio,          // Legacy Qt audio (deprecated)
+        SDL2Audio,        // Legacy SDL2 audio (deprecated)
+        UnifiedAudio      // New unified audio backend
     };
     void setAudioBackend(AudioBackend backend);
     AudioBackend getAudioBackend() const { return m_audioBackend; }
@@ -388,18 +392,21 @@ private:
     double m_targetSpeed;   // Target speed based on buffer level
     static constexpr double SPEED_ADJUSTMENT_ALPHA = 0.1;  // Smoothing factor
     
+    // Unified Audio Backend (new implementation)
+    UnifiedAudioBackend* m_unifiedAudio;
+
 #ifdef HAVE_SDL2_AUDIO
-    // SDL2 Audio backend
+    // SDL2 Audio backend (legacy)
     SDL2AudioBackend* m_sdl2Audio;
-    
-    // SDL2 audio ring buffer
+
+    // SDL2 audio ring buffer (legacy)
     QByteArray m_sdl2AudioBuffer;
     int m_sdl2WritePos;
     int m_sdl2ReadPos;
     QMutex m_sdl2AudioMutex;
     static const int SDL2_BUFFER_SIZE = 32768;  // 32KB ring buffer for better stability
-    
-    // Dynamic buffer management
+
+    // Dynamic buffer management (legacy)
     int m_sdl2TargetBufferLevel;  // Target amount of data to maintain in buffer
     int m_sdl2BufferLevelAccum;   // Accumulator for averaging buffer level
     int m_sdl2BufferLevelCount;   // Count for averaging
