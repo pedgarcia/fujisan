@@ -125,7 +125,6 @@ AtariEmulator::AtariEmulator(QObject *parent)
     // Initialize SDL2 joystick manager
     m_joystickManager = new SDL2JoystickManager(this);
     if (m_joystickManager->initialize()) {
-        qDebug() << "SDL2 joystick subsystem initialized successfully";
     } else {
         qWarning() << "Failed to initialize SDL2 joystick subsystem";
     }
@@ -198,19 +197,16 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     argList << videoSystem;    // -ntsc or -pal
     
     // Add artifact settings - only supported modes for current build
-    qDebug() << "Artifact mode requested:" << artifactMode;
     if (artifactMode != "none") {
         if (videoSystem == "-ntsc") {
             // Only ntsc-old and ntsc-new are supported (ntsc-full disabled in build)
             if (artifactMode == "ntsc-old" || artifactMode == "ntsc-new") {
                 argList << "-ntsc-artif" << artifactMode;
-                qDebug() << "Adding NTSC artifact parameters:" << "-ntsc-artif" << artifactMode;
             }
         } else if (videoSystem == "-pal") {
             // Map NTSC artifact modes to PAL simple (pal-blend disabled in build)
             if (artifactMode == "ntsc-old" || artifactMode == "ntsc-new") {
                 argList << "-pal-artif" << "pal-simple";
-                qDebug() << "Adding PAL artifact parameters:" << "-pal-artif" << "pal-simple";
             }
         }
     }
@@ -232,11 +228,6 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     // LIMITATION: Display configuration parameters are NOT supported by libatari800
     // These parameters are only available in the full SDL build of atari800, not in the minimal libatari800 library.
     // The UI controls are preserved for future compatibility when we migrate to full SDL build.
-    qDebug() << "=== SCREEN DISPLAY CONFIGURATION ===";
-    qDebug() << "Display settings - HArea:" << horizontalArea << "VArea:" << verticalArea 
-             << "HShift:" << horizontalShift << "VShift:" << verticalShift 
-             << "Fit:" << fitScreen << "80Col:" << show80Column << "VSync:" << vSyncEnabled;
-    qDebug() << "WARNING: libatari800 does not support display parameters - controls saved but not applied to emulator";
     
     // TODO: Display parameters - commented out because libatari800 doesn't support them
     // These would work with full SDL atari800 build:
@@ -248,7 +239,6 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     // if (show80Column) argList << "-80column"; else argList << "-no-80column";
     // if (vSyncEnabled) argList << "-vsync"; else argList << "-no-vsync";
     
-    qDebug() << "=== END SCREEN DISPLAY CONFIGURATION ===";
     
     // Add audio configuration
     if (m_audioEnabled) {
@@ -258,9 +248,6 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         QSettings settings("8bitrelics", "Fujisan");
         int audioFreq = settings.value("audio/frequency", 44100).toInt();
         argList << "-dsprate" << QString::number(audioFreq);
-        qDebug() << "*** AUDIO CONFIGURATION ***";
-        qDebug() << "Using audio sample rate:" << audioFreq << "Hz";
-        qDebug() << "Expected bytes/frame at" << audioFreq << "Hz:" << (audioFreq * 2 / 60) << "bytes";
         
         // At 22050Hz, we generate half the data:
         // 22050 * 2 bytes / 59.92fps = 736 bytes/frame (instead of 1472)
@@ -274,14 +261,9 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         argList << "-nosound";
     }
     
-    qDebug() << "[ROM CONFIG] Altirra OS enabled:" << m_altirraOSEnabled;
-    qDebug() << "[ROM CONFIG] Altirra BASIC enabled:" << m_altirraBASICEnabled;
-    qDebug() << "[ROM CONFIG] OS ROM path:" << (m_osRomPath.isEmpty() ? "(not set)" : m_osRomPath);
-    qDebug() << "[ROM CONFIG] BASIC ROM path:" << (m_basicRomPath.isEmpty() ? "(not set)" : m_basicRomPath);
     
     // Configure OS ROM (Altirra or External)
     if (m_altirraOSEnabled) {
-        qDebug() << "[ROM LOAD] Using built-in Altirra OS ROM";
         if (machineType == "-5200") {
             argList << "-5200-rev" << "altirra";
         } else if (machineType == "-atari") {
@@ -290,24 +272,18 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
             argList << "-xl-rev" << "altirra";
         }
     } else {
-        qDebug() << "[ROM LOAD] Attempting to use external OS ROM from user settings";
         // Only add ROM paths if they are specified in settings
         if (!m_osRomPath.isEmpty()) {
             if (machineType == "-5200") {
-                qDebug() << "[ROM LOAD] Loading 5200 OS ROM from:" << m_osRomPath;
                 argList << "-5200_rom" << m_osRomPath;
             } else if (machineType == "-atari") {
-                qDebug() << "[ROM LOAD] Loading 800 OS-B ROM from:" << m_osRomPath;
                 argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
             } else {
                 // For XL/XE machines
-                qDebug() << "[ROM LOAD] Loading XL/XE OS ROM from:" << m_osRomPath;
                 argList << "-xlxe_rom" << m_osRomPath;
             }
         } else {
-            qDebug() << "[ROM LOAD WARNING] No OS ROM path specified, falling back to Altirra OS";
             // Fallback to Altirra OS if no external ROM is specified
-            qDebug() << "[ROM LOAD] Falling back to built-in Altirra OS ROM";
             if (machineType == "-5200") {
                 argList << "-5200-rev" << "altirra";
             } else if (machineType == "-atari") {
@@ -321,16 +297,12 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     // Configure BASIC ROM (Altirra, External, or None)
     if (basicEnabled) {
         if (m_altirraBASICEnabled) {
-            qDebug() << "[ROM LOAD] Using built-in Altirra BASIC ROM";
             argList << "-basic-rev" << "altirra";
         } else {
-            qDebug() << "[ROM LOAD] Attempting to use external BASIC ROM";
             if (!m_basicRomPath.isEmpty()) {
                 QString quotedBasicPath = quotePath(m_basicRomPath);
-                qDebug() << "[ROM LOAD] Loading BASIC ROM from:" << m_basicRomPath << "-> quoted:" << quotedBasicPath;
                 argList << "-basic_rom" << quotedBasicPath;
             } else {
-                qDebug() << "[ROM LOAD WARNING] No BASIC ROM path specified, falling back to Altirra BASIC";
                 argList << "-basic-rev" << "altirra";
             }
         }
@@ -351,52 +323,32 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     }
     args[argBytes.size()] = nullptr;
     
-    qDebug() << "=== COMPLETE COMMAND LINE ===";
-    qDebug() << "Full atari800 command line:" << argList.join(" ");
-    qDebug() << "Number of arguments:" << argBytes.size();
-    qDebug() << "Note: Display parameters excluded due to libatari800 limitations";
     
     // Force complete libatari800 reset to clear any persistent ROM state
     // This ensures ROM configuration changes are applied properly
     static bool libatari800_previously_initialized = false;
     if (libatari800_previously_initialized) {
-        qDebug() << "Forcing libatari800 reset to clear ROM state...";
         libatari800_exit();
-        qDebug() << "libatari800 reset complete, reinitializing...";
     } else {
-        qDebug() << "First libatari800 initialization, skipping reset...";
     }
     
     if (libatari800_init(argBytes.size(), args.data())) {
         libatari800_previously_initialized = true;  // Mark as initialized for future resets
-        qDebug() << "✓ Emulator initialized successfully";
-        qDebug() << "  Display settings saved to profile but not applied (requires full SDL atari800)";
         
         // Verify ROM loading status
-        qDebug() << "=== ROM LOADING VERIFICATION ===";
         if (!m_altirraOSEnabled && !m_osRomPath.isEmpty()) {
-            qDebug() << "Expected: External OS ROM from" << m_osRomPath;
-            qDebug() << "libatari800 should have loaded external ROM, not Altirra fallback";
         } else if (m_altirraOSEnabled) {
-            qDebug() << "Expected: Built-in Altirra OS ROM (as configured)";
         } else {
-            qDebug() << "Expected: Fallback to Altirra OS (no external ROM path provided)";
         }
         
         if (basicEnabled && !m_altirraBASICEnabled && !m_basicRomPath.isEmpty()) {
-            qDebug() << "Expected: External BASIC ROM from" << m_basicRomPath;
         } else if (basicEnabled && m_altirraBASICEnabled) {
-            qDebug() << "Expected: Built-in Altirra BASIC ROM (as configured)";
         }
-        qDebug() << "ROM verification complete - if no 'Error opening' messages above, ROM loading succeeded";
-        qDebug() << "=================================\n";
         m_targetFps = libatari800_get_fps();
         m_frameTimeMs = 1000.0f / m_targetFps;
-        qDebug() << "Target FPS:" << m_targetFps << "Frame time:" << m_frameTimeMs << "ms";
         
         // Set up the disk activity callback for hardware-level monitoring
         libatari800_set_disk_activity_callback(diskActivityCallback);
-        qDebug() << "✓ Disk activity callback registered with libatari800";
         
         // Debug SIO patch status to investigate disk speed changes
         debugSIOPatchStatus();
@@ -411,7 +363,6 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         return true;
     }
     
-    qDebug() << "✗ Failed to initialize emulator with:" << argList.join(" ");
     return false;
 }
 
@@ -420,7 +371,6 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
                                             const QString& fitScreen, bool show80Column, bool vSyncEnabled,
                                             bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks, bool netSIOEnabled)
 {
-    qDebug() << "Initializing emulator with input config - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
     
     // Store display system and input configuration
     m_machineType = machineType;
@@ -436,36 +386,28 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     argList << videoSystem;    // -ntsc or -pal
     
     // Configure keyboard joystick emulation based on settings
-    qDebug() << "=== KEYBOARD JOYSTICK CONFIGURATION ===" ;
     // NOTE: libatari800 minimal build doesn't support -kbdjoy0/-kbdjoy1 arguments
     // These cause "Error opening" messages and break command line parsing
     // Keyboard joystick functionality is handled via direct key injection instead
     if (kbdJoy0Enabled) {
-        qDebug() << "Keyboard joystick 0 enabled (handled via Qt key events, not libatari800 args)";
     } else {
-        qDebug() << "Disabled keyboard joystick 0";
     }
     
     if (kbdJoy1Enabled) {
-        qDebug() << "Keyboard joystick 1 enabled (handled via Qt key events, not libatari800 args)";
     } else {
-        qDebug() << "Disabled keyboard joystick 1";
     }
     
     // Add artifact settings - only supported modes for current build
-    qDebug() << "Artifact mode requested:" << artifactMode;
     if (artifactMode != "none") {
         if (videoSystem == "-ntsc") {
             // Only ntsc-old and ntsc-new are supported (ntsc-full disabled in build)
             if (artifactMode == "ntsc-old" || artifactMode == "ntsc-new") {
                 argList << "-ntsc-artif" << artifactMode;
-                qDebug() << "Adding NTSC artifact parameters:" << "-ntsc-artif" << artifactMode;
             }
         } else if (videoSystem == "-pal") {
             // Map NTSC artifact modes to PAL simple (pal-blend disabled in build)
             if (artifactMode == "ntsc-old" || artifactMode == "ntsc-new") {
                 argList << "-pal-artif" << "pal-simple";
-                qDebug() << "Adding PAL artifact parameters:" << "-pal-artif" << "pal-simple";
             }
         }
     }
@@ -479,9 +421,6 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         QSettings settings("8bitrelics", "Fujisan");
         int audioFreq = settings.value("audio/frequency", 44100).toInt();
         argList << "-dsprate" << QString::number(audioFreq);
-        qDebug() << "*** AUDIO CONFIGURATION ***";
-        qDebug() << "Using audio sample rate:" << audioFreq << "Hz";
-        qDebug() << "Expected bytes/frame at" << audioFreq << "Hz:" << (audioFreq * 2 / 60) << "bytes";
         
         argList << "-audio16";
         argList << "-volume" << "80";
@@ -493,11 +432,9 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     
     // Configure OS ROM (Altirra or External)
     if (m_altirraOSEnabled) {
-        qDebug() << "[ROM LOAD] Using built-in Altirra OS ROM";
         // Use built-in Altirra OS for all machine types
         argList << "-xl-rev" << "altirra";
     } else {
-        qDebug() << "[ROM LOAD] Attempting to use external OS ROM from user settings";
         if (!m_osRomPath.isEmpty()) {
             // Use the correct parameter based on machine type
             QString quotedOSPath = quotePath(m_osRomPath);
@@ -509,11 +446,8 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
                 // For XL/XE machines
                 argList << "-xlxe_rom" << quotedOSPath;
             }
-            qDebug() << "Adding OS ROM path:" << m_osRomPath << "-> quoted:" << quotedOSPath;
         } else {
-            qDebug() << "[ROM LOAD WARNING] No OS ROM path specified, falling back to Altirra OS";
             // Fallback to Altirra OS if no external ROM is specified
-            qDebug() << "[ROM LOAD] Falling back to built-in Altirra OS ROM";
             if (machineType == "-5200") {
                 argList << "-5200-rev" << "altirra";
             } else if (machineType == "-atari") {
@@ -527,16 +461,12 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     // Configure BASIC ROM (Altirra, External, or None)
     if (basicEnabled) {
         if (m_altirraBASICEnabled) {
-            qDebug() << "[ROM LOAD] Using built-in Altirra BASIC ROM";
             argList << "-basic-rev" << "altirra";
         } else {
-            qDebug() << "[ROM LOAD] Attempting to use external BASIC ROM";
             if (!m_basicRomPath.isEmpty()) {
                 QString quotedBasicPath = quotePath(m_basicRomPath);
-                qDebug() << "[ROM LOAD] Loading BASIC ROM from:" << m_basicRomPath << "-> quoted:" << quotedBasicPath;
                 argList << "-basic_rom" << quotedBasicPath;
             } else {
-                qDebug() << "[ROM LOAD WARNING] No BASIC ROM path specified, falling back to Altirra BASIC";
                 argList << "-basic-rev" << "altirra";
             }
         }
@@ -548,7 +478,6 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     // Add NetSIO support if enabled
     if (netSIOEnabled) {
         argList << "-netsio";
-        qDebug() << "Adding NetSIO command line argument: -netsio";
     }
     
     // Initialize printer support - DISABLED (P: device not working in atari800 core)
@@ -560,14 +489,12 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         // Enable P: device before atari800 core initialization
         extern int Devices_enable_p_patch;
         Devices_enable_p_patch = 1;
-        qDebug() << "Printer enabled - setting Devices_enable_p_patch = 1 before core initialization";
     }
     */
     bool printerEnabled = false; // Force disabled
     
     // Add device debugging to help troubleshoot P: device issues
     argList << "-devbug";
-    qDebug() << "Adding device debugging: -devbug";
     
     // Convert QStringList to char* array
     QList<QByteArray> argBytes;
@@ -581,67 +508,43 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     }
     args[argBytes.size()] = nullptr;
     
-    qDebug() << "=== COMPLETE COMMAND LINE WITH INPUT SETTINGS ===" ;
-    qDebug() << "Full atari800 command line:" << argList.join(" ");
-    qDebug() << "Number of arguments:" << argBytes.size();
-    qDebug() << "Keyboard Joystick 0 (Numpad + RCtrl):" << (kbdJoy0Enabled ? "ENABLED" : "DISABLED");
-    qDebug() << "Keyboard Joystick 1 (WASD + LCtrl):" << (kbdJoy1Enabled ? "ENABLED" : "DISABLED");
     
     // Force complete libatari800 reset to clear any persistent ROM state
     // This ensures ROM configuration changes are applied properly
     static bool libatari800_previously_initialized = false;
     if (libatari800_previously_initialized) {
-        qDebug() << "Forcing libatari800 reset to clear ROM state...";
         libatari800_exit();
-        qDebug() << "libatari800 reset complete, reinitializing...";
     } else {
-        qDebug() << "First libatari800 initialization, skipping reset...";
     }
     
     if (libatari800_init(argBytes.size(), args.data())) {
         libatari800_previously_initialized = true;  // Mark as initialized for future resets
-        qDebug() << "✓ Emulator initialized successfully with input settings";
         
         // Verify ROM loading status
-        qDebug() << "=== ROM LOADING VERIFICATION ===";
         if (!m_altirraOSEnabled && !m_osRomPath.isEmpty()) {
-            qDebug() << "Expected: External OS ROM from" << m_osRomPath;
-            qDebug() << "libatari800 should have loaded external ROM, not Altirra fallback";
         } else if (m_altirraOSEnabled) {
-            qDebug() << "Expected: Built-in Altirra OS ROM (as configured)";
         } else {
-            qDebug() << "Expected: Fallback to Altirra OS (no external ROM path provided)";
         }
         
         if (basicEnabled && !m_altirraBASICEnabled && !m_basicRomPath.isEmpty()) {
-            qDebug() << "Expected: External BASIC ROM from" << m_basicRomPath;
         } else if (basicEnabled && m_altirraBASICEnabled) {
-            qDebug() << "Expected: Built-in Altirra BASIC ROM (as configured)";
         }
-        qDebug() << "ROM verification complete - if no 'Error opening' messages above, ROM loading succeeded";
-        qDebug() << "=================================\n";
         
 #ifdef GUI_SDL
         // Check actual keyboard joystick state after initialization
         extern int PLATFORM_IsKbdJoystickEnabled(int num);
         bool actualKbdJoy0 = PLATFORM_IsKbdJoystickEnabled(0);
         bool actualKbdJoy1 = PLATFORM_IsKbdJoystickEnabled(1);
-        qDebug() << "=== ACTUAL KEYBOARD JOYSTICK STATE AFTER INIT ===";
-        qDebug() << "Requested KbdJoy0:" << kbdJoy0Enabled << "-> Actual:" << actualKbdJoy0;
-        qDebug() << "Requested KbdJoy1:" << kbdJoy1Enabled << "-> Actual:" << actualKbdJoy1;
         
         if (actualKbdJoy0 != kbdJoy0Enabled || actualKbdJoy1 != kbdJoy1Enabled) {
-            qDebug() << "WARNING: Keyboard joystick state mismatch after init!";
         }
 #endif
         
         m_targetFps = libatari800_get_fps();
         m_frameTimeMs = 1000.0f / m_targetFps;
-        qDebug() << "Target FPS:" << m_targetFps << "Frame time:" << m_frameTimeMs << "ms";
         
         // Set up the disk activity callback for hardware-level monitoring
         libatari800_set_disk_activity_callback(diskActivityCallback);
-        qDebug() << "✓ Disk activity callback registered with libatari800";
         
         // Set up printer if enabled - DISABLED
         /*
@@ -652,9 +555,7 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
             Devices_SetPrintCommand(fujisanPrintCommand.toUtf8().constData());
             
             // Explicitly patch the OS to install P: device handlers
-            qDebug() << "Installing P: device handlers via ESC_PatchOS()...";
             ESC_PatchOS();
-            qDebug() << "✓ Printer callback configured and P: device handlers installed";
         }
         */
         
@@ -668,7 +569,6 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         return true;
     }
     
-    qDebug() << "✗ Failed to initialize emulator with input settings:" << argList.join(" ");
     return false;
 }
 
@@ -678,7 +578,6 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
                                              bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks,
                                              bool netSIOEnabled, bool rtimeEnabled)
 {
-    qDebug() << "Initializing emulator with NetSIO config - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
     
     // CRITICAL: NetSIO/FujiNet requires BASIC to be disabled for proper booting
     bool actualBasicEnabled = basicEnabled;
@@ -686,9 +585,6 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
         actualBasicEnabled = false;
         // Update the emulator's internal BASIC state to reflect the auto-disable
         setBasicEnabled(false);
-        qDebug() << "*** AUTOMATICALLY DISABLING BASIC FOR FUJINET ***";
-        qDebug() << "NetSIO/FujiNet requires BASIC disabled to boot from network devices";
-        qDebug() << "Original BASIC setting:" << basicEnabled << "-> Using:" << actualBasicEnabled;
     } else {
         // Ensure emulator's internal state matches the requested setting when NetSIO is disabled
         setBasicEnabled(basicEnabled);
@@ -707,11 +603,9 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
     
     // NetSIO is now initialized by atari800 core via -netsio command line argument
     if (netSIOEnabled) {
-        qDebug() << "NetSIO enabled via command line argument - setting up delayed restart mechanism";
         
         // CRITICAL: Dismount all local disks to give FujiNet boot priority
         // When NetSIO is enabled, FujiNet devices should take precedence over local ATR files
-        qDebug() << "Dismounting local disks to give FujiNet boot priority";
         for (int i = 1; i <= 8; i++) {
             dismountDiskImage(i);
         }
@@ -719,19 +613,16 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
         // Use delayed restart mechanism like Atari800MacX for proper FujiNet timing
         m_fujinet_restart_pending = true;
         m_fujinet_restart_delay = 60; // Wait 60 frames (~1 second) 
-        qDebug() << "FujiNet delayed restart set: 60 frames";
         
         // Send test command to verify NetSIO communication with FujiNet-PC
 #ifdef NETSIO
         extern void netsio_test_cmd(void);
         netsio_test_cmd();
-        qDebug() << "NetSIO test command sent to FujiNet-PC";
 #endif
     }
     
     // Enable R-Time 8 if requested
     if (rtimeEnabled) {
-        qDebug() << "Enabling R-Time 8 real-time clock...";
         extern int RTIME_enabled;
         RTIME_enabled = 1;
     }
@@ -751,13 +642,10 @@ void AtariEmulator::processFrame()
     if (m_fujinet_restart_pending && m_fujinet_restart_delay > 0) {
         m_fujinet_restart_delay--;
         if (m_fujinet_restart_delay == 10) { // Debug at 10 frames remaining
-            qDebug() << "FujiNet delayed restart countdown:" << m_fujinet_restart_delay << "frames remaining";
         }
         if (m_fujinet_restart_delay == 0) {
-            qDebug() << "Triggering delayed FujiNet machine initialization";
             Atari800_InitialiseMachine();  // Function already declared in atari.h
             m_fujinet_restart_pending = false;
-            qDebug() << "FujiNet delayed machine initialization completed";
         }
     }
 
@@ -865,7 +753,6 @@ void AtariEmulator::processFrame()
                 // Buffer overrun - this should be rare with the new architecture
                 static int overrunCount = 0;
                 if (++overrunCount % 100 == 1) {
-                    qDebug() << "Audio buffer overrun #" << overrunCount
                              << "- buffer fill:" << m_unifiedAudio->getBufferFillPercent() << "%";
                 }
             }
@@ -908,7 +795,6 @@ void AtariEmulator::processFrame()
                 static int skipCount = 0;
                 skipCount++;
                 if (skipCount <= 10 || skipCount % 100 == 0) {
-                    qDebug() << "Buffer full, skipped frame #" << skipCount << "(level:" << currentLevel << "bytes)";
                 }
             }
         }
@@ -954,7 +840,6 @@ void AtariEmulator::processFrame()
             if (gap < targetGap * 0.5) {  // Buffer less than 50% of target
                 static int underrunCount = 0;
                 if (++underrunCount % 100 == 1) {
-                    qDebug() << QString("WINDOWS AUDIO UNDERRUN #%1: Frame %2, Gap: %3 (%4%), Target: %5 - Buffer too low!")
                                 .arg(underrunCount)
                                 .arg(frameCount)
                                 .arg(gap)
@@ -972,11 +857,8 @@ void AtariEmulator::processFrame()
                 int available = m_dspWritePos - m_dspReadPos;
                 if (available < 0) available += m_dspBufferBytes;
                 int bytesFree = m_audioOutput ? m_audioOutput->bytesFree() : -1;
-                qDebug() << QString("WINDOWS AUDIO DEBUG #%1: Frame %2")
                             .arg(debugCount).arg(frameCount);
-                qDebug() << QString("  WritePos: %1, ReadPos: %2, Available: %3")
                             .arg(m_dspWritePos).arg(m_dspReadPos).arg(available);
-                qDebug() << QString("  SoundBufferLen: %1, BytesFree: %2, Gap: %3, Target: %4")
                             .arg(soundBufferLen).arg(bytesFree).arg(gap).arg(targetGap);
             }
             */
@@ -988,7 +870,6 @@ void AtariEmulator::processFrame()
             if (gap > targetGap * 3) {
                 static int warnCount = 0;
                 if (++warnCount % 200 == 1) {
-                    qDebug() << "Audio buffer high #" << warnCount << "Gap:" << gap << "Target:" << targetGap << "- continuing to write";
                 }
             }
 
@@ -1105,40 +986,31 @@ bool AtariEmulator::loadFile(const QString& filename)
     
     if (extension == "xex" || extension == "exe" || extension == "com") {
         // Load XEX/EXE/COM files as executables using BINLOAD
-        qDebug() << "Loading executable file:" << filename;
         
         int result = BINLOAD_Loader(filename.toUtf8().constData());
         
         if (result) {
-            qDebug() << "Successfully loaded and executed:" << filename;
             return true;
         } else {
-            qDebug() << "Failed to load executable:" << filename;
             return false;
         }
     } else {
         // Load other files (CAR, ROM, etc.) as cartridges
-        qDebug() << "Loading ROM/cartridge:" << filename;
         
         // First, explicitly remove any existing cartridge with reboot
         // This ensures a clean slate before loading the new cartridge
         CARTRIDGE_RemoveAutoReboot();
-        qDebug() << "Removed existing cartridge";
         
         // Now insert the new cartridge with auto-reboot
         // This provides a complete system reset with the new cartridge
         int result = CARTRIDGE_InsertAutoReboot(filename.toUtf8().constData());
         
         if (result) {
-            qDebug() << "Successfully loaded cartridge:" << filename;
             return true;
         } else {
-            qDebug() << "Failed to load cartridge:" << filename;
             // Fall back to the original method for non-cartridge files
-            qDebug() << "Trying fallback method with libatari800_reboot_with_file";
             bool fallback_result = libatari800_reboot_with_file(filename.toUtf8().constData());
             if (fallback_result) {
-                qDebug() << "Fallback method succeeded for:" << filename;
             }
             return fallback_result;
         }
@@ -1149,36 +1021,27 @@ bool AtariEmulator::mountDiskImage(int driveNumber, const QString& filename, boo
 {
     // Validate drive number (1-8 for D1: through D8:)
     if (driveNumber < 1 || driveNumber > 8) {
-        qDebug() << "Invalid drive number:" << driveNumber << "- must be 1-8";
         return false;
     }
     
     if (filename.isEmpty()) {
-        qDebug() << "Empty filename provided for drive D" << driveNumber << ":";
         return false;
     }
     
-    qDebug() << "Attempting to mount" << filename << "to drive D" << driveNumber << ":";
     
     // Mount the disk image using libatari800
     int result = libatari800_mount_disk_image(driveNumber, filename.toUtf8().constData(), readOnly ? 1 : 0);
     
-    qDebug() << "libatari800_mount_disk_image returned:" << result;
     
     if (result) {
         // Store the path for tracking
         m_diskImages[driveNumber - 1] = filename;
         m_mountedDrives.insert(driveNumber);
         
-        qDebug() << "Successfully mounted" << filename << "to drive D" << driveNumber << ":" 
                  << (readOnly ? "(read-only)" : "(read-write)");
-        qDebug() << "Disk should now be accessible from the emulated Atari";
-        qDebug() << "Disk activity LEDs will now be controlled by libatari800 callback";
         
         return true;
     } else {
-        qDebug() << "Failed to mount" << filename << "to drive D" << driveNumber << ":";
-        qDebug() << "Check if file exists and is a valid Atari disk image";
         return false;
     }
 }
@@ -1196,7 +1059,6 @@ void AtariEmulator::dismountDiskImage(int driveNumber)
     // Clear Fujisan internal state
     m_diskImages[driveNumber - 1].clear();
     m_mountedDrives.remove(driveNumber);
-    qDebug() << "Dismounted drive D" << driveNumber << ": - libatari800 core and Fujisan state cleared";
 }
 
 void AtariEmulator::disableDrive(int driveNumber)
@@ -1212,14 +1074,12 @@ void AtariEmulator::disableDrive(int driveNumber)
     // Clear Fujisan internal state
     m_diskImages[driveNumber - 1].clear();
     m_mountedDrives.remove(driveNumber);
-    qDebug() << "Disabled drive D" << driveNumber << ": - libatari800 core and Fujisan state cleared";
 }
 
 void AtariEmulator::coldRestart()
 {
     // Trigger Atari800 cold start to refresh boot sequence
     Atari800_Coldstart();
-    qDebug() << "Cold restart completed - boot sequence refreshed";
 }
 
 QString AtariEmulator::getDiskImagePath(int driveNumber) const
@@ -1265,25 +1125,20 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
             m_currentInput.keycode = baseKey | shiftctrl;
             
             if (shiftPressed && ctrlPressed) {
-                qDebug() << "Setting AKEY_SHFTCTRL keycode for" << QChar(key) << ":" << (int)m_currentInput.keycode
                          << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(pure control)";
             } else {
-                qDebug() << "Setting AKEY_CTRL keycode for" << QChar(key) << ":" << (int)m_currentInput.keycode
                          << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(display control)";
             }
         } else {
-            qDebug() << "Could not map" << QChar(key) << "to base AKEY";
         }
     } else if (key == Qt::Key_CapsLock) {
         // Send CAPS LOCK toggle to the emulator to change its internal state
         m_currentInput.keycode = AKEY_CAPSTOGGLE;
-        qDebug() << "*** CAPS LOCK KEY PRESSED! Sending AKEY_CAPSTOGGLE to emulator ***";
     } else if (key >= Qt::Key_A && key <= Qt::Key_Z) {
         if (key == Qt::Key_L) {
             // Special handling for L key since AKEY_l = 0 causes issues
             // Use keychar approach for L key only - send lowercase so emulator can apply case logic
             m_currentInput.keychar = 'l';  // Send lowercase, emulator handles case via CAPS LOCK
-            qDebug() << "*** SPECIAL L KEY: Using keychar='l' (lowercase) instead of keycode=0 ***";
         } else {
             // Normal letter handling using keycode
             unsigned char baseKey = convertQtKeyToAtari(key, Qt::NoModifier);
@@ -1313,31 +1168,24 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
     } else if (key == Qt::Key_F2) {
         // F2 = Start
         m_currentInput.start = 1;
-        qDebug() << "*** F2 DETECTED! START pressed ***";
     } else if (key == Qt::Key_F3) {
         // F3 = Select
         m_currentInput.select = 1;
-        qDebug() << "*** F3 DETECTED! SELECT pressed ***";
     } else if (key == Qt::Key_F4) {
         // F4 = Option
         m_currentInput.option = 1;
-        qDebug() << "*** F4 DETECTED! OPTION pressed ***";
     } else if (key == Qt::Key_F5 && shiftPressed) {
         // Shift+F5 = Cold Reset (Power) - libatari800 does: lastkey = -input->special
         m_currentInput.special = -AKEY_COLDSTART;  // Convert -3 to +3
-        qDebug() << "*** SHIFT+F5 DETECTED! Cold Reset (Power) - setting special to" << (int)m_currentInput.special << " ***";
     } else if (key == Qt::Key_F5 && !shiftPressed) {
         // F5 = Warm Reset - libatari800 does: lastkey = -input->special  
         m_currentInput.special = -AKEY_WARMSTART;  // Convert -2 to +2
-        qDebug() << "*** F5 DETECTED! Warm Reset - setting special to" << (int)m_currentInput.special << " ***";
     } else if (key == Qt::Key_F6) {
         // F6 = Help
         m_currentInput.keycode = AKEY_HELP;
-        qDebug() << "*** F6 DETECTED! HELP pressed ***";
     } else if (key == Qt::Key_F7 || key == Qt::Key_Pause) {
         // F7 or Pause = Break - libatari800 does: lastkey = -input->special
         m_currentInput.special = -AKEY_BREAK;  // Convert -5 to +5
-        qDebug() << "*** BREAK KEY DETECTED! F7/Pause pressed - setting special to" << (int)m_currentInput.special << " ***";
     } else if (key == Qt::Key_Exclam) {
         m_currentInput.keychar = '!';
         // Special character: !
@@ -1376,31 +1224,22 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
         // Special character: :
     } else if (key == Qt::Key_Plus) {
         m_currentInput.keychar = '+';
-        qDebug() << "*** PLUS DETECTED! Setting keychar to: + ***";
     } else if (key == Qt::Key_Less) {
         m_currentInput.keychar = '<';
-        qDebug() << "*** LESS THAN DETECTED! Setting keychar to: < ***";
     } else if (key == Qt::Key_Underscore) {
         m_currentInput.keychar = '_';
-        qDebug() << "*** UNDERSCORE DETECTED! Setting keychar to: _ ***";
     } else if (key == Qt::Key_Greater) {
         m_currentInput.keychar = '>';
-        qDebug() << "*** GREATER THAN DETECTED! Setting keychar to: > ***";
     } else if (key == Qt::Key_QuoteDbl) {
         m_currentInput.keychar = '"';
-        qDebug() << "*** QUOTE DETECTED! Setting keychar to: \" ***";
     } else if (key == Qt::Key_BraceLeft) {
         m_currentInput.keychar = '{';
-        qDebug() << "*** BRACE LEFT DETECTED! Setting keychar to: { ***";
     } else if (key == Qt::Key_Bar) {
         m_currentInput.keychar = '|';
-        qDebug() << "*** BAR DETECTED! Setting keychar to: | ***";
     } else if (key == Qt::Key_BraceRight) {
         m_currentInput.keychar = '}';
-        qDebug() << "*** BRACE RIGHT DETECTED! Setting keychar to: } ***";
     } else if (key == Qt::Key_AsciiTilde) {
         m_currentInput.keychar = '~';
-        qDebug() << "*** TILDE DETECTED! Setting keychar to: ~ ***";
     } else {
         // Handle other shifted symbols and regular punctuation
         char symbol = getShiftedSymbol(key, shiftPressed);
@@ -1436,23 +1275,18 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
                     break;
                 case Qt::Key_Apostrophe:
                     m_currentInput.keychar = '\'';
-                    qDebug() << "Setting keychar to: '";
                     break;
                 case Qt::Key_QuoteLeft:
                     m_currentInput.keychar = '`';
-                    qDebug() << "Setting keychar to: `";
                     break;
                 case Qt::Key_BracketLeft:
                     m_currentInput.keychar = '[';
-                    qDebug() << "Setting keychar to: [";
                     break;
                 case Qt::Key_BracketRight:
                     m_currentInput.keychar = ']';
-                    qDebug() << "Setting keychar to: ]";
                     break;
                 case Qt::Key_Backslash:
                     m_currentInput.keychar = '\\';
-                    qDebug() << "Setting keychar to: \\";
                     break;
                 default:
                     // For special keys, use keycode
@@ -1491,13 +1325,11 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 void AtariEmulator::coldBoot()
 {
     Atari800_Coldstart();
-    qDebug() << "Cold boot performed";
 }
 
 void AtariEmulator::warmBoot()
 {
     Atari800_Warmstart();
-    qDebug() << "Warm boot performed";
 }
 
 char AtariEmulator::getShiftedSymbol(int key, bool shiftPressed)
@@ -1585,17 +1417,12 @@ void AtariEmulator::setupAudio()
 #ifdef HAVE_SDL2_AUDIO
     // Unified Audio Backend (preferred when SDL2 is available)
     if (m_audioBackend == UnifiedAudio) {
-        qDebug() << "Setting up Unified Audio Backend for optimal cross-platform performance...";
 
         // Get audio parameters from libatari800
         int sampleRate = libatari800_get_sound_frequency();
         int channels = libatari800_get_num_sound_channels();
         int sampleSize = libatari800_get_sound_sample_size();
 
-        qDebug() << "Audio parameters from libatari800:";
-        qDebug() << "  Sample rate:" << sampleRate << "Hz";
-        qDebug() << "  Channels:" << channels;
-        qDebug() << "  Sample size:" << sampleSize << "bytes";
 
         // Create unified audio backend if not created
         if (!m_unifiedAudio) {
@@ -1604,9 +1431,6 @@ void AtariEmulator::setupAudio()
 
         // Initialize with optimal settings for each platform
         if (m_unifiedAudio->initialize(sampleRate, channels, sampleSize)) {
-            qDebug() << "Unified Audio Backend initialized successfully";
-            qDebug() << "  Actual latency:" << m_unifiedAudio->getLatencyMs() << "ms";
-            qDebug() << "  Buffer size optimized for platform";
             return;  // Successfully initialized, skip Qt audio setup
         } else {
             qWarning() << "Failed to initialize Unified Audio Backend, falling back to Qt audio";
@@ -1617,30 +1441,21 @@ void AtariEmulator::setupAudio()
 #endif
 #ifdef HAVE_SDL2_AUDIO
     if (m_audioBackend == SDL2Audio) {
-        qDebug() << "Setting up SDL2 audio backend for low latency...";
         
         // Get audio parameters from libatari800
         int sampleRate = libatari800_get_sound_frequency();
         int channels = libatari800_get_num_sound_channels();
         int sampleSize = libatari800_get_sound_sample_size();
         
-        qDebug() << "\n=== SDL2 AUDIO INITIALIZATION ===";
-        qDebug() << "libatari800 reports:";
-        qDebug() << "  Frequency:" << sampleRate << "Hz";
-        qDebug() << "  Channels:" << channels;
-        qDebug() << "  Sample size:" << sampleSize << "bytes";
         
         // Get actual sound buffer to see real size
         unsigned char* testBuffer = libatari800_get_sound_buffer();
         int actualBufferLen = libatari800_get_sound_buffer_len();
-        qDebug() << "  Actual buffer length per frame:" << actualBufferLen << "bytes";
         
         // Calculate expected bytes per frame based on sample rate
         // At 44100Hz: 44100 * 2 / 59.92 = 1472 bytes/frame
         // At 22050Hz: 22050 * 2 / 59.92 = 736 bytes/frame  
         int bytesPerFrame = (sampleRate * sampleSize * channels) / 60;  // Approximate
-        qDebug() << "  Calculated bytes per frame:" << bytesPerFrame << "(approx)";
-        qDebug() << "==================================\n";
         
         // Create SDL2 audio backend if not created
         if (!m_sdl2Audio) {
@@ -1666,7 +1481,6 @@ void AtariEmulator::setupAudio()
             m_sdl2AudioBuffer[m_sdl2WritePos] = 0;
             m_sdl2WritePos = (m_sdl2WritePos + 1) % SDL2_BUFFER_SIZE;
         }
-        qDebug() << "SDL2 buffer initialized with" << prefillBytes << "bytes (target level:" << m_sdl2TargetBufferLevel << "bytes)";
         
         // Initialize SDL2 audio
         if (m_sdl2Audio->initialize(sampleRate, channels, sampleSize)) {
@@ -1688,7 +1502,6 @@ void AtariEmulator::setupAudio()
                     
                     // Only report when significantly off target to reduce log spam
                     if (percentFull < 70.0f || percentFull > 150.0f) {
-                        qDebug() << "SDL2 buffer:" << avgLevel << "bytes (" << percentFull << "% of target)";
                     }
                     
                     m_sdl2BufferLevelAccum = 0;
@@ -1714,7 +1527,6 @@ void AtariEmulator::setupAudio()
                     static int underrunCount = 0;
                     underrunCount++;
                     if (underrunCount <= 10 || underrunCount % 100 == 0) {
-                        qDebug() << "SDL2 audio UNDERRUN - only" << availableData << "of" << len << "bytes available (count:" << underrunCount << ")";
                     }
                 } else {
                     // No data, provide silence
@@ -1723,15 +1535,12 @@ void AtariEmulator::setupAudio()
                     static int silenceCount = 0;
                     silenceCount++;
                     if (silenceCount <= 10 || silenceCount % 100 == 0) {
-                        qDebug() << "SDL2 audio buffer EMPTY - no data available (count:" << silenceCount << ")";
                     }
                 }
             });
             
-            qDebug() << "SDL2 audio backend initialized with latency:" << m_sdl2Audio->getLatencyMs() << "ms";
             return;  // Successfully initialized, skip Qt audio setup
         } else {
-            qDebug() << "Failed to initialize SDL2 audio, falling back to Qt audio";
             m_audioBackend = QtAudio;
             // Fall through to Qt audio setup
         }
@@ -1740,7 +1549,6 @@ void AtariEmulator::setupAudio()
 
     // Qt audio backend setup (original double-buffered implementation)
     if (m_audioBackend == QtAudio) {
-        qDebug() << "Setting up Qt double-buffered audio output...";
     
     // Get audio parameters from libatari800
     m_sampleRate = libatari800_get_sound_frequency();
@@ -1748,7 +1556,6 @@ void AtariEmulator::setupAudio()
     int sampleSize = libatari800_get_sound_sample_size();
     m_bytesPerSample = channels * sampleSize;
     
-    qDebug() << "Audio config - Frequency:" << m_sampleRate << "Hz, Channels:" << channels << "Sample size:" << sampleSize << "bytes";
     
     // Setup Qt audio format
     QAudioFormat format;
@@ -1762,11 +1569,9 @@ void AtariEmulator::setupAudio()
     // Check if format is supported
     QAudioDeviceInfo info = QAudioDeviceInfo::defaultOutputDevice();
     if (!info.isFormatSupported(format)) {
-        qDebug() << "Audio format not supported, trying to use nearest format";
         format = info.nearestFormat(format);
     }
     
-    qDebug() << "Using audio format - Rate:" << format.sampleRate() << "Channels:" << format.channelCount() << "Sample size:" << format.sampleSize();
     
     // Calculate fragment size and buffer parameters (like Atari800MacX)
 #ifdef _WIN32
@@ -1808,12 +1613,6 @@ void AtariEmulator::setupAudio()
     m_callbackTick = 0;
     m_avgGap = 0.0;
     
-    qDebug() << "Double buffer configuration:";
-    qDebug() << "  Fragment size:" << m_fragmentSize << "samples (" << fragmentBytes << "bytes)";
-    qDebug() << "  DSP buffer fragments:" << DSP_BUFFER_FRAGS;
-    qDebug() << "  Target delay:" << targetDelayMs << "ms (" << m_targetDelay << "samples)";
-    qDebug() << "  DSP buffer size:" << m_dspBufferBytes << "bytes";
-    qDebug() << "  Initial write pos:" << m_dspWritePos << "read pos:" << m_dspReadPos;
     
     // Create and configure audio output
     m_audioOutput = new QAudioOutput(format, this);
@@ -1821,10 +1620,8 @@ void AtariEmulator::setupAudio()
     // Use platform-optimized Qt buffer size
 #ifdef _WIN32
     m_audioOutput->setBufferSize(8192);  // Much larger buffer to slow down Qt audio consumption
-    qDebug() << "Using Windows high-latency Qt buffer: 8192 bytes";
 #else
     m_audioOutput->setBufferSize(2048);  // Balanced buffer for macOS/Linux
-    qDebug() << "Using balanced Qt buffer for stable audio: 2048 bytes";
 #endif
     
     // Set notification interval
@@ -1849,10 +1646,6 @@ void AtariEmulator::setupAudio()
     // Set volume to ensure audio is active
     m_audioOutput->setVolume(1.0);
     
-    qDebug() << "Qt Audio configuration:";
-    qDebug() << "  Buffer size:" << m_audioOutput->bufferSize() << "bytes";
-    qDebug() << "  Period size:" << m_audioOutput->periodSize() << "samples";
-    qDebug() << "  Notify interval:" << m_audioOutput->notifyInterval() << "ms";
     
     // Connect notify signal for audio callback timing
     connect(m_audioOutput, &QAudioOutput::notify, this, [this]() {
@@ -1863,13 +1656,10 @@ void AtariEmulator::setupAudio()
     m_audioDevice = m_audioOutput->start();
     
     if (m_audioDevice) {
-        qDebug() << "Double-buffered audio output started successfully";
         
         // Test what we actually get from libatari800
         int testBufferLen = libatari800_get_sound_buffer_len();
-        qDebug() << "Actual sound buffer length from libatari800:" << testBufferLen << "bytes per frame";
     } else {
-        qDebug() << "Failed to start audio output";
         m_audioEnabled = false;
     }
     }  // End of QtAudio backend setup
@@ -1924,7 +1714,6 @@ void AtariEmulator::enableAudio(bool enabled)
             }
         }
         
-        qDebug() << "Audio" << (enabled ? "enabled" : "disabled");
     }
 }
 
@@ -1933,18 +1722,15 @@ void AtariEmulator::setVolume(float volume)
 #ifdef HAVE_SDL2_AUDIO
     if (m_audioBackend == UnifiedAudio && m_unifiedAudio) {
         m_unifiedAudio->setVolume(volume);
-        qDebug() << "Unified audio volume set to:" << volume;
     }
 #endif
 #ifdef HAVE_SDL2_AUDIO
     if (m_audioBackend == SDL2Audio && m_sdl2Audio) {
         m_sdl2Audio->setVolume(volume);
-        qDebug() << "SDL2 audio volume set to:" << volume;
     }
 #endif
     if (m_audioOutput && m_audioBackend == QtAudio) {
         m_audioOutput->setVolume(qBound(0.0f, volume, 1.0f));
-        qDebug() << "Qt audio volume set to:" << volume;
     }
 }
 
@@ -1958,7 +1744,6 @@ void AtariEmulator::setAudioBackend(AudioBackend backend)
         }
         
         m_audioBackend = backend;
-        qDebug() << "Audio backend changed to:" << (backend == SDL2Audio ? "SDL2" : "Qt");
         
         // Restart audio with new backend
         if (m_audioEnabled) {
@@ -1982,13 +1767,10 @@ void AtariEmulator::setKbdJoy0Enabled(bool enabled)
     extern void PLATFORM_ToggleKbdJoystickEnabled(int num);
     
     bool currentEnabled = PLATFORM_IsKbdJoystickEnabled(0);
-    qDebug() << "setKbdJoy0Enabled called - requested:" << enabled << "current:" << currentEnabled;
     if (currentEnabled != enabled) {
         PLATFORM_ToggleKbdJoystickEnabled(0);
-        qDebug() << "Toggled kbd joy 0 to:" << enabled;
         // Verify the change
         bool newEnabled = PLATFORM_IsKbdJoystickEnabled(0);
-        qDebug() << "After toggle, kbd joy 0 is now:" << newEnabled;
     }
 #endif
 }
@@ -2003,13 +1785,10 @@ void AtariEmulator::setKbdJoy1Enabled(bool enabled)
     extern void PLATFORM_ToggleKbdJoystickEnabled(int num);
     
     bool currentEnabled = PLATFORM_IsKbdJoystickEnabled(1);
-    qDebug() << "setKbdJoy1Enabled called - requested:" << enabled << "current:" << currentEnabled;
     if (currentEnabled != enabled) {
         PLATFORM_ToggleKbdJoystickEnabled(1);
-        qDebug() << "Toggled kbd joy 1 to:" << enabled;
         // Verify the change
         bool newEnabled = PLATFORM_IsKbdJoystickEnabled(1);
-        qDebug() << "After toggle, kbd joy 1 is now:" << newEnabled;
     }
 #endif
 }
@@ -2035,7 +1814,6 @@ void AtariEmulator::updatePalColorSettings(double saturation, double contrast, d
     // Update the color palette
     Colours_Update();
     
-    qDebug() << "PAL color settings updated - Sat:" << COLOURS_PAL_setup.saturation 
              << "Cont:" << COLOURS_PAL_setup.contrast
              << "Bright:" << COLOURS_PAL_setup.brightness
              << "Gamma:" << COLOURS_PAL_setup.gamma
@@ -2054,7 +1832,6 @@ void AtariEmulator::updateNtscColorSettings(double saturation, double contrast, 
     // Update the color palette
     Colours_Update();
     
-    qDebug() << "NTSC color settings updated - Sat:" << COLOURS_NTSC_setup.saturation 
              << "Cont:" << COLOURS_NTSC_setup.contrast
              << "Bright:" << COLOURS_NTSC_setup.brightness
              << "Gamma:" << COLOURS_NTSC_setup.gamma
@@ -2063,7 +1840,6 @@ void AtariEmulator::updateNtscColorSettings(double saturation, double contrast, 
 
 void AtariEmulator::updateArtifactSettings(const QString& artifactMode)
 {
-    qDebug() << "Updating artifact mode to:" << artifactMode;
     
     // Map string mode to ARTIFACT_t enum
     ARTIFACT_t mode = ARTIFACT_NONE;
@@ -2075,13 +1851,11 @@ void AtariEmulator::updateArtifactSettings(const QString& artifactMode)
     } else if (artifactMode == "ntsc-new") {
         mode = ARTIFACT_NTSC_NEW;
     } else {
-        qDebug() << "Warning: Unknown artifact mode:" << artifactMode << "- using NONE";
         mode = ARTIFACT_NONE;
     }
     
     // Apply the artifact setting immediately
     ARTIFACT_Set(mode);
-    qDebug() << "Artifact mode set to:" << mode;
 }
 
 // FUTURE: Scanlines method (commented out - not working)
@@ -2104,7 +1878,6 @@ void AtariEmulator::setEmulationSpeed(int percentage)
         Atari800_turbo = (percentage != 100) ? 1 : 0;
     }
     
-    qDebug() << "Emulation speed set to:" << percentage << "% (turbo=" << Atari800_turbo << ")";
 }
 
 int AtariEmulator::getCurrentEmulationSpeed() const
@@ -2118,14 +1891,12 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
 {
     // Start the XEX loading process
     if (!libatari800_reboot_with_file(filename.toUtf8().constData())) {
-        qDebug() << "Failed to load XEX file for debug:" << filename;
         return false;
     }
     
     // Get memory pointer for checking vectors
     unsigned char* mem = libatari800_get_main_memory_ptr();
     if (!mem) {
-        qDebug() << "Failed to get memory pointer";
         return false;
     }
     
@@ -2134,7 +1905,6 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
     int framesProcessed = 0;
     bool loadingComplete = false;
     
-    qDebug() << "Stepping frames to complete XEX loading...";
     
     while (framesProcessed < maxFrames) {
         // Process one frame to advance the loading
@@ -2151,7 +1921,6 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
             if ((runad != 0x0000 && runad != 0xFFFF) || 
                 (initad != 0x0000 && initad != 0xFFFF)) {
                 loadingComplete = true;
-                qDebug() << "XEX loading complete after" << framesProcessed << "frames";
                 break;
             }
         }
@@ -2168,7 +1937,6 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
                 if (CPU_regPC < 0xD000 || CPU_regPC >= 0xE000) {
                     // PC is not in ROM loader area, likely done
                     loadingComplete = true;
-                    qDebug() << "XEX loading detected via vectors after" << framesProcessed << "frames";
                     break;
                 }
             }
@@ -2186,21 +1954,16 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
     unsigned short entryPoint;
     if (runad != 0x0000 && runad != 0xFFFF) {
         entryPoint = runad;
-        qDebug() << "Using RUNAD entry point:" << QString("$%1").arg(entryPoint, 4, 16, QChar('0')).toUpper();
     } else if (initad != 0x0000 && initad != 0xFFFF) {
         entryPoint = initad;
-        qDebug() << "Using INITAD entry point:" << QString("$%1").arg(entryPoint, 4, 16, QChar('0')).toUpper();
     } else {
         // Fallback to current PC if no vectors set (shouldn't happen)
         entryPoint = CPU_regPC;
-        qDebug() << "Warning: No RUNAD/INITAD, using PC:" << QString("$%1").arg(entryPoint, 4, 16, QChar('0')).toUpper();
     }
     
     if (!loadingComplete) {
-        qDebug() << "Warning: XEX loading may not be complete (timeout after" << framesProcessed << "frames)";
     }
     
-    qDebug() << QString("XEX loaded for debug. Entry point: $%1, Current PC: $%2")
                 .arg(entryPoint, 4, 16, QChar('0'))
                 .arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
     
@@ -2383,7 +2146,6 @@ void AtariEmulator::injectAKey(int akeyCode)
     // Directly set the raw AKEY code
     m_currentInput.keycode = akeyCode;
     
-    qDebug() << "Injected AKEY code:" << akeyCode << "(" << Qt::hex << akeyCode << ")";
     
     // Schedule key release after a short delay (one frame)
     QTimer::singleShot(50, this, [this]() {
@@ -2393,7 +2155,6 @@ void AtariEmulator::injectAKey(int akeyCode)
         m_currentInput.joy1 = 0x0f ^ 0xff;
         m_currentInput.trig0 = 0;
         m_currentInput.trig1 = 0;
-        qDebug() << "Key released";
     });
 }
 
@@ -2413,7 +2174,6 @@ void AtariEmulator::pauseEmulation()
         m_frameTimer->stop();
         m_emulationPaused = true;
         emit executionPaused();
-        qDebug() << "Emulation paused";
     }
 }
 
@@ -2425,7 +2185,6 @@ void AtariEmulator::resumeEmulation()
         // Reset last PC when resuming to avoid missing breakpoints
         m_lastPC = 0xFFFF;
         emit executionResumed();
-        qDebug() << "Emulation resumed";
     }
 }
 
@@ -2439,10 +2198,8 @@ void AtariEmulator::stepOneFrame()
     if (m_emulationPaused) {
         // Execute one frame manually when paused
         processFrame();
-        qDebug() << "Stepped one frame - PC:" << QString("$%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
         emit debugStepped();
     } else {
-        qDebug() << "Cannot step frame - emulation not paused";
     }
 }
 
@@ -2461,12 +2218,10 @@ void AtariEmulator::stepOneInstruction()
         // Check breakpoints after execution
         checkBreakpoints();
         
-        qDebug() << QString("Stepped from PC $%1 to $%2 (frame-based, not single instruction)")
                     .arg(startPC, 4, 16, QChar('0')).toUpper()
                     .arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
         emit debugStepped();
     } else {
-        qDebug() << "Cannot step instruction - emulation not paused";
     }
 }
 
@@ -2591,7 +2346,6 @@ void AtariEmulator::checkForDiskIO()
     // Debug: print every 60 frames to see if we're detecting anything
     static int debugCounter = 0;
     if (++debugCounter >= 60) {
-        qDebug() << "PC monitoring: currentPC=" << QString("$%1").arg(currentPC, 4, 16, QChar('0')).toUpper() 
                  << "inDiskRoutine=" << inDiskRoutine << "mountedDrives=" << m_mountedDrives.size();
         debugCounter = 0;
     }
@@ -2601,7 +2355,6 @@ void AtariEmulator::checkForDiskIO()
     
     if (inDiskRoutine && !wasInDiskRoutine) {
         // Just entered disk routine - turn LED ON
-        qDebug() << "*** DISK ROUTINE DETECTED at PC:" << QString("$%1").arg(currentPC, 4, 16, QChar('0')).toUpper() << "***";
         
         // SIMPLE approach: cycle through mounted drives based on recent activity
         static int lastUsedDrive = 1;
@@ -2632,7 +2385,6 @@ void AtariEmulator::checkForDiskIO()
         activeDrive = driveNumber;
         lastUsedDrive = driveNumber;
         
-        qDebug() << "=== LED SIGNAL SENT ===" 
                  << "Drive D" << driveNumber << ":" << (isWriting ? "WRITE" : "READ")
                  << "PC:" << QString("$%1").arg(currentPC, 4, 16, QChar('0')).toUpper()
                  << "Mounted drives:" << m_mountedDrives;
@@ -2641,7 +2393,6 @@ void AtariEmulator::checkForDiskIO()
         
     } else if (!inDiskRoutine && wasInDiskRoutine && activeDrive != -1) {
         // Exited disk routine - turn LED OFF
-        qDebug() << "=== LED OFF SIGNAL SENT === Drive D" << activeDrive << ":";
         emit diskIOEnd(activeDrive);
         activeDrive = -1;
     }
@@ -2714,11 +2465,9 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                     if (numpadTargetJoy == 0) {
                         joy0_up = isKeyPress;
                         m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
-                        qDebug() << "*** JOYSTICK 0 UP" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy0:" << m_currentInput.joy0 << "***";
                     } else {
                         joy1_up = isKeyPress;
                         m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
-                        qDebug() << "*** JOYSTICK 1 UP" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy1:" << m_currentInput.joy1 << "***";
                     }
                     return true;
                 }
@@ -2730,11 +2479,9 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                     if (numpadTargetJoy == 0) {
                         joy0_down = isKeyPress;
                         m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
-                        qDebug() << "*** JOYSTICK 0 DOWN" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy0:" << m_currentInput.joy0 << "***";
                     } else {
                         joy1_down = isKeyPress;
                         m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
-                        qDebug() << "*** JOYSTICK 1 DOWN" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy1:" << m_currentInput.joy1 << "***";
                     }
                     return true;
                 }
@@ -2746,11 +2493,9 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                     if (numpadTargetJoy == 0) {
                         joy0_left = isKeyPress;
                         m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
-                        qDebug() << "*** JOYSTICK 0 LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy0:" << m_currentInput.joy0 << "***";
                     } else {
                         joy1_left = isKeyPress;
                         m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
-                        qDebug() << "*** JOYSTICK 1 LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy1:" << m_currentInput.joy1 << "***";
                     }
                     return true;
                 }
@@ -2762,11 +2507,9 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                     if (numpadTargetJoy == 0) {
                         joy0_right = isKeyPress;
                         m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
-                        qDebug() << "*** JOYSTICK 0 RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy0:" << m_currentInput.joy0 << "***";
                     } else {
                         joy1_right = isKeyPress;
                         m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
-                        qDebug() << "*** JOYSTICK 1 RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Numpad/Arrow) - Joy1:" << m_currentInput.joy1 << "***";
                     }
                     return true;
                 }
@@ -2782,21 +2525,17 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                 if (isKeyPress) {
                     trig0State = true;
                     m_currentInput.trig0 = 1;  // 1 = pressed (inverted for libatari800)
-                    qDebug() << "*** JOYSTICK 0 FIRE PRESSED (Numpad Enter) ***";
                 } else {
                     trig0State = false;
                     m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-                    qDebug() << "*** JOYSTICK 0 FIRE RELEASED (Numpad Enter) ***";
                 }
             } else {
                 if (isKeyPress) {
                     trig1State = true;
                     m_currentInput.trig1 = 1;  // 1 = pressed (inverted for libatari800)
-                    qDebug() << "*** JOYSTICK 1 FIRE PRESSED (Numpad Enter) ***";
                 } else {
                     trig1State = false;
                     m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
-                    qDebug() << "*** JOYSTICK 1 FIRE RELEASED (Numpad Enter) ***";
                 }
             }
             return true;
@@ -2810,11 +2549,9 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                 if (wasdTargetJoy == 0) {
                     joy0_up = isKeyPress;
                     m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
-                    qDebug() << "*** JOYSTICK 0 UP" << (isKeyPress ? "PRESSED" : "RELEASED") << "(W) - Joy0:" << m_currentInput.joy0 << "***";
                 } else {
                     joy1_up = isKeyPress;
                     m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
-                    qDebug() << "*** JOYSTICK 1 UP" << (isKeyPress ? "PRESSED" : "RELEASED") << "(W) - Joy1:" << m_currentInput.joy1 << "***";
                 }
                 return true;
                 
@@ -2822,11 +2559,9 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                 if (wasdTargetJoy == 0) {
                     joy0_down = isKeyPress;
                     m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
-                    qDebug() << "*** JOYSTICK 0 DOWN" << (isKeyPress ? "PRESSED" : "RELEASED") << "(S) - Joy0:" << m_currentInput.joy0 << "***";
                 } else {
                     joy1_down = isKeyPress;
                     m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
-                    qDebug() << "*** JOYSTICK 1 DOWN" << (isKeyPress ? "PRESSED" : "RELEASED") << "(S) - Joy1:" << m_currentInput.joy1 << "***";
                 }
                 return true;
                 
@@ -2834,11 +2569,9 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                 if (wasdTargetJoy == 0) {
                     joy0_left = isKeyPress;
                     m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
-                    qDebug() << "*** JOYSTICK 0 LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(A) - Joy0:" << m_currentInput.joy0 << "***";
                 } else {
                     joy1_left = isKeyPress;
                     m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
-                    qDebug() << "*** JOYSTICK 1 LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(A) - Joy1:" << m_currentInput.joy1 << "***";
                 }
                 return true;
                 
@@ -2846,11 +2579,9 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                 if (wasdTargetJoy == 0) {
                     joy0_right = isKeyPress;
                     m_currentInput.joy0 = calculateJoystickValue(joy0_up, joy0_down, joy0_left, joy0_right);
-                    qDebug() << "*** JOYSTICK 0 RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(D) - Joy0:" << m_currentInput.joy0 << "***";
                 } else {
                     joy1_right = isKeyPress;
                     m_currentInput.joy1 = calculateJoystickValue(joy1_up, joy1_down, joy1_left, joy1_right);
-                    qDebug() << "*** JOYSTICK 1 RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(D) - Joy1:" << m_currentInput.joy1 << "***";
                 }
                 return true;
                 
@@ -2861,21 +2592,17 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
                     if (isKeyPress) {
                         trig0State = true;
                         m_currentInput.trig0 = 1;  // 1 = pressed (inverted for libatari800)
-                        qDebug() << "*** JOYSTICK 0 FIRE PRESSED (Space) ***";
                     } else {
                         trig0State = false;
                         m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-                        qDebug() << "*** JOYSTICK 0 FIRE RELEASED (Space) ***";
                     }
                 } else {
                     if (isKeyPress) {
                         trig1State = true;
                         m_currentInput.trig1 = 1;  // 1 = pressed (inverted for libatari800)
-                        qDebug() << "*** JOYSTICK 1 FIRE PRESSED (Space) ***";
                     } else {
                         trig1State = false;
                         m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
-                        qDebug() << "*** JOYSTICK 1 FIRE RELEASED (Space) ***";
                     }
                 }
                 return true;
@@ -2884,40 +2611,32 @@ bool AtariEmulator::handleJoystickKeyboardEmulation(QKeyEvent* event)
             case Qt::Key_Q:         // Q - UP+LEFT diagonal
                 if (wasdTargetJoy == 0) {
                     m_currentInput.joy0 = isKeyPress ? INPUT_STICK_UL : INPUT_STICK_CENTRE;
-                    qDebug() << "*** JOYSTICK 0 UP+LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Q) - Joy0:" << m_currentInput.joy0 << "***";
                 } else {
                     m_currentInput.joy1 = isKeyPress ? INPUT_STICK_UL : INPUT_STICK_CENTRE;
-                    qDebug() << "*** JOYSTICK 1 UP+LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Q) - Joy1:" << m_currentInput.joy1 << "***";
                 }
                 return true;
                 
             case Qt::Key_E:         // E - UP+RIGHT diagonal
                 if (wasdTargetJoy == 0) {
                     m_currentInput.joy0 = isKeyPress ? INPUT_STICK_UR : INPUT_STICK_CENTRE;
-                    qDebug() << "*** JOYSTICK 0 UP+RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(E) - Joy0:" << m_currentInput.joy0 << "***";
                 } else {
                     m_currentInput.joy1 = isKeyPress ? INPUT_STICK_UR : INPUT_STICK_CENTRE;
-                    qDebug() << "*** JOYSTICK 1 UP+RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(E) - Joy1:" << m_currentInput.joy1 << "***";
                 }
                 return true;
                 
             case Qt::Key_Z:         // Z - DOWN+LEFT diagonal
                 if (wasdTargetJoy == 0) {
                     m_currentInput.joy0 = isKeyPress ? INPUT_STICK_LL : INPUT_STICK_CENTRE;
-                    qDebug() << "*** JOYSTICK 0 DOWN+LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Z) - Joy0:" << m_currentInput.joy0 << "***";
                 } else {
                     m_currentInput.joy1 = isKeyPress ? INPUT_STICK_LL : INPUT_STICK_CENTRE;
-                    qDebug() << "*** JOYSTICK 1 DOWN+LEFT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(Z) - Joy1:" << m_currentInput.joy1 << "***";
                 }
                 return true;
                 
             case Qt::Key_C:         // C - DOWN+RIGHT diagonal
                 if (wasdTargetJoy == 0) {
                     m_currentInput.joy0 = isKeyPress ? INPUT_STICK_LR : INPUT_STICK_CENTRE;
-                    qDebug() << "*** JOYSTICK 0 DOWN+RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(C) - Joy0:" << m_currentInput.joy0 << "***";
                 } else {
                     m_currentInput.joy1 = isKeyPress ? INPUT_STICK_LR : INPUT_STICK_CENTRE;
-                    qDebug() << "*** JOYSTICK 1 DOWN+RIGHT" << (isKeyPress ? "PRESSED" : "RELEASED") << "(C) - Joy1:" << m_currentInput.joy1 << "***";
                 }
                 return true;
         }
@@ -2940,9 +2659,7 @@ bool AtariEmulator::setSIOPatchEnabled(bool enabled)
     extern int libatari800_set_sio_patch_enabled(int enabled);
     int previousState = libatari800_set_sio_patch_enabled(enabled ? 1 : 0);
     
-    qDebug() << "SIO Patch state changed from" << (previousState ? "ENABLED" : "DISABLED") 
              << "to" << (enabled ? "ENABLED" : "DISABLED");
-    qDebug() << "Disk access is now" << (enabled ? "FAST (bypasses realistic timing)" : "REALISTIC (hardware timing)");
     
     return previousState != 0;
 }
@@ -2951,19 +2668,12 @@ void AtariEmulator::debugSIOPatchStatus() const
 {
     bool isEnabled = getSIOPatchEnabled();
     
-    qDebug() << "=== SIO PATCH STATUS DEBUG ===";
-    qDebug() << "SIO Patch (Fast Disk Access):" << (isEnabled ? "ENABLED" : "DISABLED");
-    qDebug() << "Disk Access Speed:" << (isEnabled ? "FAST (emulated)" : "REALISTIC (hardware timing)");
-    qDebug() << "Description:" << (isEnabled ? 
         "Disk operations bypass sector delays for faster loading" :
         "Disk operations use realistic timing delays (~3200 scanlines between sectors)");
-    qDebug() << "=====================================";
     
     // Also check compile-time settings
     #ifdef NO_SECTOR_DELAY
-    qDebug() << "COMPILE FLAG: NO_SECTOR_DELAY is DEFINED (delays disabled at compile time)";
     #else
-    qDebug() << "COMPILE FLAG: NO_SECTOR_DELAY is NOT DEFINED (delays available if SIO patch disabled)";
     #endif
 }
 
@@ -2975,8 +2685,6 @@ void AtariEmulator::setPrinterEnabled(bool enabled)
         
         // Note: P: device setup is now handled during emulator initialization
         // Printer enable/disable changes trigger a full emulator restart via SettingsDialog
-        qDebug() << "Printer state changed to:" << (enabled ? "ENABLED" : "DISABLED");
-        qDebug() << "P: device will be" << (enabled ? "installed" : "removed") << "on next emulator restart";
     }
 }
 
@@ -2994,7 +2702,6 @@ void AtariEmulator::setPrintCommand(const QString& command)
 {
     if (!command.isEmpty()) {
         Devices_SetPrintCommand(command.toUtf8().constData());
-        qDebug() << "Print command set to:" << command;
     }
 }
 
@@ -3016,11 +2723,9 @@ void AtariEmulator::setJoystickState(int player, int direction, bool fire)
     if (player == 1) {
         m_currentInput.joy0 = invertedDirection;
         m_currentInput.trig0 = fire ? 1 : 0;  // 1 = pressed (inverted for libatari800)
-        qDebug() << "TCP Joystick 1 set - Direction:" << invertedDirection << "Fire:" << fire;
     } else {
         m_currentInput.joy1 = invertedDirection;
         m_currentInput.trig1 = fire ? 1 : 0;  // 1 = pressed (inverted for libatari800)
-        qDebug() << "TCP Joystick 2 set - Direction:" << invertedDirection << "Fire:" << fire;
     }
 }
 
@@ -3036,11 +2741,9 @@ void AtariEmulator::releaseJoystick(int player)
     if (player == 1) {
         m_currentInput.joy0 = CENTER;
         m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-        qDebug() << "TCP Joystick 1 released";
     } else {
         m_currentInput.joy1 = CENTER;
         m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
-        qDebug() << "TCP Joystick 2 released";
     }
 }
 
@@ -3177,7 +2880,6 @@ bool AtariEmulator::saveState(const QString& filename)
         stateSettings.setValue("profile", m_currentProfileName);
         stateSettings.setValue("timestamp", QDateTime::currentDateTime());
         
-        qDebug() << "State saved successfully to:" << filename << "Size:" << stateSize;
         return true;
     } else {
         qWarning() << "Failed to save state to:" << filename;
@@ -3244,11 +2946,9 @@ bool AtariEmulator::loadState(const QString& filename)
         QString profileName = stateSettings.value("profile").toString();
         if (!profileName.isEmpty()) {
             m_currentProfileName = profileName;
-            qDebug() << "State was saved with profile:" << profileName;
         }
     }
     
-    qDebug() << "State loaded successfully from:" << filename << "Size:" << fileData.size();
     return true;
 }
 
@@ -3285,7 +2985,6 @@ void AtariEmulator::addBreakpoint(unsigned short address)
     if (!m_breakpoints.contains(address)) {
         m_breakpoints.insert(address);
         emit breakpointAdded(address);
-        qDebug() << QString("Core: Added breakpoint at $%1").arg(address, 4, 16, QChar('0')).toUpper();
     }
 }
 
@@ -3293,7 +2992,6 @@ void AtariEmulator::removeBreakpoint(unsigned short address)
 {
     if (m_breakpoints.remove(address)) {
         emit breakpointRemoved(address);
-        qDebug() << QString("Core: Removed breakpoint at $%1").arg(address, 4, 16, QChar('0')).toUpper();
     }
 }
 
@@ -3302,7 +3000,6 @@ void AtariEmulator::clearAllBreakpoints()
     if (!m_breakpoints.isEmpty()) {
         m_breakpoints.clear();
         emit breakpointsCleared();
-        qDebug() << "Core: Cleared all breakpoints";
     }
 }
 
@@ -3319,7 +3016,6 @@ QSet<unsigned short> AtariEmulator::getBreakpoints() const
 void AtariEmulator::setBreakpointsEnabled(bool enabled)
 {
     m_breakpointsEnabled = enabled;
-    qDebug() << "Core: Breakpoints" << (enabled ? "enabled" : "disabled");
 }
 
 bool AtariEmulator::areBreakpointsEnabled() const
@@ -3340,7 +3036,6 @@ void AtariEmulator::checkBreakpoints()
         m_lastPC = currentPC;
         
         if (m_breakpoints.contains(currentPC)) {
-            qDebug() << QString("Core: BREAKPOINT HIT at $%1 - pausing execution").arg(currentPC, 4, 16, QChar('0')).toUpper();
             pauseEmulation();
             emit breakpointHit(currentPC);
         }
@@ -3358,20 +3053,17 @@ void AtariEmulator::setRealJoysticksEnabled(bool enabled)
 
     if (m_joystickManager) {
         m_joystickManager->setEnabled(enabled);
-        qDebug() << "Real joysticks" << (enabled ? "enabled" : "disabled");
     }
 }
 
 void AtariEmulator::setJoystick1Device(const QString& device)
 {
     m_joystick1AssignedDevice = device;
-    qDebug() << "Joystick 1 device assigned:" << device;
 }
 
 void AtariEmulator::setJoystick2Device(const QString& device)
 {
     m_joystick2AssignedDevice = device;
-    qDebug() << "Joystick 2 device assigned:" << device;
 }
 #endif
 
