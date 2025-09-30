@@ -235,6 +235,9 @@ void SDL2JoystickManager::refreshJoysticks()
         return;
     }
 
+    // Process any pending hot-plug events before scanning
+    SDL_PumpEvents();
+
     // Close existing joysticks
     closeAllJoysticks();
 
