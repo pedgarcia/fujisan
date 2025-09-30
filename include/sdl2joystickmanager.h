@@ -62,6 +62,9 @@ public:
     void setEnabled(bool enabled);
     bool isEnabled() const;
 
+    // Manual refresh (useful for settings dialogs)
+    void refreshJoysticks();
+
 signals:
     void joystickConnected(int index, const QString &name);
     void joystickDisconnected(int index);
@@ -72,8 +75,11 @@ private slots:
 
 private:
     // Internal SDL management
-    void refreshJoysticks();
     void closeAllJoysticks();
+
+    // Hot-plug detection handlers
+    void handleJoystickAdded(int sdlDeviceIndex);
+    void handleJoystickRemoved(SDL_JoystickID instanceId);
 
     // Convert SDL values to Atari format
     int convertSDLAxisToAtariStick(int xAxis, int yAxis) const;

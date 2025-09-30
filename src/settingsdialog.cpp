@@ -1384,6 +1384,13 @@ void SettingsDialog::createInputConfigTab()
         m_joystick2KeysLabel->setEnabled(enabled);
     });
 
+    // Note: Joystick refresh is handled by event filter on dropdown open
+    // This prevents signal re-entrancy issues during refresh
+
+    // Install event filters to refresh joysticks when dropdown opens
+    m_joystick1Device->installEventFilter(this);
+    m_joystick2Device->installEventFilter(this);
+
     // Initialize joystick device dropdowns
     populateJoystickDevices();
 }
@@ -3549,8 +3556,56 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     qDebug() << "Profile loaded to UI successfully";
 }
 
+bool SettingsDialog::eventFilter(QObject *watched, QEvent *event)
+{
+    // Refresh joysticks when user opens the joystick dropdown
+    if ((watched == m_joystick1Device || watched == m_joystick2Device) &&
+        event->type() == QEvent::MouseButtonPress) {
+
+#ifdef HAVE_SDL2_JOYSTICK
+        if (m_emulator && m_emulator->getJoystickManager()) {
+            SDL2JoystickManager* joyManager = m_emulator->getJoystickManager();
+
+            // Block signals to prevent re-entrancy during refresh
+            joyManager->blockSignals(true);
+
+            qDebug() << "Refreshing joysticks before opening dropdown...";
+            joyManager->refreshJoysticks();
+
+            // Unblock signals
+            joyManager->blockSignals(false);
+
+            // Save current selections
+            QString joy1Selected = m_joystick1Device->currentData().toString();
+            QString joy2Selected = m_joystick2Device->currentData().toString();
+
+            // Repopulate the dropdowns
+            populateJoystickDevices();
+
+            // Restore selections
+            int joy1Index = m_joystick1Device->findData(joy1Selected);
+            if (joy1Index >= 0) {
+                m_joystick1Device->setCurrentIndex(joy1Index);
+            }
+
+            int joy2Index = m_joystick2Device->findData(joy2Selected);
+            if (joy2Index >= 0) {
+                m_joystick2Device->setCurrentIndex(joy2Index);
+            }
+
+            qDebug() << "Joystick dropdowns refreshed";
+        }
+#endif
+    }
+
+    // Pass the event to the parent class
+    return QDialog::eventFilter(watched, event);
+}
+
 void SettingsDialog::populateJoystickDevices()
 {
+    qDebug() << "SettingsDialog::populateJoystickDevices() called";
+
     // Clear existing items
     m_joystick1Device->clear();
     m_joystick2Device->clear();
@@ -3565,7 +3620,11 @@ void SettingsDialog::populateJoystickDevices()
 #ifdef HAVE_SDL2_JOYSTICK
     // Add real joystick devices if SDL2 joystick manager is available
     if (m_emulator && m_emulator->getJoystickManager()) {
-        QStringList joystickNames = m_emulator->getJoystickManager()->getConnectedJoystickNames();
+        SDL2JoystickManager* joyManager = m_emulator->getJoystickManager();
+
+        // Get currently connected joysticks (refresh happens when dropdown opens)
+        QStringList joystickNames = joyManager->getConnectedJoystickNames();
+        qDebug() << "Found" << joystickNames.size() << "joystick devices:" << joystickNames;
 
         for (int i = 0; i < joystickNames.size(); ++i) {
             QString deviceId = QString("sdl_%1").arg(i);

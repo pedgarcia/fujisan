@@ -81,9 +81,38 @@ find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 # Find SDL2 for unified audio backend and joystick support (optional)
 find_package(SDL2 QUIET)
 if(SDL2_FOUND)
-    message(STATUS "SDL2 found - Unified audio backend and joystick support will be available")
-    set(HAVE_SDL2_AUDIO ON)
-    set(HAVE_SDL2_JOYSTICK ON)
+    # On Windows, only use SDL2 for joysticks to preserve Qt audio quality
+    if(WIN32)
+        message(STATUS "SDL2 found - Joystick support will be available (using Qt audio backend)")
+        set(HAVE_SDL2_AUDIO OFF)
+        set(HAVE_SDL2_JOYSTICK ON)
+    else()
+        message(STATUS "SDL2 found - Unified audio backend and joystick support will be available")
+        set(HAVE_SDL2_AUDIO ON)
+        set(HAVE_SDL2_JOYSTICK ON)
+    endif()
+
+    # Fix SDL2::SDL2 target for Windows cross-compilation
+    if(WIN32 AND TARGET SDL2::SDL2)
+        get_target_property(SDL2_IMPLIB SDL2::SDL2 IMPORTED_IMPLIB)
+        if(NOT SDL2_IMPLIB)
+            # Try common locations for the import library
+            find_library(SDL2_IMPLIB_LIB
+                NAMES SDL2 libSDL2.dll.a SDL2.lib
+                PATHS /usr/x86_64-w64-mingw32/lib
+                NO_DEFAULT_PATH
+            )
+            if(SDL2_IMPLIB_LIB)
+                set_target_properties(SDL2::SDL2 PROPERTIES
+                    IMPORTED_IMPLIB ${SDL2_IMPLIB_LIB}
+                )
+                message(STATUS "Fixed SDL2::SDL2 IMPORTED_IMPLIB: ${SDL2_IMPLIB_LIB}")
+            else()
+                message(WARNING "Could not find SDL2 import library for Windows cross-compilation")
+            endif()
+        endif()
+    endif()
+
     # Store SDL2 libraries for later use
     set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
 else()
@@ -298,6 +327,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${ATARI800_SOURCE_DIR}/src/libatari800
     ${ATARI800_SOURCE_DIR}/src
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:${SDL2_INCLUDE_DIRS}>
+    $<$<BOOL:${HAVE_SDL2_JOYSTICK}>:${SDL2_INCLUDE_DIRS}>
 )
 
 # ============================================================================
@@ -373,9 +403,44 @@ target_link_libraries(${PROJECT_NAME}
 # Link SDL2 only if available (for unified audio backend and/or joystick support)
 if(HAVE_SDL2_AUDIO OR HAVE_SDL2_JOYSTICK)
     if(TARGET SDL2::SDL2)
-        target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+        # Try to link with SDL2 target first
+        try_compile(SDL2_TARGET_WORKS
+            ${CMAKE_BINARY_DIR}/test_sdl2_target
+            ${CMAKE_SOURCE_DIR}/cmake/test_sdl2_target.cpp
+            LINK_LIBRARIES SDL2::SDL2
+            OUTPUT_VARIABLE SDL2_TARGET_OUTPUT
+        )
+
+        if(SDL2_TARGET_WORKS)
+            message(STATUS "SDL2::SDL2 target linking works")
+            target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+        else()
+            message(WARNING "SDL2::SDL2 target linking failed, falling back to library paths")
+            message(STATUS "SDL2 target test output: ${SDL2_TARGET_OUTPUT}")
+            # Fallback to direct library linking for cross-compilation
+            if(WIN32 AND CMAKE_CROSSCOMPILING)
+                find_library(SDL2_FALLBACK_LIB
+                    NAMES SDL2 libSDL2.dll.a SDL2.lib libSDL2
+                    PATHS /usr/x86_64-w64-mingw32/lib
+                          /usr/lib/x86_64-w64-mingw32
+                          ${SDL2_LIBRARY_DIRS}
+                    NO_DEFAULT_PATH
+                )
+                if(SDL2_FALLBACK_LIB)
+                    message(STATUS "Using SDL2 fallback library: ${SDL2_FALLBACK_LIB}")
+                    target_link_libraries(${PROJECT_NAME} ${SDL2_FALLBACK_LIB})
+                else()
+                    message(FATAL_ERROR "SDL2 fallback library not found")
+                endif()
+            elseif(SDL2_LIBRARIES)
+                target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+            endif()
+        endif()
     elseif(SDL2_LIBRARIES)
+        message(STATUS "Using SDL2_LIBRARIES: ${SDL2_LIBRARIES}")
         target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+    else()
+        message(FATAL_ERROR "SDL2 required but not found")
     endif()
 endif()
 

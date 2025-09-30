@@ -10,6 +10,8 @@
 #include "sdl2joystickmanager.h"
 #include <SDL.h>
 #include <QDebug>
+#include <QThread>
+#include <QCoreApplication>
 
 // Atari INPUT_STICK constants (from atari800/src/input.h)
 // libatari800 XORs these with 0xff, so we pre-calculate the inverted values
@@ -49,9 +51,23 @@ bool SDL2JoystickManager::initialize()
         return true;
     }
 
-    // Initialize SDL joystick subsystem
-    if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != 0) {
-        qWarning() << "Failed to initialize SDL joystick subsystem:" << SDL_GetError();
+    // Check if SDL is already initialized (main system might have initialized it)
+    bool sdlAlreadyInit = SDL_WasInit(SDL_INIT_JOYSTICK);
+
+    if (!sdlAlreadyInit) {
+        // Initialize SDL joystick subsystem
+        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != 0) {
+            qWarning() << "Failed to initialize SDL joystick subsystem:" << SDL_GetError();
+            return false;
+        }
+        qDebug() << "SDL joystick subsystem initialized";
+    } else {
+        qDebug() << "SDL joystick subsystem already initialized";
+    }
+
+    // Verify SDL joystick subsystem is ready
+    if (!SDL_WasInit(SDL_INIT_JOYSTICK)) {
+        qWarning() << "SDL joystick subsystem verification failed";
         return false;
     }
 
@@ -79,8 +95,10 @@ void SDL2JoystickManager::shutdown()
     // Close all joysticks
     closeAllJoysticks();
 
-    // Shutdown SDL joystick subsystem
-    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+    // Shutdown SDL joystick subsystem only if it's still initialized
+    if (SDL_WasInit(SDL_INIT_JOYSTICK)) {
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+    }
 
     m_initialized = false;
     qDebug() << "SDL2JoystickManager shut down";
@@ -126,16 +144,42 @@ void SDL2JoystickManager::onPollTimer()
         return;
     }
 
+    // Verify we're on the main thread (critical for macOS)
+    if (QThread::currentThread() != QCoreApplication::instance()->thread()) {
+        qWarning() << "SDL2JoystickManager: onPollTimer called from wrong thread!"
+                   << "Current:" << QThread::currentThread()
+                   << "Main:" << QCoreApplication::instance()->thread();
+        return;
+    }
+
     pollJoysticks();
 }
 
 void SDL2JoystickManager::pollJoysticks()
 {
-    if (!m_initialized) {
+    if (!m_initialized || !SDL_WasInit(SDL_INIT_JOYSTICK)) {
         return;
     }
 
-    // Update SDL events to handle device connect/disconnect
+    // First pump events to update the SDL event queue
+    SDL_PumpEvents();
+
+    // Process only joystick device events without consuming other events
+    SDL_Event events[32];  // Buffer for multiple events
+    int numEvents = SDL_PeepEvents(events, 32, SDL_GETEVENT, SDL_JOYDEVICEADDED, SDL_JOYDEVICEREMOVED);
+
+    for (int i = 0; i < numEvents; ++i) {
+        const SDL_Event& event = events[i];
+        if (event.type == SDL_JOYDEVICEADDED) {
+            qDebug() << "SDL2JoystickManager: Joystick device added (hot-plug)";
+            handleJoystickAdded(event.jdevice.which);
+        } else if (event.type == SDL_JOYDEVICEREMOVED) {
+            qDebug() << "SDL2JoystickManager: Joystick device removed (hot-unplug)";
+            handleJoystickRemoved(event.jdevice.which);
+        }
+    }
+
+    // Update SDL joystick state (this doesn't consume events)
     SDL_JoystickUpdate();
 
     // Poll each connected joystick
@@ -181,6 +225,13 @@ void SDL2JoystickManager::pollJoysticks()
 void SDL2JoystickManager::refreshJoysticks()
 {
     if (!m_initialized) {
+        qDebug() << "SDL2JoystickManager: Cannot refresh joysticks - not initialized";
+        return;
+    }
+
+    // Verify SDL joystick subsystem is initialized
+    if (!SDL_WasInit(SDL_INIT_JOYSTICK)) {
+        qWarning() << "SDL2JoystickManager: SDL joystick subsystem not initialized";
         return;
     }
 
@@ -222,11 +273,14 @@ void SDL2JoystickManager::refreshJoysticks()
 
 void SDL2JoystickManager::closeAllJoysticks()
 {
+    // Only close joysticks if SDL is still initialized
+    bool sdlInitialized = SDL_WasInit(SDL_INIT_JOYSTICK);
+
     for (auto it = m_joysticks.begin(); it != m_joysticks.end(); ++it) {
         int index = it.key();
         SDL_Joystick* joystick = it.value();
 
-        if (joystick) {
+        if (joystick && sdlInitialized) {
             SDL_JoystickClose(joystick);
             emit joystickDisconnected(index);
         }
@@ -332,6 +386,89 @@ int SDL2JoystickManager::convertSDLAxisToAtariStick(int xAxis, int yAxis) const
 bool SDL2JoystickManager::isWithinDeadZone(int axis) const
 {
     return qAbs(axis) < m_deadZone;
+}
+
+void SDL2JoystickManager::handleJoystickAdded(int sdlDeviceIndex)
+{
+    if (!m_initialized) {
+        return;
+    }
+
+    // Find the next available slot
+    int ourIndex = -1;
+    for (int i = 0; i < MAX_JOYSTICKS; ++i) {
+        if (!m_joysticks.contains(i)) {
+            ourIndex = i;
+            break;
+        }
+    }
+
+    if (ourIndex == -1) {
+        qWarning() << "SDL2JoystickManager: Maximum joysticks reached, cannot add device" << sdlDeviceIndex;
+        return;
+    }
+
+    // Open the joystick
+    SDL_Joystick* joystick = SDL_JoystickOpen(sdlDeviceIndex);
+    if (joystick) {
+        SDL_JoystickID instanceId = SDL_JoystickInstanceID(joystick);
+
+        m_joysticks[ourIndex] = joystick;
+        m_joystickIds[ourIndex] = instanceId;
+
+        JoystickState state;
+        state.connected = true;
+        state.name = QString::fromUtf8(SDL_JoystickName(joystick));
+        state.stick = INPUT_STICK_CENTRE;
+        state.trigger = false;
+
+        m_joystickStates[ourIndex] = state;
+
+        qDebug() << "SDL2JoystickManager: Hot-plugged joystick" << ourIndex
+                 << "(" << state.name << ") with"
+                 << SDL_JoystickNumAxes(joystick) << "axes and"
+                 << SDL_JoystickNumButtons(joystick) << "buttons";
+
+        emit joystickConnected(ourIndex, state.name);
+    } else {
+        qWarning() << "SDL2JoystickManager: Failed to open hot-plugged joystick" << sdlDeviceIndex << ":" << SDL_GetError();
+    }
+}
+
+void SDL2JoystickManager::handleJoystickRemoved(SDL_JoystickID instanceId)
+{
+    if (!m_initialized) {
+        return;
+    }
+
+    // Find the joystick by instance ID
+    int ourIndex = -1;
+    for (auto it = m_joystickIds.begin(); it != m_joystickIds.end(); ++it) {
+        if (it.value() == instanceId) {
+            ourIndex = it.key();
+            break;
+        }
+    }
+
+    if (ourIndex == -1) {
+        qWarning() << "SDL2JoystickManager: Received removal event for unknown joystick instance" << instanceId;
+        return;
+    }
+
+    // Close the joystick
+    SDL_Joystick* joystick = m_joysticks.value(ourIndex, nullptr);
+    if (joystick) {
+        SDL_JoystickClose(joystick);
+    }
+
+    // Remove from our tracking
+    m_joysticks.remove(ourIndex);
+    m_joystickIds.remove(ourIndex);
+    m_joystickStates.remove(ourIndex);
+
+    qDebug() << "SDL2JoystickManager: Hot-unplugged joystick" << ourIndex;
+
+    emit joystickDisconnected(ourIndex);
 }
 
 #endif // HAVE_SDL2_JOYSTICK

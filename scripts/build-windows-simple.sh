@@ -19,6 +19,7 @@ podman run --rm \
     -v "$PROJECT_ROOT:/work" \
     --workdir="/work" \
     --platform linux/amd64 \
+    --user root \
     -e VERSION="$VERSION" \
     maxrd2/arch-mingw \
     bash -c '
@@ -26,12 +27,15 @@ set -e
 
 echo "=== Building in container ==="
 
+# SDL2 MinGW libraries are already available in the container
+echo "Using pre-installed SDL2 MinGW libraries..."
+
 # Clean and create build directory
 rm -rf build-cross-windows
 mkdir -p build-cross-windows
 cd build-cross-windows
 
-# Configure with CMake (disable SDL2 for Windows)
+# Configure with CMake (enable SDL2 for Windows joystick support)
 echo "Configuring..."
 
 # Get version from environment (passed from host)
@@ -51,7 +55,6 @@ x86_64-w64-mingw32-cmake \
     -DCMAKE_SYSTEM_NAME=Windows \
     -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
     -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ \
-    -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
     -DPROJECT_VERSION="$VERSION_CLEAN" \
     ..
 
@@ -84,6 +87,15 @@ cp /usr/x86_64-w64-mingw32/bin/Qt5Gui.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/Qt5Widgets.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/Qt5Multimedia.dll build-windows/
 cp /usr/x86_64-w64-mingw32/bin/Qt5Network.dll build-windows/
+
+# Copy SDL2 libraries for joystick support
+echo "Copying SDL2 libraries..."
+if [ -f "/usr/x86_64-w64-mingw32/bin/SDL2.dll" ]; then
+    cp /usr/x86_64-w64-mingw32/bin/SDL2.dll build-windows/
+    echo "✓ SDL2.dll copied"
+else
+    echo "Warning: SDL2.dll not found - joystick support may not work"
+fi
 
 # Copy system libraries
 cp /usr/x86_64-w64-mingw32/bin/libgcc_s_seh-1.dll build-windows/

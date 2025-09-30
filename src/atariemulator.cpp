@@ -124,9 +124,10 @@ AtariEmulator::AtariEmulator(QObject *parent)
 #ifdef HAVE_SDL2_JOYSTICK
     // Initialize SDL2 joystick manager
     m_joystickManager = new SDL2JoystickManager(this);
-    if (m_joystickManager->initialize()) {
-    } else {
+    if (!m_joystickManager->initialize()) {
         qWarning() << "Failed to initialize SDL2 joystick subsystem";
+        delete m_joystickManager;
+        m_joystickManager = nullptr;
     }
 #endif
 }
@@ -753,6 +754,7 @@ void AtariEmulator::processFrame()
                 // Buffer overrun - this should be rare with the new architecture
                 static int overrunCount = 0;
                 if (++overrunCount % 100 == 1) {
+                    qDebug() << "Audio buffer overrun #" << overrunCount
                              << "- buffer fill:" << m_unifiedAudio->getBufferFillPercent() << "%";
                 }
             }
@@ -1037,9 +1039,10 @@ bool AtariEmulator::mountDiskImage(int driveNumber, const QString& filename, boo
         // Store the path for tracking
         m_diskImages[driveNumber - 1] = filename;
         m_mountedDrives.insert(driveNumber);
-        
+
+        qDebug() << "Disk mounted on D" << driveNumber << ":" << filename
                  << (readOnly ? "(read-only)" : "(read-write)");
-        
+
         return true;
     } else {
         return false;
@@ -1123,10 +1126,12 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
             if (controlKeyPressed) shiftctrl |= AKEY_CTRL;
             
             m_currentInput.keycode = baseKey | shiftctrl;
-            
+
             if (shiftPressed && ctrlPressed) {
+                qDebug() << "Key press with shift+ctrl:"
                          << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(pure control)";
             } else {
+                qDebug() << "Key press:"
                          << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(display control)";
             }
         } else {
@@ -1810,10 +1815,11 @@ void AtariEmulator::updatePalColorSettings(double saturation, double contrast, d
     COLOURS_PAL_setup.brightness = brightness / 100.0;           // -100 to 100 → -1.0 to 1.0
     COLOURS_PAL_setup.gamma = gamma / 100.0;                     // 10 to 400 → 0.1 to 4.0
     COLOURS_PAL_setup.hue = hue / 180.0;                         // -180 to 180 → -1.0 to 1.0
-    
+
     // Update the color palette
     Colours_Update();
-    
+
+    qDebug() << "PAL color settings updated:"
              << "Cont:" << COLOURS_PAL_setup.contrast
              << "Bright:" << COLOURS_PAL_setup.brightness
              << "Gamma:" << COLOURS_PAL_setup.gamma
@@ -1828,10 +1834,11 @@ void AtariEmulator::updateNtscColorSettings(double saturation, double contrast, 
     COLOURS_NTSC_setup.brightness = brightness / 100.0;           // -100 to 100 → -1.0 to 1.0
     COLOURS_NTSC_setup.gamma = gamma / 100.0;                     // 10 to 400 → 0.1 to 4.0
     COLOURS_NTSC_setup.hue = hue / 180.0;                         // -180 to 180 → -1.0 to 1.0
-    
+
     // Update the color palette
     Colours_Update();
-    
+
+    qDebug() << "NTSC color settings updated:"
              << "Cont:" << COLOURS_NTSC_setup.contrast
              << "Bright:" << COLOURS_NTSC_setup.brightness
              << "Gamma:" << COLOURS_NTSC_setup.gamma
@@ -1962,10 +1969,11 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
     }
     
     if (!loadingComplete) {
+        qDebug() << "Binary loaded with entry point: $"
+                 << QString("%1").arg(entryPoint, 4, 16, QChar('0')).toUpper()
+                 << "Current PC: $"
+                 << QString("%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
     }
-    
-                .arg(entryPoint, 4, 16, QChar('0'))
-                .arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
     
     // Emit signal for debugger widget to handle (could set a temporary breakpoint)
     emit xexLoadedForDebug(entryPoint);
@@ -2217,9 +2225,11 @@ void AtariEmulator::stepOneInstruction()
         
         // Check breakpoints after execution
         checkBreakpoints();
-        
-                    .arg(startPC, 4, 16, QChar('0')).toUpper()
-                    .arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
+
+        qDebug() << "Debug step completed: PC from $"
+                 << QString("%1").arg(startPC, 4, 16, QChar('0')).toUpper()
+                 << "to $"
+                 << QString("%1").arg(CPU_regPC, 4, 16, QChar('0')).toUpper();
         emit debugStepped();
     } else {
     }
@@ -2658,16 +2668,19 @@ bool AtariEmulator::setSIOPatchEnabled(bool enabled)
     // Control libatari800 SIO patch status
     extern int libatari800_set_sio_patch_enabled(int enabled);
     int previousState = libatari800_set_sio_patch_enabled(enabled ? 1 : 0);
-    
+
+    qDebug() << "SIO patch changed"
              << "to" << (enabled ? "ENABLED" : "DISABLED");
-    
+
     return previousState != 0;
 }
 
 void AtariEmulator::debugSIOPatchStatus() const
 {
     bool isEnabled = getSIOPatchEnabled();
-    
+
+    qDebug() << "SIO Patch Status:" << (isEnabled ? "ENABLED" : "DISABLED");
+    qDebug() << (isEnabled ?
         "Disk operations bypass sector delays for faster loading" :
         "Disk operations use realistic timing delays (~3200 scanlines between sectors)");
     

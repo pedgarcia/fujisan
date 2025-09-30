@@ -169,7 +169,6 @@ cd build-release
 
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/usr \
-      -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=TRUE \
       -DPROJECT_VERSION="$VERSION_CLEAN" \
       ..
 
@@ -212,6 +211,12 @@ chmod 755 fujisan-linux/usr/lib/fujisan/Fujisan
 # Copy Qt libraries
 echo "Copying Qt libraries..."
 for lib in libQt5Core libQt5Gui libQt5Widgets libQt5Multimedia libQt5Network libQt5DBus libQt5XcbQpa; do
+    find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-linux/usr/lib/fujisan/ \; 2>/dev/null || true
+done
+
+# Copy SDL2 libraries if available
+echo "Copying SDL2 libraries..."
+for lib in libSDL2-2.0; do
     find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-linux/usr/lib/fujisan/ \; 2>/dev/null || true
 done
 

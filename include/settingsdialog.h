@@ -66,6 +66,9 @@ private slots:
     void onLoadProfile(const QString& profileName);
     void onJoystickDeviceChanged();
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     void createHardwareTab();
     void createAudioConfigTab();

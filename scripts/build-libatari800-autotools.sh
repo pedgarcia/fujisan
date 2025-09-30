@@ -66,6 +66,7 @@ export PKG_CONFIG_PATH="/usr/x86_64-w64-mingw32/lib/pkgconfig"
     --host=x86_64-w64-mingw32 \
     --target=libatari800 \
     --disable-sdltest \
+    --without-sdl \
     --disable-riodevice \
     --disable-netsio \
     --without-x \
