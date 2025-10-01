@@ -78,19 +78,13 @@ endif()
 # Find Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Multimedia Network)
 
-# Find SDL2 for unified audio backend and joystick support (optional)
+# Find SDL2 for joystick support (optional)
+# Note: We use Qt audio backend on all platforms for consistent quality
 find_package(SDL2 QUIET)
 if(SDL2_FOUND)
-    # On Windows, only use SDL2 for joysticks to preserve Qt audio quality
-    if(WIN32)
-        message(STATUS "SDL2 found - Joystick support will be available (using Qt audio backend)")
-        set(HAVE_SDL2_AUDIO OFF)
-        set(HAVE_SDL2_JOYSTICK ON)
-    else()
-        message(STATUS "SDL2 found - Unified audio backend and joystick support will be available")
-        set(HAVE_SDL2_AUDIO ON)
-        set(HAVE_SDL2_JOYSTICK ON)
-    endif()
+    message(STATUS "SDL2 found - Joystick support will be available (using Qt audio backend)")
+    set(HAVE_SDL2_AUDIO OFF)
+    set(HAVE_SDL2_JOYSTICK ON)
 
     # Fix SDL2::SDL2 target for Windows cross-compilation
     if(WIN32 AND TARGET SDL2::SDL2)

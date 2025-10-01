@@ -36,6 +36,9 @@ RUN apt-get update && apt-get install -y \
     libxshmfence-dev \
     libasound2-dev \
     libpulse-dev \
+    # SDL2 for joystick support
+    libsdl2-dev \
+    libsdl2-2.0-0 \
     file \
     wget \
     fuse \

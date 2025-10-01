@@ -123,12 +123,18 @@ AtariEmulator::AtariEmulator(QObject *parent)
 
 #ifdef HAVE_SDL2_JOYSTICK
     // Initialize SDL2 joystick manager
+    qDebug() << "Initializing SDL2 joystick support...";
     m_joystickManager = new SDL2JoystickManager(this);
     if (!m_joystickManager->initialize()) {
-        qWarning() << "Failed to initialize SDL2 joystick subsystem";
+        qWarning() << "Failed to initialize SDL2 joystick subsystem - joystick support disabled";
+        qWarning() << "On Linux, ensure your user is in the 'input' group: sudo usermod -a -G input $USER";
         delete m_joystickManager;
         m_joystickManager = nullptr;
+    } else {
+        qDebug() << "SDL2 joystick manager initialized successfully";
     }
+#else
+    qDebug() << "SDL2 joystick support not compiled in - joystick support unavailable";
 #endif
 }
 
