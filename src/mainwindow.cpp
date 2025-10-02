@@ -50,7 +50,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setWindowTitle(QString("Fujisan %1").arg(FUJISAN_VERSION));
     setMinimumSize(800, 600);
-    resize(1280, 960);
+    resize(1440, 960);
 
 #ifdef Q_OS_MACOS
     // Disable automatic macOS fullscreen to prevent duplicate menu items
