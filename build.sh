@@ -9,7 +9,11 @@
 #   macos-x86_64   - Build for Intel Macs
 #   macos          - Build for both Mac architectures
 #   windows        - Cross-compile for Windows
-#   linux          - Build for Linux (using Docker/Podman)
+#   linux          - Build for Linux x86_64 (using Docker/Podman)
+#   linux-x86_64   - Build for Linux x86_64 explicitly
+#   linux-amd64    - Build for Linux x86_64 (alias)
+#   linux-arm64    - Build for Linux ARM64/aarch64
+#   linux-aarch64  - Build for Linux ARM64 (alias)
 #   all            - Build for all platforms
 #
 # Options:
@@ -72,10 +76,14 @@ Usage: $0 [platform] [options]
 
 Platforms:
   macos-arm64    Build for Apple Silicon Macs
-  macos-x86_64   Build for Intel Macs  
+  macos-x86_64   Build for Intel Macs
   macos          Build for both Mac architectures
   windows        Cross-compile for Windows
-  linux          Build for Linux (Docker/Podman)
+  linux          Build for Linux x86_64 (Docker/Podman)
+  linux-x86_64   Build for Linux x86_64 explicitly
+  linux-amd64    Build for Linux x86_64 (alias)
+  linux-arm64    Build for Linux ARM64/aarch64
+  linux-aarch64  Build for Linux ARM64 (alias)
   all            Build for all platforms
 
 Options:
@@ -101,8 +109,10 @@ Output:
   dist/windows/
     - Fujisan-{version}-windows.zip
   dist/linux/
-    - fujisan-{version}-linux-x64.tar.gz
-    - fujisan_{version}_amd64.deb
+    - fujisan-{version}-linux-x64.tar.gz (x86_64)
+    - fujisan_{version}_amd64.deb (x86_64)
+    - fujisan-{version}-linux-arm64.tar.gz (ARM64)
+    - fujisan_{version}_arm64.deb (ARM64)
 
 EOF
 }
@@ -571,19 +581,21 @@ build_windows() {
 
 # Build Linux
 build_linux() {
-    echo_step "Building Linux"
-    
+    local arch="${1:-amd64}"  # Default to amd64 for backward compatibility
+
+    echo_step "Building Linux ($arch)"
+
     # Ensure we're in the project root
     cd "$PROJECT_ROOT"
-    
+
     # Use the Docker-based Linux build
     if [[ -f "$SCRIPT_DIR/scripts/build-linux-docker.sh" ]]; then
-        "$SCRIPT_DIR/scripts/build-linux-docker.sh" --version "$VERSION"
+        "$SCRIPT_DIR/scripts/build-linux-docker.sh" "$arch" --version "$VERSION"
     else
         echo_error "Linux build script not found"
         return 1
     fi
-    
+
     echo_success "Linux build complete"
 }
 
@@ -649,7 +661,7 @@ while [[ $# -gt 0 ]]; do
             show_help
             exit 0
             ;;
-        macos-arm64|macos-x86_64|macos|windows|linux|all)
+        macos-arm64|macos-x86_64|macos|windows|linux|linux-x86_64|linux-amd64|linux-arm64|linux-aarch64|all)
             PLATFORM="$1"
             shift
             ;;
@@ -711,8 +723,11 @@ case $PLATFORM in
     windows)
         build_windows
         ;;
-    linux)
-        build_linux
+    linux|linux-x86_64|linux-amd64)
+        build_linux "amd64"
+        ;;
+    linux-arm64|linux-aarch64)
+        build_linux "arm64"
         ;;
     all)
         # Build for macOS if on macOS
@@ -722,7 +737,8 @@ case $PLATFORM in
         fi
         # Always build Windows and Linux (cross-platform builds)
         build_windows
-        build_linux
+        build_linux "amd64"
+        build_linux "arm64"
         ;;
     *)
         echo_error "Unknown platform: $PLATFORM"

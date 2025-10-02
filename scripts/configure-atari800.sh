@@ -105,24 +105,24 @@ elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     echo "MSYSTEM: $MSYSTEM"
     echo "Current PATH: $PATH"
     echo "Checking for autotools..."
-    
+
     # Initialize MSYS2 environment if needed
     if [[ "$MSYSTEM" == "MSYS" ]] && [[ -f "/etc/profile" ]]; then
         echo "Sourcing MSYS2 profile..."
         source /etc/profile || true
     fi
-    
+
     which autoconf || echo "autoconf not found"
-    which aclocal || echo "aclocal not found"  
+    which aclocal || echo "aclocal not found"
     which automake || echo "automake not found"
     which autoreconf || echo "autoreconf not found"
-    
+
     # Ensure MinGW-w64 tools are in PATH
     export PATH="/mingw64/bin:/usr/bin:$PATH"
     echo "Updated PATH for MinGW-w64: $PATH"
     which gcc || echo "gcc not found"
     which g++ || echo "g++ not found"
-    
+
     # Ensure we're using MinGW-w64 compiler
     export CC=gcc
     export CXX=g++
@@ -130,6 +130,18 @@ elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     export CFLAGS="-O2 ${CFLAGS:-}"
     export LDFLAGS="${LDFLAGS:-}"
     export CPPFLAGS="${CPPFLAGS:-}"
+else
+    # Linux: Set aggressive optimization flags for performance
+    echo "Configuring for Linux build with optimizations..."
+    echo "Compiler: $(gcc --version | head -1 2>/dev/null || echo 'gcc not found')"
+
+    # Use -O3 for maximum optimization, -march=native for CPU-specific optimizations
+    # Note: In containers, we use the container's native arch (specified by --platform)
+    export CFLAGS="-O3 -march=native -mtune=native ${CFLAGS:-}"
+    export LDFLAGS="${LDFLAGS:-}"
+    export CPPFLAGS="${CPPFLAGS:-}"
+
+    echo "CFLAGS: $CFLAGS"
 fi
 
 # Debug environment variables

@@ -4,6 +4,7 @@
 #
 # Based on the working GitHub Actions workflow
 # Creates .deb package, .tar.gz portable, and optionally AppImage
+# Supports both x86_64 (amd64) and ARM64 (aarch64) architectures
 #
 
 set -e
@@ -12,8 +13,22 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# Architecture - first parameter or default to amd64
+ARCH="${1:-amd64}"
+
+# Validate architecture
+if [[ "$ARCH" != "amd64" && "$ARCH" != "arm64" ]]; then
+    echo "ERROR: Invalid architecture: $ARCH (must be amd64 or arm64)"
+    exit 1
+fi
+
+# Shift to process remaining arguments
+if [[ "$1" == "amd64" ]] || [[ "$1" == "arm64" ]]; then
+    shift
+fi
+
 # Output directory
-LINUX_BUILD_DIR="${PROJECT_ROOT}/build-linux"
+LINUX_BUILD_DIR="${PROJECT_ROOT}/build-linux-${ARCH}"
 DIST_DIR="${PROJECT_ROOT}/dist/linux"
 
 # Version
@@ -90,7 +105,11 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --help)
-            echo "Usage: $0 [options]"
+            echo "Usage: $0 [arch] [options]"
+            echo ""
+            echo "Architecture:"
+            echo "  amd64            Build for x86_64 (default)"
+            echo "  arm64            Build for ARM64/aarch64"
             echo ""
             echo "Options:"
             echo "  --clean          Clean build directories before starting"
@@ -101,9 +120,13 @@ while [[ $# -gt 0 ]]; do
             echo "  --version        Set version (default: from git)"
             echo "  --help           Show this help message"
             echo ""
-            echo "Output:"
-            echo "  dist/fujisan_${VERSION_CLEAN}_amd64.deb     - Debian package"
-            echo "  dist/fujisan-${VERSION_CLEAN}-linux-x64.tar.gz - Portable tarball"
+            echo "Output (amd64):"
+            echo "  dist/linux/fujisan_${VERSION_CLEAN}_amd64.deb"
+            echo "  dist/linux/fujisan-${VERSION_CLEAN}-linux-x64.tar.gz"
+            echo ""
+            echo "Output (arm64):"
+            echo "  dist/linux/fujisan_${VERSION_CLEAN}_arm64.deb"
+            echo "  dist/linux/fujisan-${VERSION_CLEAN}-linux-arm64.tar.gz"
             echo ""
             echo "Using: $CONTAINER_RUNTIME"
             exit 0
@@ -118,6 +141,7 @@ done
 # Main execution
 echo_step "Linux Build for Fujisan"
 echo_info "Using container runtime: $CONTAINER_RUNTIME"
+echo_info "Architecture: $ARCH"
 echo_info "Project root: $PROJECT_ROOT"
 echo_info "Version: $VERSION"
 echo ""
@@ -136,11 +160,11 @@ mkdir -p "$DIST_DIR"
 echo_step "Building Container Image"
 cd "$PROJECT_ROOT"
 
-echo_info "Building Ubuntu 22.04 based container for x86_64..."
+echo_info "Building Ubuntu 22.04 based container for $ARCH..."
 $CONTAINER_RUNTIME build \
-    --platform linux/amd64 \
+    --platform linux/$ARCH \
     -f docker/Dockerfile.ubuntu-22.04 \
-    -t fujisan-linux-builder:ubuntu22 \
+    -t fujisan-linux-builder:ubuntu22-$ARCH \
     . || {
     echo_error "Failed to build container image"
     exit 1
@@ -156,6 +180,7 @@ VERSION="$1"
 VERSION_CLEAN="$2"
 BUILD_DEB="$3"
 BUILD_TARBALL="$4"
+ARCH="$5"
 
 echo "Building Fujisan version $VERSION..."
 
@@ -189,6 +214,84 @@ fi
 echo "Testing Fujisan binary..."
 file Fujisan
 ldd Fujisan | head -20
+
+# Verify architecture matches expected
+echo ""
+echo "=== Architecture Verification ==="
+FUJISAN_ARCH=$(file Fujisan | grep -o 'ELF [0-9]*-bit' | awk '{print $2}')
+FUJISAN_MACHINE=$(file Fujisan | grep -o -E '(x86-64|aarch64|ARM aarch64)')
+
+if [ "$ARCH" = "amd64" ]; then
+    EXPECTED_BITS="64"
+    EXPECTED_MACHINE="x86-64"
+elif [ "$ARCH" = "arm64" ]; then
+    EXPECTED_BITS="64"
+    EXPECTED_MACHINE="aarch64"
+fi
+
+echo "Expected architecture: $ARCH ($EXPECTED_MACHINE, ${EXPECTED_BITS}-bit)"
+echo "Fujisan binary: $FUJISAN_MACHINE, ${FUJISAN_ARCH}-bit"
+
+# Check libatari800.a architecture
+if [ -f "atari800-src/src/libatari800.a" ]; then
+    echo ""
+    echo "libatari800.a architecture:"
+    file atari800-src/src/libatari800.a
+
+    # For .a archive files, we need to extract and check an object file
+    # Create temp directory for extraction
+    TEMP_CHECK_DIR=$(mktemp -d)
+    cd "$TEMP_CHECK_DIR"
+
+    # Extract first object file from archive
+    ar x ../atari800-src/src/libatari800.a 2>/dev/null | head -1
+
+    # Get the first .o file
+    FIRST_OBJ=$(ls *.o 2>/dev/null | head -1)
+
+    if [ -n "$FIRST_OBJ" ]; then
+        echo "Checking object file: $FIRST_OBJ"
+        file "$FIRST_OBJ"
+
+        LIBATARI_MACHINE=$(file "$FIRST_OBJ" | grep -o -E '(x86-64|aarch64|ARM aarch64)')
+        echo "libatari800.a machine type: $LIBATARI_MACHINE"
+
+        # Verify libatari800 matches expected architecture
+        if [ "$ARCH" = "amd64" ] && [[ "$LIBATARI_MACHINE" != *"x86-64"* ]]; then
+            cd - > /dev/null
+            rm -rf "$TEMP_CHECK_DIR"
+            echo "❌ ERROR: libatari800.a is not x86-64! This will cause performance issues."
+            exit 1
+        elif [ "$ARCH" = "arm64" ] && [[ "$LIBATARI_MACHINE" != *"aarch64"* ]] && [[ "$LIBATARI_MACHINE" != *"ARM aarch64"* ]]; then
+            cd - > /dev/null
+            rm -rf "$TEMP_CHECK_DIR"
+            echo "❌ ERROR: libatari800.a is not ARM64/aarch64! This will cause performance issues."
+            exit 1
+        else
+            echo "✓ libatari800.a architecture verified: $LIBATARI_MACHINE"
+        fi
+    else
+        echo "⚠ Warning: Could not extract object file from libatari800.a for verification"
+    fi
+
+    # Clean up and return to build directory
+    cd - > /dev/null
+    rm -rf "$TEMP_CHECK_DIR"
+fi
+
+# Verify Fujisan binary matches expected architecture
+if [ "$ARCH" = "amd64" ] && [[ "$FUJISAN_MACHINE" != *"x86-64"* ]]; then
+    echo "❌ ERROR: Fujisan binary is not x86-64!"
+    exit 1
+elif [ "$ARCH" = "arm64" ] && [[ "$FUJISAN_MACHINE" != *"aarch64"* ]] && [[ "$FUJISAN_MACHINE" != *"ARM aarch64"* ]]; then
+    echo "❌ ERROR: Fujisan binary is not ARM64/aarch64!"
+    exit 1
+else
+    echo "✓ Fujisan binary architecture verified: $FUJISAN_MACHINE"
+fi
+
+echo "=== Architecture Verification Complete ==="
+echo ""
 
 # Prepare installation directory
 mkdir -p fujisan-linux/usr/bin
@@ -235,7 +338,12 @@ find /usr/lib -path "*/qt5/plugins/xcbglintegrations/*.so" -exec cp {} fujisan-l
 
 # Copy additional system libraries that Qt depends on
 echo "Copying system dependencies..."
-for lib in libxcb-xkb libxkbcommon-x11 libxkbcommon libicui18n libicuuc libicudata libmd4c libdouble-conversion libpcre2-16 libxcb-xinerama libxcb-xinput; do
+# Core system libraries
+for lib in libxcb-xkb libxkbcommon-x11 libxkbcommon libicui18n libicuuc libicudata libmd4c libdouble-conversion libpcre2-16; do
+    find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-linux/usr/lib/fujisan/ \; 2>/dev/null || true
+done
+# X11 libraries
+for lib in libXss libXrandr libXrender libXfixes libXcursor libXinerama libXext libXi libxcb-xinerama libxcb-xinput libxcb-randr libxcb-render libxcb-shape libxcb-shm libxcb-icccm libxcb-image libxcb-keysyms libxcb-render-util; do
     find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-linux/usr/lib/fujisan/ \; 2>/dev/null || true
 done
 
@@ -303,7 +411,7 @@ Package: fujisan
 Version: $VERSION_CLEAN
 Section: games
 Priority: optional
-Architecture: amd64
+Architecture: $ARCH
 Essential: no
 Installed-Size: $INSTALLED_SIZE
 Maintainer: 8bitrelics.com <noreply@8bitrelics.com>
@@ -324,13 +432,13 @@ EOF
     chmod 755 fujisan-linux/usr/bin/fujisan
     
     # Build .deb package
-    dpkg-deb --build fujisan-linux "fujisan_${VERSION_CLEAN}_amd64.deb"
-    
+    dpkg-deb --build fujisan-linux "fujisan_${VERSION_CLEAN}_${ARCH}.deb"
+
     echo "✓ .deb package created"
-    ls -lh "fujisan_${VERSION_CLEAN}_amd64.deb"
-    
+    ls -lh "fujisan_${VERSION_CLEAN}_${ARCH}.deb"
+
     # Copy to output
-    cp "fujisan_${VERSION_CLEAN}_amd64.deb" /output/
+    cp "fujisan_${VERSION_CLEAN}_${ARCH}.deb" /output/
 fi
 
 # Create .tar.gz package
@@ -352,10 +460,22 @@ if [ "$BUILD_TARBALL" = "true" ]; then
     done
     
     # Copy system dependencies
-    for lib in libxcb-xkb libxkbcommon-x11 libxkbcommon libicui18n libicuuc libicudata libmd4c libdouble-conversion libpcre2-16 libxcb-xinerama libxcb-xinput; do
+    echo "Copying system dependencies for portable package..."
+    # Core system libraries
+    for lib in libxcb-xkb libxkbcommon-x11 libxkbcommon libicui18n libicuuc libicudata libmd4c libdouble-conversion libpcre2-16; do
         find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-portable/lib/ \; 2>/dev/null || true
     done
-    
+    # X11 libraries
+    for lib in libXss libXrandr libXrender libXfixes libXcursor libXinerama libXext libXi libxcb-xinerama libxcb-xinput libxcb-randr libxcb-render libxcb-shape libxcb-shm libxcb-icccm libxcb-image libxcb-keysyms libxcb-render-util; do
+        find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-portable/lib/ \; 2>/dev/null || true
+    done
+
+    # Copy SDL2 libraries for joystick support
+    echo "Copying SDL2 libraries for portable package..."
+    for lib in libSDL2-2.0; do
+        find /usr/lib -name "${lib}.so*" -exec cp {} fujisan-portable/lib/ \; 2>/dev/null || true
+    done
+
     # Copy Qt plugins
     mkdir -p fujisan-portable/plugins/platforms
     mkdir -p fujisan-portable/plugins/audio
@@ -424,14 +544,20 @@ For system-wide installation, use the .deb package instead.
 Visit: https://github.com/atari800/fujisan
 EOF
     
-    # Create tar.gz
-    tar -czf "fujisan-${VERSION_CLEAN}-linux-x64.tar.gz" fujisan-portable/
-    
+    # Create tar.gz with appropriate naming
+    if [[ "$ARCH" == "amd64" ]]; then
+        TARBALL_NAME="fujisan-${VERSION_CLEAN}-linux-x64.tar.gz"
+    else
+        TARBALL_NAME="fujisan-${VERSION_CLEAN}-linux-${ARCH}.tar.gz"
+    fi
+
+    tar -czf "$TARBALL_NAME" fujisan-portable/
+
     echo "✓ .tar.gz package created"
-    ls -lh "fujisan-${VERSION_CLEAN}-linux-x64.tar.gz"
-    
+    ls -lh "$TARBALL_NAME"
+
     # Copy to output
-    cp "fujisan-${VERSION_CLEAN}-linux-x64.tar.gz" /output/
+    cp "$TARBALL_NAME" /output/
 fi
 
 # Generate checksums
@@ -453,15 +579,16 @@ chmod +x "$LINUX_BUILD_DIR/build-in-container.sh"
 # Run build in container
 echo_step "Building Fujisan in Container"
 
-echo_info "Running build for version $VERSION on x86_64..."
+echo_info "Running build for version $VERSION on $ARCH..."
 $CONTAINER_RUNTIME run --rm \
-    --platform linux/amd64 \
+    --platform linux/$ARCH \
     -v "$PROJECT_ROOT:/build/fujisan:ro" \
     -v "$LINUX_BUILD_DIR:/output" \
     -e VERSION="$VERSION" \
     -e VERSION_CLEAN="$VERSION_CLEAN" \
-    fujisan-linux-builder:ubuntu22 \
-    bash /output/build-in-container.sh "$VERSION" "$VERSION_CLEAN" "$BUILD_DEB" "$BUILD_TARBALL" || {
+    -e ARCH="$ARCH" \
+    fujisan-linux-builder:ubuntu22-$ARCH \
+    bash /output/build-in-container.sh "$VERSION" "$VERSION_CLEAN" "$BUILD_DEB" "$BUILD_TARBALL" "$ARCH" || {
     echo_error "Build failed"
     exit 1
 }
@@ -471,15 +598,22 @@ echo_success "Linux build completed"
 # Copy to dist directory
 echo_step "Copying to Distribution Directory"
 
-if [[ "$BUILD_DEB" == "true" ]] && [[ -f "$LINUX_BUILD_DIR/fujisan_${VERSION_CLEAN}_amd64.deb" ]]; then
-    cp "$LINUX_BUILD_DIR/fujisan_${VERSION_CLEAN}_amd64.deb" "$DIST_DIR/"
-    cp "$LINUX_BUILD_DIR/fujisan_${VERSION_CLEAN}_amd64.deb.sha256" "$DIST_DIR/" 2>/dev/null || true
+# Determine tarball name based on architecture
+if [[ "$ARCH" == "amd64" ]]; then
+    TARBALL_NAME="fujisan-${VERSION_CLEAN}-linux-x64.tar.gz"
+else
+    TARBALL_NAME="fujisan-${VERSION_CLEAN}-linux-${ARCH}.tar.gz"
+fi
+
+if [[ "$BUILD_DEB" == "true" ]] && [[ -f "$LINUX_BUILD_DIR/fujisan_${VERSION_CLEAN}_${ARCH}.deb" ]]; then
+    cp "$LINUX_BUILD_DIR/fujisan_${VERSION_CLEAN}_${ARCH}.deb" "$DIST_DIR/"
+    cp "$LINUX_BUILD_DIR/fujisan_${VERSION_CLEAN}_${ARCH}.deb.sha256" "$DIST_DIR/" 2>/dev/null || true
     echo_success "Copied .deb package to dist/"
 fi
 
-if [[ "$BUILD_TARBALL" == "true" ]] && [[ -f "$LINUX_BUILD_DIR/fujisan-${VERSION_CLEAN}-linux-x64.tar.gz" ]]; then
-    cp "$LINUX_BUILD_DIR/fujisan-${VERSION_CLEAN}-linux-x64.tar.gz" "$DIST_DIR/"
-    cp "$LINUX_BUILD_DIR/fujisan-${VERSION_CLEAN}-linux-x64.tar.gz.sha256" "$DIST_DIR/" 2>/dev/null || true
+if [[ "$BUILD_TARBALL" == "true" ]] && [[ -f "$LINUX_BUILD_DIR/$TARBALL_NAME" ]]; then
+    cp "$LINUX_BUILD_DIR/$TARBALL_NAME" "$DIST_DIR/"
+    cp "$LINUX_BUILD_DIR/$TARBALL_NAME.sha256" "$DIST_DIR/" 2>/dev/null || true
     echo_success "Copied .tar.gz package to dist/"
 fi
 
@@ -494,27 +628,35 @@ fi
 # Clean up container if not keeping
 if [[ "$KEEP_CONTAINER" == "false" ]]; then
     echo_info "Removing container image..."
-    $CONTAINER_RUNTIME rmi fujisan-linux-builder:ubuntu22 2>/dev/null || true
+    $CONTAINER_RUNTIME rmi fujisan-linux-builder:ubuntu22-$ARCH 2>/dev/null || true
 fi
 
 # Summary
 echo_step "Build Summary"
 echo_success "Linux build completed successfully!"
 echo ""
+echo "Architecture: $ARCH"
 echo "Version: $VERSION"
 echo "Output files in $DIST_DIR:"
 
-if [[ -f "$DIST_DIR/fujisan_${VERSION_CLEAN}_amd64.deb" ]]; then
-    SIZE=$(du -h "$DIST_DIR/fujisan_${VERSION_CLEAN}_amd64.deb" | cut -f1)
-    echo "  • fujisan_${VERSION_CLEAN}_amd64.deb ($SIZE) - Debian/Ubuntu package"
+# Determine tarball name for summary
+if [[ "$ARCH" == "amd64" ]]; then
+    TARBALL_NAME="fujisan-${VERSION_CLEAN}-linux-x64.tar.gz"
+else
+    TARBALL_NAME="fujisan-${VERSION_CLEAN}-linux-${ARCH}.tar.gz"
 fi
 
-if [[ -f "$DIST_DIR/fujisan-${VERSION_CLEAN}-linux-x64.tar.gz" ]]; then
-    SIZE=$(du -h "$DIST_DIR/fujisan-${VERSION_CLEAN}-linux-x64.tar.gz" | cut -f1)
-    echo "  • fujisan-${VERSION_CLEAN}-linux-x64.tar.gz ($SIZE) - Portable package"
+if [[ -f "$DIST_DIR/fujisan_${VERSION_CLEAN}_${ARCH}.deb" ]]; then
+    SIZE=$(du -h "$DIST_DIR/fujisan_${VERSION_CLEAN}_${ARCH}.deb" | cut -f1)
+    echo "  • fujisan_${VERSION_CLEAN}_${ARCH}.deb ($SIZE) - Debian/Ubuntu package"
+fi
+
+if [[ -f "$DIST_DIR/$TARBALL_NAME" ]]; then
+    SIZE=$(du -h "$DIST_DIR/$TARBALL_NAME" | cut -f1)
+    echo "  • $TARBALL_NAME ($SIZE) - Portable package"
 fi
 
 echo ""
 echo "Installation:"
-echo "  Debian/Ubuntu: sudo dpkg -i fujisan_${VERSION_CLEAN}_amd64.deb"
-echo "  Portable: tar xzf fujisan-${VERSION_CLEAN}-linux-x64.tar.gz && ./fujisan-portable/fujisan.sh"
+echo "  Debian/Ubuntu: sudo dpkg -i fujisan_${VERSION_CLEAN}_${ARCH}.deb"
+echo "  Portable: tar xzf $TARBALL_NAME && ./fujisan-portable/fujisan.sh"

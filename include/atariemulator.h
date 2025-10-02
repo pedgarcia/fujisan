@@ -350,7 +350,7 @@ private:
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;
     QTimer* m_frameTimer;
-    
+
     // Debug/execution state
     bool m_emulationPaused = false;
     

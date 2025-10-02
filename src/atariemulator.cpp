@@ -106,13 +106,13 @@ AtariEmulator::AtariEmulator(QObject *parent)
 #endif
 {
     libatari800_clear_input_array(&m_currentInput);
-    
+
     // Initialize joysticks to center position (inverted for libatari800)
     m_currentInput.joy0 = 0x0f ^ 0xff;  // 15 ^ 255 = 240
     m_currentInput.joy1 = 0x0f ^ 0xff;  // 15 ^ 255 = 240
     m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
     m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
-    
+
     // Set up the global instance pointer for the callback
     s_emulatorInstance = this;
     
@@ -733,7 +733,7 @@ void AtariEmulator::processFrame()
     } else {
         // Normal full-frame execution
         libatari800_next_frame(&m_currentInput);
-        
+
         // Check breakpoints once after the frame (legacy behavior)
         if (m_breakpointsEnabled && !m_breakpoints.isEmpty()) {
             checkBreakpoints();
@@ -974,10 +974,10 @@ void AtariEmulator::processFrame()
     }
     
     // Don't clear input here - let it persist until key release
-    
+
     // Check breakpoints after frame execution
     checkBreakpoints();
-    
+
     emit frameReady();
 }
 
