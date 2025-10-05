@@ -2668,7 +2668,12 @@ void SettingsDialog::saveSettings()
 void SettingsDialog::applyMediaSettings()
 {
     qDebug() << "Applying media settings to emulator...";
-    
+
+    // Apply cartridge auto-reboot setting to libatari800
+    extern int CARTRIDGE_autoreboot;
+    CARTRIDGE_autoreboot = m_cartridgeAutoRebootCheck->isChecked() ? 1 : 0;
+    qDebug() << "CARTRIDGE_autoreboot set to:" << CARTRIDGE_autoreboot;
+
     // Apply cartridge settings
     if (m_cartridgeEnabledCheck->isChecked() && !m_cartridgePath->text().isEmpty()) {
         QString cartridgePath = m_cartridgePath->text();

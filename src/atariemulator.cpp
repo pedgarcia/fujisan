@@ -354,7 +354,12 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         }
         m_targetFps = libatari800_get_fps();
         m_frameTimeMs = 1000.0f / m_targetFps;
-        
+
+        // Apply cartridge auto-reboot setting from QSettings
+        QSettings settings("8bitrelics", "Fujisan");
+        CARTRIDGE_autoreboot = settings.value("machine/cartridgeAutoReboot", true).toBool() ? 1 : 0;
+        qDebug() << "CARTRIDGE_autoreboot initialized to:" << CARTRIDGE_autoreboot;
+
         // Set up the disk activity callback for hardware-level monitoring
         libatari800_set_disk_activity_callback(diskActivityCallback);
         
@@ -550,7 +555,12 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         
         m_targetFps = libatari800_get_fps();
         m_frameTimeMs = 1000.0f / m_targetFps;
-        
+
+        // Apply cartridge auto-reboot setting from QSettings
+        QSettings settings("8bitrelics", "Fujisan");
+        CARTRIDGE_autoreboot = settings.value("machine/cartridgeAutoReboot", true).toBool() ? 1 : 0;
+        qDebug() << "CARTRIDGE_autoreboot initialized to:" << CARTRIDGE_autoreboot;
+
         // Set up the disk activity callback for hardware-level monitoring
         libatari800_set_disk_activity_callback(diskActivityCallback);
         
@@ -1005,22 +1015,51 @@ bool AtariEmulator::loadFile(const QString& filename)
         }
     } else {
         // Load other files (CAR, ROM, etc.) as cartridges
-        
+
+        qDebug() << "Loading cartridge file:" << filename;
+        qDebug() << "Current CARTRIDGE_autoreboot value:" << CARTRIDGE_autoreboot;
+        qDebug() << "Current Atari800_disable_basic value:" << Atari800_disable_basic;
+
+        // CRITICAL: Disable BASIC to allow cartridge to boot
+        // When Atari800_disable_basic = TRUE, it simulates holding the Option key
+        // during boot, which disables BASIC and allows the cartridge to run
+        Atari800_disable_basic = TRUE;
+        qDebug() << "Set Atari800_disable_basic = TRUE to allow cartridge boot";
+
         // First, explicitly remove any existing cartridge with reboot
         // This ensures a clean slate before loading the new cartridge
         CARTRIDGE_RemoveAutoReboot();
-        
+        qDebug() << "Removed existing cartridge";
+
         // Now insert the new cartridge with auto-reboot
         // This provides a complete system reset with the new cartridge
         int result = CARTRIDGE_InsertAutoReboot(filename.toUtf8().constData());
-        
-        if (result) {
+
+        qDebug() << "CARTRIDGE_InsertAutoReboot returned:" << result;
+
+        if (result == 0) {
+            // Type was auto-detected, cartridge is ready
+            qDebug() << "Cartridge type auto-detected and inserted successfully";
             return true;
+        } else if (result > 0) {
+            // Positive value = size in KB, type is UNKNOWN, must set type manually
+            qDebug() << "Cartridge size is" << result << "KB, type is UNKNOWN, setting to CARTRIDGE_STD_8";
+
+            // For 8KB cartridges, default to standard 8KB type
+            // CARTRIDGE_SetTypeAutoReboot will initialize and map the cartridge, then reboot
+            if (result == 8) {
+                CARTRIDGE_SetTypeAutoReboot(&CARTRIDGE_main, CARTRIDGE_STD_8);
+                qDebug() << "Cartridge type set to CARTRIDGE_STD_8 and system rebooted";
+                return true;
+            } else {
+                qDebug() << "Unsupported cartridge size:" << result << "KB - only 8KB standard cartridges are currently supported";
+                return false;
+            }
         } else {
+            qDebug() << "CARTRIDGE_InsertAutoReboot failed with error:" << result;
             // Fall back to the original method for non-cartridge files
             bool fallback_result = libatari800_reboot_with_file(filename.toUtf8().constData());
-            if (fallback_result) {
-            }
+            qDebug() << "Fallback method returned:" << fallback_result;
             return fallback_result;
         }
     }

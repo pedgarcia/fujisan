@@ -94,8 +94,8 @@ private:
     QPixmap m_onImage;
 
     // Constants
-    static const int CARTRIDGE_WIDTH = 75;   // Reduced from 100 for better dock fit
-    static const int CARTRIDGE_HEIGHT = 30;  // Reduced from 120 for better dock fit
+    static const int CARTRIDGE_WIDTH = 70;
+    static const int CARTRIDGE_HEIGHT = 25;
 };
 
 #endif // CARTRIDGEWIDGET_H

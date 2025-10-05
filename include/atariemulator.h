@@ -65,9 +65,25 @@ extern "C" {
     extern int SIO_last_drive;
     #define SIO_LAST_READ 0
     #define SIO_LAST_WRITE 1
-    // Cartridge functions  
+    // Cartridge functions
     extern void CARTRIDGE_RemoveAutoReboot(void);
     extern int CARTRIDGE_InsertAutoReboot(const char *filename);
+    extern int CARTRIDGE_autoreboot;
+    // Cartridge type and configuration
+    typedef struct {
+        int type;
+        int state;
+        int size;
+        unsigned char *image;
+        char filename[260];  // FILENAME_MAX
+        int raw;
+    } CARTRIDGE_image_t;
+    extern CARTRIDGE_image_t CARTRIDGE_main;
+    extern void CARTRIDGE_SetTypeAutoReboot(CARTRIDGE_image_t *cart, int type);
+    // Cartridge type constants
+    #define CARTRIDGE_STD_8 1
+    // BASIC control (needed for cartridge loading)
+    extern int Atari800_disable_basic;
     // Audio functions
     extern unsigned char* libatari800_get_sound_buffer(void);
     extern int libatari800_get_sound_buffer_len(void);

@@ -298,21 +298,12 @@ void MainWindow::createToolBar()
     separator->setFrameShadow(QFrame::Sunken);
     m_toolBar->addWidget(separator);
 
-    // Add spacer to push buttons to the right
+    // Add spacer to push console/system buttons and logo to the right
     QWidget* spacer = new QWidget();
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_toolBar->addWidget(spacer);
 
     // Reset icons removed - functionality moved to console-style buttons
-    
-    // Add divider before logo
-    QFrame* logoSeparator = new QFrame();
-    logoSeparator->setFrameShape(QFrame::VLine);
-    logoSeparator->setFrameShadow(QFrame::Sunken);
-    m_toolBar->addWidget(logoSeparator);
-
-    // Add Fujisan logo
-    createLogoSection();
 }
 
 void MainWindow::createJoystickToolbarSection()
@@ -1681,12 +1672,12 @@ void MainWindow::createMediaPeripheralsDock()
     // Create separate cartridge container
     QWidget* cartridgeContainer = new QWidget(this);
     QVBoxLayout* cartridgeMainLayout = new QVBoxLayout(cartridgeContainer);
-    cartridgeMainLayout->setContentsMargins(0, 2, 0, 2);
-    cartridgeMainLayout->setSpacing(2);
+    cartridgeMainLayout->setContentsMargins(0, 1, 0, 1);
+    cartridgeMainLayout->setSpacing(1);
     cartridgeMainLayout->setAlignment(Qt::AlignCenter);
 
     QWidget* cartridgeWidget = new QWidget();
-    cartridgeWidget->setFixedWidth(104);
+    cartridgeWidget->setFixedWidth(70);
     QHBoxLayout* cartridgeLayout = new QHBoxLayout(cartridgeWidget);
     cartridgeLayout->setContentsMargins(0, 0, 0, 0);
     cartridgeLayout->addWidget(m_cartridgeWidget, 0, Qt::AlignCenter);
@@ -2011,14 +2002,21 @@ void MainWindow::createMediaPeripheralsDock()
     // Count widgets: joystick(1) + sep(1) + audio(1) + sep(1) + profile(1) + sep(1) + spacer(1) = 7
     // Plus the ones we just inserted: d1(1) + sep(1) + cart(1) + sep(1) + machine(1) + sep(1) = 6
     // Total before spacer = 6, so spacer is at index 6+6 = 12
-    
-    // Insert console and system buttons after the spacer but before the logo separator
-    // The spacer is followed by logo separator and logo, so we insert at index 13
+
+    // Insert console and system buttons after the spacer (logo will be added at the very end)
     int insertIndex = 12;
     
     m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex), consoleButtonsContainer);
     m_toolBar->insertSeparator(m_toolBar->actions().at(insertIndex + 1));
     m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex + 2), systemButtonsContainer);
+
+    // Add logo at the very end (after console and system buttons)
+    QFrame* logoSeparator = new QFrame();
+    logoSeparator->setFrameShape(QFrame::VLine);
+    logoSeparator->setFrameShadow(QFrame::Sunken);
+    m_toolBar->addWidget(logoSeparator);
+
+    createLogoSection();
 }
 
 void MainWindow::toggleMediaDock()
@@ -2098,6 +2096,7 @@ void MainWindow::onCartridgeInserted(const QString& cartridgePath)
     QFileInfo fileInfo(cartridgePath);
     statusBar()->showMessage(QString("Cartridge loaded: %1").arg(fileInfo.fileName()), 3000);
     qDebug() << "Cartridge inserted:" << cartridgePath;
+    // Note: No manual reboot needed - CARTRIDGE_SetTypeAutoReboot handles the reboot
 }
 
 void MainWindow::onCartridgeEjected()
