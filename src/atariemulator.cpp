@@ -282,13 +282,14 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     } else {
         // Only add ROM paths if they are specified in settings
         if (!m_osRomPath.isEmpty()) {
+            QString quotedOSPath = quotePath(m_osRomPath);
             if (machineType == "-5200") {
-                argList << "-5200_rom" << m_osRomPath;
+                argList << "-5200_rom" << quotedOSPath;
             } else if (machineType == "-atari") {
-                argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
+                argList << "-osb_rom" << quotedOSPath;  // 800 OS-B ROM
             } else {
                 // For XL/XE machines
-                argList << "-xlxe_rom" << m_osRomPath;
+                argList << "-xlxe_rom" << quotedOSPath;
             }
         } else {
             // Fallback to Altirra OS if no external ROM is specified
