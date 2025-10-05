@@ -658,23 +658,27 @@ void TCPServer::handleSystemCommand(QTcpSocket* client, const QJsonObject& reque
         
     } else if (subCommand == "set_speed") {
         // Set emulation speed
+        // 0 = unlimited/host speed
+        // 10-1000 = percentage speed (10% to 1000%)
         int percentage = params["percentage"].toInt();
-        
-        if (percentage < 10 || percentage > 1000) {
-            sendResponse(client, requestId, false, QJsonValue(), 
-                        "Invalid speed percentage. Must be between 10-1000");
+
+        if (percentage != 0 && (percentage < 10 || percentage > 1000)) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Invalid speed percentage. Must be 0 (unlimited) or 10-1000");
             return;
         }
-        
+
         m_emulator->setEmulationSpeed(percentage);
-        
+
         QJsonObject result;
         result["speed_percentage"] = percentage;
+        result["speed_description"] = (percentage == 0) ? "unlimited (host speed)" : QString::number(percentage) + "%";
         sendResponse(client, requestId, true, result);
-        
+
         // Send event to all clients
         QJsonObject eventData;
         eventData["speed_percentage"] = percentage;
+        eventData["speed_description"] = (percentage == 0) ? "unlimited (host speed)" : QString::number(percentage) + "%";
         sendEventToAllClients("speed_changed", eventData);
         
     } else if (subCommand == "quick_save_state") {

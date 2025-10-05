@@ -8,12 +8,11 @@ A modern frontend for the Atari800 emulator, providing a native desktop experien
 
 "Do we really need a new emulator?" some of you might be asking. And a simple answer is, "no, not really". But, to be precise, Fujisan is a UI built on top of Atari800, so it is not really a new emulator, but a new way to use Atari800. Users have plenty of good options with Altirra, Atari800 (vanilla), Atari800MacX and Mame. One thing that Atari800 has that is great, but it throws some users off, is its built-in UI inside the emulator window. A lot of users prefer to have the native feeling like Altirra on Windows, and Atari800MacX on macOS delivers. 
 
-Fujisan is an AI-based exercise and hobby for me, to build an emulator tailored to my personal use, with fewer customization available but ready to go for 90% of the use cases. Hopefully it will attract more people like me. Also, the fact that the users will have the same native experience in Windows, MacOS or Linux is a differentiator compared to the other emulators.
+Fujisan is an exercise and hobby for me, to build an emulator tailored to my personal use, with fewer customization available but ready to go for 90% of the use cases. Hopefully it will attract more people like me. Also, the fact that the users will have the same native experience in Windows, MacOS or Linux is a differentiator compared to the other emulators.
 
 Another important objective is to always use **libatari800** so there is never incompatibility between the Atari800 source code and Fujisan (as much as possible). There are some patches I had to apply, but I am set to always make it easier for anyone that wants to build Fujisan, to be able to reproduce my steps and patch atari800 properly (There is a patches folder with detailed instructions).
 
-I guess, the big difference is that Fujisan is a UI-based emulator that is available for Windows, Mac, and Linux. (The builds and binaries will be available soon), and overtime, with some features that will help software development.
-
+I guess, the big difference is that Fujisan is a UI-based emulator that is available for Windows, Mac, and Linux. Overtime, with some features that will help software development, so if you see something wrong or have a request, use Github issue tracker.
 
 
 ![Fujisan Screenshot](images/screenshot1.png)

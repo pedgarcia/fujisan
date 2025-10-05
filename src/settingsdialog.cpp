@@ -364,38 +364,38 @@ void SettingsDialog::createHardwareTab()
     QGroupBox* performanceGroup = new QGroupBox("Performance");
     QVBoxLayout* performanceLayout = new QVBoxLayout(performanceGroup);
     
-    m_turboModeCheck = new QCheckBox("Run as fast as possible (Turbo mode)");
-    m_turboModeCheck->setToolTip("Run emulator at maximum speed, ignoring timing constraints");
+    m_turboModeCheck = new QCheckBox("Run as fast as possible (Host Speed)");
+    m_turboModeCheck->setToolTip("Run emulator at unlimited speed (as fast as your computer can go)");
     performanceLayout->addWidget(m_turboModeCheck);
-    
+
     // Speed Control
     QWidget* speedWidget = new QWidget();
     QHBoxLayout* speedLayout = new QHBoxLayout(speedWidget);
     speedLayout->setContentsMargins(0, 0, 0, 0);
-    
+
     QLabel* speedTitleLabel = new QLabel("Emulation Speed:");
     speedLayout->addWidget(speedTitleLabel);
-    
+
     m_speedSlider = new QSlider();
     m_speedSlider->setOrientation(Qt::Horizontal);
     m_speedSlider->setMinimum(0);    // 0.5x speed (index 0)
-    m_speedSlider->setMaximum(10);   // 10x speed (index 10)  
+    m_speedSlider->setMaximum(10);   // 10x speed (index 10) - host speed handled by turbo checkbox
     m_speedSlider->setValue(1);      // 1x default speed (index 1)
-    m_speedSlider->setToolTip("Set emulation speed multiplier (0.5x - 10x)");
+    m_speedSlider->setToolTip("Set emulation speed multiplier (0.5x - 10x). For unlimited speed, use Host Speed checkbox above.");
     m_speedSlider->setTickPosition(QSlider::TicksBelow);
     m_speedSlider->setTickInterval(1);
     speedLayout->addWidget(m_speedSlider, 1);
-    
+
     m_speedLabel = new QLabel("1x");
     m_speedLabel->setMinimumWidth(60);
     m_speedLabel->setAlignment(Qt::AlignCenter);
     speedLayout->addWidget(m_speedLabel);
-    
+
     connect(m_speedSlider, &QSlider::valueChanged, [this](int index) {
         // Convert slider index to speed multiplier
         double speedMultiplier;
         QString labelText;
-        
+
         if (index == 0) {
             speedMultiplier = 0.5;
             labelText = "0.5x";
@@ -403,16 +403,33 @@ void SettingsDialog::createHardwareTab()
             speedMultiplier = index;  // 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
             labelText = QString::number(index) + "x";
         }
-        
+
         m_speedLabel->setText(labelText);
-        
-        // Update emulator speed in real-time
-        if (m_emulator) {
+
+        // Update emulator speed in real-time (unless turbo mode is active)
+        if (m_emulator && !m_turboModeCheck->isChecked()) {
             int percentage = (int)(speedMultiplier * 100);
             m_emulator->setEmulationSpeed(percentage);
         }
     });
-    
+
+    // Link turbo mode checkbox to unlimited host speed
+    connect(m_turboModeCheck, &QCheckBox::toggled, [this](bool checked) {
+        if (m_emulator) {
+            if (checked) {
+                // Enable unlimited host speed
+                m_emulator->setEmulationSpeed(0);
+                m_speedSlider->setEnabled(false); // Disable slider when host speed is active
+            } else {
+                // Restore slider-based speed
+                m_speedSlider->setEnabled(true);
+                int index = m_speedSlider->value();
+                int percentage = (index == 0) ? 50 : (index * 100);
+                m_emulator->setEmulationSpeed(percentage);
+            }
+        }
+    });
+
     performanceLayout->addWidget(speedWidget);
     
     rightColumn->addWidget(performanceGroup);
@@ -2349,20 +2366,26 @@ void SettingsDialog::loadSettings()
         // Update speed settings based on current emulation speed
         int currentSpeed = m_emulator->getCurrentEmulationSpeed();
         qDebug() << "Current emulation speed:" << currentSpeed << "%";
-        
-        if (currentSpeed == 1000) {
-            // Full speed mode (toolbar shows "Full")
+
+        if (currentSpeed == 0) {
+            // Host speed mode (unlimited/turbo)
             m_turboModeCheck->setChecked(true);
-            m_speedSlider->setValue(10); // 10x speed
-        } else if (currentSpeed == 100) {
-            // Real speed mode (toolbar shows "Real")
-            m_turboModeCheck->setChecked(false);
-            m_speedSlider->setValue(1); // 1x speed
+            m_speedSlider->setEnabled(false);
+            // Keep slider at last position (don't change it)
         } else {
-            // Other speed values
+            // Specific speed percentage
             m_turboModeCheck->setChecked(false);
+            m_speedSlider->setEnabled(true);
+
             // Convert percentage to slider index
-            int sliderIndex = (currentSpeed == 50) ? 0 : (currentSpeed / 100);
+            int sliderIndex;
+            if (currentSpeed == 50) {
+                sliderIndex = 0;  // 0.5x
+            } else if (currentSpeed >= 100 && currentSpeed <= 1000) {
+                sliderIndex = currentSpeed / 100;  // 1x-10x
+            } else {
+                sliderIndex = 1;  // Default to 1x if out of range
+            }
             m_speedSlider->setValue(sliderIndex);
         }
         
@@ -2841,11 +2864,17 @@ void SettingsDialog::applySettings()
     
     // Apply speed setting (can be applied live)
     if (m_emulator) {
-        int speedIndex = m_speedSlider->value();
-        int percentage = (speedIndex == 0) ? 50 : speedIndex * 100; // 0.5x = 50%, others = index * 100
-        m_emulator->setEmulationSpeed(percentage);
+        if (m_turboModeCheck->isChecked()) {
+            // Host speed (unlimited)
+            m_emulator->setEmulationSpeed(0);
+        } else {
+            // Slider-based speed
+            int speedIndex = m_speedSlider->value();
+            int percentage = (speedIndex == 0) ? 50 : speedIndex * 100; // 0.5x = 50%, others = index * 100
+            m_emulator->setEmulationSpeed(percentage);
+        }
     }
-    
+
     emit settingsChanged();
 }
 

@@ -204,11 +204,19 @@ void SDL2JoystickManager::pollJoysticks()
             newState.stick = INPUT_STICK_CENTRE;
         }
 
-        // Read trigger button (button 0 is typically primary button)
-        if (SDL_JoystickNumButtons(joystick) > 0) {
-            newState.trigger = SDL_JoystickGetButton(joystick, 0) != 0;
-        } else {
-            newState.trigger = false;
+        // Read trigger button - check buttons 0-3 for better compatibility
+        // Different controllers map fire to different buttons:
+        // - Xbox: A=0, B=1, X=2, Y=3
+        // - PlayStation: varies
+        // - Generic USB: varies
+        // Solution: treat any of the first 4 buttons as fire (like Atari800MacX)
+        newState.trigger = false;
+        int numButtons = SDL_JoystickNumButtons(joystick);
+        for (int btn = 0; btn < numButtons && btn < 4; ++btn) {
+            if (SDL_JoystickGetButton(joystick, btn) != 0) {
+                newState.trigger = true;
+                break;
+            }
         }
 
         // Check if state changed

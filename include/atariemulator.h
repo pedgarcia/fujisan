@@ -391,6 +391,9 @@ private:
     double m_currentSpeed;  // Current emulation speed (0.95 to 1.05)
     double m_targetSpeed;   // Target speed based on buffer level
     static constexpr double SPEED_ADJUSTMENT_ALPHA = 0.1;  // Smoothing factor
+
+    // User-requested speed multiplier (separate from audio sync adjustment)
+    double m_userRequestedSpeedMultiplier;  // 1.0 = normal, 2.0 = 2x, 0.5 = 0.5x, 0.0 = unlimited
     
     // Unified Audio Backend (new implementation)
     UnifiedAudioBackend* m_unifiedAudio;

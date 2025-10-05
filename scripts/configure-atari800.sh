@@ -97,8 +97,8 @@ echo "Configuring libatari800..."
 # Set platform-specific build flags
 if [[ "$OSTYPE" == "darwin"* ]]; then
     echo "Configuring for universal macOS build (Intel + Apple Silicon)..."
-    export CFLAGS="-arch arm64 -arch x86_64 ${CFLAGS:-}"
-    export LDFLAGS="-arch arm64 -arch x86_64 ${LDFLAGS:-}"
+    export CFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -Wno-macro-redefined ${CFLAGS:-}"
+    export LDFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=11.0 ${LDFLAGS:-}"
     export CPPFLAGS="${CPPFLAGS:-}"
 elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     echo "Configuring for Windows build with MSYS2/MinGW..."

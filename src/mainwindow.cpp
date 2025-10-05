@@ -377,11 +377,11 @@ void MainWindow::createJoystickToolbarSection()
         QSettings settings;
         settings.setValue("input/joystickEnabled", checked);
         settings.sync(); // Force immediate write
-        
+
         qDebug() << "=== JOYSTICK CHECKBOX TOGGLED ===";
         qDebug() << "New value:" << checked;
         qDebug() << "Saved to settings and synced";
-        
+
         if (m_emulator) {
             // Apply the effective keyboard joystick state based on both checkboxes
             bool effectiveKbdJoy0 = checked && m_kbdJoy0Check->isChecked();
@@ -389,13 +389,18 @@ void MainWindow::createJoystickToolbarSection()
             m_emulator->setKbdJoy0Enabled(effectiveKbdJoy0);
             m_emulator->setKbdJoy1Enabled(effectiveKbdJoy1);
         }
-        
+
         // Enable/disable the keyboard joystick checkboxes visually (but preserve their state)
         m_kbdJoy0Check->setEnabled(checked);
         m_kbdJoy1Check->setEnabled(checked);
         m_joystickSwapWidget->setEnabled(checked);
-        
+
         qDebug() << "Joystick enabled changed to:" << checked;
+
+        // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
 
     connect(m_kbdJoy0Check, &QCheckBox::toggled, this, [this](bool checked) {
@@ -407,6 +412,11 @@ void MainWindow::createJoystickToolbarSection()
             m_emulator->setKbdJoy0Enabled(effectiveEnabled);
         }
         qDebug() << "Keyboard Joy0 changed to:" << checked;
+
+        // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
 
     connect(m_kbdJoy1Check, &QCheckBox::toggled, this, [this](bool checked) {
@@ -418,6 +428,11 @@ void MainWindow::createJoystickToolbarSection()
             m_emulator->setKbdJoy1Enabled(effectiveEnabled);
         }
         qDebug() << "Keyboard Joy1 changed to:" << checked;
+
+        // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
 
     connect(m_joystickSwapWidget, &JoystickSwapWidget::toggled, this, [this](bool swapped) {
@@ -427,6 +442,11 @@ void MainWindow::createJoystickToolbarSection()
             m_emulator->setJoysticksSwapped(swapped);
         }
         qDebug() << "Joystick swap changed to:" << swapped;
+
+        // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
 
     // Add to toolbar
@@ -500,6 +520,11 @@ void MainWindow::createAudioToolbarSection()
         }
         volumePercentLabel->setText(QString("%1%").arg(value));
         qDebug() << "Volume changed to:" << value;
+
+        // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
 
     // Add to toolbar
@@ -782,6 +807,11 @@ void MainWindow::toggleBasic(bool enabled)
     m_basicAction->setChecked(enabled);
 
     restartEmulator();
+
+    // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::toggleAltirraOS(bool enabled)
@@ -952,18 +982,28 @@ void MainWindow::onVideoSystemToggled(bool isPAL)
         statusBar()->showMessage("Video system set to NTSC (59.92 fps) - restarting...", 3000);
     }
     restartEmulator();
+
+    // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::onSpeedToggled(bool isFullSpeed)
 {
     if (isFullSpeed) {
-        // Full speed mode (toggle ON) - enable turbo for maximum host speed
-        m_emulator->setEmulationSpeed(1000); // High percentage to enable turbo mode
-        statusBar()->showMessage("Emulation speed set to Full (host speed)", 2000);
+        // Full speed mode (toggle ON) - unlimited host speed
+        m_emulator->setEmulationSpeed(0); // 0 = unlimited/host speed
+        statusBar()->showMessage("Emulation speed set to Full (unlimited host speed)", 2000);
     } else {
         // Real speed mode (toggle OFF) - authentic Atari timing
         m_emulator->setEmulationSpeed(100);
         statusBar()->showMessage("Emulation speed set to Real (authentic Atari speed)", 2000);
+    }
+
+    // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
     }
 }
 
@@ -2167,8 +2207,45 @@ void MainWindow::loadInitialSettings()
     m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
     qDebug() << "Applied keyboard joystick state after init - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
 
+#ifdef HAVE_SDL2_JOYSTICK
+    // Load USB joystick device assignments
+    // This ensures USB joysticks work on startup, not just after opening settings dialog
+    QString joystick1Device = settings.value("input/joystick1Device", "keyboard").toString();
+    QString joystick2Device = settings.value("input/joystick2Device", "keyboard").toString();
+
+    m_emulator->setJoystick1Device(joystick1Device);
+    m_emulator->setJoystick2Device(joystick2Device);
+
+    // Enable SDL joystick manager if any SDL device is selected
+    bool realJoysticksNeeded = joystick1Device.startsWith("sdl_") || joystick2Device.startsWith("sdl_");
+    m_emulator->setRealJoysticksEnabled(realJoysticksNeeded);
+
+    qDebug() << "Applied joystick device assignments - Joy1:" << joystick1Device
+             << "Joy2:" << joystick2Device << "SDL enabled:" << realJoysticksNeeded;
+#endif
+
     // Load and apply media settings (disk images, etc.)
     loadAndApplyMediaSettings();
+
+    // Load and apply speed settings
+    bool turboMode = settings.value("machine/turboMode", false).toBool();
+    int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt(); // Default to 1x (index 1)
+
+    // Convert speed index to percentage
+    int speedPercentage;
+    if (turboMode) {
+        // Turbo mode = host speed (unlimited)
+        speedPercentage = 0;
+    } else if (speedIndex == 0) {
+        // Index 0 = 0.5x speed
+        speedPercentage = 50;
+    } else {
+        // Index 1-10 = 1x-10x speed (index * 100)
+        speedPercentage = speedIndex * 100;
+    }
+
+    m_emulator->setEmulationSpeed(speedPercentage);
+    qDebug() << "Applied speed settings - Turbo:" << turboMode << "Index:" << speedIndex << "Percentage:" << speedPercentage;
 
     // Update toolbar to reflect loaded settings
     updateToolbarFromSettings();
@@ -2413,11 +2490,16 @@ void MainWindow::quickSaveState()
     // Update emulator with current profile name
     QString profileName = m_profileCombo->currentText();
     m_emulator->setCurrentProfileName(profileName);
-    
+
     if (m_emulator->quickSaveState()) {
         statusBar()->showMessage("Quick state saved", 2000);
     } else {
         QMessageBox::warning(this, "Quick Save Failed", "Failed to save state");
+    }
+
+    // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
     }
 }
 
@@ -2426,7 +2508,7 @@ void MainWindow::quickLoadState()
     if (m_emulator->quickLoadState()) {
         // Get the profile name from the loaded state
         QString profileName = m_emulator->getCurrentProfileName();
-        
+
         // Try to select the profile in the combo box
         int index = m_profileCombo->findText(profileName);
         if (index >= 0) {
@@ -2434,10 +2516,15 @@ void MainWindow::quickLoadState()
         } else if (!profileName.isEmpty() && profileName != "Default") {
             statusBar()->showMessage(QString("Profile '%1' not found, using current").arg(profileName), 3000);
         }
-        
+
         statusBar()->showMessage("Quick state loaded", 2000);
     } else {
         QMessageBox::warning(this, "Quick Load Failed", "No quick save state found");
+    }
+
+    // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
     }
 }
 
@@ -2635,46 +2722,73 @@ void MainWindow::refreshProfileList()
 void MainWindow::onLoadProfile()
 {
     if (!m_profileCombo || !m_profileManager) return;
-    
+
     QString profileName = m_profileCombo->currentText();
     if (profileName.isEmpty()) return;
-    
+
     qDebug() << "Loading profile:" << profileName;
-    
+
     ConfigurationProfile profile = m_profileManager->loadProfile(profileName);
     if (profile.isValid()) {
         // Apply profile to emulator
         applyProfileToEmulator(profile);
-        
+
         // Update current profile
         m_profileManager->setCurrentProfileName(profileName);
-        
+
         qDebug() << "Profile loaded successfully:" << profileName;
     } else {
         qWarning() << "Failed to load profile:" << profileName;
+    }
+
+    // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
     }
 }
 
 void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
 {
     if (!m_emulator) return;
-    
+
     // Apply machine configuration
     m_emulator->setMachineType(profile.machineType);
     m_emulator->setVideoSystem(profile.videoSystem);
     m_emulator->setBasicEnabled(profile.basicEnabled);
-    
+
     // Apply audio configuration
     m_emulator->enableAudio(profile.audioEnabled);
     m_emulator->setVolume(profile.audioVolume / 100.0);
-    
+
+    // Apply speed settings
+    int speedPercentage;
+    if (profile.turboMode) {
+        // Turbo mode = host speed (unlimited)
+        speedPercentage = 0;
+    } else if (profile.emulationSpeedIndex == 0) {
+        // Index 0 = 0.5x speed
+        speedPercentage = 50;
+    } else {
+        // Index 1-10 = 1x-10x speed (index * 100)
+        speedPercentage = profile.emulationSpeedIndex * 100;
+    }
+    m_emulator->setEmulationSpeed(speedPercentage);
+
+    // Update toolbar speed toggle to reflect profile speed
+    if (m_speedToggle) {
+        m_speedToggle->blockSignals(true);
+        m_speedToggle->setChecked(profile.turboMode); // Turbo mode = Full speed toggle ON
+        m_speedToggle->blockSignals(false);
+    }
+
     // Update UI to reflect changes
     updateToolbarFromSettings();
-    
+
     // Cold boot to apply machine configuration changes
     coldBoot();
-    
-    qDebug() << "Applied profile to emulator and rebooted:" << profile.name;
+
+    qDebug() << "Applied profile to emulator and rebooted:" << profile.name
+             << "Speed:" << speedPercentage << "% (Turbo:" << profile.turboMode << ")";
 }
 
 void MainWindow::onDiskDroppedOnEmulator(const QString& filename)

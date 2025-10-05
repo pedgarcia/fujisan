@@ -93,6 +93,7 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_sampleRate(44100)
     , m_bytesPerSample(4)
     , m_fragmentSize(1024)
+    , m_userRequestedSpeedMultiplier(1.0)
     , m_printerEnabled(false)
     , m_fujinet_restart_pending(false)
     , m_fujinet_restart_delay(0)
@@ -1880,22 +1881,62 @@ void AtariEmulator::updateArtifactSettings(const QString& artifactMode)
 
 void AtariEmulator::setEmulationSpeed(int percentage)
 {
-    // Set the speed: 0 = unlimited turbo, percentage otherwise  
-    if (percentage <= 0) {
-        // Invalid input, set to 100%
-        Atari800_turbo_speed = 100;
+    // Set the speed:
+    // 0 = unlimited/host speed (maximum turbo)
+    // 100 = normal Atari speed
+    // Other values = percentage speed multiplier
+
+    // Convert percentage to multiplier and store
+    if (percentage == 0) {
+        // Host speed (unlimited)
+        m_userRequestedSpeedMultiplier = 0.0;  // Special value for unlimited
+        Atari800_turbo = 1;
+        Atari800_turbo_speed = 0;  // 0 means unlimited in atari800 core
+    } else if (percentage < 0) {
+        // Invalid input, set to normal speed (100%)
+        m_userRequestedSpeedMultiplier = 1.0;
         Atari800_turbo = 0;
+        Atari800_turbo_speed = 100;
+    } else if (percentage == 100) {
+        // Normal Atari speed
+        m_userRequestedSpeedMultiplier = 1.0;
+        Atari800_turbo = 0;
+        Atari800_turbo_speed = 100;
     } else {
+        // Custom speed percentage - convert to multiplier (e.g., 200% = 2.0x, 50% = 0.5x)
+        m_userRequestedSpeedMultiplier = percentage / 100.0;
+        Atari800_turbo = 1;
         Atari800_turbo_speed = percentage;
-        // Enable turbo mode if speed is not 100%
-        Atari800_turbo = (percentage != 100) ? 1 : 0;
     }
-    
+
+    // Adjust frame timer interval based on speed
+    // Update interval whether timer is active or not (for pause/resume and settings changes)
+    if (m_frameTimer) {
+        if (m_userRequestedSpeedMultiplier == 0.0) {
+            // Unlimited speed - run as fast as possible with minimal interval
+            m_frameTimer->setInterval(1);
+        } else {
+            // Calculate interval based on speed multiplier
+            // Faster speed = shorter interval
+            // e.g., 2x speed = half interval, 0.5x speed = double interval
+            int newInterval = static_cast<int>(m_frameTimeMs / m_userRequestedSpeedMultiplier);
+            m_frameTimer->setInterval(newInterval);
+        }
+    }
+
+    qDebug() << "Speed set to" << percentage << "% (multiplier:" << m_userRequestedSpeedMultiplier
+             << ") - Atari800_turbo:" << Atari800_turbo
+             << "Atari800_turbo_speed:" << Atari800_turbo_speed
+             << "Frame interval:" << (m_frameTimer ? m_frameTimer->interval() : 0) << "ms";
 }
 
 int AtariEmulator::getCurrentEmulationSpeed() const
 {
     // Return the current emulation speed percentage
+    // Note: 0 means unlimited/host speed
+    if (Atari800_turbo && Atari800_turbo_speed == 0) {
+        return 0;  // Host speed (unlimited)
+    }
     return Atari800_turbo_speed;
 }
 
@@ -2302,20 +2343,25 @@ double AtariEmulator::calculateSpeedAdjustment()
 
 void AtariEmulator::updateEmulationSpeed()
 {
+    // Don't apply audio sync adjustments if user requested unlimited speed
+    if (m_userRequestedSpeedMultiplier == 0.0) {
+        return;  // Keep unlimited speed, don't adjust
+    }
+
     if (!m_audioEnabled || m_audioBackend != QtAudio) {
         m_currentSpeed = 1.0;
         return;
     }
-    
-    // Calculate speed adjustment
+
+    // Calculate speed adjustment for audio synchronization
     double adjustment = calculateSpeedAdjustment();
-    
-    // Update target speed
+
+    // Update target speed (audio sync adjustment only)
     m_targetSpeed = 1.0 + adjustment;
-    
+
     // Clamp to reasonable range (95% to 105%)
     m_targetSpeed = qBound(0.95, m_targetSpeed, 1.05);
-    
+
     // Smooth transition to target speed
 #ifdef _WIN32
     // Windows: Smoother transition to avoid audio artifacts
@@ -2324,12 +2370,16 @@ void AtariEmulator::updateEmulationSpeed()
     // macOS/Linux: Faster transition for more responsive adjustment
     m_currentSpeed = m_currentSpeed * 0.9 + m_targetSpeed * 0.1;
 #endif
-    
-    // Apply speed to frame timer
+
+    // Apply combined speed to frame timer:
+    // Base speed from user request, fine-tuned by audio sync adjustment
     if (m_frameTimer) {
-        // Adjust frame interval based on speed
-        // Faster speed = shorter frame interval
-        float adjustedFrameTime = m_frameTimeMs / m_currentSpeed;
+        // Combine user-requested speed with audio sync adjustment
+        double combinedSpeed = m_userRequestedSpeedMultiplier * m_currentSpeed;
+
+        // Adjust frame interval based on combined speed
+        // Faster speed = shorter interval
+        float adjustedFrameTime = m_frameTimeMs / combinedSpeed;
         m_frameTimer->setInterval(static_cast<int>(adjustedFrameTime));
     }
 }
