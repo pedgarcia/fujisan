@@ -139,7 +139,12 @@ void CartridgeWidget::loadCartridge(const QString& cartridgePath)
 void CartridgeWidget::ejectCartridge()
 {
     if (hasCartridge()) {
-        // TODO: Add libatari800 cartridge eject functionality when available
+        // Tell the emulator to remove the cartridge from memory
+        if (m_emulator) {
+            m_emulator->ejectCartridge();
+        }
+
+        // Clear UI state
         m_cartridgePath.clear();
         setState(Off);
         updateTooltip();

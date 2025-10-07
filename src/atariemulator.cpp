@@ -1106,6 +1106,17 @@ bool AtariEmulator::loadFile(const QString& filename)
     }
 }
 
+void AtariEmulator::ejectCartridge()
+{
+    // Remove cartridge from libatari800 and reboot
+    CARTRIDGE_RemoveAutoReboot();
+
+    // Re-enable BASIC (we disabled it when loading the cartridge)
+    Atari800_disable_basic = FALSE;
+
+    qDebug() << "Cartridge ejected from emulator";
+}
+
 bool AtariEmulator::mountDiskImage(int driveNumber, const QString& filename, bool readOnly)
 {
     // Validate drive number (1-8 for D1: through D8:)

@@ -175,7 +175,8 @@ public:
     
     const unsigned char* getScreen();
     bool loadFile(const QString& filename);
-    
+    void ejectCartridge();
+
     // Disk drive functions
     bool mountDiskImage(int driveNumber, const QString& filename, bool readOnly = false);
     void dismountDiskImage(int driveNumber);
