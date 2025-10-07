@@ -282,19 +282,20 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     } else {
         // Only add ROM paths if they are specified in settings
         if (!m_osRomPath.isEmpty()) {
-            QString quotedOSPath = quotePath(m_osRomPath);
-            qDebug() << "OS ROM path (original):" << m_osRomPath;
-            qDebug() << "OS ROM path (quoted):" << quotedOSPath;
+            // NOTE: Do NOT use quotePath() here! We're passing arguments via char* array (argc/argv),
+            // not as a shell command string. Quotes are only needed for shell parsing.
+            // Each QStringList element becomes a separate argv[] entry, so spaces are handled correctly.
+            qDebug() << "OS ROM path:" << m_osRomPath;
             if (machineType == "-5200") {
-                qDebug() << "Adding argument: -5200_rom" << quotedOSPath;
-                argList << "-5200_rom" << quotedOSPath;
+                qDebug() << "Adding argument: -5200_rom" << m_osRomPath;
+                argList << "-5200_rom" << m_osRomPath;
             } else if (machineType == "-atari") {
-                qDebug() << "Adding argument: -osb_rom" << quotedOSPath;
-                argList << "-osb_rom" << quotedOSPath;  // 800 OS-B ROM
+                qDebug() << "Adding argument: -osb_rom" << m_osRomPath;
+                argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
             } else {
                 // For XL/XE machines
-                qDebug() << "Adding argument: -xlxe_rom" << quotedOSPath;
-                argList << "-xlxe_rom" << quotedOSPath;
+                qDebug() << "Adding argument: -xlxe_rom" << m_osRomPath;
+                argList << "-xlxe_rom" << m_osRomPath;
             }
         } else {
             // Fallback to Altirra OS if no external ROM is specified
@@ -314,8 +315,8 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
             argList << "-basic-rev" << "altirra";
         } else {
             if (!m_basicRomPath.isEmpty()) {
-                QString quotedBasicPath = quotePath(m_basicRomPath);
-                argList << "-basic_rom" << quotedBasicPath;
+                // NOTE: Do NOT quote - we're using char* array, not shell string
+                argList << "-basic_rom" << m_basicRomPath;
             } else {
                 argList << "-basic-rev" << "altirra";
             }
@@ -455,20 +456,18 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         argList << "-xl-rev" << "altirra";
     } else {
         if (!m_osRomPath.isEmpty()) {
-            // Use the correct parameter based on machine type
-            QString quotedOSPath = quotePath(m_osRomPath);
-            qDebug() << "OS ROM path (original):" << m_osRomPath;
-            qDebug() << "OS ROM path (quoted):" << quotedOSPath;
+            // NOTE: Do NOT use quotePath() - we're using char* array, not shell string
+            qDebug() << "OS ROM path:" << m_osRomPath;
             if (machineType == "-5200") {
-                qDebug() << "Adding argument: -5200_rom" << quotedOSPath;
-                argList << "-5200_rom" << quotedOSPath;
+                qDebug() << "Adding argument: -5200_rom" << m_osRomPath;
+                argList << "-5200_rom" << m_osRomPath;
             } else if (machineType == "-atari") {
-                qDebug() << "Adding argument: -osb_rom" << quotedOSPath;
-                argList << "-osb_rom" << quotedOSPath;  // 800 OS-B ROM
+                qDebug() << "Adding argument: -osb_rom" << m_osRomPath;
+                argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
             } else {
                 // For XL/XE machines
-                qDebug() << "Adding argument: -xlxe_rom" << quotedOSPath;
-                argList << "-xlxe_rom" << quotedOSPath;
+                qDebug() << "Adding argument: -xlxe_rom" << m_osRomPath;
+                argList << "-xlxe_rom" << m_osRomPath;
             }
         } else {
             // Fallback to Altirra OS if no external ROM is specified
@@ -488,8 +487,8 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
             argList << "-basic-rev" << "altirra";
         } else {
             if (!m_basicRomPath.isEmpty()) {
-                QString quotedBasicPath = quotePath(m_basicRomPath);
-                argList << "-basic_rom" << quotedBasicPath;
+                // NOTE: Do NOT quote - we're using char* array, not shell string
+                argList << "-basic_rom" << m_basicRomPath;
             } else {
                 argList << "-basic-rev" << "altirra";
             }
@@ -1464,19 +1463,34 @@ QString AtariEmulator::quotePath(const QString& path)
         return path;
     }
 
+    qDebug() << "[quotePath] Input path:" << path;
+    qDebug() << "[quotePath] Input length:" << path.length();
+    if (path.length() > 0) {
+        qDebug() << "[quotePath] First char code:" << (int)path[0].unicode();
+        qDebug() << "[quotePath] Last char code:" << (int)path[path.length()-1].unicode();
+    }
+    qDebug() << "[quotePath] Starts with quote:" << path.startsWith('"');
+    qDebug() << "[quotePath] Ends with quote:" << path.endsWith('"');
+
     // First, strip any existing quotes that might have been added by settings or file dialogs
     QString cleanPath = path;
     if (cleanPath.startsWith('"') && cleanPath.endsWith('"')) {
+        qDebug() << "[quotePath] Stripping existing quotes...";
         cleanPath = cleanPath.mid(1, cleanPath.length() - 2);
+        qDebug() << "[quotePath] After stripping:" << cleanPath;
     }
 
     // If path contains spaces, quote it to prevent libatari800 parsing issues
     // This is needed across all platforms (Windows, macOS, Linux)
     if (cleanPath.contains(' ')) {
+        qDebug() << "[quotePath] Path contains spaces, adding quotes";
         // Use double quotes for cross-platform compatibility
-        return QString("\"%1\"").arg(cleanPath);
+        QString result = QString("\"%1\"").arg(cleanPath);
+        qDebug() << "[quotePath] Result:" << result;
+        return result;
     }
 
+    qDebug() << "[quotePath] No spaces, returning clean path:" << cleanPath;
     return cleanPath;
 }
 
