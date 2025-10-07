@@ -283,12 +283,17 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         // Only add ROM paths if they are specified in settings
         if (!m_osRomPath.isEmpty()) {
             QString quotedOSPath = quotePath(m_osRomPath);
+            qDebug() << "OS ROM path (original):" << m_osRomPath;
+            qDebug() << "OS ROM path (quoted):" << quotedOSPath;
             if (machineType == "-5200") {
+                qDebug() << "Adding argument: -5200_rom" << quotedOSPath;
                 argList << "-5200_rom" << quotedOSPath;
             } else if (machineType == "-atari") {
+                qDebug() << "Adding argument: -osb_rom" << quotedOSPath;
                 argList << "-osb_rom" << quotedOSPath;  // 800 OS-B ROM
             } else {
                 // For XL/XE machines
+                qDebug() << "Adding argument: -xlxe_rom" << quotedOSPath;
                 argList << "-xlxe_rom" << quotedOSPath;
             }
         } else {
@@ -452,12 +457,17 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         if (!m_osRomPath.isEmpty()) {
             // Use the correct parameter based on machine type
             QString quotedOSPath = quotePath(m_osRomPath);
+            qDebug() << "OS ROM path (original):" << m_osRomPath;
+            qDebug() << "OS ROM path (quoted):" << quotedOSPath;
             if (machineType == "-5200") {
+                qDebug() << "Adding argument: -5200_rom" << quotedOSPath;
                 argList << "-5200_rom" << quotedOSPath;
             } else if (machineType == "-atari") {
+                qDebug() << "Adding argument: -osb_rom" << quotedOSPath;
                 argList << "-osb_rom" << quotedOSPath;  // 800 OS-B ROM
             } else {
                 // For XL/XE machines
+                qDebug() << "Adding argument: -xlxe_rom" << quotedOSPath;
                 argList << "-xlxe_rom" << quotedOSPath;
             }
         } else {
@@ -1448,20 +1458,26 @@ unsigned char AtariEmulator::convertQtKeyToAtari(int key, Qt::KeyboardModifiers 
     }
 }
 
-QString AtariEmulator::quotePath(const QString& path) 
+QString AtariEmulator::quotePath(const QString& path)
 {
     if (path.isEmpty()) {
         return path;
     }
-    
+
+    // First, strip any existing quotes that might have been added by settings or file dialogs
+    QString cleanPath = path;
+    if (cleanPath.startsWith('"') && cleanPath.endsWith('"')) {
+        cleanPath = cleanPath.mid(1, cleanPath.length() - 2);
+    }
+
     // If path contains spaces, quote it to prevent libatari800 parsing issues
     // This is needed across all platforms (Windows, macOS, Linux)
-    if (path.contains(' ')) {
+    if (cleanPath.contains(' ')) {
         // Use double quotes for cross-platform compatibility
-        return QString("\"%1\"").arg(path);
+        return QString("\"%1\"").arg(cleanPath);
     }
-    
-    return path;
+
+    return cleanPath;
 }
 
 void AtariEmulator::setupAudio()
