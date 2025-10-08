@@ -1700,10 +1700,10 @@ void AtariEmulator::setupAudio()
     // Buffer needs to be large enough to absorb this while we wait for consumption
     m_targetDelay = (m_sampleRate * targetDelayMs) / 1000;  // Convert to samples
     // Use a larger buffer to handle the accumulation
-#ifdef _WIN32
-    int dspBufferSamples = m_fragmentSize * 20;  // Extra large buffer for Windows audio consumption
+#if defined(_WIN32) || defined(__linux__)
+    int dspBufferSamples = m_fragmentSize * 20;  // Large buffer for Windows/Linux to handle frame timing variations
 #else
-    int dspBufferSamples = m_fragmentSize * 10;  // Standard buffer for macOS/Linux
+    int dspBufferSamples = m_fragmentSize * 10;  // Standard buffer for macOS
 #endif
     m_dspBufferBytes = dspBufferSamples * m_bytesPerSample;
     
@@ -1727,18 +1727,18 @@ void AtariEmulator::setupAudio()
     m_audioOutput = new QAudioOutput(format, this);
     
     // Use platform-optimized Qt buffer size
-#ifdef _WIN32
-    m_audioOutput->setBufferSize(8192);  // Much larger buffer to slow down Qt audio consumption
+#if defined(_WIN32) || defined(__linux__)
+    m_audioOutput->setBufferSize(8192);  // Large buffer for Windows/Linux to absorb frame timing variations
 #else
-    m_audioOutput->setBufferSize(2048);  // Balanced buffer for macOS/Linux
+    m_audioOutput->setBufferSize(2048);  // Balanced buffer for macOS
 #endif
     
     // Set notification interval
-#ifdef _WIN32
-    // Windows: Use much larger interval to slow down Qt audio processing
+#if defined(_WIN32) || defined(__linux__)
+    // Windows/Linux: Use larger interval for stable audio with dynamic frame timing
     int notifyMs = 50;  // Process audio chunks less frequently
 #else
-    // macOS/Linux: Match frame rate for responsiveness
+    // macOS: Match frame rate for responsiveness
     int notifyMs = (m_videoSystem == "-ntsc") ? 16 : 20;  // 60Hz or 50Hz
 #endif
     m_audioOutput->setNotifyInterval(notifyMs);
