@@ -1683,14 +1683,14 @@ void AtariEmulator::setupAudio()
     
     
     // Calculate fragment size and buffer parameters (like Atari800MacX)
-#ifdef _WIN32
-    // Windows Qt audio works best with smaller buffer - add headroom for window operations
+#if defined(_WIN32) || defined(__linux__)
+    // Windows/Linux: Use larger fragments for stability with dynamic frame timing
     m_fragmentSize = 1024; // Larger fragments for better Qt audio stability (~23ms at 44100Hz)
-    int targetDelayMs = 30;   // Slight headroom for UI operations (drag/resize)
+    int targetDelayMs = 30;   // Slight headroom for UI operations (drag/resize/typing)
 #else
-    // macOS/Linux can use smaller buffers for lower latency
+    // macOS: Smaller buffers work fine here
     m_fragmentSize = 512; // Smaller fragments for more responsive audio
-    int targetDelayMs = 40;  // Original delay for macOS/Linux
+    int targetDelayMs = 40;  // Original delay for macOS
 #endif
     int fragmentBytes = m_fragmentSize * m_bytesPerSample;
     
