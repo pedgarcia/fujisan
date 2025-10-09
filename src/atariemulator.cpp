@@ -284,15 +284,21 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         if (!m_osRomPath.isEmpty()) {
             QFileInfo osRomFile(m_osRomPath);
             if (osRomFile.exists()) {
+                // CRITICAL: Must set -rev AUTO BEFORE the ROM file to reset any previously cached revision
+                // This clears the Altirra OS setting and allows libatari800 to auto-select the custom ROM
+                // NOTE: Must use uppercase "AUTO" - atari800 uses case-sensitive strcmp() for this value
                 // NOTE: Do NOT use quotePath() here! We're passing arguments via char* array (argc/argv),
                 // not as a shell command string. Quotes are only needed for shell parsing.
                 // Each QStringList element becomes a separate argv[] entry, so spaces are handled correctly.
                 if (machineType == "-5200") {
+                    argList << "-5200-rev" << "AUTO";
                     argList << "-5200_rom" << m_osRomPath;
                 } else if (machineType == "-atari") {
+                    argList << "-800-rev" << "AUTO";
                     argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
                 } else {
                     // For XL/XE machines
+                    argList << "-xl-rev" << "AUTO";
                     argList << "-xlxe_rom" << m_osRomPath;
                 }
             } else {
@@ -326,7 +332,9 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
             if (!m_basicRomPath.isEmpty()) {
                 QFileInfo basicRomFile(m_basicRomPath);
                 if (basicRomFile.exists()) {
+                    // CRITICAL: Must set -basic-rev AUTO BEFORE the ROM file to reset any previously cached revision
                     // NOTE: Do NOT quote - we're using char* array, not shell string
+                    argList << "-basic-rev" << "AUTO";
                     argList << "-basic_rom" << m_basicRomPath;
                 } else {
                     // File doesn't exist - fallback to Altirra BASIC
@@ -465,47 +473,93 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     } else {
         argList << "-nosound";
     }
-    
+
+    // Diagnostic logging: Log emulator state before ROM configuration
+    QString platform;
+#ifdef Q_OS_WIN
+    platform = "Windows";
+#elif defined(Q_OS_LINUX)
+    platform = "Linux";
+#elif defined(Q_OS_MACOS)
+    platform = "macOS";
+#else
+    platform = "Unknown";
+#endif
+
+    qDebug() << "=== ROM CONFIGURATION DIAGNOSTIC [Platform:" << platform << "] ===";
+    qDebug() << "  m_altirraOSEnabled:" << m_altirraOSEnabled;
+    qDebug() << "  m_osRomPath:" << m_osRomPath;
+    qDebug() << "  machineType:" << machineType;
+    qDebug() << "  basicEnabled:" << basicEnabled;
+    qDebug() << "  m_altirraBASICEnabled:" << m_altirraBASICEnabled;
+    qDebug() << "  m_basicRomPath:" << m_basicRomPath;
+
     // Configure OS ROM (Altirra or External)
     if (m_altirraOSEnabled) {
+        qDebug() << "  -> Using Altirra OS (m_altirraOSEnabled = true)";
         // Use built-in Altirra OS for all machine types
         argList << "-xl-rev" << "altirra";
+        qDebug() << "  -> Added arguments: -xl-rev altirra";
     } else {
         if (!m_osRomPath.isEmpty()) {
+            qDebug() << "  Checking external OS ROM path...";
             QFileInfo osRomFile(m_osRomPath);
-            if (osRomFile.exists()) {
+            bool romExists = osRomFile.exists();
+            qDebug() << "  QFileInfo::exists() returned:" << romExists;
+            qDebug() << "  Absolute path:" << osRomFile.absoluteFilePath();
+            qDebug() << "  Is readable:" << osRomFile.isReadable();
+
+            if (romExists) {
+                qDebug() << "  -> Using external OS ROM";
+                // CRITICAL: Must set -rev AUTO BEFORE the ROM file to reset any previously cached revision
+                // This clears the Altirra OS setting and allows libatari800 to auto-select the custom ROM
+                // NOTE: Must use uppercase "AUTO" - atari800 uses case-sensitive strcmp() for this value
                 // NOTE: Do NOT use quotePath() - we're using char* array, not shell string
                 if (machineType == "-5200") {
+                    argList << "-5200-rev" << "AUTO";
                     argList << "-5200_rom" << m_osRomPath;
+                    qDebug() << "  -> Added arguments: -5200-rev AUTO -5200_rom" << m_osRomPath;
                 } else if (machineType == "-atari") {
+                    argList << "-800-rev" << "AUTO";
                     argList << "-osb_rom" << m_osRomPath;  // 800 OS-B ROM
+                    qDebug() << "  -> Added arguments: -800-rev AUTO -osb_rom" << m_osRomPath;
                 } else {
                     // For XL/XE machines
+                    argList << "-xl-rev" << "AUTO";
                     argList << "-xlxe_rom" << m_osRomPath;
+                    qDebug() << "  -> Added arguments: -xl-rev AUTO -xlxe_rom" << m_osRomPath;
                 }
             } else {
                 // File doesn't exist - fallback to Altirra OS
+                qWarning() << "  -> OS ROM file not found, falling back to Altirra OS";
                 qWarning() << "OS ROM file not found at" << m_osRomPath << "- Loading Altirra OS";
                 if (machineType == "-5200") {
                     argList << "-5200-rev" << "altirra";
+                    qDebug() << "  -> Added arguments: -5200-rev altirra";
                 } else if (machineType == "-atari") {
                     argList << "-800-rev" << "altirra";
+                    qDebug() << "  -> Added arguments: -800-rev altirra";
                 } else {
                     argList << "-xl-rev" << "altirra";
+                    qDebug() << "  -> Added arguments: -xl-rev altirra";
                 }
             }
         } else {
+            qDebug() << "  -> m_osRomPath is empty, falling back to Altirra OS";
             // Fallback to Altirra OS if no external ROM is specified
             if (machineType == "-5200") {
                 argList << "-5200-rev" << "altirra";
+                qDebug() << "  -> Added arguments: -5200-rev altirra";
             } else if (machineType == "-atari") {
                 argList << "-800-rev" << "altirra";
+                qDebug() << "  -> Added arguments: -800-rev altirra";
             } else {
                 argList << "-xl-rev" << "altirra";
+                qDebug() << "  -> Added arguments: -xl-rev altirra";
             }
         }
     }
-    
+
     // Configure BASIC ROM (Altirra, External, or None)
     if (basicEnabled) {
         if (m_altirraBASICEnabled) {
@@ -514,8 +568,11 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
             if (!m_basicRomPath.isEmpty()) {
                 QFileInfo basicRomFile(m_basicRomPath);
                 if (basicRomFile.exists()) {
+                    // CRITICAL: Must set -basic-rev AUTO BEFORE the ROM file to reset any previously cached revision
                     // NOTE: Do NOT quote - we're using char* array, not shell string
+                    argList << "-basic-rev" << "AUTO";
                     argList << "-basic_rom" << m_basicRomPath;
+                    qDebug() << "  -> Added arguments: -basic-rev AUTO -basic_rom" << m_basicRomPath;
                 } else {
                     qWarning() << "BASIC ROM file not found at" << m_basicRomPath << "- Loading Altirra BASIC";
                     argList << "-basic-rev" << "altirra";
@@ -549,29 +606,43 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     
     // Add device debugging to help troubleshoot P: device issues
     argList << "-devbug";
-    
+
     // Convert QStringList to char* array
     QList<QByteArray> argBytes;
     for (const QString& arg : argList) {
         argBytes.append(arg.toUtf8());
     }
-    
+
     std::vector<char*> args(argBytes.size() + 1);
     for (int i = 0; i < argBytes.size(); ++i) {
         args[i] = argBytes[i].data();
     }
     args[argBytes.size()] = nullptr;
-    
-    
+
+    // Log complete argument list being passed to libatari800
+    qDebug() << "=== COMPLETE ARGUMENT LIST FOR libatari800_init() ===";
+    QString argString;
+    for (const QString& arg : argList) {
+        argString += arg + " ";
+    }
+    qDebug() << "  Arguments:" << argString.trimmed();
+    qDebug() << "  Total argument count:" << argList.size();
+
     // Force complete libatari800 reset to clear any persistent ROM state
     // This ensures ROM configuration changes are applied properly
     static bool libatari800_previously_initialized = false;
     if (libatari800_previously_initialized) {
+        qDebug() << "=== libatari800 RESTART DETECTED ===";
+        qDebug() << "  Calling libatari800_exit() to reset state...";
         libatari800_exit();
+        qDebug() << "  libatari800_exit() completed";
     } else {
+        qDebug() << "=== FIRST libatari800 INITIALIZATION ===";
     }
-    
+
+    qDebug() << "  Calling libatari800_init()...";
     if (libatari800_init(argBytes.size(), args.data())) {
+        qDebug() << "  libatari800_init() returned SUCCESS";
         libatari800_previously_initialized = true;  // Mark as initialized for future resets
         
         // Verify ROM loading status
@@ -625,9 +696,12 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         
         // Start the frame timer
         m_frameTimer->start(static_cast<int>(m_frameTimeMs));
+        qDebug() << "=== INITIALIZATION COMPLETE - Emulator started successfully ===";
         return true;
     }
-    
+
+    qDebug() << "  libatari800_init() returned FAILURE";
+    qDebug() << "=== INITIALIZATION FAILED ===";
     return false;
 }
 
