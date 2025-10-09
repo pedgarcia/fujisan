@@ -108,6 +108,7 @@ For detailed information, see:
 - **[Build Checklist](docs/build/CHECKLIST.md)** - Critical verification steps for every build
 - **[Platform Guide](docs/build/PLATFORMS.md)** - Detailed platform-specific instructions
 - **[Windows Technical Details](docs/build/WINDOWS.md)** - Windows build troubleshooting
+- **[Code Signing Reference](docs_local/SIGNING_REFERENCE.md)** - Quick reference for macOS signing & notarization
 
 ## Common Issues
 
