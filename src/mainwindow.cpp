@@ -1089,9 +1089,11 @@ void MainWindow::updateToolbarFromSettings()
     m_videoToggle->blockSignals(false);
     
 
-    // Update speed toggle (default to normal speed)
+    // Update speed toggle from settings
+    QSettings speedSettings("8bitrelics", "Fujisan");
+    bool turboMode = speedSettings.value("machine/turboMode", false).toBool();
     m_speedToggle->blockSignals(true);
-    m_speedToggle->setChecked(false); // Default to normal speed (100%)
+    m_speedToggle->setChecked(turboMode);
     m_speedToggle->blockSignals(false);
 
     // Update menu actions

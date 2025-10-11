@@ -394,6 +394,50 @@ fujisan.exe
 ### Known Limitations
 - **Printer Support**: P: device (printer) functionality is currently disabled due to Error 138 (Device Timeout) issues in the atari800 core. Commands like `LPRINT` and `LIST "P:"` will not work. This limitation also affects the official atari800 emulator and is not specific to Fujisan.
 
+## Configuration Files
+
+Fujisan stores its configuration in platform-specific locations following standard OS conventions.
+
+### Main Settings
+
+Application settings (speed, audio, video, etc.) are stored using Qt's native settings format:
+
+**macOS:**
+```
+~/Library/Preferences/com.8bitrelics.Fujisan.plist
+```
+
+**Windows:**
+```
+Registry: HKEY_CURRENT_USER\Software\8bitrelics\Fujisan
+```
+
+**Linux:**
+```
+~/.config/8bitrelics/Fujisan.conf
+```
+
+### Configuration Profiles
+
+Machine configuration profiles (complete emulator setups) are stored as JSON files:
+
+**macOS:**
+```
+~/Library/Application Support/Fujisan/profiles/*.profile
+```
+
+**Windows:**
+```
+C:\Users\<username>\AppData\Roaming\Fujisan\profiles\*.profile
+```
+
+**Linux:**
+```
+~/.local/share/Fujisan/profiles/*.profile
+```
+
+Profiles contain complete machine configurations including hardware settings, memory configuration, peripherals, and media paths. They can be managed through the Settings dialog's profile system.
+
 ## TCP Server API
 
 Fujisan includes a powerful TCP server for remote control and automation. This enables IDE integration, automated testing, and programmatic control of all emulator features.

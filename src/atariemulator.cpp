@@ -953,8 +953,9 @@ void AtariEmulator::processFrame()
                 gap += m_dspBufferBytes;
             }
             
-            // Conditional speed adjustment - disabled for Windows due to Qt audio issues
-#ifndef _WIN32
+            // Conditional speed adjustment - disabled for Windows/Linux due to Qt audio issues
+            // Speed micro-adjustments can cause timing variations during typing/UI operations
+#if 0  // Disabled for all platforms - provides more stable audio
             updateEmulationSpeed();
 #endif
 
@@ -1760,7 +1761,7 @@ void AtariEmulator::setupAudio()
 #if defined(_WIN32) || defined(__linux__)
     // Windows/Linux: Use larger fragments for stability with dynamic frame timing
     m_fragmentSize = 1024; // Larger fragments for better Qt audio stability (~23ms at 44100Hz)
-    int targetDelayMs = 30;   // Slight headroom for UI operations (drag/resize/typing)
+    int targetDelayMs = 50;   // Extra headroom for UI operations and typing resilience
 #else
     // macOS: Smaller buffers work fine here
     m_fragmentSize = 512; // Smaller fragments for more responsive audio
@@ -1775,7 +1776,7 @@ void AtariEmulator::setupAudio()
     m_targetDelay = (m_sampleRate * targetDelayMs) / 1000;  // Convert to samples
     // Use a larger buffer to handle the accumulation
 #if defined(_WIN32) || defined(__linux__)
-    int dspBufferSamples = m_fragmentSize * 20;  // Large buffer for Windows/Linux to handle frame timing variations
+    int dspBufferSamples = m_fragmentSize * 25;  // Extra-large buffer for maximum stability during typing/UI ops
 #else
     int dspBufferSamples = m_fragmentSize * 10;  // Standard buffer for macOS
 #endif
@@ -1818,11 +1819,11 @@ void AtariEmulator::setupAudio()
     m_audioOutput->setNotifyInterval(notifyMs);
     
     // Set category for optimal performance
-#ifdef _WIN32
-    // Windows: Use music category for higher latency/buffering
+#if defined(_WIN32) || defined(__linux__)
+    // Windows/Linux: Use music category for higher latency/buffering and stability
     m_audioOutput->setCategory("music");
 #else
-    // macOS/Linux: Use game category for lower latency
+    // macOS: Use game category for lower latency (works fine with smaller buffers)
     m_audioOutput->setCategory("game");
 #endif
     
