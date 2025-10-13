@@ -311,6 +311,13 @@ mkdir -p fujisan-linux/usr/lib/fujisan/plugins/xcbglintegrations
 cp Fujisan fujisan-linux/usr/lib/fujisan/Fujisan
 chmod 755 fujisan-linux/usr/lib/fujisan/Fujisan
 
+# Create qt.conf to prevent Qt from searching system plugin paths
+# This is critical for preventing version conflicts on KDE systems
+cat > fujisan-linux/usr/lib/fujisan/qt.conf << 'QTCONF_EOF'
+[Paths]
+Plugins = plugins
+QTCONF_EOF
+
 # Copy Qt libraries
 echo "Copying Qt libraries..."
 for lib in libQt5Core libQt5Gui libQt5Widgets libQt5Multimedia libQt5Network libQt5DBus libQt5XcbQpa; do
@@ -351,9 +358,13 @@ done
 cat > fujisan-linux/usr/bin/fujisan << 'WRAPPER_EOF'
 #!/bin/bash
 # Fujisan wrapper script
-export LD_LIBRARY_PATH="/usr/lib/fujisan:$LD_LIBRARY_PATH"
-export QT_PLUGIN_PATH="/usr/lib/fujisan/plugins:$QT_PLUGIN_PATH"
+# Note: qt.conf (next to binary) prevents Qt from searching system plugin paths
+export LD_LIBRARY_PATH="/usr/lib/fujisan"
 export FUJISAN_IMAGES_PATH="/usr/share/fujisan/images"
+# Disable KDE platform theme integration to prevent loading system Qt plugins
+export QT_QPA_PLATFORMTHEME=""
+# Use bundled Fusion style for consistent cross-platform appearance
+export QT_STYLE_OVERRIDE="Fusion"
 exec /usr/lib/fujisan/Fujisan "$@"
 WRAPPER_EOF
 chmod 755 fujisan-linux/usr/bin/fujisan
@@ -451,7 +462,14 @@ if [ "$BUILD_TARBALL" = "true" ]; then
     
     # Copy binary and libraries
     cp Fujisan fujisan-portable/bin/
-    
+
+    # Create qt.conf to prevent Qt from searching system plugin paths
+    # This is critical for preventing version conflicts on KDE systems
+    cat > fujisan-portable/bin/qt.conf << 'QTCONF_EOF'
+[Paths]
+Plugins = ../plugins
+QTCONF_EOF
+
     # Copy Qt libraries
     mkdir -p fujisan-portable/lib
     echo "Copying Qt libraries for portable package..."
@@ -509,12 +527,13 @@ if [ "$BUILD_TARBALL" = "true" ]; then
 #!/bin/bash
 # Fujisan Portable Launcher
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
-export QT_PLUGIN_PATH="$SCRIPT_DIR/plugins:$QT_PLUGIN_PATH"
+# Note: qt.conf (in bin/) prevents Qt from searching system plugin paths
+export LD_LIBRARY_PATH="$SCRIPT_DIR/lib"
 export FUJISAN_IMAGES_PATH="$SCRIPT_DIR/images"
-
-# Ensure xcb platform plugin can find its dependencies
-export QT_QPA_PLATFORM_PLUGIN_PATH="$SCRIPT_DIR/plugins/platforms"
+# Disable KDE platform theme integration to prevent loading system Qt plugins
+export QT_QPA_PLATFORMTHEME=""
+# Use bundled Fusion style for consistent cross-platform appearance
+export QT_STYLE_OVERRIDE="Fusion"
 
 exec "$SCRIPT_DIR/bin/Fujisan" "$@"
 EOF
