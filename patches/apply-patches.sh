@@ -24,7 +24,13 @@ if [ -d .git ]; then
         if [ -f "$patch" ]; then
             patch_name="$(basename "$patch")"
             echo "Applying patch: $patch_name"
-            
+
+            # Skip patch 0001 - merged into upstream as PR #252 (Oct 13, 2025)
+            if [[ "$patch_name" == "0001-libatari800-disk-api.patch" ]]; then
+                echo "Skipping patch 0001 - already in upstream (PR #252 merged)"
+                continue
+            fi
+
             # Skip Windows-specific patches on non-Windows systems
             # Allow Windows patches when cross-compiling (CC contains mingw)
             if [[ "$patch_name" == *"windows"* ]] && [[ "$OSTYPE" != "msys" ]] && [[ "$MSYSTEM" == "" ]] && [[ "$CC" != *"mingw"* ]]; then
@@ -80,10 +86,18 @@ else
     echo "Not a git repository, using 'patch' command"
     for patch in "$PATCHES_DIR"/0*.patch; do
         if [ -f "$patch" ]; then
-            echo "Applying patch: $(basename "$patch")"
+            patch_name="$(basename "$patch")"
+
+            # Skip patch 0001 - merged into upstream as PR #252 (Oct 13, 2025)
+            if [[ "$patch_name" == "0001-libatari800-disk-api.patch" ]]; then
+                echo "Skipping patch 0001 - already in upstream (PR #252 merged)"
+                continue
+            fi
+
+            echo "Applying patch: $patch_name"
             # Use force and no-backup-if-mismatch to avoid prompts
             patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null || {
-                echo "Error: Failed to apply patch $(basename "$patch")"
+                echo "Error: Failed to apply patch $patch_name"
                 exit 1
             }
         fi

@@ -185,7 +185,7 @@ endif()
 # Download and build atari800 with Fujisan patches
 ExternalProject_Add(atari800_external
     GIT_REPOSITORY https://github.com/atari800/atari800.git
-    GIT_TAG 575a943b3523bf0f5c9b73ba8641d83cac672f24  # Known compatible version
+    GIT_TAG fcb6e799734c749f9e326640f4d506abf854e95c  # Includes merged PR #252 (disk API)
     SOURCE_DIR ${ATARI800_SOURCE_DIR}
     BINARY_DIR ${ATARI800_BINARY_DIR}
     
