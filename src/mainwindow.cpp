@@ -1877,7 +1877,8 @@ void MainWindow::createMediaPeripheralsDock()
     // Machine selector on top
     m_machineCombo = new QComboBox();
     m_machineCombo->setIconSize(QSize(32, 20));
-    m_machineCombo->setMinimumWidth(150);
+    m_machineCombo->setMinimumWidth(200);
+    m_machineCombo->setMaximumWidth(200);
 
     // Create machine icons (same as original createToolBar)
     auto createMachineIcon = [](const QColor& baseColor, const QString& text) -> QIcon {
@@ -1940,14 +1941,14 @@ void MainWindow::createMediaPeripheralsDock()
     basicLayout->setContentsMargins(0, 0, 0, 0);
     basicLayout->setSpacing(4);
 
-    QLabel* basicLabel = new QLabel("BASIC:");
-    basicLabel->setMinimumWidth(35);
+    // QLabel* basicLabel = new QLabel("BASIC:");
+    // basicLabel->setMinimumWidth(35);
     m_basicToggle = new ToggleSwitch();
-    m_basicToggle->setLabels("ON", "OFF");
+    m_basicToggle->setLabels(" BASIC", "OS");
     m_basicToggle->setChecked(m_emulator->isBasicEnabled());
     connect(m_basicToggle, &ToggleSwitch::toggled, this, &MainWindow::toggleBasic);
 
-    basicLayout->addWidget(basicLabel);
+    // basicLayout->addWidget(basicLabel);
     basicLayout->addWidget(m_basicToggle);
 
     // Create video system toggle container
@@ -1956,15 +1957,15 @@ void MainWindow::createMediaPeripheralsDock()
     videoLayout->setContentsMargins(0, 0, 0, 0);
     videoLayout->setSpacing(4);
 
-    QLabel* videoLabel = new QLabel("Video:");
-    videoLabel->setMinimumWidth(35);
+    // QLabel* videoLabel = new QLabel("Video:");
+    // videoLabel->setMinimumWidth(35);
     m_videoToggle = new ToggleSwitch();
     m_videoToggle->setLabels("PAL", "NTSC");
     m_videoToggle->setColors(QColor(70, 130, 180), QColor(70, 130, 180)); // Steel blue for both states
     m_videoToggle->setChecked(true); // Default to PAL (ON position)
     connect(m_videoToggle, &ToggleSwitch::toggled, this, &MainWindow::onVideoSystemToggled);
 
-    videoLayout->addWidget(videoLabel);
+    // videoLayout->addWidget(videoLabel);
     videoLayout->addWidget(m_videoToggle);
 
     // Create speed toggle container
@@ -1973,15 +1974,15 @@ void MainWindow::createMediaPeripheralsDock()
     speedLayout->setContentsMargins(0, 0, 0, 0);
     speedLayout->setSpacing(4);
 
-    QLabel* speedLabel = new QLabel("Speed:");
-    speedLabel->setMinimumWidth(35);
+    // QLabel* speedLabel = new QLabel("Speed:");
+    // speedLabel->setMinimumWidth(35);
     m_speedToggle = new ToggleSwitch();
-    m_speedToggle->setLabels("Full", "Real");
+    m_speedToggle->setLabels("MAX", "1x");
     m_speedToggle->setColors(QColor(70, 130, 180), QColor(70, 130, 180)); // Steel blue for both states
     m_speedToggle->setChecked(false); // Default to Real speed (OFF position = authentic Atari speed)
     connect(m_speedToggle, &ToggleSwitch::toggled, this, &MainWindow::onSpeedToggled);
 
-    speedLayout->addWidget(speedLabel);
+    // speedLayout->addWidget(speedLabel);
     speedLayout->addWidget(m_speedToggle);
 
     // Add all three toggle switches to the container

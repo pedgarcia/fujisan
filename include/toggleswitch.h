@@ -49,8 +49,8 @@ private:
     QColor m_checkedColor;
     QColor m_uncheckedColor;
     
-    static const int SWITCH_WIDTH = 50;
-    static const int SWITCH_HEIGHT = 22;
+    static const int SWITCH_WIDTH = 55;
+    static const int SWITCH_HEIGHT = 21;
     static const int THUMB_SIZE = 18;
     static const int THUMB_MARGIN = 2;
 };

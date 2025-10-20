@@ -187,34 +187,106 @@ void TCPServer::onClientDataReady()
     if (!client) {
         return;
     }
-    
+
     // Read all available data and append to client buffer
     QByteArray newData = client->readAll();
     m_clientBuffers[client].append(newData);
-    
-    // Process complete JSON messages (delimited by newlines)
+
+    // Process complete JSON objects by tracking braces
     QByteArray& buffer = m_clientBuffers[client];
-    int newlineIndex;
-    
-    while ((newlineIndex = buffer.indexOf('\n')) != -1) {
-        QByteArray jsonData = buffer.left(newlineIndex);
-        buffer.remove(0, newlineIndex + 1);
-        
-        // Skip empty lines
-        if (jsonData.trimmed().isEmpty()) {
+
+    while (!buffer.isEmpty()) {
+        // Skip whitespace at the beginning
+        int startPos = 0;
+        while (startPos < buffer.size() && (buffer[startPos] == ' ' || buffer[startPos] == '\t' ||
+               buffer[startPos] == '\r' || buffer[startPos] == '\n')) {
+            startPos++;
+        }
+
+        if (startPos >= buffer.size()) {
+            buffer.clear();
+            break;
+        }
+
+        // Check if we have a JSON object starting
+        if (buffer[startPos] != '{') {
+            // Invalid data - skip to next newline or clear buffer
+            int newlinePos = buffer.indexOf('\n', startPos);
+            if (newlinePos != -1) {
+                QByteArray invalidData = buffer.mid(startPos, newlinePos - startPos);
+                buffer.remove(0, newlinePos + 1);
+                sendResponse(client, QJsonValue(), false, QJsonValue(),
+                            "Invalid JSON format (expected '{' at start): " + QString::fromUtf8(invalidData.trimmed()));
+            } else {
+                buffer.clear();
+                sendResponse(client, QJsonValue(), false, QJsonValue(),
+                            "Invalid JSON format (expected '{' at start)");
+            }
             continue;
         }
-        
-        // Parse and process JSON command
-        bool parseSuccess;
-        QJsonObject request = parseJsonMessage(jsonData, parseSuccess);
-        
-        if (parseSuccess) {
-            processCommand(client, request);
+
+        // Find the complete JSON object by tracking brace depth
+        int braceCount = 0;
+        bool inString = false;
+        bool escapeNext = false;
+        int endPos = -1;
+
+        for (int i = startPos; i < buffer.size(); i++) {
+            char ch = buffer[i];
+
+            if (escapeNext) {
+                escapeNext = false;
+                continue;
+            }
+
+            if (ch == '\\' && inString) {
+                escapeNext = true;
+                continue;
+            }
+
+            if (ch == '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString) {
+                if (ch == '{') {
+                    braceCount++;
+                } else if (ch == '}') {
+                    braceCount--;
+                    if (braceCount == 0) {
+                        endPos = i;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If we found a complete JSON object, process it
+        if (endPos != -1) {
+            QByteArray jsonData = buffer.mid(startPos, endPos - startPos + 1);
+            buffer.remove(0, endPos + 1);
+
+            // Parse and process JSON command
+            bool parseSuccess;
+            QJsonObject request = parseJsonMessage(jsonData, parseSuccess);
+
+            if (parseSuccess) {
+                processCommand(client, request);
+            } else {
+                // Send error response for invalid JSON
+                sendResponse(client, QJsonValue(), false, QJsonValue(),
+                            "Invalid JSON format: " + QString::fromUtf8(jsonData.left(50)));
+            }
         } else {
-            // Send error response for invalid JSON
-            sendResponse(client, QJsonValue(), false, QJsonValue(), 
-                        "Invalid JSON format: " + QString::fromUtf8(jsonData));
+            // Incomplete JSON object - wait for more data
+            // But if buffer is getting too large, there might be an issue
+            if (buffer.size() > 1048576) {  // 1MB limit
+                buffer.clear();
+                sendResponse(client, QJsonValue(), false, QJsonValue(),
+                            "JSON message too large or incomplete (>1MB)");
+            }
+            break;
         }
     }
 }
@@ -299,22 +371,27 @@ void TCPServer::processCommand(QTcpSocket* client, const QJsonObject& request)
 void TCPServer::sendResponse(QTcpSocket* client, const QJsonValue& requestId, bool success,
                            const QJsonValue& result, const QString& error)
 {
+    // Check if client is still connected before sending
+    if (!client || client->state() != QAbstractSocket::ConnectedState) {
+        return;
+    }
+
     QJsonObject response;
     response["type"] = "response";
     response["status"] = success ? "success" : "error";
-    
+
     if (!requestId.isNull()) {
         response["id"] = requestId;
     }
-    
+
     if (success && !result.isNull()) {
         response["result"] = result;
     }
-    
+
     if (!success && !error.isEmpty()) {
         response["error"] = error;
     }
-    
+
     // Send response as JSON + newline
     QJsonDocument doc(response);
     QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
@@ -324,11 +401,16 @@ void TCPServer::sendResponse(QTcpSocket* client, const QJsonValue& requestId, bo
 
 void TCPServer::sendEvent(QTcpSocket* client, const QString& eventType, const QJsonObject& data)
 {
+    // Check if client is still connected before sending
+    if (!client || client->state() != QAbstractSocket::ConnectedState) {
+        return;
+    }
+
     QJsonObject event;
     event["type"] = "event";
     event["event"] = eventType;
     event["data"] = data;
-    
+
     QJsonDocument doc(event);
     QByteArray eventData = doc.toJson(QJsonDocument::Compact) + "\n";
     client->write(eventData);
@@ -347,17 +429,34 @@ void TCPServer::sendEventToAllClients(const QString& eventType, const QJsonObjec
 QString TCPServer::validateAndNormalizePath(const QString& path)
 {
     if (path.isEmpty()) {
+        qDebug() << "TCP Server: validateAndNormalizePath - empty path";
         return QString();
     }
-    
-    // Convert to absolute path and check if file exists
+
+    qDebug() << "TCP Server: validateAndNormalizePath - input path:" << path;
+
+    // First, try the path as-is
     QFileInfo fileInfo(path);
-    if (!fileInfo.exists()) {
-        return QString();
+    if (fileInfo.exists()) {
+        QString canonicalPath = fileInfo.canonicalFilePath();
+        qDebug() << "TCP Server: validateAndNormalizePath - path exists, canonical:" << canonicalPath;
+        return canonicalPath;
     }
-    
-    // Return canonical path (resolves symlinks, removes . and ..)
-    return fileInfo.canonicalFilePath();
+
+    // If path doesn't exist as-is and doesn't start with '/', try adding leading '/'
+    // This handles cases where absolute Unix paths are sent without leading slash
+    if (!path.startsWith('/') && !path.startsWith('~')) {
+        QString absolutePath = "/" + path;
+        QFileInfo absoluteFileInfo(absolutePath);
+        if (absoluteFileInfo.exists()) {
+            QString canonicalPath = absoluteFileInfo.canonicalFilePath();
+            qDebug() << "TCP Server: validateAndNormalizePath - found with leading slash:" << canonicalPath;
+            return canonicalPath;
+        }
+    }
+
+    qDebug() << "TCP Server: validateAndNormalizePath - file not found:" << path;
+    return QString();
 }
 
 // Command handler stubs - to be implemented in the next steps

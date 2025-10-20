@@ -127,29 +127,50 @@ void CartridgeWidget::setState(CartridgeState state)
 
 void CartridgeWidget::loadCartridge(const QString& cartridgePath)
 {
-    if (m_emulator && m_emulator->loadFile(cartridgePath)) {
+    qDebug() << "CartridgeWidget::loadCartridge called with path:" << cartridgePath;
+    qDebug() << "CartridgeWidget: m_emulator =" << m_emulator;
+
+    if (!m_emulator) {
+        qDebug() << "CartridgeWidget: ERROR - m_emulator is null!";
+        return;
+    }
+
+    bool loadSuccess = m_emulator->loadFile(cartridgePath);
+    qDebug() << "CartridgeWidget: loadFile returned:" << loadSuccess;
+
+    if (loadSuccess) {
         m_cartridgePath = cartridgePath;
+        qDebug() << "CartridgeWidget: Setting state to On, current state:" << m_currentState;
         setState(On);
         updateTooltip();
         emit cartridgeInserted(cartridgePath);
-        qDebug() << "Loaded cartridge:" << cartridgePath;
+        qDebug() << "CartridgeWidget: Successfully loaded cartridge, new state:" << m_currentState;
+    } else {
+        qDebug() << "CartridgeWidget: Failed to load cartridge file:" << cartridgePath;
     }
 }
 
 void CartridgeWidget::ejectCartridge()
 {
+    qDebug() << "CartridgeWidget::ejectCartridge called, hasCartridge:" << hasCartridge();
+    qDebug() << "CartridgeWidget: Current state:" << m_currentState << "Path:" << m_cartridgePath;
+
     if (hasCartridge()) {
         // Tell the emulator to remove the cartridge from memory
         if (m_emulator) {
+            qDebug() << "CartridgeWidget: Calling emulator->ejectCartridge()";
             m_emulator->ejectCartridge();
         }
 
         // Clear UI state
         m_cartridgePath.clear();
+        qDebug() << "CartridgeWidget: Setting state to Off";
         setState(Off);
         updateTooltip();
         emit cartridgeEjected();
-        qDebug() << "Ejected cartridge";
+        qDebug() << "CartridgeWidget: Successfully ejected cartridge, new state:" << m_currentState;
+    } else {
+        qDebug() << "CartridgeWidget: No cartridge to eject";
     }
 }
 
