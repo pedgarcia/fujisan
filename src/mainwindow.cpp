@@ -2064,10 +2064,6 @@ void MainWindow::onDriveStateChanged(int driveNumber, bool enabled)
         // Disable drive in libatari800 core (dismounts disk and sets status to OFF)
         m_emulator->disableDrive(driveNumber);
         qDebug() << "Drive D" << driveNumber << ": disabled in libatari800 core";
-        
-        // Trigger cold restart to refresh boot sequence
-        m_emulator->coldRestart();
-        qDebug() << "Cold restart triggered - boot sequence refreshed";
     }
 
     // Save drive state to settings
@@ -2919,18 +2915,22 @@ void MainWindow::requestEmulatorRestart()
 bool MainWindow::insertDiskViaTCP(int driveNumber, const QString& diskPath)
 {
     qDebug() << "MainWindow::insertDiskViaTCP called for drive" << driveNumber << "path:" << diskPath;
-    
+
     if (driveNumber == 1 && m_diskDrive1) {
         // For D1, use the toolbar disk drive widget
         m_diskDrive1->setDriveEnabled(true);  // Enable the drive first
         m_diskDrive1->insertDisk(diskPath);   // Insert the disk
         return true;
-    } else if (driveNumber >= 2 && driveNumber <= 8) {
-        // For D2-D8, fall back to direct emulator call for now
-        // TODO: Implement proper GUI integration for D2-D8
-        return m_emulator->mountDiskImage(driveNumber, diskPath, false);
+    } else if (driveNumber >= 2 && driveNumber <= 8 && m_mediaPeripheralsDock) {
+        // For D2-D8, use the widget from MediaPeripheralsDock
+        DiskDriveWidget* widget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+        if (widget) {
+            widget->setDriveEnabled(true);  // Enable the drive first
+            widget->insertDisk(diskPath);   // Insert the disk
+            return true;
+        }
     }
-    
+
     qDebug() << "MainWindow::insertDiskViaTCP failed - invalid drive or widget not available";
     return false;
 }
@@ -2938,18 +2938,20 @@ bool MainWindow::insertDiskViaTCP(int driveNumber, const QString& diskPath)
 bool MainWindow::ejectDiskViaTCP(int driveNumber)
 {
     qDebug() << "MainWindow::ejectDiskViaTCP called for drive" << driveNumber;
-    
+
     if (driveNumber == 1 && m_diskDrive1) {
         // For D1, use the toolbar disk drive widget
         m_diskDrive1->ejectDisk();
         return true;
-    } else if (driveNumber >= 2 && driveNumber <= 8) {
-        // For D2-D8, fall back to direct emulator call for now
-        // TODO: Implement proper GUI integration for D2-D8
-        m_emulator->dismountDiskImage(driveNumber);
-        return true;
+    } else if (driveNumber >= 2 && driveNumber <= 8 && m_mediaPeripheralsDock) {
+        // For D2-D8, use the widget from MediaPeripheralsDock
+        DiskDriveWidget* widget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+        if (widget) {
+            widget->ejectDisk();
+            return true;
+        }
     }
-    
+
     qDebug() << "MainWindow::ejectDiskViaTCP failed - invalid drive or widget not available";
     return false;
 }
@@ -2957,18 +2959,20 @@ bool MainWindow::ejectDiskViaTCP(int driveNumber)
 bool MainWindow::enableDriveViaTCP(int driveNumber, bool enabled)
 {
     qDebug() << "MainWindow::enableDriveViaTCP called for drive" << driveNumber << "enabled:" << enabled;
-    
+
     if (driveNumber == 1 && m_diskDrive1) {
         // For D1, use the toolbar disk drive widget
         m_diskDrive1->setDriveEnabled(enabled);
         return true;
     } else if (driveNumber >= 2 && driveNumber <= 8 && m_mediaPeripheralsDock) {
-        // For D2-D8, would need to access media dock drives
-        // TODO: Implement proper GUI integration for D2-D8 drive enable/disable
-        qDebug() << "MainWindow::enableDriveViaTCP - D2-D8 not yet implemented";
-        return false;
+        // For D2-D8, use the widget from MediaPeripheralsDock
+        DiskDriveWidget* widget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+        if (widget) {
+            widget->setDriveEnabled(enabled);
+            return true;
+        }
     }
-    
+
     qDebug() << "MainWindow::enableDriveViaTCP failed - invalid drive or widget not available";
     return false;
 }
