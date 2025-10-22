@@ -49,6 +49,9 @@ void Devices_UpdatePatches(void);
 // Access to CPU registers for XEX loading
 extern unsigned char CPU_regS;
 extern unsigned short CPU_regPC;
+
+// Access to GTIA console override for warm boot BASIC state preservation
+extern int GTIA_consol_override;
 }
 
 // Static callback function for libatari800 disk activity
@@ -1507,6 +1510,16 @@ void AtariEmulator::coldBoot()
 
 void AtariEmulator::warmBoot()
 {
+    // Preserve BASIC disabled state across warm boot
+    // If BASIC was disabled (e.g., via Option key or cartridge),
+    // set consol_override to hold Option key during warm boot
+    if (Atari800_disable_basic) {
+        GTIA_consol_override = 2;  // Hold Option for 2 console reads
+        qDebug() << "Warm boot: Preserving BASIC-disabled state (GTIA_consol_override = 2)";
+    } else {
+        qDebug() << "Warm boot: BASIC enabled, no override needed";
+    }
+
     Atari800_Warmstart();
 }
 
