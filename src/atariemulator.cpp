@@ -1315,6 +1315,8 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
     } else if (key == Qt::Key_CapsLock) {
         // Send CAPS LOCK toggle to the emulator to change its internal state
         m_currentInput.keycode = AKEY_CAPSTOGGLE;
+        // Update our internal caps lock state tracking
+        m_capsLockEnabled = !m_capsLockEnabled;
     } else if (key >= Qt::Key_A && key <= Qt::Key_Z) {
         if (key == Qt::Key_L) {
             // Special handling for L key since AKEY_l = 0 causes issues
@@ -2406,6 +2408,20 @@ void AtariEmulator::clearInput()
     m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
     m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
     m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+}
+
+void AtariEmulator::setCapsLock(bool enabled)
+{
+    // Only toggle if the current state differs from desired state
+    if (m_capsLockEnabled != enabled) {
+        injectAKey(AKEY_CAPSTOGGLE);
+        m_capsLockEnabled = enabled;
+    }
+}
+
+bool AtariEmulator::getCapsLockState() const
+{
+    return m_capsLockEnabled;
 }
 
 void AtariEmulator::pauseEmulation()

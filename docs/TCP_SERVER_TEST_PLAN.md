@@ -20,12 +20,78 @@
   Media Commands - Disk Operations
 
   - media.insert_disk - Insert disk into D1-D8
+    ```bash
+    # Insert disk into D1
+    echo '{"command": "media.insert_disk", "params": {"drive": 1, "path": "/Users/pgarcia/dev/atari/roms/HardwareTester.atr"}}' | nc localhost 6502
+
+    # Insert disk into D2
+    echo '{"command": "media.insert_disk", "params": {"drive": 2, "path": "/Users/pgarcia/dev/atari/roms/Mega Maze.atr"}}' | nc localhost 6502
+
+    # Test all drives (D1-D8)
+    for drive in {1..8}; do
+      echo "{\"command\": \"media.insert_disk\", \"params\": {\"drive\": $drive, \"path\": \"/Users/pgarcia/dev/atari/roms/HardwareTester.atr\"}}" | nc localhost 6502
+      sleep 1
+    done
+    ```
+
   - media.eject_disk - Eject disk from D1-D8
+    ```bash
+    # Eject disk from D1
+    echo '{"command": "media.eject_disk", "params": {"drive": 1}}' | nc localhost 6502
+
+    # Eject disk from D2
+    echo '{"command": "media.eject_disk", "params": {"drive": 2}}' | nc localhost 6502
+
+    # Eject all drives (D1-D8)
+    for drive in {1..8}; do
+      echo "{\"command\": \"media.eject_disk\", \"params\": {\"drive\": $drive}}" | nc localhost 6502
+      sleep 1
+    done
+    ```
+
   - media.enable_drive - Enable drive D1-D8
+    ```bash
+    # Enable D1
+    echo '{"command": "media.enable_drive", "params": {"drive": 1}}' | nc localhost 6502
+
+    # Enable D2
+    echo '{"command": "media.enable_drive", "params": {"drive": 2}}' | nc localhost 6502
+
+    # Enable all drives (D1-D8)
+    for drive in {1..8}; do
+      echo "{\"command\": \"media.enable_drive\", \"params\": {\"drive\": $drive}}" | nc localhost 6502
+      sleep 1
+    done
+    ```
+
   - media.disable_drive - Disable drive D1-D8
+    ```bash
+    # Disable D1
+    echo '{"command": "media.disable_drive", "params": {"drive": 1}}' | nc localhost 6502
+
+    # Disable D2
+    echo '{"command": "media.disable_drive", "params": {"drive": 2}}' | nc localhost 6502
+
+    # Disable all drives (D1-D8)
+    for drive in {1..8}; do
+      echo "{\"command\": \"media.disable_drive\", \"params\": {\"drive\": $drive}}" | nc localhost 6502
+      sleep 1
+    done
+    ```
+
   - Verify UI updates when disk inserted via TCP
   - Verify UI updates when disk ejected via TCP
   - Test invalid drive numbers (0, 9, negative)
+    ```bash
+    # Test invalid drive 0
+    echo '{"command": "media.insert_disk", "params": {"drive": 0, "path": "/Users/pgarcia/dev/atari/roms/HardwareTester.atr"}}' | nc localhost 6502
+
+    # Test invalid drive 9
+    echo '{"command": "media.insert_disk", "params": {"drive": 9, "path": "/Users/pgarcia/dev/atari/roms/HardwareTester.atr"}}' | nc localhost 6502
+
+    # Test negative drive number
+    echo '{"command": "media.insert_disk", "params": {"drive": -1, "path": "/Users/pgarcia/dev/atari/roms/HardwareTester.atr"}}' | nc localhost 6502
+    ```
 
   Media Commands - Cartridge Operations
 

@@ -1277,28 +1277,26 @@ void TCPServer::handleInputCommand(QTcpSocket* client, const QJsonObject& reques
     } else if (subCommand == "caps_lock") {
         // Toggle caps lock or set specific state
         QString action = params["action"].toString().toLower();
-        
-        int akeyCode = AKEY_NONE;
+
         if (action == "toggle" || action.isEmpty()) {
             // Toggle caps lock state
-            akeyCode = AKEY_CAPSTOGGLE;
+            bool currentState = m_emulator->getCapsLockState();
+            m_emulator->setCapsLock(!currentState);
         } else if (action == "on") {
             // Turn caps lock on
-            akeyCode = AKEY_CAPSLOCK;
+            m_emulator->setCapsLock(true);
         } else if (action == "off") {
-            // Turn caps lock off (send caps lock again if it's on)
-            akeyCode = AKEY_CAPSLOCK;
+            // Turn caps lock off
+            m_emulator->setCapsLock(false);
         } else {
-            sendResponse(client, requestId, false, QJsonValue(), 
+            sendResponse(client, requestId, false, QJsonValue(),
                         "Invalid caps lock action. Use 'toggle', 'on', or 'off'");
             return;
         }
-        
-        m_emulator->injectCharacter(akeyCode);
-        
+
         QJsonObject result;
         result["caps_lock_action"] = action.isEmpty() ? "toggle" : action;
-        result["akey_code"] = akeyCode;
+        result["caps_lock_enabled"] = m_emulator->getCapsLockState();
         sendResponse(client, requestId, true, result);
         
     } else {

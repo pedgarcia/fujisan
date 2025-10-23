@@ -304,6 +304,10 @@ public:
     
     void injectAKey(int akeyCode);  // For raw AKEY code injection
     void clearInput();
+
+    // Caps lock control
+    void setCapsLock(bool enabled);  // Set caps lock to specific state
+    bool getCapsLockState() const;   // Get current caps lock state
     
     // Debug/execution control
     void pauseEmulation();
@@ -366,6 +370,7 @@ private:
     float m_targetFps = 59.92f;
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;
+    bool m_capsLockEnabled = false;  // Track caps lock state
     QTimer* m_frameTimer;
 
     // Debug/execution state
