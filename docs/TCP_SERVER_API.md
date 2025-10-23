@@ -998,7 +998,7 @@ Manage emulator configuration settings.
 
 #### `config.get_machine_type` / `config.set_machine_type`
 
-Get or set machine type.
+Get or set machine type. Setting the machine type automatically restarts the emulator.
 
 ```bash
 # Get current machine type
@@ -1007,25 +1007,34 @@ echo '{"command": "config.get_machine_type"}' | nc localhost 6502
 # Set to Atari 800XL
 echo '{
   "command": "config.set_machine_type",
-  "params": {"machine_type": "-xl"}
+  "params": {"machine_type": "xl"}
 }' | nc localhost 6502
 ```
 
-**Valid machine types:** `-400`, `-800`, `-xl`, `-xe`, `-xegs`, `-5200`
+**Valid machine types:** `400`, `800`, `xl`, `xe`, `xegs`, `5200`
 
 #### `config.get_video_system` / `config.set_video_system`
 
-Get or set video system.
+Get or set video system. Setting the video system automatically restarts the emulator.
 
 ```bash
+# Get current video system
+echo '{"command": "config.get_video_system"}' | nc localhost 6502
+
 # Set to PAL
 echo '{
   "command": "config.set_video_system",
-  "params": {"video_system": "-pal"}
+  "params": {"video_system": "pal"}
+}' | nc localhost 6502
+
+# Set to NTSC
+echo '{
+  "command": "config.set_video_system",
+  "params": {"video_system": "ntsc"}
 }' | nc localhost 6502
 ```
 
-**Valid video systems:** `-ntsc`, `-pal`
+**Valid video systems:** `ntsc`, `pal`
 
 #### `config.get_basic_enabled` / `config.set_basic_enabled`
 

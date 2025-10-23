@@ -1728,62 +1728,82 @@ void TCPServer::handleConfigCommand(QTcpSocket* client, const QJsonObject& reque
     
     if (subCommand == "get_machine_type") {
         // Get current machine type
+        QString machineType = m_emulator->getMachineType();
+        // Remove dash prefix for API consistency
+        if (machineType.startsWith("-")) {
+            machineType = machineType.mid(1);
+        }
         QJsonObject result;
-        result["machine_type"] = m_emulator->getMachineType();
+        result["machine_type"] = machineType;
         sendResponse(client, requestId, true, result);
-        
+
     } else if (subCommand == "set_machine_type") {
-        // Set machine type (requires restart)
-        QString machineType = params["machine_type"].toString();
-        
-        QStringList validTypes = {"-400", "-800", "-xl", "-xe", "-xegs", "-5200"};
+        // Set machine type and restart emulator
+        QString machineType = params["machine_type"].toString().toLower();
+
+        QStringList validTypes = {"400", "800", "xl", "xe", "xegs", "5200"};
         if (!validTypes.contains(machineType)) {
-            sendResponse(client, requestId, false, QJsonValue(), 
+            sendResponse(client, requestId, false, QJsonValue(),
                         "Invalid machine type. Valid types: " + validTypes.join(", "));
             return;
         }
-        
-        m_emulator->setMachineType(machineType);
-        
+
+        // Add dash prefix for internal format
+        QString internalFormat = "-" + machineType;
+        m_emulator->setMachineType(internalFormat);
+
+        // Restart the emulator to apply the change
+        m_mainWindow->requestEmulatorRestart();
+
         QJsonObject result;
         result["machine_type"] = machineType;
-        result["restart_required"] = true;
+        result["restarted"] = true;
         sendResponse(client, requestId, true, result);
-        
+
         // Send event to all clients
         QJsonObject eventData;
         eventData["machine_type"] = machineType;
-        eventData["restart_required"] = true;
+        eventData["restarted"] = true;
         sendEventToAllClients("machine_type_changed", eventData);
         
     } else if (subCommand == "get_video_system") {
         // Get current video system
+        QString videoSystem = m_emulator->getVideoSystem();
+        // Remove dash prefix for API consistency
+        if (videoSystem.startsWith("-")) {
+            videoSystem = videoSystem.mid(1);
+        }
         QJsonObject result;
-        result["video_system"] = m_emulator->getVideoSystem();
+        result["video_system"] = videoSystem;
         sendResponse(client, requestId, true, result);
         
     } else if (subCommand == "set_video_system") {
-        // Set video system (requires restart)
-        QString videoSystem = params["video_system"].toString();
-        
-        QStringList validSystems = {"-ntsc", "-pal"};
+        // Set video system and restart emulator
+        QString videoSystem = params["video_system"].toString().toLower();
+
+        QStringList validSystems = {"ntsc", "pal"};
         if (!validSystems.contains(videoSystem)) {
-            sendResponse(client, requestId, false, QJsonValue(), 
+            sendResponse(client, requestId, false, QJsonValue(),
                         "Invalid video system. Valid systems: " + validSystems.join(", "));
             return;
         }
-        
-        m_emulator->setVideoSystem(videoSystem);
-        
+
+        // Add dash prefix for internal format
+        QString internalFormat = "-" + videoSystem;
+        m_emulator->setVideoSystem(internalFormat);
+
+        // Restart the emulator to apply the change
+        m_mainWindow->requestEmulatorRestart();
+
         QJsonObject result;
         result["video_system"] = videoSystem;
-        result["restart_required"] = true;
+        result["restarted"] = true;
         sendResponse(client, requestId, true, result);
-        
+
         // Send event to all clients
         QJsonObject eventData;
         eventData["video_system"] = videoSystem;
-        eventData["restart_required"] = true;
+        eventData["restarted"] = true;
         sendEventToAllClients("video_system_changed", eventData);
         
     } else if (subCommand == "get_basic_enabled") {
