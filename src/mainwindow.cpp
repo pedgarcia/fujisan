@@ -41,7 +41,6 @@ MainWindow::MainWindow(QWidget *parent)
     , m_pasteIndex(0)
     , m_originalEmulationSpeed(100)
     , m_profileManager(new ConfigurationProfileManager(this))
-    , m_pasteCharacterSent(false)
     , m_diskDrive1(nullptr)
     , m_mediaPeripheralsDock(nullptr)
     , m_mediaPeripheralsDockWidget(nullptr)
@@ -2608,14 +2607,16 @@ void MainWindow::sendTextToEmulator(const QString& text)
         m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
     }
 
-    // Store current emulation speed and boost it moderately for pasting
-    m_originalEmulationSpeed = 100; // Assume 100% as default, could be made configurable
-    m_emulator->setEmulationSpeed(200); // 2x speed for more reliable pasting
+    // Save current emulation speed and boost to 200% for fast, reliable pasting
+    m_originalEmulationSpeed = m_emulator->getCurrentEmulationSpeed();
+    m_emulator->setEmulationSpeed(200);
+
+    // Use fixed timer interval optimized for 200% speed
+    m_pasteTimer->setInterval(37);  // ~37ms per character at 2x speed
 
     // Setup the paste buffer
     m_pasteBuffer = text;
     m_pasteIndex = 0;
-    m_pasteCharacterSent = false;
 
     // Start the timer to send characters
     m_pasteTimer->start();
@@ -2628,28 +2629,21 @@ void MainWindow::sendNextCharacter()
         return;
     }
 
-    if (!m_pasteCharacterSent) {
-        // Check if we've finished all characters
-        if (m_pasteIndex >= m_pasteBuffer.length()) {
-            // Finished pasting - restore original emulation speed
-            m_pasteTimer->stop();
-            m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
-            m_pasteBuffer.clear();
-            m_pasteIndex = 0;
-            m_pasteCharacterSent = false;
-            return;
-        }
-
-        // Send character
-        QChar ch = m_pasteBuffer.at(m_pasteIndex);
-        m_emulator->injectCharacter(ch.toLatin1());
-        m_pasteCharacterSent = true;
-    } else {
-        // Clear input and advance to next character
-        m_emulator->clearInput();
-        m_pasteIndex++;
-        m_pasteCharacterSent = false;
+    // Check if we've finished all characters
+    if (m_pasteIndex >= m_pasteBuffer.length()) {
+        // Finished pasting - restore original emulation speed
+        m_pasteTimer->stop();
+        m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
+        m_pasteBuffer.clear();
+        m_pasteIndex = 0;
+        return;
     }
+
+    // Send character and immediately clear in single phase
+    QChar ch = m_pasteBuffer.at(m_pasteIndex);
+    m_emulator->injectCharacter(ch.toLatin1());
+    m_emulator->clearInput();
+    m_pasteIndex++;
 
     // Allow some processing time
     QCoreApplication::processEvents();

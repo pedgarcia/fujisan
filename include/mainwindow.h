@@ -226,7 +226,6 @@ private:
     QString m_pasteBuffer;
     int m_pasteIndex;
     int m_originalEmulationSpeed;
-    bool m_pasteCharacterSent;
 };
 
 #endif // MAINWINDOW_H
