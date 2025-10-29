@@ -263,14 +263,77 @@ echo '{"command": "system.resume"}' | nc localhost 6502
 
 #### `system.set_speed`
 
-Set emulation speed (10-1000%).
+Set emulation speed using multiplier notation (0.5x - 10x) or host speed.
 
 ```bash
+# Set to 2x speed
 echo '{
   "command": "system.set_speed",
-  "params": {"percentage": 200}
+  "params": {"speed": "2x"}
+}' | nc localhost 6502
+
+# Set to 0.5x speed (half speed)
+echo '{
+  "command": "system.set_speed",
+  "params": {"speed": "0.5x"}
+}' | nc localhost 6502
+
+# Set to host speed (unlimited/as fast as possible)
+echo '{
+  "command": "system.set_speed",
+  "params": {"speed": "host"}
 }' | nc localhost 6502
 ```
+
+**Parameters:**
+- `speed` - Speed multiplier: `"0.5x"`, `"1x"`, `"2x"`, ... `"10x"`, or `"host"` for unlimited speed
+- `percentage` - (Deprecated) Percentage value (10-1000, or 0 for unlimited). Use `speed` parameter instead.
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "speed": "2x",
+    "percentage": 200
+  }
+}
+```
+
+**Event broadcast to all clients:**
+```json
+{
+  "type": "event",
+  "event": "speed_changed",
+  "data": {
+    "speed": "2x",
+    "percentage": 200
+  }
+}
+```
+
+#### `system.get_speed`
+
+Get current emulation speed.
+
+```bash
+echo '{"command": "system.get_speed"}' | nc localhost 6502
+```
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "speed": "1x",
+    "percentage": 100
+  }
+}
+```
+
+Returns both the speed in multiplier format (`"0.5x"`, `"1x"`, `"2x"`, etc., or `"host"`) and as a percentage value for backward compatibility.
 
 #### `system.quick_save_state`
 

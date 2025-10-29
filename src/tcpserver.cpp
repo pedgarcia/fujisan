@@ -757,29 +757,98 @@ void TCPServer::handleSystemCommand(QTcpSocket* client, const QJsonObject& reque
         
     } else if (subCommand == "set_speed") {
         // Set emulation speed
-        // 0 = unlimited/host speed
-        // 10-1000 = percentage speed (10% to 1000%)
-        int percentage = params["percentage"].toInt();
+        // Accepts speed parameter in multiplier format: "0.5x", "1x", "2x", ... "10x", "host"
+        // Legacy: Also accepts percentage parameter (deprecated)
 
-        if (percentage != 0 && (percentage < 10 || percentage > 1000)) {
+        int percentage = 0;
+        QString speedStr;
+
+        // Check for new "speed" parameter (preferred)
+        if (params.contains("speed")) {
+            speedStr = params["speed"].toString().toLower();
+
+            if (speedStr == "host") {
+                percentage = 0; // Unlimited/host speed
+            } else if (speedStr.endsWith("x")) {
+                // Parse multiplier format: "0.5x", "1x", "2x", etc.
+                QString multiplierStr = speedStr.left(speedStr.length() - 1);
+                bool ok;
+                double multiplier = multiplierStr.toDouble(&ok);
+
+                if (!ok || multiplier < 0.5 || multiplier > 10.0) {
+                    sendResponse(client, requestId, false, QJsonValue(),
+                                "Invalid speed value. Must be \"0.5x\" through \"10x\" or \"host\"");
+                    return;
+                }
+
+                // Convert multiplier to percentage (0.5x = 50%, 1x = 100%, 2x = 200%)
+                percentage = static_cast<int>(multiplier * 100);
+            } else {
+                sendResponse(client, requestId, false, QJsonValue(),
+                            "Invalid speed format. Use \"0.5x\", \"1x\", \"2x\", ... \"10x\", or \"host\"");
+                return;
+            }
+        }
+        // Check for legacy "percentage" parameter (deprecated but supported)
+        else if (params.contains("percentage")) {
+            percentage = params["percentage"].toInt();
+
+            if (percentage != 0 && (percentage < 10 || percentage > 1000)) {
+                sendResponse(client, requestId, false, QJsonValue(),
+                            "Invalid speed percentage. Must be 0 (unlimited) or 10-1000");
+                return;
+            }
+
+            // Convert percentage to speed string for response
+            if (percentage == 0) {
+                speedStr = "host";
+            } else if (percentage == 50) {
+                speedStr = "0.5x";
+            } else if (percentage >= 100 && percentage <= 1000 && percentage % 100 == 0) {
+                speedStr = QString::number(percentage / 100) + "x";
+            } else {
+                speedStr = QString::number(percentage) + "%"; // Non-standard speeds
+            }
+        } else {
             sendResponse(client, requestId, false, QJsonValue(),
-                        "Invalid speed percentage. Must be 0 (unlimited) or 10-1000");
+                        "Missing required parameter: \"speed\" (e.g., \"1x\", \"2x\", \"host\")");
             return;
         }
 
         m_emulator->setEmulationSpeed(percentage);
 
         QJsonObject result;
-        result["speed_percentage"] = percentage;
-        result["speed_description"] = (percentage == 0) ? "unlimited (host speed)" : QString::number(percentage) + "%";
+        result["speed"] = speedStr;
+        result["percentage"] = percentage; // Include for backward compatibility
         sendResponse(client, requestId, true, result);
 
         // Send event to all clients
         QJsonObject eventData;
-        eventData["speed_percentage"] = percentage;
-        eventData["speed_description"] = (percentage == 0) ? "unlimited (host speed)" : QString::number(percentage) + "%";
+        eventData["speed"] = speedStr;
+        eventData["percentage"] = percentage;
         sendEventToAllClients("speed_changed", eventData);
-        
+
+    } else if (subCommand == "get_speed") {
+        // Get current emulation speed
+        int currentPercentage = m_emulator->getCurrentEmulationSpeed();
+        QString currentSpeed;
+
+        // Convert percentage to speed string
+        if (currentPercentage == 0) {
+            currentSpeed = "host";
+        } else if (currentPercentage == 50) {
+            currentSpeed = "0.5x";
+        } else if (currentPercentage >= 100 && currentPercentage <= 1000 && currentPercentage % 100 == 0) {
+            currentSpeed = QString::number(currentPercentage / 100) + "x";
+        } else {
+            currentSpeed = QString::number(currentPercentage) + "%"; // Non-standard speeds
+        }
+
+        QJsonObject result;
+        result["speed"] = currentSpeed;
+        result["percentage"] = currentPercentage;
+        sendResponse(client, requestId, true, result);
+
     } else if (subCommand == "quick_save_state") {
         // Quick save state
         // First set the current profile name from main window if available

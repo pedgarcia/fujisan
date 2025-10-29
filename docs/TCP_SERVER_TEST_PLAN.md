@@ -124,10 +124,12 @@
 
   System Commands - Speed Control
 
-  - system.set_speed - Test 10%, 50%, 100%, 200%, 1000%
-  - Test speed 0 (unlimited/host speed)
-  - Test invalid speeds (<10, >1000)
-  - Verify speed change event broadcast to all clients
+  - system.set_speed - Test speed values: "0.5x", "1x", "2x", "5x", "10x", "host"
+  - Test legacy percentage parameter: 10%, 50%, 100%, 200%, 1000%
+  - Test invalid speeds (e.g., "0.4x", "11x", invalid format)
+  - Verify speed change event broadcast to all clients with both speed and percentage
+  - system.get_speed - Get current speed
+  - Verify response includes both speed ("1x", "2x", "host") and percentage (100, 200, 0)
 
   System Commands - Save States
 
