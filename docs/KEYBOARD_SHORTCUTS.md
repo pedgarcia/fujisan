@@ -30,7 +30,7 @@
 | | F6 | Atari Help |
 | | F7 or Pause | Atari Break |
 | **Joystick Controls** | | |
-| | Arrow Keys / Numpad 2,4,6,8 | Joystick Direction |
+| | Arrow Keys / Numpad 2,4,6,8 | Joystick Direction. Uncheck "Enable Joystick Support" in System > Settings > Input Configuration to use the arrow keys for text editing. |
 | | Numpad Enter | Joystick Fire |
 | | W,A,S,D | WASD Joystick Direction |
 | | Space | WASD Joystick Fire |
