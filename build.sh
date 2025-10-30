@@ -48,7 +48,10 @@ QT_ARM64_PATH="/opt/homebrew/opt/qt@5"
 QT_X86_64_PATH="/usr/local/opt/qt@5"
 
 # Version
+# Full version from git (e.g., "v1.0.5-9-g296092d")
 VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null || echo "v1.0.0-dev")}"
+# Remove 'v' prefix (e.g., "1.0.5-9-g296092d")
+# Note: CMakeLists.txt will extract numeric version for CMake's project(VERSION)
 VERSION_CLEAN=$(echo "$VERSION" | sed 's/^v//')
 
 # Notarization settings

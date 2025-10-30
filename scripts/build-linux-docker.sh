@@ -32,7 +32,10 @@ LINUX_BUILD_DIR="${PROJECT_ROOT}/build-linux-${ARCH}"
 DIST_DIR="${PROJECT_ROOT}/dist/linux"
 
 # Version
+# Full version from git (e.g., "v1.0.5-9-g296092d")
 VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null || echo "v1.0.0-dev")}"
+# Remove 'v' prefix (e.g., "1.0.5-9-g296092d")
+# Note: CMakeLists.txt will extract numeric version for CMake's project(VERSION)
 VERSION_CLEAN=$(echo "$VERSION" | sed 's/^v//')
 
 # Container runtime detection

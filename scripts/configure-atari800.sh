@@ -167,7 +167,8 @@ if [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]] || [[ "$OS" == "Windows_N
     exit 0
 else
     # Unix/macOS: Use full configuration
-    ./configure --target=libatari800 --enable-netsio
+    # Disable MP3 support to avoid libmp3lame dependency (users can still record to WAV/PCM)
+    ./configure --target=libatari800 --enable-netsio --with-mp3=no
 fi
 
 echo "atari800 configuration completed"

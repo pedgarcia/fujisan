@@ -54,16 +54,49 @@ sudo apt install podman # Linux
 ```
 
 ### Linux
+
+**IMPORTANT: The recommended build method uses Docker/Podman for consistency and portability.**
+
+#### For Container-based Builds (Recommended)
+```bash
+# Ubuntu/Debian
+sudo apt install podman
+# OR
+sudo apt install docker.io
+# Add your user to the docker group (if using Docker)
+sudo usermod -aG docker $USER
+# Then log out and log back in for group changes to take effect
+
+# Fedora/RHEL
+sudo dnf install podman
+```
+
+#### For Manual/Native Builds (Advanced)
+If building without Docker/Podman, install these dependencies:
+
 ```bash
 # Ubuntu/Debian
 sudo apt update
 sudo apt install qtbase5-dev qtmultimedia5-dev build-essential
 sudo apt install cmake git autoconf automake libtool
+sudo apt install libgl1-mesa-dev libglu1-mesa-dev
+sudo apt install libxrandr-dev libxss-dev libxcursor-dev libxinerama-dev
+sudo apt install libxi-dev libxext-dev libxfixes-dev libxrender-dev
+sudo apt install libxcb1-dev libx11-xcb-dev libxcb-glx0-dev
+sudo apt install libfontconfig1-dev libfreetype6-dev
+sudo apt install libasound2-dev libpulse-dev
+sudo apt install libsdl2-dev  # Optional: for joystick support
 
 # Fedora/RHEL
 sudo dnf install qt5-qtbase-devel qt5-qtmultimedia-devel
 sudo dnf install gcc gcc-c++ cmake git autotools
+sudo dnf install mesa-libGL-devel mesa-libGLU-devel
+sudo dnf install libXrandr-devel libXss-devel libXcursor-devel
+sudo dnf install libXinerama-devel libXi-devel libXext-devel
+sudo dnf install SDL2-devel  # Optional: for joystick support
 ```
+
+**Note:** Manual builds may encounter issues depending on your system's library versions. The container-based build provides a consistent Ubuntu 22.04 environment.
 
 ## Platform-Specific Builds
 
@@ -90,16 +123,37 @@ make -j$(sysctl -n hw.ncpu)
 ```
 
 ### Linux Build
+
+#### Recommended: Container-based Build
 ```bash
-# Native build
+# Requires Docker or Podman (see Prerequisites section)
+./build.sh linux
+
+# Output:
+# - dist/linux/fujisan_{version}_amd64.deb
+# - dist/linux/fujisan-{version}-linux-x64.tar.gz
+
+# For ARM64 (Raspberry Pi 4/5, etc.)
+./build.sh linux-arm64
+```
+
+**Why use containers?**
+- Consistent Ubuntu 22.04 environment
+- All dependencies pre-installed
+- Avoids version conflicts with system libraries
+- Works the same on any Linux distribution
+
+#### Advanced: Manual/Native Build
+```bash
+# Only recommended if you can't use Docker/Podman
+# Requires all dependencies from Prerequisites section
 mkdir build-linux && cd build-linux
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 ./Fujisan
-
-# Or use container build
-./build.sh linux
 ```
+
+**Note:** Manual builds may fail with version-related CMake errors or missing dependencies. Use the container build for reliable results.
 
 ## Build Documentation
 

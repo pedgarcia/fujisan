@@ -9,7 +9,14 @@ if(NOT PROJECT_VERSION)
     set(PROJECT_VERSION "1.0.0")
 endif()
 
-project(Fujisan VERSION ${PROJECT_VERSION})
+# Extract numeric version for CMake (e.g., "1.0.5" from "1.0.5-9-g296092d")
+# CMake VERSION only accepts numeric semver format (major.minor.patch[.tweak])
+string(REGEX REPLACE "^([0-9]+\\.[0-9]+\\.[0-9]+).*" "\\1" PROJECT_VERSION_NUMERIC "${PROJECT_VERSION}")
+
+# Store full version for display/packaging
+set(PROJECT_VERSION_FULL "${PROJECT_VERSION}")
+
+project(Fujisan VERSION ${PROJECT_VERSION_NUMERIC})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
