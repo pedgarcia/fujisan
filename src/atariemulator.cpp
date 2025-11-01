@@ -458,8 +458,44 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
             }
         }
     }
-    
-    
+
+    // Memory Configuration
+    QSettings memSettings("8bitrelics", "Fujisan");
+
+    // Note: enable800Ram (C000-CFFF RAM for Atari 800) doesn't have a direct command-line
+    // parameter. For Atari 800, the RAM size is set based on machine type. The 48KB
+    // configuration (which includes C000-CFFF) is the default for -atari machine type.
+    // If finer control is needed, MEMORY_ram_size extern can be set after initialization.
+
+    // Mosaic RAM expansion (48-1024 KB, in 4KB increments)
+    bool enableMosaic = memSettings.value("machine/enableMosaic", false).toBool();
+    if (enableMosaic) {
+        int mosaicSize = memSettings.value("machine/mosaicSize", 320).toInt();
+        argList << "-mosaic" << QString::number(mosaicSize);
+    }
+
+    // Axlon RAM expansion (48-1024 KB, in 16KB banks)
+    bool enableAxlon = memSettings.value("machine/enableAxlon", false).toBool();
+    if (enableAxlon) {
+        int axlonSize = memSettings.value("machine/axlonSize", 320).toInt();
+        argList << "-axlon" << QString::number(axlonSize);
+
+        // Axlon 0xF bank shadow mode
+        bool axlonShadow = memSettings.value("machine/axlonShadow", false).toBool();
+        if (axlonShadow) {
+            argList << "-axlon0f";
+        }
+    }
+
+    // MapRAM (XL/XE machines only)
+    bool enableMapRam = memSettings.value("machine/enableMapRam", true).toBool();
+    if (enableMapRam) {
+        argList << "-mapram";
+    } else {
+        argList << "-no-mapram";
+    }
+
+
     // Audio configuration
     if (m_audioEnabled) {
         argList << "-sound";

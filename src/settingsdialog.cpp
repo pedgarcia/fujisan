@@ -228,47 +228,53 @@ void SettingsDialog::createHardwareTab()
     // Memory Configuration Group
     QGroupBox* memoryGroup = new QGroupBox("Memory Configuration");
     QVBoxLayout* memoryLayout = new QVBoxLayout(memoryGroup);
-    
-    m_enable800RamCheck = new QCheckBox("Enable RAM at 0xC000-0xCFFF (Atari 800)");
-    m_enable800RamCheck->setToolTip("Enable RAM between 0xC000-0xCFFF in Atari 800");
-    memoryLayout->addWidget(m_enable800RamCheck);
-    
+
+    // NOTE: Enable 800 RAM option disabled - no direct command-line parameter in libatari800
+    // The Atari 800 machine type (-atari) defaults to 48KB which includes C000-CFFF RAM
+    // m_enable800RamCheck = new QCheckBox("Enable RAM at 0xC000-0xCFFF (Atari 800)");
+    // m_enable800RamCheck->setToolTip("Enable RAM between 0xC000-0xCFFF in Atari 800");
+    // memoryLayout->addWidget(m_enable800RamCheck);
+
     // Mosaic RAM expansion
+    // Valid sizes: 48 + (n * 4) where n = 0 to 63, max 300 KB
     QHBoxLayout* mosaicLayout = new QHBoxLayout();
     m_enableMosaicCheck = new QCheckBox("Enable Mosaic RAM expansion:");
     mosaicLayout->addWidget(m_enableMosaicCheck);
-    
+
     m_mosaicSizeSpinBox = new QSpinBox();
-    m_mosaicSizeSpinBox->setRange(64, 1024);
-    m_mosaicSizeSpinBox->setSingleStep(64);
+    m_mosaicSizeSpinBox->setRange(48, 300);
+    m_mosaicSizeSpinBox->setSingleStep(4);
     m_mosaicSizeSpinBox->setSuffix(" KB");
-    m_mosaicSizeSpinBox->setValue(320);
-    m_mosaicSizeSpinBox->setToolTip("Total RAM size with Mosaic expansion");
+    m_mosaicSizeSpinBox->setValue(128);
+    m_mosaicSizeSpinBox->setToolTip("Total RAM size with Mosaic expansion (48-300 KB in 4KB increments)");
     mosaicLayout->addWidget(m_mosaicSizeSpinBox);
     mosaicLayout->addStretch();
-    
+
     connect(m_enableMosaicCheck, &QCheckBox::toggled, m_mosaicSizeSpinBox, &QSpinBox::setEnabled);
     m_mosaicSizeSpinBox->setEnabled(false);
-    
+
     memoryLayout->addLayout(mosaicLayout);
-    
+
     // Axlon RAM expansion
+    // Valid sizes: 32, 160, 288, 544, 1056, 2080, 4128 KB (based on valid bank counts)
     QHBoxLayout* axlonLayout = new QHBoxLayout();
     m_enableAxlonCheck = new QCheckBox("Enable Axlon RAM expansion:");
     axlonLayout->addWidget(m_enableAxlonCheck);
-    
-    m_axlonSizeSpinBox = new QSpinBox();
-    m_axlonSizeSpinBox->setRange(64, 1024);
-    m_axlonSizeSpinBox->setSingleStep(64);
-    m_axlonSizeSpinBox->setSuffix(" KB");
-    m_axlonSizeSpinBox->setValue(320);
-    m_axlonSizeSpinBox->setToolTip("Total RAM size with Axlon expansion");
-    axlonLayout->addWidget(m_axlonSizeSpinBox);
+
+    m_axlonSizeCombo = new QComboBox();
+    m_axlonSizeCombo->addItem("32 KB (0 banks)", 32);
+    m_axlonSizeCombo->addItem("160 KB (8 banks)", 160);
+    m_axlonSizeCombo->addItem("288 KB (16 banks)", 288);
+    m_axlonSizeCombo->addItem("544 KB (32 banks)", 544);
+    m_axlonSizeCombo->addItem("1056 KB (64 banks)", 1056);
+    m_axlonSizeCombo->setCurrentIndex(1); // Default to 160 KB
+    m_axlonSizeCombo->setToolTip("Total RAM size with Axlon expansion (only specific sizes are valid)");
+    axlonLayout->addWidget(m_axlonSizeCombo);
     axlonLayout->addStretch();
-    
-    connect(m_enableAxlonCheck, &QCheckBox::toggled, m_axlonSizeSpinBox, &QSpinBox::setEnabled);
-    m_axlonSizeSpinBox->setEnabled(false);
-    
+
+    connect(m_enableAxlonCheck, &QCheckBox::toggled, m_axlonSizeCombo, &QComboBox::setEnabled);
+    m_axlonSizeCombo->setEnabled(false);
+
     memoryLayout->addLayout(axlonLayout);
     
     m_axlonShadowCheck = new QCheckBox("Use Axlon shadow at 0x0FC0-0x0FFF");
@@ -2014,13 +2020,50 @@ void SettingsDialog::loadSettings()
     m_altirraBASICCheck->setChecked(altirraBASIC);
     
     // Load Memory Configuration
-    m_enable800RamCheck->setChecked(settings.value("machine/enable800Ram", false).toBool());
+    // m_enable800RamCheck->setChecked(settings.value("machine/enable800Ram", false).toBool());
     m_enableMosaicCheck->setChecked(settings.value("machine/enableMosaic", false).toBool());
-    m_mosaicSizeSpinBox->setValue(settings.value("machine/mosaicSize", 320).toInt());
+
+    // Load Mosaic size with validation and migration
+    int mosaicSize = settings.value("machine/mosaicSize", 128).toInt();
+    bool mosaicMigrated = false;
+    if (mosaicSize > 300) {
+        qWarning() << "Mosaic RAM size" << mosaicSize << "KB exceeds maximum 300 KB - clamping to 300 KB";
+        mosaicSize = 300;
+        mosaicMigrated = true;
+    } else if (mosaicSize < 48) {
+        qWarning() << "Mosaic RAM size" << mosaicSize << "KB below minimum 48 KB - setting to 128 KB";
+        mosaicSize = 128;
+        mosaicMigrated = true;
+    } else if ((mosaicSize - 48) % 4 != 0) {
+        // Round to nearest valid value (must be 48 + multiple of 4)
+        int nearestValid = 48 + (((mosaicSize - 48 + 2) / 4) * 4);
+        qWarning() << "Mosaic RAM size" << mosaicSize << "KB is not valid (must be 48 + multiple of 4) - rounding to" << nearestValid << "KB";
+        mosaicSize = nearestValid;
+        mosaicMigrated = true;
+    }
+    m_mosaicSizeSpinBox->setValue(mosaicSize);
+    if (mosaicMigrated) {
+        settings.setValue("machine/mosaicSize", mosaicSize);
+    }
+
     m_enableAxlonCheck->setChecked(settings.value("machine/enableAxlon", false).toBool());
-    m_axlonSizeSpinBox->setValue(settings.value("machine/axlonSize", 320).toInt());
+
+    // Load Axlon size from settings - find matching combo box entry, migrate if invalid
+    int axlonSize = settings.value("machine/axlonSize", 160).toInt();
+    int axlonIndex = m_axlonSizeCombo->findData(axlonSize);
+    if (axlonIndex >= 0) {
+        m_axlonSizeCombo->setCurrentIndex(axlonIndex);
+    } else {
+        qWarning() << "Axlon RAM size" << axlonSize << "KB is not valid - defaulting to 160 KB (valid sizes: 32, 160, 288, 544, 1056)";
+        m_axlonSizeCombo->setCurrentIndex(1); // Default to 160 KB
+        settings.setValue("machine/axlonSize", 160);
+    }
+
     m_axlonShadowCheck->setChecked(settings.value("machine/axlonShadow", false).toBool());
-    m_enableMapRamCheck->setChecked(settings.value("machine/enableMapRam", false).toBool());
+
+    // Load MapRAM setting - default to true if not present (migration for old configs)
+    bool mapRamValue = settings.value("machine/enableMapRam", true).toBool();
+    m_enableMapRamCheck->setChecked(mapRamValue);
     
     // Load Performance settings
     m_turboModeCheck->setChecked(settings.value("machine/turboMode", false).toBool());
@@ -2056,9 +2099,9 @@ void SettingsDialog::loadSettings()
     
     m_cartridgeAutoRebootCheck->setChecked(settings.value("machine/cartridgeAutoReboot", true).toBool());
     
-    // Update spinbox enabled state based on checkbox values
+    // Update spinbox/combo enabled state based on checkbox values
     m_mosaicSizeSpinBox->setEnabled(m_enableMosaicCheck->isChecked());
-    m_axlonSizeSpinBox->setEnabled(m_enableAxlonCheck->isChecked());
+    m_axlonSizeCombo->setEnabled(m_enableAxlonCheck->isChecked());
     
     // Load ROM paths
     QString currentMachineType = m_machineTypeCombo->currentData().toString();
@@ -2439,11 +2482,11 @@ void SettingsDialog::saveSettings()
     settings.setValue("machine/basicRom", m_basicRomPath->text());
     
     // Save Memory Configuration
-    settings.setValue("machine/enable800Ram", m_enable800RamCheck->isChecked());
+    // settings.setValue("machine/enable800Ram", m_enable800RamCheck->isChecked());
     settings.setValue("machine/enableMosaic", m_enableMosaicCheck->isChecked());
     settings.setValue("machine/mosaicSize", m_mosaicSizeSpinBox->value());
     settings.setValue("machine/enableAxlon", m_enableAxlonCheck->isChecked());
-    settings.setValue("machine/axlonSize", m_axlonSizeSpinBox->value());
+    settings.setValue("machine/axlonSize", m_axlonSizeCombo->currentData().toInt());
     settings.setValue("machine/axlonShadow", m_axlonShadowCheck->isChecked());
     settings.setValue("machine/enableMapRam", m_enableMapRamCheck->isChecked());
     
@@ -2983,13 +3026,13 @@ void SettingsDialog::restoreDefaults()
     onAltirraBASICChanged(); // Update BASIC ROM controls
     
     // Memory Configuration defaults
-    m_enable800RamCheck->setChecked(false);
+    // m_enable800RamCheck->setChecked(false);
     m_enableMosaicCheck->setChecked(false);
-    m_mosaicSizeSpinBox->setValue(320);
+    m_mosaicSizeSpinBox->setValue(128);  // Default to 128 KB for Mosaic
     m_enableAxlonCheck->setChecked(false);
-    m_axlonSizeSpinBox->setValue(320);
+    m_axlonSizeCombo->setCurrentIndex(1);  // Default to 160 KB for Axlon
     m_axlonShadowCheck->setChecked(false);
-    m_enableMapRamCheck->setChecked(false);
+    m_enableMapRamCheck->setChecked(true);  // MapRAM enabled by default
     
     // Performance defaults
     m_turboModeCheck->setChecked(false);
@@ -3195,9 +3238,9 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.basicRomPath = m_basicRomPath->text();
     
     // Memory Configuration
-    profile.enable800Ram = m_enable800RamCheck->isChecked();
+    // profile.enable800Ram = m_enable800RamCheck->isChecked();
     profile.mosaicSize = m_mosaicSizeSpinBox->value();
-    profile.axlonSize = m_axlonSizeSpinBox->value();
+    profile.axlonSize = m_axlonSizeCombo->currentData().toInt();
     profile.axlonShadow = m_axlonShadowCheck->isChecked();
     profile.enableMapRam = m_enableMapRamCheck->isChecked();
     
@@ -3356,9 +3399,32 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_basicRomPath->setText(profile.basicRomPath);
     
     // Memory Configuration
-    m_enable800RamCheck->setChecked(profile.enable800Ram);
-    m_mosaicSizeSpinBox->setValue(profile.mosaicSize);
-    m_axlonSizeSpinBox->setValue(profile.axlonSize);
+    // m_enable800RamCheck->setChecked(profile.enable800Ram);
+
+    // Load Mosaic size with validation
+    int profileMosaicSize = profile.mosaicSize;
+    if (profileMosaicSize > 300) {
+        qWarning() << "Profile Mosaic RAM size" << profileMosaicSize << "KB exceeds maximum 300 KB - clamping to 300 KB";
+        profileMosaicSize = 300;
+    } else if (profileMosaicSize < 48) {
+        qWarning() << "Profile Mosaic RAM size" << profileMosaicSize << "KB below minimum 48 KB - setting to 128 KB";
+        profileMosaicSize = 128;
+    } else if ((profileMosaicSize - 48) % 4 != 0) {
+        int nearestValid = 48 + (((profileMosaicSize - 48 + 2) / 4) * 4);
+        qWarning() << "Profile Mosaic RAM size" << profileMosaicSize << "KB is not valid - rounding to" << nearestValid << "KB";
+        profileMosaicSize = nearestValid;
+    }
+    m_mosaicSizeSpinBox->setValue(profileMosaicSize);
+
+    // Load Axlon size from profile - find matching combo box entry, validate if invalid
+    int axlonProfileIndex = m_axlonSizeCombo->findData(profile.axlonSize);
+    if (axlonProfileIndex >= 0) {
+        m_axlonSizeCombo->setCurrentIndex(axlonProfileIndex);
+    } else {
+        qWarning() << "Profile Axlon RAM size" << profile.axlonSize << "KB is not valid - defaulting to 160 KB";
+        m_axlonSizeCombo->setCurrentIndex(1); // Default to 160 KB
+    }
+
     m_axlonShadowCheck->setChecked(profile.axlonShadow);
     m_enableMapRamCheck->setChecked(profile.enableMapRam);
     

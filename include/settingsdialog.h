@@ -113,7 +113,7 @@ private:
     QCheckBox* m_enableMosaicCheck;
     QSpinBox* m_mosaicSizeSpinBox;
     QCheckBox* m_enableAxlonCheck;
-    QSpinBox* m_axlonSizeSpinBox;
+    QComboBox* m_axlonSizeCombo;  // Changed from QSpinBox to QComboBox for valid values only
     QCheckBox* m_axlonShadowCheck;
     QCheckBox* m_enableMapRamCheck;
     
