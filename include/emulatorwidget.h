@@ -25,8 +25,9 @@ class EmulatorWidget : public QWidget
 
 public:
     explicit EmulatorWidget(QWidget *parent = nullptr);
-    
+
     void setEmulator(AtariEmulator* emulator);
+    void setScalingSettings(bool integerScaling, bool scalingFilter, const QString& fitScreen, bool keepAspectRatio);
 
 signals:
     void diskDroppedOnEmulator(const QString& filename);
@@ -50,10 +51,16 @@ private:
     QRect calculateDisplayRect() const;
     bool isValidExecutableFile(const QString& fileName) const;
     bool isValidDiskFile(const QString& fileName) const;
-    
+
     AtariEmulator* m_emulator;
     QImage m_screenImage;
     bool m_needsUpdate;
+
+    // Video scaling settings
+    bool m_integerScaling;
+    bool m_scalingFilter;
+    QString m_fitScreen;
+    bool m_keepAspectRatio;
     
     // Screen buffer constants - show full screen without cropping
     static const int SCREEN_WIDTH = 384;

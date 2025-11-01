@@ -26,15 +26,19 @@ EmulatorWidget::EmulatorWidget(QWidget *parent)
     , m_emulator(nullptr)
     , m_screenImage(DISPLAY_WIDTH, DISPLAY_HEIGHT, QImage::Format_RGB32)
     , m_needsUpdate(true)
+    , m_integerScaling(false)
+    , m_scalingFilter(true)
+    , m_fitScreen("both")
+    , m_keepAspectRatio(true)
 {
     setFocusPolicy(Qt::StrongFocus);
-    
+
     // Allow the widget to expand to fill all available space
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    
+
     // Enable drag and drop for XEX files
     setAcceptDrops(true);
-    
+
     // Fill with black initially
     m_screenImage.fill(Qt::black);
 }
@@ -45,6 +49,15 @@ void EmulatorWidget::setEmulator(AtariEmulator* emulator)
     if (m_emulator) {
         connect(m_emulator, &AtariEmulator::frameReady, this, &EmulatorWidget::updateDisplay);
     }
+}
+
+void EmulatorWidget::setScalingSettings(bool integerScaling, bool scalingFilter, const QString& fitScreen, bool keepAspectRatio)
+{
+    m_integerScaling = integerScaling;
+    m_scalingFilter = scalingFilter;
+    m_fitScreen = fitScreen;
+    m_keepAspectRatio = keepAspectRatio;
+    update(); // Trigger repaint with new settings
 }
 
 void EmulatorWidget::paintEvent(QPaintEvent *event)
@@ -60,12 +73,14 @@ void EmulatorWidget::paintEvent(QPaintEvent *event)
     
     // Fill widget background with black (overscan area)
     painter.fillRect(rect(), Qt::black);
-    
+
     // Calculate authentic Atari display area with proper aspect ratio
     QRect targetRect = calculateDisplayRect();
-    
-    // Use nearest neighbor scaling for crisp pixels
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+
+    // Apply scaling filter setting (smooth vs nearest-neighbor)
+    // Integer scaling always uses nearest-neighbor for pixel-perfect display
+    bool useSmoothScaling = m_scalingFilter && !m_integerScaling;
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, useSmoothScaling);
     painter.drawImage(targetRect, m_screenImage);
 }
 
@@ -150,10 +165,10 @@ QRect EmulatorWidget::calculateDisplayRect() const
 {
     // Get current video system from emulator to apply correct pixel aspect ratio
     double pixelAspectRatio = 1.0; // Default to square pixels
-    
-    if (m_emulator) {
+
+    if (m_emulator && m_keepAspectRatio) {
         QString videoSystem = m_emulator->getVideoSystem();
-        
+
         if (videoSystem == "-ntsc") {
             // NTSC: Compensates for 14.31818 MHz actual vs ideal 12+3/11 MHz pixel clock
             pixelAspectRatio = (12.0 + 3.0/11.0) / 14.31818; // ≈ 0.857
@@ -163,32 +178,64 @@ QRect EmulatorWidget::calculateDisplayRect() const
             pixelAspectRatio = 0.87; // Slightly less compression than NTSC
         }
     }
-    
+
     // Apply pixel aspect ratio correction to source dimensions
     const double correctedWidth = DISPLAY_WIDTH * pixelAspectRatio;
     const double correctedHeight = DISPLAY_HEIGHT;
-    
-    // Get available widget dimensions  
+
+    // Get available widget dimensions
     const int widgetWidth = width();
     const int widgetHeight = height();
-    
-    // Calculate scaling to fit within widget while preserving aspect ratio
-    const double scaleX = widgetWidth / correctedWidth;
-    const double scaleY = widgetHeight / correctedHeight;
-    const double scale = qMin(scaleX, scaleY);
-    
-    // Use more screen space while keeping small border for clean look
-    const double overscanFactor = 0.98;
-    const double finalScale = scale * overscanFactor;
-    
-    // Calculate final display dimensions
-    const int displayWidth = static_cast<int>(correctedWidth * finalScale);
-    const int displayHeight = static_cast<int>(correctedHeight * finalScale);
-    
-    // Center the display within the widget
+
+    int displayWidth, displayHeight;
+
+    if (m_integerScaling) {
+        // INTEGER SCALING MODE - Based on atari800 videomode.c algorithm
+        // Calculate maximum integer multipliers for each dimension
+        int multW = static_cast<int>(widgetWidth / correctedWidth);
+        int multH = static_cast<int>(widgetHeight / correctedHeight);
+
+        // Ensure minimum 1x scaling
+        if (multW == 0) multW = 1;
+        if (multH == 0) multH = 1;
+
+        // Apply fitScreen strategy
+        int finalMult;
+        if (m_fitScreen == "width") {
+            // Fit to width - use width multiplier for both dimensions
+            finalMult = multW;
+        } else if (m_fitScreen == "height") {
+            // Fit to height - use height multiplier for both dimensions
+            finalMult = multH;
+        } else { // "both" or default
+            // Fit both - use smaller multiplier to ensure it fits
+            finalMult = qMin(multW, multH);
+        }
+
+        // Calculate final integer-scaled dimensions
+        displayWidth = static_cast<int>(correctedWidth * finalMult);
+        displayHeight = static_cast<int>(correctedHeight * finalMult);
+
+    } else {
+        // SMOOTH SCALING MODE - Original floating-point scaling
+        // Calculate scaling to fit within widget while preserving aspect ratio
+        const double scaleX = widgetWidth / correctedWidth;
+        const double scaleY = widgetHeight / correctedHeight;
+        const double scale = qMin(scaleX, scaleY);
+
+        // Use more screen space while keeping small border for clean look
+        const double overscanFactor = 0.98;
+        const double finalScale = scale * overscanFactor;
+
+        // Calculate final display dimensions
+        displayWidth = static_cast<int>(correctedWidth * finalScale);
+        displayHeight = static_cast<int>(correctedHeight * finalScale);
+    }
+
+    // Center the display within the widget (letterboxing/pillarboxing)
     const int x = (widgetWidth - displayWidth) / 2;
     const int y = (widgetHeight - displayHeight) / 2;
-    
+
     return QRect(x, y, displayWidth, displayHeight);
 }
 

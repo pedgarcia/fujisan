@@ -663,11 +663,15 @@ void SettingsDialog::createVideoDisplayTab()
     
     // Column 2: Scaling and Aspect Settings
     QVBoxLayout* generalCol2 = new QVBoxLayout();
-    
+
     m_scalingFilter = new QCheckBox("Enable Scaling Filter");
     m_scalingFilter->setToolTip("Apply smoothing when scaling the display");
     generalCol2->addWidget(m_scalingFilter);
-    
+
+    m_integerScaling = new QCheckBox("Integer Scaling (Pixel-Perfect)");
+    m_integerScaling->setToolTip("Scale only in whole multiples (2x, 3x, 4x) for crisp, evenly-sized pixels");
+    generalCol2->addWidget(m_integerScaling);
+
     m_keepAspectRatio = new QCheckBox("Keep 4:3 Aspect Ratio");
     m_keepAspectRatio->setToolTip("Maintain authentic 4:3 display proportions when resizing window");
     generalCol2->addWidget(m_keepAspectRatio);
@@ -2138,6 +2142,7 @@ void SettingsDialog::loadSettings()
     
     m_showFPS->setChecked(settings.value("video/showFPS", false).toBool());
     m_scalingFilter->setChecked(settings.value("video/scalingFilter", true).toBool());
+    m_integerScaling->setChecked(settings.value("video/integerScaling", false).toBool());
     m_keepAspectRatio->setChecked(settings.value("video/keepAspectRatio", true).toBool());
     m_fullscreenMode->setChecked(settings.value("video/fullscreenMode", false).toBool());
     
@@ -2492,6 +2497,7 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/artifacting", m_artifactingMode->currentData().toString());
     settings.setValue("video/showFPS", m_showFPS->isChecked());
     settings.setValue("video/scalingFilter", m_scalingFilter->isChecked());
+    settings.setValue("video/integerScaling", m_integerScaling->isChecked());
     settings.setValue("video/keepAspectRatio", m_keepAspectRatio->isChecked());
     settings.setValue("video/fullscreenMode", m_fullscreenMode->isChecked());
     
@@ -3035,6 +3041,7 @@ void SettingsDialog::restoreDefaults()
     m_artifactingMode->setCurrentIndex(0); // None
     m_showFPS->setChecked(false);
     m_scalingFilter->setChecked(true);
+    m_integerScaling->setChecked(false);
     m_keepAspectRatio->setChecked(true);
     m_fullscreenMode->setChecked(false);
     
@@ -3213,6 +3220,7 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.artifactingMode = m_artifactingMode->currentData().toString();
     profile.showFPS = m_showFPS->isChecked();
     profile.scalingFilter = m_scalingFilter->isChecked();
+    profile.integerScaling = m_integerScaling->isChecked();
     profile.keepAspectRatio = m_keepAspectRatio->isChecked();
     profile.fullscreenMode = m_fullscreenMode->isChecked();
     
@@ -3393,6 +3401,7 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     
     m_showFPS->setChecked(profile.showFPS);
     m_scalingFilter->setChecked(profile.scalingFilter);
+    m_integerScaling->setChecked(profile.integerScaling);
     m_keepAspectRatio->setChecked(profile.keepAspectRatio);
     m_fullscreenMode->setChecked(profile.fullscreenMode);
     

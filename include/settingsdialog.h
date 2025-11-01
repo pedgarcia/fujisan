@@ -174,6 +174,7 @@ private:
     QComboBox* m_artifactingMode;
     QCheckBox* m_showFPS;
     QCheckBox* m_scalingFilter;
+    QCheckBox* m_integerScaling;
     QCheckBox* m_keepAspectRatio;
     QCheckBox* m_fullscreenMode;
     

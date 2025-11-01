@@ -2386,6 +2386,16 @@ void MainWindow::loadVideoSettings()
     m_keepAspectRatio = settings.value("video/keepAspectRatio", true).toBool();
     m_startInFullscreen = settings.value("video/fullscreenMode", false).toBool();
 
+    // Load scaling settings
+    bool integerScaling = settings.value("video/integerScaling", false).toBool();
+    bool scalingFilter = settings.value("video/scalingFilter", true).toBool();
+    QString fitScreen = settings.value("video/fitScreen", "both").toString();
+
+    // Apply scaling settings to emulator widget
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setScalingSettings(integerScaling, scalingFilter, fitScreen, m_keepAspectRatio);
+    }
+
     // Apply fullscreen setting based on preference
     if (m_startInFullscreen && !m_isInCustomFullscreen) {
         enterCustomFullscreen();
@@ -2394,7 +2404,10 @@ void MainWindow::loadVideoSettings()
     }
 
     qDebug() << "Video settings loaded - Keep aspect ratio:" << m_keepAspectRatio
-             << "Start fullscreen:" << m_startInFullscreen;
+             << "Start fullscreen:" << m_startInFullscreen
+             << "Integer scaling:" << integerScaling
+             << "Scaling filter:" << scalingFilter
+             << "Fit screen:" << fitScreen;
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)
