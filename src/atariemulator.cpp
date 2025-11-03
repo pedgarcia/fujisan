@@ -39,6 +39,11 @@
 extern "C" {
 #ifdef NETSIO
 #include "../src/netsio.h"
+// NetSIO enabled flag - set by atari800 core when FujiNet-PC confirms connection
+extern volatile int netsio_enabled;
+// NetSIO reset functions - send 0xFF/0xFE packets to FujiNet-PC
+extern int netsio_cold_reset(void);
+extern int netsio_warm_reset(void);
 #endif
 #include "../src/rtime.h"
 #include "../src/binload.h"
@@ -98,8 +103,7 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_fragmentSize(1024)
     , m_userRequestedSpeedMultiplier(1.0)
     , m_printerEnabled(false)
-    , m_fujinet_restart_pending(false)
-    , m_fujinet_restart_delay(0)
+    , m_netSIOEnabled(false)
     , m_usePartialFrameExecution(false)
     , m_cyclesThisFrame(0)
 #ifdef HAVE_SDL2_JOYSTICK
@@ -750,7 +754,14 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
                                              bool kbdJoy0Enabled, bool kbdJoy1Enabled, bool swapJoysticks,
                                              bool netSIOEnabled, bool rtimeEnabled)
 {
-    
+    qDebug() << "=== initializeWithNetSIOConfig START ===";
+    qDebug() << "NetSIO requested:" << netSIOEnabled;
+    qDebug() << "Previous m_netSIOEnabled:" << m_netSIOEnabled;
+
+    // Track NetSIO state for cold boot re-initialization
+    m_netSIOEnabled = netSIOEnabled;
+    qDebug() << "Updated m_netSIOEnabled to:" << m_netSIOEnabled;
+
     // CRITICAL: NetSIO/FujiNet requires BASIC to be disabled for proper booting
     bool actualBasicEnabled = basicEnabled;
     if (netSIOEnabled && basicEnabled) {
@@ -781,14 +792,12 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
         for (int i = 1; i <= 8; i++) {
             dismountDiskImage(i);
         }
-        
-        // Use delayed restart mechanism like Atari800MacX for proper FujiNet timing
-        m_fujinet_restart_pending = true;
-        m_fujinet_restart_delay = 60; // Wait 60 frames (~1 second) 
-        
+
         // Send test command to verify NetSIO communication with FujiNet-PC
+        // This is only needed for initial connection - subsequent boots use reset packets
 #ifdef NETSIO
         extern void netsio_test_cmd(void);
+        qDebug() << "Sending NetSIO test command for initial connection verification";
         netsio_test_cmd();
 #endif
     }
@@ -810,16 +819,9 @@ void AtariEmulator::shutdown()
 
 void AtariEmulator::processFrame()
 {
-    // Handle delayed FujiNet restart (critical for FujiNet timing)
-    if (m_fujinet_restart_pending && m_fujinet_restart_delay > 0) {
-        m_fujinet_restart_delay--;
-        if (m_fujinet_restart_delay == 10) { // Debug at 10 frames remaining
-        }
-        if (m_fujinet_restart_delay == 0) {
-            Atari800_InitialiseMachine();  // Function already declared in atari.h
-            m_fujinet_restart_pending = false;
-        }
-    }
+    // Delayed restart mechanism removed - no longer needed!
+    // NetSIO reset notifications (0xFF/0xFE packets) provide instant state sync
+    // with FujiNet-PC, eliminating the need for polling and delays.
 
     // Process device-specific joystick input
 #ifdef HAVE_SDL2_JOYSTICK
@@ -1543,22 +1545,55 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 
 void AtariEmulator::coldBoot()
 {
+    qDebug() << "=== COLD BOOT START ===";
+    qDebug() << "NetSIO enabled:" << m_netSIOEnabled;
+
+    // CRITICAL: Send cold reset notification to FujiNet-PC BEFORE resetting emulator
+    // This tells FujiNet-PC to reset its state (boot_config=true, status_wait_count=5)
+#ifdef NETSIO
+    if (m_netSIOEnabled && netsio_enabled) {
+        qDebug() << "Sending cold reset to FujiNet-PC (0xFF packet)";
+        netsio_cold_reset();
+    }
+#endif
+
+    // Reset the Atari
     Atari800_Coldstart();
+
+    // Dismount local disks to give FujiNet boot priority
+    if (m_netSIOEnabled) {
+        qDebug() << "Dismounting local disks for FujiNet priority";
+        for (int i = 1; i <= 8; i++) {
+            dismountDiskImage(i);
+        }
+    }
+
+    qDebug() << "=== COLD BOOT COMPLETE ===";
 }
 
 void AtariEmulator::warmBoot()
 {
+    qDebug() << "=== WARM BOOT START ===";
+
     // Preserve BASIC disabled state across warm boot
-    // If BASIC was disabled (e.g., via Option key or cartridge),
-    // set consol_override to hold Option key during warm boot
     if (Atari800_disable_basic) {
         GTIA_consol_override = 2;  // Hold Option for 2 console reads
-        qDebug() << "Warm boot: Preserving BASIC-disabled state (GTIA_consol_override = 2)";
-    } else {
-        qDebug() << "Warm boot: BASIC enabled, no override needed";
+        qDebug() << "Preserving BASIC-disabled state (GTIA_consol_override = 2)";
     }
 
+    // CRITICAL: Send warm reset notification to FujiNet-PC BEFORE resetting emulator
+    // This tells FujiNet-PC to reset its state for warm boot
+#ifdef NETSIO
+    if (m_netSIOEnabled && netsio_enabled) {
+        qDebug() << "Sending warm reset to FujiNet-PC (0xFE packet)";
+        netsio_warm_reset();
+    }
+#endif
+
+    // Reset the Atari
     Atari800_Warmstart();
+
+    qDebug() << "=== WARM BOOT COMPLETE ===";
 }
 
 char AtariEmulator::getShiftedSymbol(int key, bool shiftPressed)

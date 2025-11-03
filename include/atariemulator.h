@@ -452,11 +452,10 @@ private:
     // Printer components
     bool m_printerEnabled;
     std::function<void(const QString&)> m_printerOutputCallback;
-    
-    // FujiNet delayed restart mechanism (matches Atari800MacX timing)
-    bool m_fujinet_restart_pending;
-    int m_fujinet_restart_delay;
-    
+
+    // NetSIO/FujiNet state tracking
+    bool m_netSIOEnabled;
+
     // Current profile name for state saves
     QString m_currentProfileName;
     
