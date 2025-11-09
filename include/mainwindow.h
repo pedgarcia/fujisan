@@ -38,6 +38,11 @@
 #include "configurationprofilemanager.h"
 #include "tcpserver.h"
 
+#ifndef Q_OS_WIN
+class FujiNetProcessManager;
+class FujiNetBinaryManager;
+#endif
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -72,7 +77,13 @@ private slots:
     void sendNextCharacter();
     void toggleMediaDock();
     void togglePause();
-    
+
+#ifndef Q_OS_WIN
+    // FujiNet slots
+    void onFujiNetProcessStateChanged(int state);
+    void onNetSIOEnabledChanged(bool enabled);
+#endif
+
     // State save/load slots
     void quickSaveState();
     void quickLoadState();
@@ -143,6 +154,12 @@ private:
     
     // TCP Server for remote control
     TCPServer* m_tcpServer;
+
+#ifndef Q_OS_WIN
+    // FujiNet-PC process management
+    FujiNetProcessManager* m_fujinetProcessManager;
+    FujiNetBinaryManager* m_fujinetBinaryManager;
+#endif
 
     // Debugger
     DebuggerWidget* m_debuggerWidget;

@@ -49,6 +49,7 @@ public:
 signals:
     void settingsChanged();
     void syncPrinterStateRequested();
+    void netSIOEnabledChanged(bool enabled);
 
 private slots:
     void accept() override;

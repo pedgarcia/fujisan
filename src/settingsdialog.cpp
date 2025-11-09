@@ -2103,6 +2103,9 @@ void SettingsDialog::onNetSIOToggled(bool enabled)
         m_basicEnabledCheck->setEnabled(true);
         m_basicEnabledCheck->setToolTip("Enable or disable the Atari BASIC interpreter");
     }
+
+    // Emit signal to notify MainWindow of NetSIO state change
+    emit netSIOEnabledChanged(enabled);
 }
 
 void SettingsDialog::setupFilePathTooltip(QLineEdit* lineEdit)
