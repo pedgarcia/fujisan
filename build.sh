@@ -785,7 +785,7 @@ PLATFORM=""
 CLEAN=false
 SIGN=false
 NOTARIZE=false
-BUNDLE_FUJINET=false
+BUNDLE_FUJINET=true  # Default to bundling FujiNet-PC (core feature)
 DEVELOPER_ID=""
 
 while [[ $# -gt 0 ]]; do
@@ -805,6 +805,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --bundle-fujinet)
             BUNDLE_FUJINET=true
+            shift
+            ;;
+        --no-fujinet)
+            BUNDLE_FUJINET=false
             shift
             ;;
         --developer-id)
