@@ -46,6 +46,8 @@ public:
     QString getLastError() const { return m_lastError; }
     QString getStdout() const { return m_stdoutBuffer; }
     QString getStderr() const { return m_stderrBuffer; }
+    int getLastExitCode() const { return m_lastExitCode; }
+    QProcess::ExitStatus getLastExitStatus() const { return m_lastExitStatus; }
 
     // Configuration
     void setLaunchBehavior(LaunchBehavior behavior) { m_launchBehavior = behavior; }
@@ -86,6 +88,8 @@ private:
     QString m_binaryPath;
     QStringList m_arguments;
     QString m_lastError;
+    int m_lastExitCode;
+    QProcess::ExitStatus m_lastExitStatus;
 
     // Output buffers
     QString m_stdoutBuffer;

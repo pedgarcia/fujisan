@@ -24,6 +24,7 @@
 #include <QTimer>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QDateTime>
 
 #ifndef Q_OS_WIN
 #include "fujinetprocessmanager.h"
@@ -41,6 +42,8 @@ MainWindow::MainWindow(QWidget *parent)
 #ifndef Q_OS_WIN
     , m_fujinetProcessManager(new FujiNetProcessManager(this))
     , m_fujinetBinaryManager(new FujiNetBinaryManager(this))
+    , m_fujinetRestartCount(0)
+    , m_fujinetFirstRestartTime(0)
 #endif
     , m_keepAspectRatio(true)
     , m_startInFullscreen(false)
@@ -3108,10 +3111,59 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
     FujiNetProcessManager::ProcessState processState = static_cast<FujiNetProcessManager::ProcessState>(state);
 
     switch (processState) {
-        case FujiNetProcessManager::NotRunning:
+        case FujiNetProcessManager::NotRunning: {
+            int exitCode = m_fujinetProcessManager->getLastExitCode();
+
+            // Exit code 75 = EX_TEMPFAIL = "please restart me" (cold reset)
+            // This is the expected behavior when emulator sends cold reset (0xFF)
+            if (exitCode == 75) {
+                QSettings settings;
+                bool netSIOEnabled = settings.value("netSIO/enabled", false).toBool();
+
+                if (netSIOEnabled) {
+                    // Restart loop protection: prevent infinite restarts on crashes
+                    qint64 now = QDateTime::currentMSecsSinceEpoch();
+
+                    if (m_fujinetFirstRestartTime == 0 || (now - m_fujinetFirstRestartTime) > RESTART_WINDOW_MS) {
+                        // First restart or outside restart window - reset counters
+                        m_fujinetRestartCount = 1;
+                        m_fujinetFirstRestartTime = now;
+                    } else {
+                        // Within restart window - increment counter
+                        m_fujinetRestartCount++;
+
+                        if (m_fujinetRestartCount > MAX_RESTARTS) {
+                            qWarning() << "FujiNet-PC restarted" << m_fujinetRestartCount
+                                      << "times in" << RESTART_WINDOW_MS << "ms - stopping auto-restart";
+                            statusBar()->showMessage("FujiNet-PC restart loop detected - auto-restart disabled", 5000);
+                            m_fujinetRestartCount = 0;
+                            m_fujinetFirstRestartTime = 0;
+                            break; // Exit switch, show stopped message
+                        }
+                    }
+
+                    qDebug() << "FujiNet-PC exited with code 75 (cold reset request) - auto-restarting..."
+                             << "(" << m_fujinetRestartCount << "of" << MAX_RESTARTS << "allowed restarts)";
+
+                    QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
+                    if (!binaryPath.isEmpty()) {
+                        QStringList arguments;
+                        arguments << "-c" << "fnconfig.ini";
+                        arguments << "-s" << "SD";
+
+                        m_fujinetProcessManager->start(binaryPath, arguments);
+                        statusBar()->showMessage("Restarting FujiNet-PC after cold reset...", 2000);
+                        return; // Don't show "stopped" message
+                    } else {
+                        qWarning() << "Cannot restart FujiNet-PC - binary path not found";
+                    }
+                }
+            }
+
             qDebug() << "FujiNet-PC process stopped";
             statusBar()->showMessage("FujiNet-PC stopped", 3000);
             break;
+        }
         case FujiNetProcessManager::Starting:
             qDebug() << "FujiNet-PC process starting...";
             statusBar()->showMessage("Starting FujiNet-PC...", 3000);

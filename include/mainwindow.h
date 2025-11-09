@@ -159,6 +159,12 @@ private:
     // FujiNet-PC process management
     FujiNetProcessManager* m_fujinetProcessManager;
     FujiNetBinaryManager* m_fujinetBinaryManager;
+
+    // Restart loop protection
+    int m_fujinetRestartCount;
+    qint64 m_fujinetFirstRestartTime;
+    static const int MAX_RESTARTS = 3;
+    static const int RESTART_WINDOW_MS = 10000; // 10 seconds
 #endif
 
     // Debugger

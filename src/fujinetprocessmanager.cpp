@@ -16,6 +16,8 @@ FujiNetProcessManager::FujiNetProcessManager(QObject *parent)
     , m_process(new QProcess(this))
     , m_state(NotRunning)
     , m_launchBehavior(AutoLaunch)
+    , m_lastExitCode(0)
+    , m_lastExitStatus(QProcess::NormalExit)
     , m_startTimer(new QTimer(this))
 {
     // Connect process signals
@@ -153,6 +155,10 @@ void FujiNetProcessManager::onProcessFinished(int exitCode, QProcess::ExitStatus
 {
     qDebug() << "FujiNet-PC exited with code:" << exitCode << "status:" << exitStatus;
 
+    // Store exit code for auto-restart logic
+    m_lastExitCode = exitCode;
+    m_lastExitStatus = exitStatus;
+
     if (exitStatus == QProcess::CrashExit) {
         m_lastError = "FujiNet-PC crashed";
         setState(Error);
@@ -185,8 +191,18 @@ void FujiNetProcessManager::onReadyReadStdout()
             m_stdoutBuffer = m_stdoutBuffer.right(MAX_BUFFER_SIZE / 2);
         }
 
-        // Log FujiNet output for debugging
-        qDebug() << "[FujiNet-PC stdout]" << output.trimmed();
+        // Convert literal \r\n and \n to actual newlines for better formatting
+        QString formatted = output;
+        formatted.replace("\\r\\n", "\n").replace("\\n", "\n");
+
+        // Log each line separately for cleaner output
+        QStringList lines = formatted.split('\n', Qt::SkipEmptyParts);
+        for (const QString& line : lines) {
+            QString trimmed = line.trimmed();
+            if (!trimmed.isEmpty()) {
+                qDebug() << "[FujiNet-PC]" << trimmed;
+            }
+        }
 
         emit stdoutReceived(output);
     }
@@ -203,8 +219,18 @@ void FujiNetProcessManager::onReadyReadStderr()
             m_stderrBuffer = m_stderrBuffer.right(MAX_BUFFER_SIZE / 2);
         }
 
-        // Log FujiNet errors for debugging
-        qWarning() << "[FujiNet-PC stderr]" << output.trimmed();
+        // Convert literal \r\n and \n to actual newlines for better formatting
+        QString formatted = output;
+        formatted.replace("\\r\\n", "\n").replace("\\n", "\n");
+
+        // Log each line separately for cleaner output
+        QStringList lines = formatted.split('\n', Qt::SkipEmptyParts);
+        for (const QString& line : lines) {
+            QString trimmed = line.trimmed();
+            if (!trimmed.isEmpty()) {
+                qWarning() << "[FujiNet-PC ERROR]" << trimmed;
+            }
+        }
 
         emit stderrReceived(output);
     }
