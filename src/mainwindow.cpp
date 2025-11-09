@@ -109,7 +109,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 #ifndef Q_OS_WIN
     // Connect FujiNet process manager signals
-    connect(m_fujinetProcessManager, &FujiNetProcessManager::processStateChanged,
+    connect(m_fujinetProcessManager, &FujiNetProcessManager::stateChanged,
             this, &MainWindow::onFujiNetProcessStateChanged);
 
     // Auto-start FujiNet-PC if NetSIO is enabled and launch behavior is Auto
