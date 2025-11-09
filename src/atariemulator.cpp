@@ -786,20 +786,28 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
     
     // NetSIO is now initialized by atari800 core via -netsio command line argument
     if (netSIOEnabled) {
-        
+        qDebug() << "NetSIO initialization in progress...";
+
         // CRITICAL: Dismount all local disks to give FujiNet boot priority
         // When NetSIO is enabled, FujiNet devices should take precedence over local ATR files
         for (int i = 1; i <= 8; i++) {
             dismountDiskImage(i);
         }
+        qDebug() << "All local disks dismounted for FujiNet priority";
 
         // Send test command to verify NetSIO communication with FujiNet-PC
         // This is only needed for initial connection - subsequent boots use reset packets
 #ifdef NETSIO
         extern void netsio_test_cmd(void);
         qDebug() << "Sending NetSIO test command for initial connection verification";
+        qDebug() << "netsio_enabled before test:" << netsio_enabled;
         netsio_test_cmd();
+        qDebug() << "netsio_enabled after test:" << netsio_enabled;
+#else
+        qDebug() << "WARNING: NETSIO not compiled - test command not available";
 #endif
+    } else {
+        qDebug() << "NetSIO not requested - skipping NetSIO initialization";
     }
     
     // Enable R-Time 8 if requested
@@ -1546,19 +1554,38 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 void AtariEmulator::coldBoot()
 {
     qDebug() << "=== COLD BOOT START ===";
-    qDebug() << "NetSIO enabled:" << m_netSIOEnabled;
+    qDebug() << "m_netSIOEnabled:" << m_netSIOEnabled;
+
+#ifdef NETSIO
+    qDebug() << "NETSIO compiled: YES [v0.9.5 WITH SO_REUSEPORT FIX]";
+    qDebug() << "netsio_enabled (core variable):" << netsio_enabled;
+#else
+    qDebug() << "NETSIO compiled: NO";
+#endif
 
     // CRITICAL: Send cold reset notification to FujiNet-PC BEFORE resetting emulator
     // This tells FujiNet-PC to reset its state (boot_config=true, status_wait_count=5)
 #ifdef NETSIO
     if (m_netSIOEnabled && netsio_enabled) {
-        qDebug() << "Sending cold reset to FujiNet-PC (0xFF packet)";
-        netsio_cold_reset();
+        qDebug() << "Conditions met for NetSIO. Sending cold reset to FujiNet-PC (0xFF packet)";
+        int resetResult = netsio_cold_reset();
+        qDebug() << "netsio_cold_reset() returned:" << resetResult;
+    } else {
+        if (!m_netSIOEnabled) {
+            qDebug() << "WARNING: m_netSIOEnabled is FALSE - NetSIO disabled in Fujisan";
+        }
+        if (!netsio_enabled) {
+            qDebug() << "WARNING: netsio_enabled is FALSE - NetSIO not enabled in atari800 core";
+        }
     }
+#else
+    qDebug() << "WARNING: NETSIO not compiled - NetSIO not available";
 #endif
 
     // Reset the Atari
+    qDebug() << "Calling Atari800_Coldstart()...";
     Atari800_Coldstart();
+    qDebug() << "Atari800_Coldstart() completed";
 
     // Dismount local disks to give FujiNet boot priority
     if (m_netSIOEnabled) {
@@ -1566,6 +1593,7 @@ void AtariEmulator::coldBoot()
         for (int i = 1; i <= 8; i++) {
             dismountDiskImage(i);
         }
+        qDebug() << "Local disk dismounting complete";
     }
 
     qDebug() << "=== COLD BOOT COMPLETE ===";
@@ -1574,6 +1602,7 @@ void AtariEmulator::coldBoot()
 void AtariEmulator::warmBoot()
 {
     qDebug() << "=== WARM BOOT START ===";
+    qDebug() << "m_netSIOEnabled:" << m_netSIOEnabled;
 
     // Preserve BASIC disabled state across warm boot
     if (Atari800_disable_basic) {
@@ -1584,14 +1613,25 @@ void AtariEmulator::warmBoot()
     // CRITICAL: Send warm reset notification to FujiNet-PC BEFORE resetting emulator
     // This tells FujiNet-PC to reset its state for warm boot
 #ifdef NETSIO
+    qDebug() << "netsio_enabled (core variable):" << netsio_enabled;
     if (m_netSIOEnabled && netsio_enabled) {
-        qDebug() << "Sending warm reset to FujiNet-PC (0xFE packet)";
-        netsio_warm_reset();
+        qDebug() << "Conditions met for NetSIO. Sending warm reset to FujiNet-PC (0xFE packet)";
+        int resetResult = netsio_warm_reset();
+        qDebug() << "netsio_warm_reset() returned:" << resetResult;
+    } else {
+        if (!m_netSIOEnabled) {
+            qDebug() << "WARNING: m_netSIOEnabled is FALSE - NetSIO disabled in Fujisan";
+        }
+        if (!netsio_enabled) {
+            qDebug() << "WARNING: netsio_enabled is FALSE - NetSIO not enabled in atari800 core";
+        }
     }
 #endif
 
     // Reset the Atari
+    qDebug() << "Calling Atari800_Warmstart()...";
     Atari800_Warmstart();
+    qDebug() << "Atari800_Warmstart() completed";
 
     qDebug() << "=== WARM BOOT COMPLETE ===";
 }

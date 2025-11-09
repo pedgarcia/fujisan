@@ -285,6 +285,145 @@ EOF
     cd - > /dev/null
 }
 
+# Function to bundle FujiNet-PC binary
+bundle_fujinet_pc() {
+    local app_path="$1"
+    local arch="$2"  # "arm64" or "x86_64"
+    local dev_id="$3"  # Optional: Developer ID for signing
+
+    echo_info "Bundling FujiNet-PC binary for $arch..."
+
+    # Use local pre-built FujiNet-PC binary from fujinet-firmware
+    local FUJINET_SOURCE_DIR="${PROJECT_ROOT}/../fujinet-firmware/build/dist"
+
+    if [[ ! -f "$FUJINET_SOURCE_DIR/fujinet" ]]; then
+        echo_error "FujiNet-PC binary not found at: $FUJINET_SOURCE_DIR/fujinet"
+        echo_info "Expected location: $FUJINET_SOURCE_DIR"
+        echo_info "Please build FujiNet-PC first: cd ${PROJECT_ROOT}/../fujinet-firmware && ./build.sh"
+        return 1
+    fi
+
+    # Get version from binary
+    local version=$("$FUJINET_SOURCE_DIR/fujinet" -V 2>&1 | grep "^FujiNet-PC" | awk '{print $2}')
+    if [[ -z "$version" ]]; then
+        version="local-build"
+    fi
+
+    echo_info "Found FujiNet-PC $version at: $FUJINET_SOURCE_DIR"
+
+    # Create Resources/fujinet-pc directory in app bundle
+    local fujinet_dir="$app_path/Contents/Resources/fujinet-pc"
+    rm -rf "$fujinet_dir"  # Clean slate
+    mkdir -p "$fujinet_dir"
+
+    # Copy binary
+    cp "$FUJINET_SOURCE_DIR/fujinet" "$fujinet_dir/fujinet"
+    chmod +x "$fujinet_dir/fujinet"
+
+    # Copy data folder (required for handlers and printer fonts)
+    if [[ -d "$FUJINET_SOURCE_DIR/data" ]]; then
+        echo_info "Copying data folder..."
+        cp -R "$FUJINET_SOURCE_DIR/data" "$fujinet_dir/"
+    else
+        echo_warning "data folder not found - FujiNet may not function properly"
+    fi
+
+    # Create SD folder for SD card emulation
+    mkdir -p "$fujinet_dir/SD"
+    echo "--- FujiNet SD Card ---" > "$fujinet_dir/SD/README.txt"
+    echo "Place disk images (.atr, .xex files) here for FujiNet access" >> "$fujinet_dir/SD/README.txt"
+
+    # Create default fnconfig.ini
+    cat > "$fujinet_dir/fnconfig.ini" << 'EOF'
+[General]
+devicename=
+hsioindex=8
+rotationsounds=1
+configenabled=1
+config_ng=0
+altconfigfile=
+boot_mode=0
+fnconfig_on_spifs=1
+status_wait_enabled=1
+printer_enabled=1
+encrypt_passphrase=0
+
+[WiFi]
+enabled=1
+SSID=Dummy Cafe
+passphrase=
+
+[Bluetooth]
+devicename=SIO2BTFujiNet
+enabled=0
+baud=19200
+
+[Network]
+sntpserver=pool.ntp.org
+
+[Host1]
+type=SD
+name=SD
+
+[Host2]
+type=TNFS
+name=fujinet.online
+
+[Host3]
+type=TNFS
+name=fujinet.pl
+
+[Modem]
+modem_enabled=1
+sniffer_enabled=0
+
+[Cassette]
+play_record=0 Play
+pulldown=1 Pulldown Resistor
+cassette_enabled=1
+
+[CPM]
+cpm_enabled=1
+ccp=
+
+[ENABLE]
+enable_device_slot_1=1
+enable_device_slot_2=1
+enable_device_slot_3=1
+enable_device_slot_4=1
+enable_device_slot_5=1
+enable_device_slot_6=1
+enable_device_slot_7=1
+enable_device_slot_8=1
+enable_apetime=1
+enable_pclink=1
+
+[BOIP]
+enabled=1
+host=localhost
+port=
+
+[Serial]
+port=
+command=DSR
+proceed=DTR
+EOF
+
+    echo_info "Created default fnconfig.ini"
+
+    # Create version file
+    echo "$version" > "$fujinet_dir/version.txt"
+
+    # Sign the binary if Developer ID provided
+    if [[ -n "$dev_id" ]]; then
+        echo_info "Signing FujiNet-PC binary..."
+        codesign --force --timestamp --options runtime --sign "$dev_id" "$fujinet_dir/fujinet"
+        echo_success "FujiNet-PC binary signed"
+    fi
+
+    echo_success "FujiNet-PC $version bundled successfully"
+}
+
 # Function to notarize DMG
 notarize_dmg() {
     local dmg_path="$1"
@@ -388,14 +527,20 @@ build_macos_arm64() {
     cp -r "$PROJECT_ROOT/images/"*.png "Fujisan.app/Contents/Resources/images/" 2>/dev/null || true
     
     # Sign with Developer ID or ad-hoc
+    local dev_id=""
     if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
-        local dev_id=$(find_developer_id)
+        dev_id=$(find_developer_id)
         sign_app_bundle "Fujisan.app" "$dev_id"
     else
         echo_info "Ad-hoc signing app..."
         codesign --force --deep --sign - "Fujisan.app"
     fi
-    
+
+    # Bundle FujiNet-PC if requested
+    if [[ "$BUNDLE_FUJINET" == "true" ]]; then
+        bundle_fujinet_pc "$ARM64_BUILD_DIR/Fujisan.app" "arm64" "$dev_id"
+    fi
+
     # Verify architecture
     echo_info "Verifying ARM64 build..."
     EXEC_ARCH=$(lipo -archs "Fujisan.app/Contents/MacOS/Fujisan")
@@ -404,13 +549,13 @@ build_macos_arm64() {
     else
         echo_error "Unexpected architecture: $EXEC_ARCH"
     fi
-    
+
     # Create DMG
     local dmg_sign="false"
     if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
         dmg_sign="true"
     fi
-    
+
     create_dmg "$ARM64_BUILD_DIR/Fujisan.app" \
                "Fujisan-${VERSION_CLEAN}-arm64.dmg" \
                "Fujisan (Apple Silicon)" \
@@ -468,14 +613,20 @@ build_macos_x86_64() {
     cp -r "$PROJECT_ROOT/images/"*.png "Fujisan.app/Contents/Resources/images/" 2>/dev/null || true
     
     # Sign with Developer ID or ad-hoc
+    local dev_id=""
     if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
-        local dev_id=$(find_developer_id)
+        dev_id=$(find_developer_id)
         sign_app_bundle "Fujisan.app" "$dev_id"
     else
         echo_info "Ad-hoc signing app..."
         codesign --force --deep --sign - "Fujisan.app"
     fi
-    
+
+    # Bundle FujiNet-PC if requested
+    if [[ "$BUNDLE_FUJINET" == "true" ]]; then
+        bundle_fujinet_pc "$X86_64_BUILD_DIR/Fujisan.app" "x86_64" "$dev_id"
+    fi
+
     # Verify architecture
     echo_info "Verifying x86_64 build..."
     EXEC_ARCH=$(lipo -archs "Fujisan.app/Contents/MacOS/Fujisan")
@@ -634,6 +785,7 @@ PLATFORM=""
 CLEAN=false
 SIGN=false
 NOTARIZE=false
+BUNDLE_FUJINET=false
 DEVELOPER_ID=""
 
 while [[ $# -gt 0 ]]; do
@@ -649,6 +801,10 @@ while [[ $# -gt 0 ]]; do
         --notarize)
             NOTARIZE=true
             SIGN=true  # Notarization requires signing
+            shift
+            ;;
+        --bundle-fujinet)
+            BUNDLE_FUJINET=true
             shift
             ;;
         --developer-id)
