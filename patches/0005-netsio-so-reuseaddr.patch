@@ -1,0 +1,55 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Developer <fujisan@atari>
+Date: Wed, 6 Nov 2025 00:00:00 -0800
+Subject: [PATCH] Add SO_REUSEADDR and SO_REUSEPORT to NetSIO socket
+ initialization
+
+Enable SO_REUSEADDR and SO_REUSEPORT socket options in NetSIO initialization
+to allow the emulator to bind to port 9997 even when FujiNet-PC is already
+listening on the same port.
+
+SO_REUSEADDR allows binding to a port that's in TIME_WAIT state.
+SO_REUSEPORT (macOS/BSD) allows multiple processes to bind to the same port
+and both receive unicast UDP packets, which is required for proper NetSIO
+communication between the emulator and FujiNet-PC.
+
+Without these options, the bind() call fails when FujiNet-PC is running,
+preventing NetSIO from initializing and causing netsio_enabled to remain
+at 0.
+---
+ src/netsio.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/src/netsio.c b/src/netsio.c
+index 2dfa9659..feb3f1c5 100644
+--- a/src/netsio.c
++++ b/src/netsio.c
+@@ -255,6 +255,25 @@ int netsio_init(uint16_t port) {
+ #endif
+     }
+
++    /* Enable SO_REUSEADDR to allow binding even if the port is in TIME_WAIT state */
++    int reuse = 1;
++    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
++    {
++#ifdef DEBUG
++        Log_print("netsio setsockopt SO_REUSEADDR failed");
++#endif
++    }
++
++    /* On macOS/BSD, SO_REUSEPORT is required to allow multiple processes to receive on same port */
++#ifdef SO_REUSEPORT
++    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) < 0)
++    {
++#ifdef DEBUG
++        Log_print("netsio setsockopt SO_REUSEPORT failed");
++#endif
++    }
++#endif
++
+     /* Bind to the socket on requested port */
+     if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+     {
+--
+2.39.2
+
