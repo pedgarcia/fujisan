@@ -286,6 +286,9 @@ set(SOURCES
     src/printerwidget.cpp
     src/mediaperipheralsdock.cpp
     src/tcpserver.cpp
+    $<$<NOT:$<PLATFORM_ID:Windows>>:src/fujinetservice.cpp>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:src/fujinetprocessmanager.cpp>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:src/fujinetbinarymanager.cpp>
 )
 
 set(HEADERS
@@ -310,6 +313,9 @@ set(HEADERS
     include/printerwidget.h
     include/mediaperipheralsdock.h
     include/tcpserver.h
+    $<$<NOT:$<PLATFORM_ID:Windows>>:include/fujinetservice.h>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:include/fujinetprocessmanager.h>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:include/fujinetbinarymanager.h>
 )
 
 # ============================================================================

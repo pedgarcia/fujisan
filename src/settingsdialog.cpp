@@ -13,6 +13,12 @@
 #include "sdl2joystickmanager.h"
 #endif
 
+#ifndef Q_OS_WIN
+#include "fujinetservice.h"
+#include "fujinetprocessmanager.h"
+#include "fujinetbinarymanager.h"
+#endif
+
 SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     : QDialog(parent)
     , m_emulator(emulator)
@@ -75,7 +81,10 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     createInputConfigTab();
     createMediaConfigTab();
     createEmulatorTab();
-    
+#ifndef Q_OS_WIN
+    createFujiNetTab();
+#endif
+
     // Create button box with custom buttons
     m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     m_defaultsButton = new QPushButton("Restore Defaults");
@@ -1719,6 +1728,150 @@ void SettingsDialog::createEmulatorTab()
     mainLayout->addStretch();
 }
 
+#ifndef Q_OS_WIN
+void SettingsDialog::createFujiNetTab()
+{
+    m_fujinetTab = new QWidget();
+    m_tabWidget->addTab(m_fujinetTab, "FujiNet");
+
+    QVBoxLayout* mainLayout = new QVBoxLayout(m_fujinetTab);
+    mainLayout->setSpacing(20);
+
+    // Initialize FujiNet services
+    // NOTE: These are NOT children of this dialog (parent=nullptr) so they persist
+    // after the settings dialog closes. They should only be destroyed when the
+    // application exits, not when settings dialog closes.
+    m_fujinetService = new FujiNetService(nullptr);
+    m_fujinetProcessManager = new FujiNetProcessManager(nullptr);
+    m_fujinetBinaryManager = new FujiNetBinaryManager(nullptr);
+
+    // Server Configuration
+    QGroupBox* serverGroup = new QGroupBox("FujiNet Server");
+    QFormLayout* serverLayout = new QFormLayout(serverGroup);
+
+    m_fujinetServerUrl = new QLineEdit();
+    m_fujinetServerUrl->setPlaceholderText("http://localhost:8000");
+    m_fujinetServerUrl->setToolTip("URL of the FujiNet-PC server");
+    serverLayout->addRow("Server URL:", m_fujinetServerUrl);
+
+    m_fujinetStatusLabel = new QLabel("Not connected");
+    m_fujinetStatusLabel->setStyleSheet("color: #666;");
+    serverLayout->addRow("Status:", m_fujinetStatusLabel);
+
+    mainLayout->addWidget(serverGroup);
+
+    // Binary Location
+    QGroupBox* binaryGroup = new QGroupBox("Binary Location");
+    QFormLayout* binaryLayout = new QFormLayout(binaryGroup);
+
+    QHBoxLayout* pathLayout = new QHBoxLayout();
+    m_fujinetBinaryPath = new QLineEdit();
+    m_fujinetBinaryPath->setReadOnly(true);
+    m_fujinetBinaryPath->setPlaceholderText("Not configured");
+    m_fujinetBrowseButton = new QPushButton("Browse...");
+
+    pathLayout->addWidget(m_fujinetBinaryPath);
+    pathLayout->addWidget(m_fujinetBrowseButton);
+    binaryLayout->addRow("Path:", pathLayout);
+
+    m_fujinetVersionLabel = new QLabel("Not found");
+    m_fujinetVersionLabel->setStyleSheet("color: #666;");
+    binaryLayout->addRow("Version:", m_fujinetVersionLabel);
+
+    mainLayout->addWidget(binaryGroup);
+
+    // Launch Behavior
+    QGroupBox* launchGroup = new QGroupBox("Launch Behavior");
+    QFormLayout* launchLayout = new QFormLayout(launchGroup);
+
+    m_fujinetLaunchBehavior = new QComboBox();
+    m_fujinetLaunchBehavior->addItem("Auto-launch when NetSIO enabled", 0);
+    m_fujinetLaunchBehavior->addItem("Detect existing FujiNet-PC process", 1);
+    m_fujinetLaunchBehavior->addItem("Manual control", 2);
+    m_fujinetLaunchBehavior->setToolTip("How Fujisan should manage the FujiNet-PC process");
+    launchLayout->addRow("Behavior:", m_fujinetLaunchBehavior);
+
+    mainLayout->addWidget(launchGroup);
+
+    // Process Control
+    QGroupBox* processGroup = new QGroupBox("Process Control");
+    QHBoxLayout* processLayout = new QHBoxLayout(processGroup);
+
+    m_fujinetStartButton = new QPushButton("Start");
+    m_fujinetStopButton = new QPushButton("Stop");
+    m_fujinetRestartButton = new QPushButton("Restart");
+
+    processLayout->addWidget(m_fujinetStartButton);
+    processLayout->addWidget(m_fujinetStopButton);
+    processLayout->addWidget(m_fujinetRestartButton);
+
+    mainLayout->addWidget(processGroup);
+
+    // Description
+    QLabel* description = new QLabel(
+        "FujiNet-PC provides network-based disk drive emulation for the Atari 8-bit.\n"
+        "When enabled with NetSIO, all disk drives (D1-D8) are served by FujiNet-PC.\n\n"
+        "Note: FujiNet support is not available on Windows."
+    );
+    description->setWordWrap(true);
+    description->setStyleSheet("color: #666; font-size: 11px; margin-top: 10px;");
+    mainLayout->addWidget(description);
+
+    mainLayout->addStretch();
+
+    // Connect signals
+    connect(m_fujinetBrowseButton, &QPushButton::clicked, this, &SettingsDialog::onFujiNetBrowseBinary);
+    connect(m_fujinetStartButton, &QPushButton::clicked, this, &SettingsDialog::onFujiNetStart);
+    connect(m_fujinetStopButton, &QPushButton::clicked, this, &SettingsDialog::onFujiNetStop);
+    connect(m_fujinetRestartButton, &QPushButton::clicked, this, &SettingsDialog::onFujiNetRestart);
+
+    // Connect service signals
+    connect(m_fujinetService, &FujiNetService::connected, [this]() { onFujiNetConnectionChanged(true); });
+    connect(m_fujinetService, &FujiNetService::disconnected, [this]() { onFujiNetConnectionChanged(false); });
+
+    connect(m_fujinetProcessManager, &FujiNetProcessManager::stateChanged,
+            this, &SettingsDialog::onFujiNetProcessStateChanged);
+
+    // Load settings and check binary status
+    QSettings settings;
+    m_fujinetServerUrl->setText(settings.value("fujinet/serverUrl", "http://localhost:8000").toString());
+    m_fujinetLaunchBehavior->setCurrentIndex(settings.value("fujinet/launchBehavior", 0).toInt());
+
+    // Check for bundled binary first, then custom path
+    QString bundledPath = m_fujinetBinaryManager->getBinaryPath();
+    QString customPath = settings.value("fujinet/customBinaryPath", "").toString();
+    QString binaryPath;
+
+    if (QFile::exists(bundledPath)) {
+        // Bundled binary exists
+        binaryPath = bundledPath;
+        m_fujinetBinaryPath->setText(bundledPath + " (bundled)");
+        m_fujinetBrowseButton->setEnabled(false); // Disable browse for bundled version
+        QString version = m_fujinetBinaryManager->getInstalledVersion();
+        m_fujinetVersionLabel->setText(version.isEmpty() ? "Unknown" : version);
+        m_fujinetStartButton->setEnabled(true);
+    } else if (!customPath.isEmpty() && QFile::exists(customPath)) {
+        // Custom path exists
+        binaryPath = customPath;
+        m_fujinetBinaryPath->setText(customPath);
+        m_fujinetBrowseButton->setEnabled(true);
+        QString version = m_fujinetBinaryManager->parseVersionFromBinary(customPath);
+        m_fujinetVersionLabel->setText(version.isEmpty() ? "Unknown" : version);
+        m_fujinetStartButton->setEnabled(true);
+    } else {
+        // No binary found
+        m_fujinetBinaryPath->setPlaceholderText("Not configured - Click Browse to select binary");
+        m_fujinetBrowseButton->setEnabled(true);
+        m_fujinetVersionLabel->setText("Not found");
+        m_fujinetStartButton->setEnabled(false);
+    }
+
+    // Set initial button states
+    m_fujinetStopButton->setEnabled(false);
+    m_fujinetRestartButton->setEnabled(false);
+}
+#endif
+
 void SettingsDialog::browseDiskImage(int diskNumber)
 {
     QString fileName = QFileDialog::getOpenFileName(
@@ -2935,6 +3088,14 @@ void SettingsDialog::applySettings()
 void SettingsDialog::accept()
 {
     applySettings();
+
+#ifndef Q_OS_WIN
+    // Stop FujiNet health check to prevent signals firing during destruction
+    if (m_fujinetService) {
+        m_fujinetService->stopHealthCheck();
+    }
+#endif
+
     QDialog::accept();
 }
 
@@ -2942,6 +3103,14 @@ void SettingsDialog::reject()
 {
     // Restore original settings without applying
     qDebug() << "Settings dialog cancelled - restoring original settings";
+
+#ifndef Q_OS_WIN
+    // Stop FujiNet health check to prevent signals firing during destruction
+    if (m_fujinetService) {
+        m_fujinetService->stopHealthCheck();
+    }
+#endif
+
     QDialog::reject();
 }
 
@@ -3847,3 +4016,151 @@ void SettingsDialog::onJoystickDeviceChanged()
              << "Kbd2:" << kbd2Enabled << "Real:" << realJoysticksNeeded;
 #endif
 }
+
+#ifndef Q_OS_WIN
+// FujiNet slot implementations
+
+void SettingsDialog::onFujiNetBrowseBinary()
+{
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        "Select FujiNet-PC Binary",
+        QString(),
+        "Executables (fujinet *);;All Files (*)"
+    );
+
+    if (!fileName.isEmpty()) {
+        // Validate the binary
+        QFile file(fileName);
+        if (!file.exists()) {
+            m_fujinetVersionLabel->setText("File not found");
+            m_fujinetVersionLabel->setStyleSheet("color: red;");
+            return;
+        }
+
+        // Try to get version
+        QString version = m_fujinetBinaryManager->parseVersionFromBinary(fileName);
+        if (version.isEmpty()) {
+            version = "Unknown";
+        }
+
+        // Save to settings
+        QSettings settings;
+        settings.setValue("fujinet/customBinaryPath", fileName);
+
+        // Update UI
+        m_fujinetBinaryPath->setText(fileName);
+        m_fujinetVersionLabel->setText(version);
+        m_fujinetVersionLabel->setStyleSheet("color: #666;");
+        m_fujinetStartButton->setEnabled(true);
+
+        qDebug() << "FujiNet-PC binary configured:" << fileName << "Version:" << version;
+    }
+}
+
+void SettingsDialog::onFujiNetStart()
+{
+    // Get binary path - bundled or custom
+    QSettings settings;
+    QString bundledPath = m_fujinetBinaryManager->getBinaryPath();
+    QString customPath = settings.value("fujinet/customBinaryPath", "").toString();
+    QString binaryPath;
+
+    if (QFile::exists(bundledPath)) {
+        binaryPath = bundledPath;
+    } else if (!customPath.isEmpty() && QFile::exists(customPath)) {
+        binaryPath = customPath;
+    } else {
+        m_fujinetVersionLabel->setText("No binary configured");
+        m_fujinetVersionLabel->setStyleSheet("color: red;");
+        return;
+    }
+
+    // Build command-line arguments for FujiNet-PC
+    // -c fnconfig.ini : config file path
+    // -s SD : SD card directory path
+    QStringList arguments;
+    arguments << "-c" << "fnconfig.ini";
+    arguments << "-s" << "SD";
+
+    qDebug() << "Starting FujiNet-PC with arguments:" << arguments;
+
+    if (m_fujinetProcessManager->start(binaryPath, arguments)) {
+        m_fujinetStartButton->setEnabled(false);
+        m_fujinetStopButton->setEnabled(true);
+        m_fujinetRestartButton->setEnabled(true);
+
+        // Start connection health check after 2-second delay
+        // This gives FujiNet-PC time to initialize and start listening
+        QString serverUrl = m_fujinetServerUrl->text();
+        if (!serverUrl.isEmpty()) {
+            m_fujinetService->setServerUrl(serverUrl);
+            QTimer::singleShot(2000, this, [this]() {
+                m_fujinetService->startHealthCheck(3000); // Check every 3 seconds
+            });
+        }
+    }
+}
+
+void SettingsDialog::onFujiNetStop()
+{
+    m_fujinetProcessManager->stop();
+    m_fujinetService->stopHealthCheck();
+
+    m_fujinetStartButton->setEnabled(true);
+    m_fujinetStopButton->setEnabled(false);
+    m_fujinetRestartButton->setEnabled(false);
+    m_fujinetStatusLabel->setText("Not connected");
+    m_fujinetStatusLabel->setStyleSheet("color: #666;");
+}
+
+void SettingsDialog::onFujiNetRestart()
+{
+    m_fujinetProcessManager->restart();
+}
+
+void SettingsDialog::onFujiNetConnectionChanged(bool connected)
+{
+    if (connected) {
+        m_fujinetStatusLabel->setText("Connected");
+        m_fujinetStatusLabel->setStyleSheet("color: green; font-weight: bold;");
+    } else {
+        m_fujinetStatusLabel->setText("Not connected");
+        m_fujinetStatusLabel->setStyleSheet("color: #666;");
+    }
+}
+
+void SettingsDialog::onFujiNetProcessStateChanged(int state)
+{
+    // state: NotRunning=0, Starting=1, Running=2, Stopping=3, Error=4
+    switch (state) {
+    case 0: // NotRunning
+        m_fujinetStartButton->setEnabled(true);
+        m_fujinetStopButton->setEnabled(false);
+        m_fujinetRestartButton->setEnabled(false);
+        break;
+    case 1: // Starting
+        m_fujinetStartButton->setEnabled(false);
+        m_fujinetStopButton->setEnabled(false);
+        m_fujinetRestartButton->setEnabled(false);
+        break;
+    case 2: // Running
+        m_fujinetStartButton->setEnabled(false);
+        m_fujinetStopButton->setEnabled(true);
+        m_fujinetRestartButton->setEnabled(true);
+        break;
+    case 3: // Stopping
+        m_fujinetStartButton->setEnabled(false);
+        m_fujinetStopButton->setEnabled(false);
+        m_fujinetRestartButton->setEnabled(false);
+        break;
+    case 4: // Error
+        m_fujinetStartButton->setEnabled(true);
+        m_fujinetStopButton->setEnabled(false);
+        m_fujinetRestartButton->setEnabled(false);
+        m_fujinetStatusLabel->setText("Error: " + m_fujinetProcessManager->getLastError());
+        m_fujinetStatusLabel->setStyleSheet("color: red;");
+        break;
+    }
+}
+#endif

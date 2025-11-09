@@ -24,9 +24,17 @@
 #include <QDoubleSpinBox>
 #include <QSlider>
 #include <QSettings>
+#include <QProgressBar>
 #include "atariemulator.h"
 #include "configurationprofilemanager.h"
 #include "profileselectionwidget.h"
+
+#ifndef Q_OS_WIN
+// FujiNet support (not available on Windows)
+class FujiNetService;
+class FujiNetProcessManager;
+class FujiNetBinaryManager;
+#endif
 
 class SettingsDialog : public QDialog
 {
@@ -66,6 +74,16 @@ private slots:
     void onLoadProfile(const QString& profileName);
     void onJoystickDeviceChanged();
 
+#ifndef Q_OS_WIN
+    // FujiNet slots
+    void onFujiNetBrowseBinary();
+    void onFujiNetStart();
+    void onFujiNetStop();
+    void onFujiNetRestart();
+    void onFujiNetConnectionChanged(bool connected);
+    void onFujiNetProcessStateChanged(int state);
+#endif
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
@@ -76,6 +94,9 @@ private:
     void createInputConfigTab();
     void createMediaConfigTab();
     void createEmulatorTab();
+#ifndef Q_OS_WIN
+    void createFujiNetTab();
+#endif
     void saveSettings();
     void applySettings();
     void applyMediaSettings();
@@ -275,7 +296,26 @@ private:
     QWidget* m_emulatorTab;
     QCheckBox* m_tcpServerEnabled;
     QSpinBox* m_tcpServerPort;
-    
+
+#ifndef Q_OS_WIN
+    // FujiNet Configuration controls
+    QWidget* m_fujinetTab;
+    QLineEdit* m_fujinetServerUrl;
+    QComboBox* m_fujinetLaunchBehavior;
+    QLabel* m_fujinetStatusLabel;
+    QLineEdit* m_fujinetBinaryPath;
+    QPushButton* m_fujinetBrowseButton;
+    QLabel* m_fujinetVersionLabel;
+    QPushButton* m_fujinetStartButton;
+    QPushButton* m_fujinetStopButton;
+    QPushButton* m_fujinetRestartButton;
+
+    // FujiNet service classes
+    FujiNetService* m_fujinetService;
+    FujiNetProcessManager* m_fujinetProcessManager;
+    FujiNetBinaryManager* m_fujinetBinaryManager;
+#endif
+
     // Store original settings for cancel functionality
     struct OriginalSettings {
         QString machineType;
