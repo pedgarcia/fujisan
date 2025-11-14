@@ -42,9 +42,15 @@ class SettingsDialog : public QDialog
 
 public:
     explicit SettingsDialog(AtariEmulator* emulator, QWidget *parent = nullptr);
-    
+
     // Public methods for external synchronization
     void loadSettings();
+
+#ifndef Q_OS_WIN
+    // Set shared FujiNet managers (must be called before showing dialog)
+    void setFujiNetManagers(FujiNetProcessManager* processManager,
+                           FujiNetBinaryManager* binaryManager);
+#endif
 
 signals:
     void settingsChanged();
@@ -78,9 +84,12 @@ private slots:
 #ifndef Q_OS_WIN
     // FujiNet slots
     void onFujiNetBrowseBinary();
+    void onFujiNetBrowseSDFolder();
+    void onFujiNetBrowseConfig();
+    void onFujiNetOpenConfigFolder();
+    void onFujiNetCustomConfigToggled(bool enabled);
     void onFujiNetStart();
     void onFujiNetStop();
-    void onFujiNetRestart();
     void onFujiNetConnectionChanged(bool connected);
     void onFujiNetProcessStateChanged(int state);
 #endif
@@ -301,7 +310,8 @@ private:
 #ifndef Q_OS_WIN
     // FujiNet Configuration controls
     QWidget* m_fujinetTab;
-    QLineEdit* m_fujinetServerUrl;
+    QSpinBox* m_fujinetApiPort;
+    QSpinBox* m_fujinetNetsioPort;
     QComboBox* m_fujinetLaunchBehavior;
     QLabel* m_fujinetStatusLabel;
     QLineEdit* m_fujinetBinaryPath;
@@ -309,12 +319,36 @@ private:
     QLabel* m_fujinetVersionLabel;
     QPushButton* m_fujinetStartButton;
     QPushButton* m_fujinetStopButton;
-    QPushButton* m_fujinetRestartButton;
 
-    // FujiNet service classes
-    FujiNetService* m_fujinetService;
-    FujiNetProcessManager* m_fujinetProcessManager;
-    FujiNetBinaryManager* m_fujinetBinaryManager;
+    // SD Card Folder configuration
+    QLineEdit* m_fujinetSDPath;
+    QPushButton* m_fujinetBrowseSDButton;
+
+    // Config File configuration
+    QLabel* m_fujinetDefaultConfigLabel;
+    QPushButton* m_fujinetOpenConfigFolderButton;
+    QCheckBox* m_fujinetUseCustomConfig;
+    QLineEdit* m_fujinetCustomConfigPath;
+    QPushButton* m_fujinetBrowseConfigButton;
+
+    // Track original values for change detection
+    int m_originalHttpPort;
+    int m_originalNetsioPort;
+    QString m_originalSDPath;
+    bool m_originalUseCustomConfig;
+    QString m_originalCustomConfigPath;
+
+    // Restart warning label
+    QLabel* m_fujinetRestartWarningLabel;
+
+    // FujiNet service classes (shared with MainWindow - not owned)
+    FujiNetService* m_fujinetService;  // Dialog-only (owned)
+    FujiNetProcessManager* m_fujinetProcessManager;  // Shared pointer (not owned)
+    FujiNetBinaryManager* m_fujinetBinaryManager;    // Shared pointer (not owned)
+
+    // Helper functions
+    void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
+    void checkFujiNetRestartRequired();
 #endif
 
     // Store original settings for cancel functionality

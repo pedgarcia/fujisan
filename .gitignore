@@ -108,3 +108,6 @@ RELEASE_INSTRUCTIONS.md
 
 # Project configuration (contains personal settings)
 CLAUDE.md
+
+# FujiNet-PC downloaded binaries (use scripts/download-fujinet-pc.sh to populate)
+fujinet/

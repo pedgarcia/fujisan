@@ -62,6 +62,9 @@ public:
     // Output buffer management
     void clearOutputBuffers();
 
+    // Process detection
+    static bool isProcessRunningExternally(const QString& processName = "fujinet");
+
 signals:
     void stateChanged(ProcessState newState);
     void processStarted();

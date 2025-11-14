@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
+#include <QThread>
 
 FujiNetProcessManager::FujiNetProcessManager(QObject *parent)
     : QObject(parent)
@@ -45,6 +46,16 @@ bool FujiNetProcessManager::start(const QString& binaryPath, const QStringList& 
     if (m_state == Running || m_state == Starting) {
         qWarning() << "FujiNet-PC is already running or starting";
         return false;
+    }
+
+    // Check if FujiNet-PC is already running externally (not managed by us)
+    if (isProcessRunningExternally("fujinet")) {
+        qDebug() << "FujiNet-PC process already running externally - attaching to external process";
+        // Set state to Running even though we didn't start it
+        // This allows UI to show correct state and cold boot logic to work
+        setState(Running);
+        emit processStarted();
+        return true; // Return success - we have a running FujiNet-PC
     }
 
     m_binaryPath = binaryPath.isEmpty() ? m_binaryPath : binaryPath;
@@ -115,14 +126,32 @@ void FujiNetProcessManager::stop()
     qDebug() << "Stopping FujiNet-PC";
     setState(Stopping);
 
-    // Try graceful termination first
-    m_process->terminate();
+    // Check if we're managing the process or just tracking an external one
+    if (m_process->state() == QProcess::NotRunning) {
+        // External process - use pkill to stop it
+        qDebug() << "Stopping external FujiNet-PC process with pkill";
+        QProcess pkill;
+        pkill.start("pkill", QStringList() << "-TERM" << "fujinet");
+        pkill.waitForFinished(2000);
 
-    // Wait up to 5 seconds for graceful shutdown
-    if (!m_process->waitForFinished(5000)) {
-        qWarning() << "FujiNet-PC did not terminate gracefully, killing process";
-        m_process->kill();
-        m_process->waitForFinished(1000);
+        // Give it a moment, then force kill if needed
+        QThread::msleep(1000);
+        if (isProcessRunningExternally("fujinet")) {
+            qDebug() << "External FujiNet-PC did not terminate, force killing";
+            QProcess pkillForce;
+            pkillForce.start("pkill", QStringList() << "-9" << "fujinet");
+            pkillForce.waitForFinished(2000);
+        }
+    } else {
+        // Process we started - use QProcess methods
+        m_process->terminate();
+
+        // Wait up to 5 seconds for graceful shutdown
+        if (!m_process->waitForFinished(5000)) {
+            qWarning() << "FujiNet-PC did not terminate gracefully, killing process";
+            m_process->kill();
+            m_process->waitForFinished(1000);
+        }
     }
 
     setState(NotRunning);
@@ -139,6 +168,23 @@ void FujiNetProcessManager::clearOutputBuffers()
 {
     m_stdoutBuffer.clear();
     m_stderrBuffer.clear();
+}
+
+bool FujiNetProcessManager::isProcessRunningExternally(const QString& processName)
+{
+    // Use pgrep to check if process is running (Unix/Linux/macOS)
+    QProcess pgrep;
+    pgrep.start("pgrep", QStringList() << "-x" << processName);
+    pgrep.waitForFinished(1000);
+
+    // pgrep returns 0 if process found, 1 if not found
+    bool isRunning = (pgrep.exitCode() == 0);
+
+    if (isRunning) {
+        qDebug() << "Detected existing" << processName << "process";
+    }
+
+    return isRunning;
 }
 
 // Private slots

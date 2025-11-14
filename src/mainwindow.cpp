@@ -116,25 +116,23 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onFujiNetProcessStateChanged);
 
     // Auto-start FujiNet-PC if NetSIO is enabled and launch behavior is Auto
-    bool netSIOEnabled = settings.value("netSIO/enabled", false).toBool();
+    bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
     int launchBehavior = settings.value("fujinet/launchBehavior", 0).toInt(); // 0=Auto, 1=Detect, 2=Manual
 
     if (netSIOEnabled && launchBehavior == 0) { // Auto-launch mode
-        qDebug() << "NetSIO enabled - auto-starting FujiNet-PC...";
-
-        QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
-        if (binaryPath.isEmpty()) {
-            qDebug() << "FujiNet-PC binary not found - cannot auto-start";
-        } else {
-            QStringList arguments;
-            arguments << "-c" << "fnconfig.ini";
-            arguments << "-s" << "SD";
-
-            m_fujinetProcessManager->start(binaryPath, arguments);
-        }
+        qDebug() << "NetSIO enabled - auto-starting FujiNet-PC with saved settings...";
+        startFujiNetWithSavedSettings();
     } else if (netSIOEnabled && launchBehavior == 1) { // Detect existing mode
         qDebug() << "NetSIO enabled - detecting existing FujiNet-PC process...";
-        // TODO: Implement process detection (check if port 8000 is responding)
+
+        // Check if FujiNet-PC is already running externally
+        if (FujiNetProcessManager::isProcessRunningExternally("fujinet")) {
+            qDebug() << "Found existing FujiNet-PC process - attaching to it";
+            // Start with saved settings for future restart needs
+            startFujiNetWithSavedSettings();
+        } else {
+            qDebug() << "No existing FujiNet-PC process found - waiting for external start";
+        }
     }
 #endif
 
@@ -148,6 +146,17 @@ MainWindow::~MainWindow()
     if (m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
         qDebug() << "Stopping FujiNet-PC process...";
         m_fujinetProcessManager->stop();
+    }
+
+    // Aggressive cleanup: kill ALL FujiNet-PC processes to prevent orphans
+    // This handles cases where processes weren't tracked properly
+    qDebug() << "Performing aggressive FujiNet-PC cleanup...";
+    QProcess cleanup;
+    cleanup.start("pkill", QStringList() << "-9" << "fujinet");
+    cleanup.waitForFinished(2000); // Wait up to 2 seconds
+
+    if (cleanup.exitCode() == 0) {
+        qDebug() << "Killed orphaned FujiNet-PC processes";
     }
 #endif
 
@@ -825,6 +834,39 @@ void MainWindow::loadRom()
 
 void MainWindow::coldBoot()
 {
+#ifndef Q_OS_WIN
+    // Check if NetSIO is enabled and FujiNet-PC is running (managed or external)
+    // Cold boot triggers FujiNet-PC exit code 75 (restart request)
+    // We need to delay the boot to allow FujiNet-PC to restart and be ready
+    QSettings settings;
+    bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
+
+    // Check if FujiNet-PC is running (either managed by us or externally)
+    bool fujinetRunning = false;
+    if (m_fujinetProcessManager) {
+        fujinetRunning = m_fujinetProcessManager->isRunning() ||
+                        FujiNetProcessManager::isProcessRunningExternally("fujinet");
+    }
+
+    if (netSIOEnabled && fujinetRunning) {
+        // Show message immediately for user feedback
+        statusBar()->showMessage("Cold boot - waiting for FujiNet-PC to restart...", 4000);
+        qDebug() << "Cold boot with NetSIO - FujiNet-PC will restart";
+
+        // Perform cold boot immediately (screen goes black, provides instant feedback)
+        m_emulator->coldBoot();
+
+        // Show completion message after a short delay (gives FujiNet-PC time to restart)
+        // 2 seconds should be sufficient for FujiNet-PC to exit and begin restarting
+        QTimer::singleShot(2000, this, [this]() {
+            statusBar()->showMessage("Cold boot completed - FujiNet-PC ready", 2000);
+            qDebug() << "Cold boot with FujiNet-PC restart completed";
+        });
+        return;
+    }
+#endif
+
+    // Normal cold boot (no NetSIO or not running FujiNet-PC)
     m_emulator->coldBoot();
     statusBar()->showMessage("Cold boot performed", 2000);
 }
@@ -1054,6 +1096,10 @@ void MainWindow::showSettings()
     // Connect NetSIO enabled change signal for FujiNet-PC process management
     connect(&dialog, &SettingsDialog::netSIOEnabledChanged,
             this, &MainWindow::onNetSIOEnabledChanged);
+
+    // Share FujiNet managers with the dialog to prevent orphaned processes
+    // and ensure coordinated lifecycle management
+    dialog.setFujiNetManagers(m_fujinetProcessManager, m_fujinetBinaryManager);
 #endif
 
     // Connect signal to sync printer state when profile is being saved
@@ -3106,6 +3152,125 @@ void MainWindow::togglePause()
 }
 
 #ifndef Q_OS_WIN
+void MainWindow::updateFujiNetConfigFile(const QString& configPath, int netsioPort)
+{
+    // Read existing config file
+    QFile file(configPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open config file for reading:" << configPath;
+        return;
+    }
+
+    QString content = file.readAll();
+    file.close();
+
+    // Update or add [BOIP] section with port
+    QStringList lines = content.split('\n');
+    bool inBoipSection = false;
+    bool portFound = false;
+    QStringList updatedLines;
+
+    for (const QString& line : lines) {
+        QString trimmed = line.trimmed();
+        if (trimmed.startsWith('[')) {
+            inBoipSection = (trimmed == "[BOIP]");
+            updatedLines.append(line);
+            continue;
+        }
+
+        if (inBoipSection && trimmed.startsWith("port=")) {
+            updatedLines.append(QString("port=%1").arg(netsioPort));
+            portFound = true;
+        } else {
+            updatedLines.append(line);
+        }
+    }
+
+    // If we didn't find the port setting in [BOIP] section, add it
+    if (inBoipSection && !portFound) {
+        updatedLines.append(QString("port=%1").arg(netsioPort));
+    }
+
+    // Write back to config file
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+        qWarning() << "Failed to open config file for writing:" << configPath;
+        return;
+    }
+
+    QTextStream out(&file);
+    out << updatedLines.join('\n');
+    file.close();
+
+    qDebug() << "Updated FujiNet config file" << configPath << "with NetSIO port:" << netsioPort;
+}
+
+void MainWindow::startFujiNetWithSavedSettings()
+{
+    if (!m_fujinetProcessManager || !m_fujinetBinaryManager) {
+        qWarning() << "FujiNet managers not initialized - cannot start";
+        return;
+    }
+
+    // Get binary path
+    QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
+    if (binaryPath.isEmpty()) {
+        qDebug() << "FujiNet-PC binary not found - cannot auto-start";
+        return;
+    }
+
+    // Read saved settings
+    QSettings settings;
+    int httpPort = settings.value("fujinet/apiPort", 8000).toInt();
+    int netsioPort = settings.value("fujinet/netsioPort", 9997).toInt();
+    QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+    bool useCustomConfig = settings.value("fujinet/useCustomConfig", false).toBool();
+    QString customConfigPath = settings.value("fujinet/customConfigPath", "").toString();
+
+    // Build command-line arguments
+    QStringList arguments;
+
+    // HTTP server URL parameter (-u)
+    QString httpUrl = QString("http://0.0.0.0:%1").arg(httpPort);
+    arguments << "-u" << httpUrl;
+
+    // Config file parameter (-c)
+    QString configPath;
+    if (useCustomConfig && !customConfigPath.isEmpty() && QFile::exists(customConfigPath)) {
+        configPath = customConfigPath;
+    } else {
+        // Use default config in binary directory
+        QFileInfo binaryInfo(binaryPath);
+        configPath = binaryInfo.absolutePath() + "/fnconfig.ini";
+    }
+
+    // Update config file with NetSIO port before starting
+    updateFujiNetConfigFile(configPath, netsioPort);
+
+    // Add config file to arguments (use relative path if default)
+    if (useCustomConfig && !customConfigPath.isEmpty() && QFile::exists(customConfigPath)) {
+        arguments << "-c" << configPath;
+    } else {
+        arguments << "-c" << "fnconfig.ini";
+    }
+
+    // SD card folder parameter (-s)
+    if (sdPath.isEmpty()) {
+        sdPath = "SD";  // Default
+    } else if (!QDir(sdPath).exists()) {
+        qWarning() << "SD card folder not found:" << sdPath << "- using default";
+        sdPath = "SD";
+    }
+    arguments << "-s" << sdPath;
+
+    qDebug() << "Starting FujiNet-PC with saved settings:";
+    qDebug() << "  HTTP URL:" << httpUrl;
+    qDebug() << "  NetSIO Port:" << netsioPort;
+    qDebug() << "  Config:" << configPath;
+    qDebug() << "  SD Path:" << sdPath;
+
+    m_fujinetProcessManager->start(binaryPath, arguments);
+}
+
 void MainWindow::onFujiNetProcessStateChanged(int state)
 {
     FujiNetProcessManager::ProcessState processState = static_cast<FujiNetProcessManager::ProcessState>(state);
@@ -3118,7 +3283,7 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
             // This is the expected behavior when emulator sends cold reset (0xFF)
             if (exitCode == 75) {
                 QSettings settings;
-                bool netSIOEnabled = settings.value("netSIO/enabled", false).toBool();
+                bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
 
                 if (netSIOEnabled) {
                     // Restart loop protection: prevent infinite restarts on crashes
@@ -3197,19 +3362,8 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
     if (enabled) {
         // NetSIO enabled - start FujiNet-PC if not already running
         if (!m_fujinetProcessManager->isRunning()) {
-            qDebug() << "NetSIO enabled - auto-starting FujiNet-PC...";
-
-            QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
-            if (binaryPath.isEmpty()) {
-                qWarning() << "FujiNet-PC binary not found - cannot auto-start";
-                statusBar()->showMessage("FujiNet-PC binary not found", 5000);
-            } else {
-                QStringList arguments;
-                arguments << "-c" << "fnconfig.ini";
-                arguments << "-s" << "SD";
-
-                m_fujinetProcessManager->start(binaryPath, arguments);
-            }
+            qDebug() << "NetSIO enabled - auto-starting FujiNet-PC with saved settings...";
+            startFujiNetWithSavedSettings();
         } else {
             qDebug() << "NetSIO enabled but FujiNet-PC already running";
         }

@@ -293,13 +293,29 @@ bundle_fujinet_pc() {
 
     echo_info "Bundling FujiNet-PC binary for $arch..."
 
-    # Use local pre-built FujiNet-PC binary from fujinet-firmware
-    local FUJINET_SOURCE_DIR="${PROJECT_ROOT}/../fujinet-firmware/build/dist"
+    # Map architecture to platform folder
+    local platform_folder
+    case "$arch" in
+        arm64)
+            platform_folder="macos-arm64"
+            ;;
+        x86_64)
+            platform_folder="macos-x86_64"
+            ;;
+        *)
+            echo_error "Unknown architecture: $arch"
+            return 1
+            ;;
+    esac
+
+    # Use pre-downloaded FujiNet-PC binary from fujinet folder
+    local FUJINET_SOURCE_DIR="${PROJECT_ROOT}/fujinet/$platform_folder"
 
     if [[ ! -f "$FUJINET_SOURCE_DIR/fujinet" ]]; then
         echo_error "FujiNet-PC binary not found at: $FUJINET_SOURCE_DIR/fujinet"
         echo_info "Expected location: $FUJINET_SOURCE_DIR"
-        echo_info "Please build FujiNet-PC first: cd ${PROJECT_ROOT}/../fujinet-firmware && ./build.sh"
+        echo_info "Please download FujiNet-PC binaries first:"
+        echo_info "  cd ${PROJECT_ROOT} && ./scripts/download-fujinet-pc.sh"
         return 1
     fi
 

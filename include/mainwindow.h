@@ -148,6 +148,12 @@ private:
     void refreshProfileList();
     void applyProfileToEmulator(const ConfigurationProfile& profile);
 
+#ifndef Q_OS_WIN
+    // FujiNet helper methods
+    void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
+    void startFujiNetWithSavedSettings();
+#endif
+
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
     QToolBar* m_toolBar;
