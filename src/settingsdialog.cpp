@@ -2666,71 +2666,9 @@ void SettingsDialog::loadSettings()
     // Update PAL/NTSC dependent controls
     updateVideoSystemDependentControls();
     
-    qDebug() << "Settings loaded from persistent storage - Machine:" << machineType 
+    qDebug() << "Settings loaded from persistent storage - Machine:" << machineType
              << "Video:" << videoSystem << "BASIC:" << m_basicEnabledCheck->isChecked();
-    
-    // Sync with current emulator runtime state (overrides saved settings)
-    if (m_emulator) {
-        qDebug() << "Syncing with current emulator runtime state...";
-        
-        // Update machine type combo to match current runtime state
-        QString currentMachineType = m_emulator->getMachineType();
-        for (int i = 0; i < m_machineTypeCombo->count(); ++i) {
-            if (m_machineTypeCombo->itemData(i).toString() == currentMachineType) {
-                m_machineTypeCombo->setCurrentIndex(i);
-                break;
-            }
-        }
-        
-        // Update video system combo to match current runtime state
-        QString currentVideoSystem = m_emulator->getVideoSystem();
-        for (int i = 0; i < m_videoSystemCombo->count(); ++i) {
-            if (m_videoSystemCombo->itemData(i).toString() == currentVideoSystem) {
-                m_videoSystemCombo->setCurrentIndex(i);
-                break;
-            }
-        }
-        
-        // Update PAL/NTSC dependent controls after changing video system
-        updateVideoSystemDependentControls();
-        
-        // Update BASIC enabled to match current runtime state
-        m_basicEnabledCheck->setChecked(m_emulator->isBasicEnabled());
-        
-        // Update Altirra OS enabled to match current runtime state
-        m_altirraOSCheck->setChecked(m_emulator->isAltirraOSEnabled());
-        
-        // Update speed settings based on current emulation speed
-        int currentSpeed = m_emulator->getCurrentEmulationSpeed();
-        qDebug() << "Current emulation speed:" << currentSpeed << "%";
 
-        if (currentSpeed == 0) {
-            // Host speed mode (unlimited/turbo)
-            m_turboModeCheck->setChecked(true);
-            m_speedSlider->setEnabled(false);
-            // Keep slider at last position (don't change it)
-        } else {
-            // Specific speed percentage
-            m_turboModeCheck->setChecked(false);
-            m_speedSlider->setEnabled(true);
-
-            // Convert percentage to slider index
-            int sliderIndex;
-            if (currentSpeed == 50) {
-                sliderIndex = 0;  // 0.5x
-            } else if (currentSpeed >= 100 && currentSpeed <= 1000) {
-                sliderIndex = currentSpeed / 100;  // 1x-10x
-            } else {
-                sliderIndex = 1;  // Default to 1x if out of range
-            }
-            m_speedSlider->setValue(sliderIndex);
-        }
-        
-        qDebug() << "Runtime state synced - Machine:" << currentMachineType 
-                 << "Video:" << currentVideoSystem << "BASIC:" << m_emulator->isBasicEnabled()
-                 << "Speed:" << currentSpeed << "%";
-    }
-    
     // Update profile widget to show current profile
     if (m_profileWidget && m_profileManager) {
         QString currentProfile = m_profileManager->getCurrentProfileName();
@@ -3178,23 +3116,45 @@ void SettingsDialog::applySettings()
         qDebug() << "  Altirra BASIC:" << altirraBASICEnabled;
         qDebug() << "  OS ROM path:" << osRomPath;
         qDebug() << "  BASIC ROM path:" << basicRomPath;
-        
+
+        qDebug() << "=== SETTINGS DIALOG RESTART START ===";
+        qDebug() << "NetSIO enabled from UI:" << m_netSIOEnabled->isChecked();
+
         // Full restart needed for machine/video/OS settings
         m_emulator->shutdown();
         
         // Get artifact settings from UI
         QString artifactMode = m_artifactingMode->currentData().toString();
-        
-        // Now initialize with the updated values from the emulator object
-        if (m_emulator->initializeWithInputConfig(
-                m_emulator->isBasicEnabled(), 
-                m_emulator->getMachineType(), 
+
+        // Get display settings from UI
+        QString horizontalArea = m_horizontalArea->currentData().toString();
+        QString verticalArea = m_verticalArea->currentData().toString();
+        int horizontalShift = m_horizontalShift->value();
+        int verticalShift = m_verticalShift->value();
+        QString fitScreen = m_fitScreen->currentData().toString();
+        bool show80Column = m_show80Column->isChecked();
+        bool vSyncEnabled = m_vSyncEnabled->isChecked();
+
+        // Get special device settings from UI
+        bool netSIOEnabled = m_netSIOEnabled->isChecked();
+        bool rtimeEnabled = m_rtimeEnabled->isChecked();
+
+        qDebug() << "*** ABOUT TO CALL initializeWithNetSIOConfig with NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
+
+        // Now initialize with NetSIO config (same as MainWindow does)
+        // This ensures NetSIO is properly initialized and FujiNet-PC gets machine type updates
+        if (m_emulator->initializeWithNetSIOConfig(
+                m_emulator->isBasicEnabled(),
+                m_emulator->getMachineType(),
                 m_emulator->getVideoSystem(),
                 artifactMode,
-                "tv", "tv", 0, 0, "both", false, false,
+                horizontalArea, verticalArea,
+                horizontalShift, verticalShift,
+                fitScreen, show80Column, vSyncEnabled,
                 (m_joystick1Device->currentData().toString() == "keyboard"),
                 (m_joystick2Device->currentData().toString() == "keyboard"),
-                m_swapJoysticks->isChecked())) {
+                m_swapJoysticks->isChecked(),
+                netSIOEnabled, rtimeEnabled)) {
             qDebug() << "Emulator restarted with new settings";
             
             // Reapply media settings after restart

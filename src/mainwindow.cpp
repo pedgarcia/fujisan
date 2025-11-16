@@ -961,12 +961,22 @@ void MainWindow::onMachineTypeChanged(int index)
     }
 
     m_emulator->setMachineType(machineType);
+
+    // Save to settings so it persists across restarts
+    QSettings settings("8bitrelics", "Fujisan");
+    settings.setValue("machine/type", machineType);
+
     statusBar()->showMessage(message, 3000);
     restartEmulator();
 }
 
 void MainWindow::restartEmulator()
 {
+    qDebug() << "=== RESTART EMULATOR START ===";
+#ifndef Q_OS_WIN
+    qDebug() << "FujiNet-PC process running:" << (m_fujinetProcessManager && m_fujinetProcessManager->isRunning());
+#endif
+
     m_emulator->shutdown();
 
     // Load display and artifact settings from preferences
@@ -1007,23 +1017,29 @@ void MainWindow::restartEmulator()
 
     qDebug() << "Applying input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
     qDebug() << "Special devices - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
+    qDebug() << "*** ABOUT TO CALL initializeWithNetSIOConfig with NetSIO:" << netSIOEnabled;
+
+    // Load core machine settings from QSettings (not from emulator object which may be reset after shutdown)
+    QString machineType = settings.value("machine/type", "-xl").toString();
+    QString videoSystem = settings.value("machine/videoSystem", "-pal").toString();
+    bool basicEnabled = settings.value("machine/basicEnabled", true).toBool();
 
     // Load ROM paths BEFORE initialization
-    QString machineType = m_emulator->getMachineType();
     QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
     QString osRomPath = settings.value(osRomKey, "").toString();
     QString basicRomPath = settings.value("machine/basicRom", "").toString();
-    
+
     // Set ROM paths in the emulator before initialization
     m_emulator->setOSRomPath(osRomPath);
     m_emulator->setBasicRomPath(basicRomPath);
-    
+
+    qDebug() << "Machine settings for restart - Type:" << machineType << "Video:" << videoSystem << "BASIC:" << basicEnabled;
     qDebug() << "ROM paths for restart - OS:" << osRomPath << "BASIC:" << basicRomPath;
     qDebug() << "Altirra OS enabled:" << m_emulator->isAltirraOSEnabled();
 
-    if (m_emulator->initializeWithNetSIOConfig(m_emulator->isBasicEnabled(),
-                                             m_emulator->getMachineType(),
-                                             m_emulator->getVideoSystem(),
+    if (m_emulator->initializeWithNetSIOConfig(basicEnabled,
+                                             machineType,
+                                             videoSystem,
                                              artifactMode,
                                              horizontalArea, verticalArea,
                                              horizontalShift, verticalShift,
