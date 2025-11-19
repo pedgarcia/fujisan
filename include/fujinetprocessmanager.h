@@ -84,6 +84,7 @@ private slots:
 private:
     void setState(ProcessState newState);
     QString processErrorToString(QProcess::ProcessError error);
+    bool shouldFilterLogMessage(const QString& message);
 
     QProcess* m_process;
     ProcessState m_state;

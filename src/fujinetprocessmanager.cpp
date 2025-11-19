@@ -11,6 +11,8 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QThread>
+#include <QSettings>
+#include <QRegularExpression>
 
 FujiNetProcessManager::FujiNetProcessManager(QObject *parent)
     : QObject(parent)
@@ -237,16 +239,22 @@ void FujiNetProcessManager::onReadyReadStdout()
             m_stdoutBuffer = m_stdoutBuffer.right(MAX_BUFFER_SIZE / 2);
         }
 
-        // Convert literal \r\n and \n to actual newlines for better formatting
-        QString formatted = output;
-        formatted.replace("\\r\\n", "\n").replace("\\n", "\n");
+        // Check if FujiNet-PC logs should be hidden
+        QSettings settings("8bitrelics", "Fujisan");
+        bool hideFujiNetLogs = settings.value("log/hideFujiNetLogs", false).toBool();
 
-        // Log each line separately for cleaner output
-        QStringList lines = formatted.split('\n', Qt::SkipEmptyParts);
-        for (const QString& line : lines) {
-            QString trimmed = line.trimmed();
-            if (!trimmed.isEmpty()) {
-                qDebug() << "[FujiNet-PC]" << trimmed;
+        if (!hideFujiNetLogs) {
+            // Convert literal \r\n and \n to actual newlines for better formatting
+            QString formatted = output;
+            formatted.replace("\\r\\n", "\n").replace("\\n", "\n");
+
+            // Log each line separately for cleaner output
+            QStringList lines = formatted.split('\n', Qt::SkipEmptyParts);
+            for (const QString& line : lines) {
+                QString trimmed = line.trimmed();
+                if (!trimmed.isEmpty() && !shouldFilterLogMessage(trimmed)) {
+                    qDebug() << "[FUJINET]" << trimmed;
+                }
             }
         }
 
@@ -265,16 +273,22 @@ void FujiNetProcessManager::onReadyReadStderr()
             m_stderrBuffer = m_stderrBuffer.right(MAX_BUFFER_SIZE / 2);
         }
 
-        // Convert literal \r\n and \n to actual newlines for better formatting
-        QString formatted = output;
-        formatted.replace("\\r\\n", "\n").replace("\\n", "\n");
+        // Check if FujiNet-PC logs should be hidden
+        QSettings settings("8bitrelics", "Fujisan");
+        bool hideFujiNetLogs = settings.value("log/hideFujiNetLogs", false).toBool();
 
-        // Log each line separately for cleaner output
-        QStringList lines = formatted.split('\n', Qt::SkipEmptyParts);
-        for (const QString& line : lines) {
-            QString trimmed = line.trimmed();
-            if (!trimmed.isEmpty()) {
-                qWarning() << "[FujiNet-PC ERROR]" << trimmed;
+        if (!hideFujiNetLogs) {
+            // Convert literal \r\n and \n to actual newlines for better formatting
+            QString formatted = output;
+            formatted.replace("\\r\\n", "\n").replace("\\n", "\n");
+
+            // Log each line separately for cleaner output
+            QStringList lines = formatted.split('\n', Qt::SkipEmptyParts);
+            for (const QString& line : lines) {
+                QString trimmed = line.trimmed();
+                if (!trimmed.isEmpty() && !shouldFilterLogMessage(trimmed)) {
+                    qWarning() << "[FUJINET ERROR]" << trimmed;
+                }
             }
         }
 
@@ -321,4 +335,30 @@ QString FujiNetProcessManager::processErrorToString(QProcess::ProcessError error
     default:
         return "Unknown error occurred.";
     }
+}
+
+bool FujiNetProcessManager::shouldFilterLogMessage(const QString& message)
+{
+    QSettings settings("8bitrelics", "Fujisan");
+
+    // Check if general text filtering is enabled
+    QString filterString = settings.value("log/filterString", "").toString();
+    if (!filterString.isEmpty()) {
+        bool useRegex = settings.value("log/useRegex", false).toBool();
+
+        if (useRegex) {
+            // Use regular expression matching
+            QRegularExpression regex(filterString);
+            if (regex.isValid() && regex.match(message).hasMatch()) {
+                return true;  // Filter out this message
+            }
+        } else {
+            // Simple string contains (case-sensitive)
+            if (message.contains(filterString, Qt::CaseSensitive)) {
+                return true;  // Filter out this message
+            }
+        }
+    }
+
+    return false;  // Don't filter this message
 }

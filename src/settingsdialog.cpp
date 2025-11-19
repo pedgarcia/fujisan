@@ -1789,6 +1789,41 @@ void SettingsDialog::createEmulatorTab()
     tcpServerLayout->addRow(tcpDescription);
     
     mainLayout->addWidget(tcpServerGroup);
+
+    // Log Filtering Configuration
+    QGroupBox* logFilterGroup = new QGroupBox("Console Log Filtering");
+    QVBoxLayout* logFilterLayout = new QVBoxLayout(logFilterGroup);
+
+    // Hide FujiNet-PC logs checkbox
+    m_hideFujiNetLogs = new QCheckBox("Hide FujiNet-PC logs");
+    m_hideFujiNetLogs->setToolTip("Hide output from FujiNet-PC process (most verbose log source)");
+    logFilterLayout->addWidget(m_hideFujiNetLogs);
+
+    // Filter string input
+    QHBoxLayout* filterStringLayout = new QHBoxLayout();
+    QLabel* filterLabel = new QLabel("Filter out messages containing:");
+    m_logFilterString = new QLineEdit();
+    m_logFilterString->setPlaceholderText("Enter text to filter (case-sensitive)");
+    m_logFilterString->setToolTip("Console messages containing this text will be hidden");
+    filterStringLayout->addWidget(filterLabel);
+    filterStringLayout->addWidget(m_logFilterString);
+    logFilterLayout->addLayout(filterStringLayout);
+
+    // Regex mode checkbox
+    m_logFilterRegex = new QCheckBox("Use regular expression matching");
+    m_logFilterRegex->setToolTip("Treat filter text as a regular expression pattern");
+    logFilterLayout->addWidget(m_logFilterRegex);
+
+    // Add description
+    QLabel* logDescription = new QLabel(
+        "These filters reduce console log noise by hiding specific messages.\n"
+        "Logs are still generated internally; these settings only control what appears in the console output."
+    );
+    logDescription->setWordWrap(true);
+    logDescription->setStyleSheet("color: #666; font-size: 11px; margin-top: 10px;");
+    logFilterLayout->addWidget(logDescription);
+
+    mainLayout->addWidget(logFilterGroup);
     mainLayout->addStretch();
 }
 
@@ -2659,7 +2694,12 @@ void SettingsDialog::loadSettings()
     // TCP Server Configuration
     m_tcpServerEnabled->setChecked(settings.value("emulator/tcpServerEnabled", true).toBool());
     m_tcpServerPort->setValue(settings.value("emulator/tcpServerPort", 6502).toInt());
-    
+
+    // Log Filtering Configuration
+    m_hideFujiNetLogs->setChecked(settings.value("log/hideFujiNetLogs", false).toBool());
+    m_logFilterString->setText(settings.value("log/filterString", "").toString());
+    m_logFilterRegex->setChecked(settings.value("log/useRegex", false).toBool());
+
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
     
@@ -2855,7 +2895,12 @@ void SettingsDialog::saveSettings()
     // TCP Server Configuration
     settings.setValue("emulator/tcpServerEnabled", m_tcpServerEnabled->isChecked());
     settings.setValue("emulator/tcpServerPort", m_tcpServerPort->value());
-    
+
+    // Log Filtering Configuration
+    settings.setValue("log/hideFujiNetLogs", m_hideFujiNetLogs->isChecked());
+    settings.setValue("log/filterString", m_logFilterString->text());
+    settings.setValue("log/useRegex", m_logFilterRegex->isChecked());
+
     // Force sync to ensure settings are written to disk immediately
     settings.sync();
     

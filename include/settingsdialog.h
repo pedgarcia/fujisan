@@ -307,6 +307,11 @@ private:
     QCheckBox* m_tcpServerEnabled;
     QSpinBox* m_tcpServerPort;
 
+    // Log Filtering controls
+    QCheckBox* m_hideFujiNetLogs;
+    QLineEdit* m_logFilterString;
+    QCheckBox* m_logFilterRegex;
+
 #ifndef Q_OS_WIN
     // FujiNet Configuration controls
     QWidget* m_fujinetTab;

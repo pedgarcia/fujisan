@@ -58,7 +58,7 @@ TCPServer::TCPServer(AtariEmulator* emulator, MainWindow* mainWindow, QObject* p
     // Connect server signals
     connect(m_server, &QTcpServer::newConnection, this, &TCPServer::onNewConnection);
     
-    qDebug() << "TCP Server initialized - ready to start on port" << m_port;
+    qDebug() << "[TCP] Server initialized - ready to start on port" << m_port;
 }
 
 TCPServer::~TCPServer()
@@ -69,22 +69,22 @@ TCPServer::~TCPServer()
 bool TCPServer::startServer(quint16 port)
 {
     if (m_isRunning) {
-        qDebug() << "TCP Server already running on port" << m_port;
+        qDebug() << "[TCP] Server already running on port" << m_port;
         return true;
     }
-    
+
     m_port = port;
-    
+
     // Listen only on localhost for security
     if (!m_server->listen(QHostAddress::LocalHost, m_port)) {
-        qDebug() << "Failed to start TCP Server on port" << m_port 
+        qDebug() << "[TCP] Failed to start server on port" << m_port
                  << "Error:" << m_server->errorString();
         return false;
     }
-    
+
     m_isRunning = true;
-    qDebug() << "TCP Server started successfully on localhost:" << m_port;
-    qDebug() << "Clients can connect to: http://localhost:" << m_port;
+    qDebug() << "[TCP] Server started successfully on localhost:" << m_port;
+    qDebug() << "[TCP] Clients can connect to: http://localhost:" << m_port;
     
     return true;
 }
@@ -108,8 +108,8 @@ void TCPServer::stopServer()
     // Stop server
     m_server->close();
     m_isRunning = false;
-    
-    qDebug() << "TCP Server stopped";
+
+    qDebug() << "[TCP] Server stopped";
 }
 
 bool TCPServer::isRunning() const
@@ -130,7 +130,7 @@ int TCPServer::connectedClientCount() const
 void TCPServer::setDebuggerWidget(DebuggerWidget* debugger)
 {
     m_debugger = debugger;
-    qDebug() << "TCP Server: Debugger widget" << (debugger ? "connected" : "disconnected");
+    qDebug() << "[TCP] Debugger widget" << (debugger ? "connected" : "disconnected");
 }
 
 void TCPServer::onNewConnection()
@@ -146,7 +146,7 @@ void TCPServer::onNewConnection()
         m_clientBuffers[client] = QByteArray();
         
         QString clientAddress = client->peerAddress().toString();
-        qDebug() << "TCP Server: New client connected from" << clientAddress 
+        qDebug() << "[TCP] New client connected from" << clientAddress
                  << "Total clients:" << m_clients.count();
         
         // Send welcome message
@@ -175,7 +175,7 @@ void TCPServer::onClientDisconnected()
         m_joystickStreamTimer->stop();
     }
     
-    qDebug() << "TCP Server: Client disconnected from" << clientAddress
+    qDebug() << "[TCP] Client disconnected from" << clientAddress
              << "Remaining clients:" << m_clients.count();
     
     client->deleteLater();
