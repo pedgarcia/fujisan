@@ -330,32 +330,33 @@ void ProfileSelectionWidget::setupUI()
     
     groupLayout->addLayout(selectionLayout);
     
-    // Buttons row with description on the right - tighter spacing
+    // Buttons row with description on the right
     QHBoxLayout* buttonDescLayout = new QHBoxLayout();
-    buttonDescLayout->setSpacing(4); // Reduce spacing between buttons
-    
+    buttonDescLayout->setSpacing(12); // Spacing between buttons
+
     // Buttons on the left
     m_saveButton = new QPushButton("Save");
     m_saveButton->setToolTip("Save current settings to the selected profile");
     buttonDescLayout->addWidget(m_saveButton);
-    
+
     m_saveAsButton = new QPushButton("Save As...");
     m_saveAsButton->setToolTip("Save current settings as a new profile");
     buttonDescLayout->addWidget(m_saveAsButton);
-    
+
     m_loadButton = new QPushButton("Load");
     m_loadButton->setToolTip("Load the selected profile");
     buttonDescLayout->addWidget(m_loadButton);
-    
+
     m_renameButton = new QPushButton("Rename...");
     m_renameButton->setToolTip("Rename the selected profile");
     buttonDescLayout->addWidget(m_renameButton);
-    
+
     m_deleteButton = new QPushButton("Delete");
     m_deleteButton->setToolTip("Delete the selected profile");
     buttonDescLayout->addWidget(m_deleteButton);
-    
-    buttonDescLayout->addSpacing(10); // Reduced spacing before description
+
+    buttonDescLayout->addStretch(); // Prevent button expansion
+    buttonDescLayout->addSpacing(10); // Spacing before description
     
     // Description on the right with last used below it - tighter spacing
     QVBoxLayout* rightInfoLayout = new QVBoxLayout();
