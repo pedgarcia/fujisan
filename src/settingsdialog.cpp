@@ -3178,54 +3178,33 @@ void SettingsDialog::applySettings()
         }
     }
 
-    qDebug() << "=== [APPLY DEBUG] applySettings() about to emit settingsChanged signal ===";
     emit settingsChanged();
-    qDebug() << "=== [APPLY DEBUG] applySettings() COMPLETED ===";
 }
 
 void SettingsDialog::accept()
 {
-    qDebug() << "=== [ACCEPT DEBUG] SettingsDialog::accept() CALLED ===";
-
     // Save the current profile name BEFORE applySettings (which might reset it)
     QString profileBeforeApply = m_profileManager->getCurrentProfileName();
-    qDebug() << "=== [PROFILE DEBUG] Profile name BEFORE applySettings():" << profileBeforeApply;
 
 #ifndef Q_OS_WIN
-    // CRITICAL: Read old NetSIO state BEFORE applySettings() saves the new state
+    // Read old NetSIO state BEFORE applySettings() saves the new state
     QSettings settings;
     bool oldNetSIOState = settings.value("media/netSIOEnabled", false).toBool();
     bool newNetSIOState = m_netSIOEnabled->isChecked();
-
-    qDebug() << "=== [PROFILE DEBUG] NetSIO state check BEFORE applySettings() ===";
-    qDebug() << "=== [PROFILE DEBUG] Old NetSIO state (from QSettings):" << oldNetSIOState;
-    qDebug() << "=== [PROFILE DEBUG] New NetSIO state (from checkbox):" << newNetSIOState;
 #endif
 
-    qDebug() << "=== [ACCEPT DEBUG] About to call applySettings()...";
     applySettings();
-    qDebug() << "=== [ACCEPT DEBUG] applySettings() completed";
 
     // Restore the profile name after applySettings (in case it was reset)
     QString profileAfterApply = m_profileManager->getCurrentProfileName();
-    qDebug() << "=== [PROFILE DEBUG] Profile name AFTER applySettings():" << profileAfterApply;
-
     if (profileAfterApply != profileBeforeApply) {
-        qDebug() << "=== [PROFILE DEBUG] Profile name changed during applySettings! Restoring to:" << profileBeforeApply;
         m_profileManager->setCurrentProfileName(profileBeforeApply);
     }
 
-    // Ensure toolbar reflects the current profile after applying settings
-    QString currentProfileName = m_profileManager->getCurrentProfileName();
-    qDebug() << "=== [ACCEPT DEBUG] Current profile after restore:" << currentProfileName;
-
 #ifndef Q_OS_WIN
-    // Now emit signal if NetSIO state changed (after applySettings has saved it)
+    // Emit signal if NetSIO state changed (after applySettings has saved it)
     if (oldNetSIOState != newNetSIOState) {
-        qDebug() << "=== [PROFILE DEBUG] NetSIO CHANGED! Emitting netSIOEnabledChanged signal with:" << newNetSIOState;
         emit netSIOEnabledChanged(newNetSIOState);
-    } else {
-        qDebug() << "=== [PROFILE DEBUG] NetSIO unchanged, NOT emitting signal";
     }
 
     // Save FujiNet settings before closing
@@ -3236,23 +3215,13 @@ void SettingsDialog::accept()
     settings.setValue("fujinet/useCustomConfig", m_fujinetUseCustomConfig->isChecked());
     settings.setValue("fujinet/customConfigPath", m_fujinetCustomConfigPath->text());
 
-    qDebug() << "Saved FujiNet settings:";
-    qDebug() << "  API Port:" << m_fujinetApiPort->value();
-    qDebug() << "  NetSIO Port:" << m_fujinetNetsioPort->value();
-    qDebug() << "  Launch behavior:" << m_fujinetLaunchBehavior->currentIndex();
-    qDebug() << "  SD Card Path:" << m_fujinetSDPath->text();
-    qDebug() << "  Use Custom Config:" << m_fujinetUseCustomConfig->isChecked();
-    qDebug() << "  Custom Config Path:" << m_fujinetCustomConfigPath->text();
-
     // Stop FujiNet health check to prevent signals firing during destruction
     if (m_fujinetService) {
         m_fujinetService->stopHealthCheck();
     }
 #endif
 
-    qDebug() << "=== [ACCEPT DEBUG] About to call QDialog::accept() ===";
     QDialog::accept();
-    qDebug() << "=== [ACCEPT DEBUG] QDialog::accept() completed ===";
 }
 
 void SettingsDialog::reject()

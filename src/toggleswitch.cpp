@@ -32,14 +32,14 @@ void ToggleSwitch::setChecked(bool checked)
 {
     if (m_checked != checked) {
         m_checked = checked;
-        
+
         int startOffset = m_offset;
         int endOffset = checked ? (SWITCH_WIDTH - THUMB_SIZE - THUMB_MARGIN) : THUMB_MARGIN;
-        
+
         m_animation->setStartValue(startOffset);
         m_animation->setEndValue(endOffset);
         m_animation->start();
-        
+
         emit toggled(checked);
     }
 }

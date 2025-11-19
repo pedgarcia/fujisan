@@ -1184,30 +1184,18 @@ void MainWindow::showSettings()
 
 void MainWindow::onSettingsChanged()
 {
-    qDebug() << "=== [SETTINGS CHANGED] onSettingsChanged() CALLED ===";
-    qDebug() << "Settings changed - updating toolbar and video settings";
     updateToolbarFromSettings();
     loadVideoSettings();
 
     // Update toolbar profile dropdown to reflect current profile
-    // Force update even if index appears correct, to handle profile changes from Settings dialog
     if (m_profileCombo && m_profileManager) {
         QString currentProfileName = m_profileManager->getCurrentProfileName();
-        qDebug() << "=== [PROFILE DEBUG] onSettingsChanged() - Updating toolbar combo ===";
-        qDebug() << "=== [PROFILE DEBUG] Current profile from manager:" << currentProfileName;
-        qDebug() << "=== [PROFILE DEBUG] Current toolbar combo shows:" << m_profileCombo->currentText();
-
         int index = m_profileCombo->findText(currentProfileName);
-        qDebug() << "=== [PROFILE DEBUG] Found profile at index:" << index;
 
         if (index >= 0) {
-            // Always update, even if index appears the same (profile may have been reloaded)
             m_profileCombo->blockSignals(true);
             m_profileCombo->setCurrentIndex(index);
             m_profileCombo->blockSignals(false);
-            qDebug() << "=== [PROFILE DEBUG] Updated toolbar combo to:" << currentProfileName;
-        } else {
-            qDebug() << "=== [PROFILE DEBUG] WARNING: Profile not found in combo!";
         }
     }
 
@@ -2982,21 +2970,13 @@ void MainWindow::onLoadProfile()
 
 void MainWindow::onProfileChanged(const QString& profileName)
 {
-    qDebug() << "=== [PROFILE CHANGED] Profile changed to:" << profileName;
-
     // Update toolbar profile dropdown to reflect the new profile
     if (m_profileCombo) {
         int index = m_profileCombo->findText(profileName);
-        qDebug() << "=== [PROFILE CHANGED] Found profile at index:" << index;
-
         if (index >= 0) {
-            // Block signals to prevent recursive updates
             m_profileCombo->blockSignals(true);
             m_profileCombo->setCurrentIndex(index);
             m_profileCombo->blockSignals(false);
-            qDebug() << "=== [PROFILE CHANGED] Updated toolbar combo to:" << profileName;
-        } else {
-            qDebug() << "=== [PROFILE CHANGED] WARNING: Profile not found in combo!";
         }
     }
 }
