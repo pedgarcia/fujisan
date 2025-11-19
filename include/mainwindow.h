@@ -102,6 +102,7 @@ private slots:
     void onPrinterOutputFormatChanged(const QString& format);
     void onPrinterTypeChanged(const QString& type);
     void onLoadProfile();
+    void onProfileChanged(const QString& profileName);
 
 public:
     // Public method for TCP server to request proper emulator restart
@@ -134,6 +135,7 @@ private:
     void createMediaPeripheralsDock();
     void restartEmulator();
     void updateToolbarFromSettings();
+    void updateBasicToggleState();
     void updateToolbarLogo();
     void updateToolbarButtonStyles();
     void loadInitialSettings();
@@ -249,6 +251,9 @@ private:
     // Fullscreen state
     bool m_isInCustomFullscreen;
     QWidget* m_fullscreenWidget;
+
+    // NetSIO state tracking (for BASIC toggle disabling)
+    bool m_netSIOEnabled;
 
     // Paste functionality
     QTimer* m_pasteTimer;

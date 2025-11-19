@@ -49,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_startInFullscreen(false)
     , m_isInCustomFullscreen(false)
     , m_fullscreenWidget(nullptr)
+    , m_netSIOEnabled(false)
     , m_pasteTimer(new QTimer(this))
     , m_pasteIndex(0)
     , m_originalEmulationSpeed(100)
@@ -115,8 +116,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_fujinetProcessManager, &FujiNetProcessManager::stateChanged,
             this, &MainWindow::onFujiNetProcessStateChanged);
 
-    // Auto-start FujiNet-PC if NetSIO is enabled and launch behavior is Auto
+    // Initialize NetSIO state and update BASIC toggle accordingly
     bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
+    m_netSIOEnabled = netSIOEnabled;
+    updateBasicToggleState();
+
     int launchBehavior = settings.value("fujinet/launchBehavior", 0).toInt(); // 0=Auto, 1=Detect, 2=Manual
 
     if (netSIOEnabled && launchBehavior == 0) { // Auto-launch mode
@@ -714,6 +718,8 @@ void MainWindow::createProfileToolbarSection()
     connect(m_quickLoadButton, &QPushButton::clicked, this, &MainWindow::quickLoadState);
     connect(m_profileManager, &ConfigurationProfileManager::profileListChanged,
             this, &MainWindow::refreshProfileList);
+    connect(m_profileManager, &ConfigurationProfileManager::profileChanged,
+            this, &MainWindow::onProfileChanged);
 
     m_toolBar->addWidget(profileContainer);
 }
@@ -879,6 +885,22 @@ void MainWindow::warmBoot()
 
 void MainWindow::toggleBasic(bool enabled)
 {
+    // Defensive check - prevent enabling BASIC when NetSIO is active
+    // (This shouldn't happen if UI is disabled correctly, but safety first)
+    if (m_netSIOEnabled && enabled) {
+        qWarning() << "Attempted to enable BASIC while NetSIO is active - ignoring";
+        m_basicToggle->blockSignals(true);
+        m_basicToggle->setChecked(false);
+        m_basicToggle->blockSignals(false);
+        if (m_basicAction) {
+            m_basicAction->blockSignals(true);
+            m_basicAction->setChecked(false);
+            m_basicAction->blockSignals(false);
+        }
+        statusBar()->showMessage("Cannot enable BASIC while NetSIO is active", 3000);
+        return;
+    }
+
     m_emulator->setBasicEnabled(enabled);
     QString message = enabled ? "BASIC enabled - restarting..." : "BASIC disabled - restarting...";
     statusBar()->showMessage(message, 3000);
@@ -886,12 +908,18 @@ void MainWindow::toggleBasic(bool enabled)
     // Also update the menu checkbox to stay in sync
     m_basicAction->setChecked(enabled);
 
-    restartEmulator();
+    // Save to QSettings so it persists
+    QSettings settings("8bitrelics", "Fujisan");
+    settings.setValue("machine/basicEnabled", enabled);
 
-    // Restore focus to emulator widget (fixes Windows/Linux focus loss)
-    if (m_emulatorWidget) {
-        m_emulatorWidget->setFocus();
-    }
+    // Delay restart to allow toggle switch animation to complete (150ms animation + 50ms buffer)
+    QTimer::singleShot(200, this, [this]() {
+        restartEmulator();
+        // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
+    });
 }
 
 void MainWindow::toggleAltirraOS(bool enabled)
@@ -1068,21 +1096,31 @@ void MainWindow::restartEmulator()
 
 void MainWindow::onVideoSystemToggled(bool isPAL)
 {
+    QString videoSystem;
     if (isPAL) {
         // PAL mode (toggle ON)
-        m_emulator->setVideoSystem("-pal");
+        videoSystem = "-pal";
+        m_emulator->setVideoSystem(videoSystem);
         statusBar()->showMessage("Video system set to PAL (49.86 fps) - restarting...", 3000);
     } else {
         // NTSC mode (toggle OFF)
-        m_emulator->setVideoSystem("-ntsc");
+        videoSystem = "-ntsc";
+        m_emulator->setVideoSystem(videoSystem);
         statusBar()->showMessage("Video system set to NTSC (59.92 fps) - restarting...", 3000);
     }
-    restartEmulator();
 
-    // Restore focus to emulator widget (fixes Windows/Linux focus loss)
-    if (m_emulatorWidget) {
-        m_emulatorWidget->setFocus();
-    }
+    // Save to QSettings so it persists
+    QSettings settings("8bitrelics", "Fujisan");
+    settings.setValue("machine/videoSystem", videoSystem);
+
+    // Delay restart to allow toggle switch animation to complete (150ms animation + 50ms buffer)
+    QTimer::singleShot(200, this, [this]() {
+        restartEmulator();
+        // Restore focus to emulator widget (fixes Windows/Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
+    });
 }
 
 void MainWindow::onSpeedToggled(bool isFullSpeed)
@@ -1105,7 +1143,7 @@ void MainWindow::onSpeedToggled(bool isFullSpeed)
 
 void MainWindow::showSettings()
 {
-    SettingsDialog dialog(m_emulator, this);
+    SettingsDialog dialog(m_emulator, m_profileManager, this);
     connect(&dialog, &SettingsDialog::settingsChanged, this, &MainWindow::onSettingsChanged);
 
 #ifndef Q_OS_WIN
@@ -1146,9 +1184,32 @@ void MainWindow::showSettings()
 
 void MainWindow::onSettingsChanged()
 {
+    qDebug() << "=== [SETTINGS CHANGED] onSettingsChanged() CALLED ===";
     qDebug() << "Settings changed - updating toolbar and video settings";
     updateToolbarFromSettings();
     loadVideoSettings();
+
+    // Update toolbar profile dropdown to reflect current profile
+    // Force update even if index appears correct, to handle profile changes from Settings dialog
+    if (m_profileCombo && m_profileManager) {
+        QString currentProfileName = m_profileManager->getCurrentProfileName();
+        qDebug() << "=== [PROFILE DEBUG] onSettingsChanged() - Updating toolbar combo ===";
+        qDebug() << "=== [PROFILE DEBUG] Current profile from manager:" << currentProfileName;
+        qDebug() << "=== [PROFILE DEBUG] Current toolbar combo shows:" << m_profileCombo->currentText();
+
+        int index = m_profileCombo->findText(currentProfileName);
+        qDebug() << "=== [PROFILE DEBUG] Found profile at index:" << index;
+
+        if (index >= 0) {
+            // Always update, even if index appears the same (profile may have been reloaded)
+            m_profileCombo->blockSignals(true);
+            m_profileCombo->setCurrentIndex(index);
+            m_profileCombo->blockSignals(false);
+            qDebug() << "=== [PROFILE DEBUG] Updated toolbar combo to:" << currentProfileName;
+        } else {
+            qDebug() << "=== [PROFILE DEBUG] WARNING: Profile not found in combo!";
+        }
+    }
 
     // Reload media settings to sync disk widgets with any changes made in settings dialog
     loadAndApplyMediaSettings();
@@ -1196,6 +1257,9 @@ void MainWindow::updateToolbarFromSettings()
     m_basicToggle->blockSignals(true);
     m_basicToggle->setChecked(m_emulator->isBasicEnabled());
     m_basicToggle->blockSignals(false);
+
+    // Update BASIC toggle enabled/disabled state based on NetSIO
+    updateBasicToggleState();
 
     // Update video toggle (PAL = ON, NTSC = OFF)
     bool isPAL = (m_emulator->getVideoSystem() == "-pal");
@@ -1291,8 +1355,51 @@ void MainWindow::updateToolbarFromSettings()
     qDebug() << "Toolbar updated - Machine:" << machineType << "BASIC:" << m_emulator->isBasicEnabled()
              << "Video:" << m_emulator->getVideoSystem() << "Volume:" << volume
              << "Joy0:" << (m_emulator ? m_emulator->isKbdJoy0Enabled() : false)
-             << "Joy1:" << (m_emulator ? m_emulator->isKbdJoy1Enabled() : false) 
+             << "Joy1:" << (m_emulator ? m_emulator->isKbdJoy1Enabled() : false)
              << "Swapped:" << (m_emulator ? m_emulator->isJoysticksSwapped() : false);
+}
+
+void MainWindow::updateBasicToggleState()
+{
+    if (!m_basicToggle || !m_emulator) return;
+
+    if (m_netSIOEnabled) {
+        // NetSIO enabled - disable BASIC toggle and force it to OFF (OS mode)
+        m_basicToggle->blockSignals(true);
+        m_basicToggle->setChecked(false);  // Force to OS mode
+        m_basicToggle->blockSignals(false);
+        m_basicToggle->setEnabled(false);  // Gray out the toggle
+        m_basicToggle->setToolTip("BASIC automatically disabled when NetSIO is enabled\n"
+                                  "FujiNet requires BASIC disabled to boot properly");
+
+        // Also update menu action
+        if (m_basicAction) {
+            m_basicAction->blockSignals(true);
+            m_basicAction->setChecked(false);
+            m_basicAction->blockSignals(false);
+        }
+
+        qDebug() << "BASIC toggle disabled - NetSIO is enabled";
+    } else {
+        // NetSIO disabled - re-enable BASIC toggle
+        m_basicToggle->setEnabled(true);
+        m_basicToggle->setToolTip("Toggle between BASIC and OS-only modes");
+
+        // Restore actual BASIC state from emulator
+        bool basicEnabled = m_emulator->isBasicEnabled();
+        m_basicToggle->blockSignals(true);
+        m_basicToggle->setChecked(basicEnabled);
+        m_basicToggle->blockSignals(false);
+
+        // Also update menu action
+        if (m_basicAction) {
+            m_basicAction->blockSignals(true);
+            m_basicAction->setChecked(basicEnabled);
+            m_basicAction->blockSignals(false);
+        }
+
+        qDebug() << "BASIC toggle enabled - NetSIO is disabled, BASIC state:" << basicEnabled;
+    }
 }
 
 void MainWindow::updateToolbarLogo()
@@ -2061,6 +2168,7 @@ void MainWindow::createMediaPeripheralsDock()
     m_basicToggle = new ToggleSwitch();
     m_basicToggle->setLabels(" BASIC", "OS");
     m_basicToggle->setChecked(m_emulator->isBasicEnabled());
+    m_basicToggle->setEnabled(true); // Explicitly enable the toggle
     connect(m_basicToggle, &ToggleSwitch::toggled, this, &MainWindow::toggleBasic);
 
     // basicLayout->addWidget(basicLabel);
@@ -2078,6 +2186,7 @@ void MainWindow::createMediaPeripheralsDock()
     m_videoToggle->setLabels("PAL", "NTSC");
     m_videoToggle->setColors(QColor(70, 130, 180), QColor(70, 130, 180)); // Steel blue for both states
     m_videoToggle->setChecked(true); // Default to PAL (ON position)
+    m_videoToggle->setEnabled(true); // Explicitly enable the toggle
     connect(m_videoToggle, &ToggleSwitch::toggled, this, &MainWindow::onVideoSystemToggled);
 
     // videoLayout->addWidget(videoLabel);
@@ -2830,12 +2939,15 @@ void MainWindow::refreshProfileList()
         }
     }
     
-    // Select current profile if none selected
-    if (m_profileCombo->currentText().isEmpty()) {
-        QString currentProfileName = m_profileManager->getCurrentProfileName();
+    // Always update to show current profile from ProfileManager
+    QString currentProfileName = m_profileManager->getCurrentProfileName();
+    if (!currentProfileName.isEmpty()) {
         int index = m_profileCombo->findText(currentProfileName);
-        if (index >= 0) {
+        if (index >= 0 && m_profileCombo->currentIndex() != index) {
+            qDebug() << "=== [REFRESH PROFILE LIST] Setting toolbar combo to current profile:" << currentProfileName;
+            m_profileCombo->blockSignals(true);
             m_profileCombo->setCurrentIndex(index);
+            m_profileCombo->blockSignals(false);
         }
     }
 }
@@ -2865,6 +2977,27 @@ void MainWindow::onLoadProfile()
     // Restore focus to emulator widget (fixes Windows/Linux focus loss)
     if (m_emulatorWidget) {
         m_emulatorWidget->setFocus();
+    }
+}
+
+void MainWindow::onProfileChanged(const QString& profileName)
+{
+    qDebug() << "=== [PROFILE CHANGED] Profile changed to:" << profileName;
+
+    // Update toolbar profile dropdown to reflect the new profile
+    if (m_profileCombo) {
+        int index = m_profileCombo->findText(profileName);
+        qDebug() << "=== [PROFILE CHANGED] Found profile at index:" << index;
+
+        if (index >= 0) {
+            // Block signals to prevent recursive updates
+            m_profileCombo->blockSignals(true);
+            m_profileCombo->setCurrentIndex(index);
+            m_profileCombo->blockSignals(false);
+            qDebug() << "=== [PROFILE CHANGED] Updated toolbar combo to:" << profileName;
+        } else {
+            qDebug() << "=== [PROFILE CHANGED] WARNING: Profile not found in combo!";
+        }
     }
 }
 
@@ -2905,8 +3038,47 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
     // Update UI to reflect changes
     updateToolbarFromSettings();
 
-    // Cold boot to apply machine configuration changes
-    coldBoot();
+    // Save profile values to QSettings so Settings Dialog will show correct values
+    QSettings settings("8bitrelics", "Fujisan");
+
+#ifndef Q_OS_WIN
+    // Check if NetSIO state is changing (read old state BEFORE saving new value)
+    bool oldNetSIOState = settings.value("media/netSIOEnabled", false).toBool();
+    bool newNetSIOState = profile.netSIOEnabled;
+    qDebug() << "=== [TOOLBAR PROFILE] NetSIO state check - Old:" << oldNetSIOState << "New:" << newNetSIOState;
+#endif
+
+    settings.setValue("machine/type", profile.machineType);
+    settings.setValue("machine/videoSystem", profile.videoSystem);
+    settings.setValue("machine/basicEnabled", profile.basicEnabled);
+    settings.setValue("machine/turboMode", profile.turboMode);
+    settings.setValue("machine/emulationSpeedIndex", profile.emulationSpeedIndex);
+    settings.setValue("audio/enabled", profile.audioEnabled);
+    settings.setValue("audio/volume", profile.audioVolume);
+    settings.setValue("media/netSIOEnabled", profile.netSIOEnabled);
+
+#ifndef Q_OS_WIN
+    // CRITICAL: Start/stop FujiNet-PC BEFORE emulator restart if NetSIO state changed
+    // FujiNet must be running before emulator initializes with NetSIO enabled
+    if (oldNetSIOState != newNetSIOState) {
+        qDebug() << "=== [TOOLBAR PROFILE] NetSIO CHANGED! Calling onNetSIOEnabledChanged with:" << newNetSIOState;
+        onNetSIOEnabledChanged(newNetSIOState);
+        // Add delay to let FujiNet-PC start before emulator initializes
+        if (newNetSIOState) {
+            qDebug() << "=== [TOOLBAR PROFILE] Waiting 500ms for FujiNet-PC to start...";
+            QEventLoop loop;
+            QTimer::singleShot(500, &loop, &QEventLoop::quit);
+            loop.exec();
+        }
+    } else {
+        qDebug() << "=== [TOOLBAR PROFILE] NetSIO unchanged, no FujiNet action needed";
+    }
+#endif
+
+    // Restart emulator to apply all configuration changes (including NetSIO)
+    // Must use restartEmulator() not coldBoot() because NetSIO requires full reinitialization
+    qDebug() << "=== [TOOLBAR PROFILE] Calling restartEmulator() to apply profile changes with NetSIO...";
+    restartEmulator();
 
     qDebug() << "Applied profile to emulator and rebooted:" << profile.name
              << "Speed:" << speedPercentage << "% (Turbo:" << profile.turboMode << ")";
@@ -3273,8 +3445,7 @@ void MainWindow::startFujiNetWithSavedSettings()
     if (sdPath.isEmpty()) {
         sdPath = "SD";  // Default
     } else if (!QDir(sdPath).exists()) {
-        qWarning() << "SD card folder not found:" << sdPath << "- using default";
-        sdPath = "SD";
+        qWarning() << "SD card folder not found:" << sdPath << "- will use saved path anyway";
     }
     arguments << "-s" << sdPath;
 
@@ -3328,10 +3499,18 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
 
                     QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
                     if (!binaryPath.isEmpty()) {
+                        // Load saved settings instead of using hardcoded defaults
+                        QSettings settings;
+                        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+                        if (sdPath.isEmpty()) {
+                            sdPath = "SD";  // Default only if no saved path
+                        }
+
                         QStringList arguments;
                         arguments << "-c" << "fnconfig.ini";
-                        arguments << "-s" << "SD";
+                        arguments << "-s" << sdPath;
 
+                        qDebug() << "Restarting FujiNet-PC with SD path:" << sdPath;
                         m_fujinetProcessManager->start(binaryPath, arguments);
                         statusBar()->showMessage("Restarting FujiNet-PC after cold reset...", 2000);
                         return; // Don't show "stopped" message
@@ -3366,6 +3545,10 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
 
 void MainWindow::onNetSIOEnabledChanged(bool enabled)
 {
+    // Store NetSIO state and update BASIC toggle UI
+    m_netSIOEnabled = enabled;
+    updateBasicToggleState();
+
     QSettings settings;
     int launchBehavior = settings.value("fujinet/launchBehavior", 0).toInt(); // 0=Auto, 1=Detect, 2=Manual
 

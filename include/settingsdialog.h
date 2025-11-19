@@ -41,7 +41,7 @@ class SettingsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit SettingsDialog(AtariEmulator* emulator, QWidget *parent = nullptr);
+    explicit SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager, QWidget *parent = nullptr);
 
     // Public methods for external synchronization
     void loadSettings();

@@ -24,13 +24,13 @@
 #include "fujinetbinarymanager.h"
 #endif
 
-SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
+SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager, QWidget *parent)
     : QDialog(parent)
     , m_emulator(emulator)
     , m_tabWidget(nullptr)
     , m_buttonBox(nullptr)
     , m_defaultsButton(nullptr)
-    , m_profileManager(nullptr)
+    , m_profileManager(profileManager)
     , m_profileWidget(nullptr)
     , m_hardwareTab(nullptr)
     , m_machineTypeCombo(nullptr)
@@ -72,10 +72,10 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, QWidget *parent)
     
     // Create main layout
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    
-    // Initialize profile management
-    m_profileManager = new ConfigurationProfileManager(this);
-    
+
+    // Profile manager is now passed in constructor (shared with MainWindow)
+    // No need to create a new instance here
+
     // Create profile selection section
     createProfileSection();
     mainLayout->addWidget(m_profileWidget);
@@ -3178,16 +3178,57 @@ void SettingsDialog::applySettings()
         }
     }
 
+    qDebug() << "=== [APPLY DEBUG] applySettings() about to emit settingsChanged signal ===";
     emit settingsChanged();
+    qDebug() << "=== [APPLY DEBUG] applySettings() COMPLETED ===";
 }
 
 void SettingsDialog::accept()
 {
-    applySettings();
+    qDebug() << "=== [ACCEPT DEBUG] SettingsDialog::accept() CALLED ===";
+
+    // Save the current profile name BEFORE applySettings (which might reset it)
+    QString profileBeforeApply = m_profileManager->getCurrentProfileName();
+    qDebug() << "=== [PROFILE DEBUG] Profile name BEFORE applySettings():" << profileBeforeApply;
 
 #ifndef Q_OS_WIN
-    // Save FujiNet settings before closing
+    // CRITICAL: Read old NetSIO state BEFORE applySettings() saves the new state
     QSettings settings;
+    bool oldNetSIOState = settings.value("media/netSIOEnabled", false).toBool();
+    bool newNetSIOState = m_netSIOEnabled->isChecked();
+
+    qDebug() << "=== [PROFILE DEBUG] NetSIO state check BEFORE applySettings() ===";
+    qDebug() << "=== [PROFILE DEBUG] Old NetSIO state (from QSettings):" << oldNetSIOState;
+    qDebug() << "=== [PROFILE DEBUG] New NetSIO state (from checkbox):" << newNetSIOState;
+#endif
+
+    qDebug() << "=== [ACCEPT DEBUG] About to call applySettings()...";
+    applySettings();
+    qDebug() << "=== [ACCEPT DEBUG] applySettings() completed";
+
+    // Restore the profile name after applySettings (in case it was reset)
+    QString profileAfterApply = m_profileManager->getCurrentProfileName();
+    qDebug() << "=== [PROFILE DEBUG] Profile name AFTER applySettings():" << profileAfterApply;
+
+    if (profileAfterApply != profileBeforeApply) {
+        qDebug() << "=== [PROFILE DEBUG] Profile name changed during applySettings! Restoring to:" << profileBeforeApply;
+        m_profileManager->setCurrentProfileName(profileBeforeApply);
+    }
+
+    // Ensure toolbar reflects the current profile after applying settings
+    QString currentProfileName = m_profileManager->getCurrentProfileName();
+    qDebug() << "=== [ACCEPT DEBUG] Current profile after restore:" << currentProfileName;
+
+#ifndef Q_OS_WIN
+    // Now emit signal if NetSIO state changed (after applySettings has saved it)
+    if (oldNetSIOState != newNetSIOState) {
+        qDebug() << "=== [PROFILE DEBUG] NetSIO CHANGED! Emitting netSIOEnabledChanged signal with:" << newNetSIOState;
+        emit netSIOEnabledChanged(newNetSIOState);
+    } else {
+        qDebug() << "=== [PROFILE DEBUG] NetSIO unchanged, NOT emitting signal";
+    }
+
+    // Save FujiNet settings before closing
     settings.setValue("fujinet/apiPort", m_fujinetApiPort->value());
     settings.setValue("fujinet/netsioPort", m_fujinetNetsioPort->value());
     settings.setValue("fujinet/launchBehavior", m_fujinetLaunchBehavior->currentIndex());
@@ -3209,7 +3250,9 @@ void SettingsDialog::accept()
     }
 #endif
 
+    qDebug() << "=== [ACCEPT DEBUG] About to call QDialog::accept() ===";
     QDialog::accept();
+    qDebug() << "=== [ACCEPT DEBUG] QDialog::accept() completed ===";
 }
 
 void SettingsDialog::reject()
