@@ -21,6 +21,7 @@
 #include <QDragLeaveEvent>
 #include <QDropEvent>
 #include <QString>
+#include "fujinetservice.h"  // For FujiNetDrive struct
 
 class AtariEmulator;
 
@@ -37,11 +38,20 @@ public:
         Writing     // Drive is writing (atari810write.png)
     };
 
+    enum DriveMode {
+        LOCAL,      // Local disk images (Atari800 core)
+        FUJINET     // FujiNet network drives
+    };
+
     explicit DiskDriveWidget(int driveNumber, AtariEmulator* emulator, QWidget *parent = nullptr, bool isDrawerDrive = false);
 
     // State management
     void setState(DriveState state);
     DriveState getState() const { return m_currentState; }
+
+    // Drive mode management
+    void setDriveMode(DriveMode mode);
+    DriveMode getDriveMode() const { return m_driveMode; }
 
     // Disk operations
     void insertDisk(const QString& diskPath);
@@ -52,6 +62,10 @@ public:
     // Disk info
     QString getDiskPath() const { return m_diskPath; }
     bool hasDisk() const { return !m_diskPath.isEmpty(); }
+
+    // FujiNet mode operations
+    void updateFromFujiNet(const FujiNetDrive& driveInfo);
+    void showCopyProgress(bool show);  // Show/hide file copy spinner
 
     // Visual feedback for I/O operations
     void showReadActivity();  // Blinking (legacy)
@@ -108,9 +122,15 @@ private:
     bool m_driveEnabled;
     QString m_diskPath;
     bool m_isDrawerDrive;  // True for D3-D8 drives (larger size)
+    DriveMode m_driveMode;  // LOCAL or FUJINET mode
+
+    // FujiNet mode state
+    FujiNetDrive m_fujinetDriveInfo;
+    bool m_showingCopyProgress;
 
     // UI Components
     QLabel* m_imageLabel;
+    QLabel* m_progressLabel;  // For showing copy progress spinner
     QMenu* m_contextMenu;
     QAction* m_toggleAction;
     QAction* m_insertAction;

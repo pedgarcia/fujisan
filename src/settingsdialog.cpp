@@ -24,7 +24,11 @@
 #include "fujinetbinarymanager.h"
 #endif
 
-SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager, QWidget *parent)
+SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager,
+#ifndef Q_OS_WIN
+                               FujiNetService* fujinetService,
+#endif
+                               QWidget *parent)
     : QDialog(parent)
     , m_emulator(emulator)
     , m_tabWidget(nullptr)
@@ -39,7 +43,7 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
     , m_altirraOSCheck(nullptr)
     , m_altirraBASICCheck(nullptr)
 #ifndef Q_OS_WIN
-    , m_fujinetService(nullptr)
+    , m_fujinetService(fujinetService)
     , m_fujinetProcessManager(nullptr)
     , m_fujinetBinaryManager(nullptr)
 #endif
@@ -1836,10 +1840,9 @@ void SettingsDialog::createFujiNetTab()
     QVBoxLayout* mainLayout = new QVBoxLayout(m_fujinetTab);
     mainLayout->setSpacing(20);
 
-    // Initialize FujiNet service (dialog-only instance)
-    // NOTE: Process and Binary managers are shared with MainWindow via setFujiNetManagers()
+    // FujiNetService is shared from MainWindow (passed via constructor)
+    // Process and Binary managers are also shared via setFujiNetManagers()
     // This prevents orphaned processes and ensures coordinated lifecycle management
-    m_fujinetService = new FujiNetService(nullptr);
 
     // GROUP 1: Binary & Storage
     QGroupBox* binaryStorageGroup = new QGroupBox("Binary & Storage");

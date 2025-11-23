@@ -11,8 +11,10 @@
 #include <QFileDialog>
 #include <QDebug>
 #include <QApplication>
+#include <QDir>
 #include <QFileInfo>
 #include <QPainter>
+#include <QSettings>
 #include <QMimeData>
 #include <QUrl>
 #include <QDragEnterEvent>
@@ -28,6 +30,7 @@ DiskDriveWidget::DiskDriveWidget(int driveNumber, AtariEmulator* emulator, QWidg
     , m_baseState(Off)
     , m_driveEnabled(false)
     , m_imageLabel(nullptr)
+    , m_progressLabel(nullptr)
     , m_contextMenu(nullptr)
     , m_blinkTimer(new QTimer(this))
     , m_blinkVisible(true)
@@ -35,6 +38,8 @@ DiskDriveWidget::DiskDriveWidget(int driveNumber, AtariEmulator* emulator, QWidg
     , m_ledDebounceTimer(new QTimer(this))
     , m_pendingOffState(Off)
     , m_isDrawerDrive(isDrawerDrive)
+    , m_driveMode(LOCAL)
+    , m_showingCopyProgress(false)
 {
     setupUI();
     loadImages();
@@ -90,6 +95,14 @@ void DiskDriveWidget::setupUI()
     m_imageLabel->setScaledContents(true);
     m_imageLabel->setContentsMargins(0, 0, 0, 0);  // No margins on the image label
     layout->addWidget(m_imageLabel);
+
+    // Create progress label for file copy operations (hidden by default)
+    m_progressLabel = new QLabel(this);
+    m_progressLabel->setAlignment(Qt::AlignCenter);
+    m_progressLabel->setText("Copying...");
+    m_progressLabel->setStyleSheet("background-color: rgba(0, 0, 0, 150); color: white; font-weight: bold;");
+    m_progressLabel->setVisible(false);
+    m_progressLabel->raise();  // Ensure it's on top
 
 }
 
@@ -168,23 +181,37 @@ void DiskDriveWidget::setState(DriveState state)
 
 void DiskDriveWidget::insertDisk(const QString& diskPath)
 {
-    if (m_emulator && m_emulator->mountDiskImage(m_driveNumber, diskPath, false)) {
-        m_diskPath = diskPath;
-        setState(m_driveEnabled ? Closed : Off);
-        updateTooltip();
+    if (m_driveMode == FUJINET) {
+        // In FujiNet mode, just emit the signal
+        // MainWindow will handle copying to SD and calling FujiNet API
         emit diskInserted(m_driveNumber, diskPath);
+    } else {
+        // Local mode - mount to emulator
+        if (m_emulator && m_emulator->mountDiskImage(m_driveNumber, diskPath, false)) {
+            m_diskPath = diskPath;
+            setState(m_driveEnabled ? Closed : Off);
+            updateTooltip();
+            emit diskInserted(m_driveNumber, diskPath);
+        }
     }
 }
 
 void DiskDriveWidget::ejectDisk()
 {
-    if (m_emulator && hasDisk()) {
-        // Properly dismount disk from emulator
-        m_emulator->dismountDiskImage(m_driveNumber);
-        m_diskPath.clear();
-        setState(m_driveEnabled ? Empty : Off);
-        updateTooltip();
+    if (m_driveMode == FUJINET) {
+        // In FujiNet mode, just emit the signal
+        // MainWindow will handle calling FujiNet API
         emit diskEjected(m_driveNumber);
+    } else {
+        // Local mode - dismount from emulator
+        if (m_emulator && hasDisk()) {
+            // Properly dismount disk from emulator
+            m_emulator->dismountDiskImage(m_driveNumber);
+            m_diskPath.clear();
+            setState(m_driveEnabled ? Empty : Off);
+            updateTooltip();
+            emit diskEjected(m_driveNumber);
+        }
     }
 }
 
@@ -328,25 +355,42 @@ void DiskDriveWidget::updateDisplay()
 
 void DiskDriveWidget::updateTooltip()
 {
-    QString tooltip = QString("Drive D%1:").arg(m_driveNumber);
+    QString tooltip;
 
-    switch (m_currentState) {
-        case Off:
-            tooltip += " Off";
-            break;
-        case Empty:
-            tooltip += " On (Empty)";
-            break;
-        case Closed:
-        case Reading:
-        case Writing:
-            if (hasDisk()) {
-                QFileInfo fileInfo(m_diskPath);
-                tooltip += QString(" %1").arg(fileInfo.fileName());
-            } else {
-                tooltip += " On (Disk Inserted)";
-            }
-            break;
+    if (m_driveMode == FUJINET) {
+        // FujiNet mode tooltip
+        if (m_fujinetDriveInfo.isEmpty) {
+            tooltip = QString("D%1: Empty\nDrag disk image here to mount to FujiNet")
+                .arg(m_driveNumber);
+        } else {
+            QString mode = m_fujinetDriveInfo.isReadOnly ? "R/O" : "R/W";
+            tooltip = QString("D%1: %2 (%3)\nHost: SD\nStatus: Connected\nClick to eject")
+                .arg(m_driveNumber)
+                .arg(m_fujinetDriveInfo.filename)
+                .arg(mode);
+        }
+    } else {
+        // Local mode tooltip (original behavior)
+        tooltip = QString("Drive D%1:").arg(m_driveNumber);
+
+        switch (m_currentState) {
+            case Off:
+                tooltip += " Off";
+                break;
+            case Empty:
+                tooltip += " On (Empty)";
+                break;
+            case Closed:
+            case Reading:
+            case Writing:
+                if (hasDisk()) {
+                    QFileInfo fileInfo(m_diskPath);
+                    tooltip += QString(" %1").arg(fileInfo.fileName());
+                } else {
+                    tooltip += " On (Disk Inserted)";
+                }
+                break;
+        }
     }
 
     setToolTip(tooltip);
@@ -493,10 +537,27 @@ void DiskDriveWidget::onInsertDisk()
 {
     if (!m_driveEnabled) return;
 
+    // Determine starting directory based on drive mode
+    QString startDir;
+    if (m_driveMode == FUJINET) {
+        // In FujiNet mode, default to SD card path
+        QSettings settings;
+        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+        if (!sdPath.isEmpty() && QDir(sdPath).exists()) {
+            startDir = sdPath;
+        } else {
+            // Fallback to home if SD path not configured
+            startDir = QDir::homePath();
+        }
+    } else {
+        // In LOCAL mode, use Qt's default (last used directory)
+        startDir = QString();
+    }
+
     QString fileName = QFileDialog::getOpenFileName(
         this,
         QString("Select Disk Image for Drive D%1:").arg(m_driveNumber),
-        QString(),
+        startDir,
         "Atari Disk Images (*.atr *.ATR *.xfd *.XFD *.dcm *.DCM);;All Files (*)"
     );
 
@@ -539,5 +600,73 @@ void DiskDriveWidget::onLedDebounceTimeout()
         stopBlinking();
         m_currentState = m_pendingOffState; // Return to saved state
         updateDisplay();
+    }
+}
+
+// FujiNet mode methods
+
+void DiskDriveWidget::setDriveMode(DriveMode mode)
+{
+    if (m_driveMode == mode) {
+        return;  // No change
+    }
+
+    m_driveMode = mode;
+
+    // Update visual indicator based on mode
+    if (mode == FUJINET) {
+        // Apply subtle blue tint for FujiNet mode
+        setStyleSheet("background-color: rgba(100, 150, 255, 30);");
+    } else {
+        // Clear style for local mode
+        setStyleSheet("");
+    }
+
+    // Update tooltip to show current mode
+    updateTooltip();
+}
+
+void DiskDriveWidget::updateFromFujiNet(const FujiNetDrive& driveInfo)
+{
+    // Only update if in FujiNet mode
+    if (m_driveMode != FUJINET) {
+        return;
+    }
+
+    m_fujinetDriveInfo = driveInfo;
+
+    // FujiNet drives should be enabled when we receive status from FujiNet
+    // Set the flag directly without emitting signal to avoid triggering config updates
+    if (!m_driveEnabled) {
+        m_driveEnabled = true;
+    }
+
+    // Update drive state based on FujiNet info
+    if (driveInfo.isEmpty) {
+        if (m_currentState != Empty) {
+            setState(Empty);
+        }
+        m_diskPath = QString();
+    } else {
+        m_diskPath = driveInfo.filename;
+        if (m_currentState != Closed) {
+            setState(Closed);
+        }
+    }
+
+    updateTooltip();
+}
+
+void DiskDriveWidget::showCopyProgress(bool show)
+{
+    m_showingCopyProgress = show;
+
+    if (m_progressLabel) {
+        m_progressLabel->setVisible(show);
+
+        // Position progress label to cover the drive image
+        if (show) {
+            m_progressLabel->setGeometry(rect());
+        }
     }
 }

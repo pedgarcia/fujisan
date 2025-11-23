@@ -37,6 +37,7 @@
 #include "mediaperipheralsdock.h"
 #include "configurationprofilemanager.h"
 #include "tcpserver.h"
+#include "fujinetservice.h"
 
 #ifndef Q_OS_WIN
 class FujiNetProcessManager;
@@ -82,6 +83,9 @@ private slots:
     // FujiNet slots
     void onFujiNetProcessStateChanged(int state);
     void onNetSIOEnabledChanged(bool enabled);
+    void onFujiNetConnected();
+    void onFujiNetDisconnected();
+    void onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives);
 #endif
 
     // State save/load slots
@@ -154,6 +158,9 @@ private:
     // FujiNet helper methods
     void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
     void startFujiNetWithSavedSettings();
+    void switchDrivesToFujiNetMode();
+    void switchDrivesToLocalMode();
+    void updateStatusBarForDriveMode();
 #endif
 
     AtariEmulator* m_emulator;
@@ -167,6 +174,8 @@ private:
     // FujiNet-PC process management
     FujiNetProcessManager* m_fujinetProcessManager;
     FujiNetBinaryManager* m_fujinetBinaryManager;
+    FujiNetService* m_fujinetService;  // Service for FujiNet API communication
+    bool m_fujinetIntentionalRestart;  // Track intentional vs unexpected disconnects
 
     // Restart loop protection
     int m_fujinetRestartCount;

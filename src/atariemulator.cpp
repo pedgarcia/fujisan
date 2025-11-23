@@ -822,6 +822,14 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
 void AtariEmulator::shutdown()
 {
     m_frameTimer->stop();
+
+    // Clear BINLOAD state to prevent XEX from persisting across restarts/profile loads
+    if (BINLOAD_bin_file != NULL) {
+        fclose(BINLOAD_bin_file);
+        BINLOAD_bin_file = NULL;
+    }
+    BINLOAD_start_binloading = FALSE;
+
     libatari800_exit();
 }
 

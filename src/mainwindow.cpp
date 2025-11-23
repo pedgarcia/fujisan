@@ -42,6 +42,8 @@ MainWindow::MainWindow(QWidget *parent)
 #ifndef Q_OS_WIN
     , m_fujinetProcessManager(new FujiNetProcessManager(this))
     , m_fujinetBinaryManager(new FujiNetBinaryManager(this))
+    , m_fujinetService(new FujiNetService(this))
+    , m_fujinetIntentionalRestart(false)
     , m_fujinetRestartCount(0)
     , m_fujinetFirstRestartTime(0)
 #endif
@@ -115,6 +117,120 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect FujiNet process manager signals
     connect(m_fujinetProcessManager, &FujiNetProcessManager::stateChanged,
             this, &MainWindow::onFujiNetProcessStateChanged);
+
+    // Connect FujiNet service signals
+    connect(m_fujinetService, &FujiNetService::connected,
+            this, &MainWindow::onFujiNetConnected);
+    connect(m_fujinetService, &FujiNetService::disconnected,
+            this, &MainWindow::onFujiNetDisconnected);
+    connect(m_fujinetService, &FujiNetService::driveStatusUpdated,
+            this, &MainWindow::onFujiNetDriveStatusUpdated);
+
+    // Connect FujiNet file copy progress signals
+    connect(m_fujinetService, &FujiNetService::copyProgress,
+            this, [this](int percent, const QString& filename) {
+                statusBar()->showMessage(QString("Copying %1 to FujiNet SD: %2%").arg(filename).arg(percent));
+            });
+    connect(m_fujinetService, &FujiNetService::copySuccess,
+            this, [this](const QString& sdPath) {
+                statusBar()->showMessage(QString("Successfully copied to FujiNet SD: %1").arg(sdPath), 3000);
+            });
+    connect(m_fujinetService, &FujiNetService::copyFailed,
+            this, [this](const QString& error) {
+                statusBar()->showMessage(QString("Copy failed: %1").arg(error), 5000);
+                QMessageBox::warning(this, "FujiNet Copy Error",
+                                   QString("Failed to copy file to FujiNet SD folder:\n\n%1").arg(error));
+            });
+
+    // Connect FujiNet mount/unmount result signals
+    connect(m_fujinetService, &FujiNetService::mountSuccess,
+            this, [this](int deviceSlot) {
+                int driveNumber = deviceSlot + 1;
+                statusBar()->showMessage(QString("Successfully mounted disk to FujiNet D%1").arg(driveNumber), 3000);
+
+                // Hide copy progress spinner
+                DiskDriveWidget* driveWidget = (driveNumber == 1) ? m_diskDrive1 :
+                                                m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+                if (driveWidget) {
+                    driveWidget->showCopyProgress(false);
+                }
+
+                // Auto-refresh FujiNet CONFIG if it's showing drive slots
+                // Send two TABs to force CONFIG to refresh the drive list
+                // If CONFIG isn't running or is on a different screen, TABs are harmless
+                QTimer::singleShot(100, this, [this]() {
+                    m_emulator->injectAKey(AKEY_TAB);
+                });
+                QTimer::singleShot(200, this, [this]() {
+                    m_emulator->injectAKey(AKEY_TAB);
+                });
+            });
+    connect(m_fujinetService, &FujiNetService::mountFailed,
+            this, [this](int deviceSlot, const QString& error) {
+                int driveNumber = deviceSlot + 1;
+                statusBar()->showMessage(QString("Failed to mount to FujiNet D%1: %2").arg(driveNumber).arg(error), 5000);
+
+                // Hide copy progress spinner
+                DiskDriveWidget* driveWidget = (driveNumber == 1) ? m_diskDrive1 :
+                                                m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+                if (driveWidget) {
+                    driveWidget->showCopyProgress(false);
+                }
+
+                // Offer retry option to the user
+                QMessageBox msgBox(this);
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setWindowTitle("FujiNet Mount Error");
+                msgBox.setText(QString("Failed to mount disk to FujiNet D%1").arg(driveNumber));
+                msgBox.setInformativeText(QString("Error: %1\n\nWould you like to retry?").arg(error));
+                msgBox.setStandardButtons(QMessageBox::Retry | QMessageBox::Cancel);
+                msgBox.setDefaultButton(QMessageBox::Retry);
+
+                if (msgBox.exec() == QMessageBox::Retry) {
+                    // Get the last disk path from the drive widget
+                    if (driveWidget && driveWidget->hasDisk()) {
+                        QString diskPath = driveWidget->getDiskPath();
+                        statusBar()->showMessage(QString("Retrying mount to FujiNet D%1...").arg(driveNumber), 3000);
+                        // Re-insert the disk, which will trigger the mount process again
+                        driveWidget->insertDisk(diskPath);
+                    }
+                }
+            });
+    connect(m_fujinetService, &FujiNetService::unmountSuccess,
+            this, [this](int deviceSlot) {
+                int driveNumber = deviceSlot + 1;
+                statusBar()->showMessage(QString("Successfully ejected disk from FujiNet D%1").arg(driveNumber), 3000);
+
+                // Auto-refresh FujiNet CONFIG if it's showing drive slots
+                // Send two TABs to force CONFIG to refresh the drive list
+                // If CONFIG isn't running or is on a different screen, TABs are harmless
+                QTimer::singleShot(100, this, [this]() {
+                    m_emulator->injectAKey(AKEY_TAB);
+                });
+                QTimer::singleShot(200, this, [this]() {
+                    m_emulator->injectAKey(AKEY_TAB);
+                });
+            });
+    connect(m_fujinetService, &FujiNetService::unmountFailed,
+            this, [this](int deviceSlot, const QString& error) {
+                int driveNumber = deviceSlot + 1;
+                statusBar()->showMessage(QString("Failed to eject from FujiNet D%1: %2").arg(driveNumber).arg(error), 5000);
+
+                // Offer retry option to the user
+                QMessageBox msgBox(this);
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setWindowTitle("FujiNet Eject Error");
+                msgBox.setText(QString("Failed to eject disk from FujiNet D%1").arg(driveNumber));
+                msgBox.setInformativeText(QString("Error: %1\n\nWould you like to retry?").arg(error));
+                msgBox.setStandardButtons(QMessageBox::Retry | QMessageBox::Cancel);
+                msgBox.setDefaultButton(QMessageBox::Retry);
+
+                if (msgBox.exec() == QMessageBox::Retry) {
+                    statusBar()->showMessage(QString("Retrying eject from FujiNet D%1...").arg(driveNumber), 3000);
+                    // Retry the unmount
+                    m_fujinetService->unmount(deviceSlot);
+                }
+            });
 
     // Initialize NetSIO state and update BASIC toggle accordingly
     bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
@@ -1143,7 +1259,11 @@ void MainWindow::onSpeedToggled(bool isFullSpeed)
 
 void MainWindow::showSettings()
 {
-    SettingsDialog dialog(m_emulator, m_profileManager, this);
+    SettingsDialog dialog(m_emulator, m_profileManager,
+#ifndef Q_OS_WIN
+                         m_fujinetService,
+#endif
+                         this);
     connect(&dialog, &SettingsDialog::settingsChanged, this, &MainWindow::onSettingsChanged);
 
 #ifndef Q_OS_WIN
@@ -2248,6 +2368,57 @@ void MainWindow::toggleMediaDock()
 void MainWindow::onDiskInserted(int driveNumber, const QString& diskPath)
 {
     QFileInfo fileInfo(diskPath);
+
+#ifndef Q_OS_WIN
+    // Check if we're in FujiNet mode
+    qDebug() << "NetSIO enabled:" << m_netSIOEnabled << ", FujiNet connected:" << m_fujinetService->isConnected();
+    if (m_netSIOEnabled && m_fujinetService->isConnected()) {
+        // FujiNet mode - copy file to SD and mount via API
+        qDebug() << "FujiNet mode: copying" << diskPath << "to SD and mounting on D" << driveNumber;
+
+        // Get SD path from settings
+        QSettings settings;
+        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+
+        if (sdPath.isEmpty()) {
+            statusBar()->showMessage("Error: FujiNet SD path not configured", 5000);
+            qWarning() << "FujiNet SD path not configured";
+            return;
+        }
+
+        // Show copy progress on the drive widget
+        DiskDriveWidget* driveWidget = (driveNumber == 1) ? m_diskDrive1 :
+                                        m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+        if (driveWidget) {
+            driveWidget->showCopyProgress(true);
+        }
+
+        // Copy file to SD folder
+        QString sdRelativePath = m_fujinetService->copyToSD(diskPath, sdPath);
+
+        if (!sdRelativePath.isEmpty()) {
+            // File copied successfully, now mount via FujiNet API
+            // deviceSlot = driveNumber - 1 (D1 = slot 0, D2 = slot 1, etc.)
+            // host = 0 (SD card - Host1 in config, but 0-indexed in API)
+            // mode = false (read-write)
+            m_fujinetService->mount(driveNumber - 1, 0, sdRelativePath, false);
+
+            statusBar()->showMessage(QString("Mounting %1 to FujiNet D%2...")
+                                    .arg(fileInfo.fileName()).arg(driveNumber), 3000);
+        } else {
+            // Copy failed
+            if (driveWidget) {
+                driveWidget->showCopyProgress(false);
+            }
+            statusBar()->showMessage(QString("Failed to copy disk to FujiNet SD folder"), 5000);
+        }
+
+        // Progress indicator will be hidden by mountSuccess/mountFailed signal handlers
+        return;
+    }
+#endif
+
+    // Local mode - normal handling
     statusBar()->showMessage(QString("Disk mounted to D%1: %2 - Try typing DIR from BASIC")
                             .arg(driveNumber).arg(fileInfo.fileName()), 5000);
     qDebug() << "Disk inserted in drive" << driveNumber << ":" << diskPath;
@@ -2258,6 +2429,21 @@ void MainWindow::onDiskInserted(int driveNumber, const QString& diskPath)
 
 void MainWindow::onDiskEjected(int driveNumber)
 {
+#ifndef Q_OS_WIN
+    // Check if we're in FujiNet mode
+    if (m_netSIOEnabled && m_fujinetService->isConnected()) {
+        // FujiNet mode - unmount via API
+        qDebug() << "FujiNet mode: unmounting D" << driveNumber;
+
+        // deviceSlot = driveNumber - 1 (D1 = slot 0, D2 = slot 1, etc.)
+        m_fujinetService->unmount(driveNumber - 1);
+
+        statusBar()->showMessage(QString("Ejecting disk from FujiNet D%1...").arg(driveNumber), 3000);
+        return;
+    }
+#endif
+
+    // Local mode - normal handling
     statusBar()->showMessage(QString("Disk ejected from D%1:").arg(driveNumber), 3000);
     qDebug() << "Disk ejected from drive" << driveNumber;
 
@@ -2280,6 +2466,70 @@ void MainWindow::onDriveStateChanged(int driveNumber, bool enabled)
 
     // Save drive state to settings
     saveDriveStateToSettings(driveNumber, enabled);
+
+#ifndef Q_OS_WIN
+    // If NetSIO is enabled, sync the enable/disable state to FujiNet config
+    if (m_netSIOEnabled && m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
+        QSettings settings;
+        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+
+        if (!sdPath.isEmpty()) {
+            // fnconfig.ini is in the parent directory of the SD folder
+            QFileInfo sdInfo(sdPath);
+            QString configPath = sdInfo.absolutePath() + "/../fnconfig.ini";
+
+            qDebug() << "Updating FujiNet config at:" << configPath;
+
+            // Update fnconfig.ini [ENABLE] section
+            QSettings fnConfig(configPath, QSettings::IniFormat);
+            fnConfig.beginGroup("ENABLE");
+            fnConfig.setValue(QString("enable_device_slot_%1").arg(driveNumber), enabled ? 1 : 0);
+            fnConfig.endGroup();
+            fnConfig.sync();
+
+            // Stop drive polling while config change is in progress
+            // This prevents FujiNet from overwriting our local state change
+            // with its old state before the restart happens
+            if (m_fujinetService && m_fujinetService->isConnected()) {
+                m_fujinetService->stopDrivePolling();
+                qDebug() << "Stopped drive polling during drive state change";
+            }
+
+            // Prompt user to restart FujiNet-PC for changes to take effect
+            QMessageBox msgBox(this);
+            msgBox.setIcon(QMessageBox::Question);
+            msgBox.setWindowTitle("FujiNet-PC Restart Required");
+            msgBox.setText(QString("Drive D%1 has been %2 in FujiNet configuration.")
+                          .arg(driveNumber)
+                          .arg(enabled ? "enabled" : "disabled"));
+            msgBox.setInformativeText("FujiNet-PC must restart for this change to take effect.\n\nRestart FujiNet-PC now?");
+            msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+            msgBox.setDefaultButton(QMessageBox::Yes);
+
+            if (msgBox.exec() == QMessageBox::Yes) {
+                // Set intentional restart flag to suppress disconnect error
+                m_fujinetIntentionalRestart = true;
+
+                // Stop FujiNet-PC
+                qDebug() << "Stopping FujiNet-PC for config reload...";
+                m_fujinetProcessManager->stop();
+
+                // Restart after 1 second delay
+                QTimer::singleShot(1000, this, [this]() {
+                    qDebug() << "Restarting FujiNet-PC with updated config...";
+                    startFujiNetWithSavedSettings();
+                });
+                // Note: Polling will resume automatically via onFujiNetConnected()
+            } else {
+                // User clicked "No" - resume polling with current state
+                if (m_fujinetService && m_fujinetService->isConnected()) {
+                    m_fujinetService->startDrivePolling();
+                    qDebug() << "Resumed drive polling after user cancelled restart";
+                }
+            }
+        }
+    }
+#endif
 }
 
 void MainWindow::onCassetteInserted(const QString& cassettePath)
@@ -2496,13 +2746,16 @@ void MainWindow::loadAndApplyMediaSettings()
     }
 
     // Load and mount disk images for D1-D8
-    for (int i = 0; i < 8; i++) {
-        QString diskKey = QString("media/disk%1").arg(i + 1);
-        bool diskEnabled = settings.value(diskKey + "Enabled", false).toBool();
-        QString diskPath = settings.value(diskKey + "Path", "").toString();
-        bool diskReadOnly = settings.value(diskKey + "ReadOnly", false).toBool();
+    // Skip loading saved disks if NetSIO is enabled - FujiNet will provide drive state
+    bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
+    if (!netSIOEnabled) {
+        for (int i = 0; i < 8; i++) {
+            QString diskKey = QString("media/disk%1").arg(i + 1);
+            bool diskEnabled = settings.value(diskKey + "Enabled", false).toBool();
+            QString diskPath = settings.value(diskKey + "Path", "").toString();
+            bool diskReadOnly = settings.value(diskKey + "ReadOnly", false).toBool();
 
-        if (diskEnabled && !diskPath.isEmpty()) {
+            if (diskEnabled && !diskPath.isEmpty()) {
             qDebug() << QString("Auto-mounting D%1: %2 (read-only: %3)")
                         .arg(i + 1).arg(diskPath).arg(diskReadOnly);
 
@@ -2525,7 +2778,10 @@ void MainWindow::loadAndApplyMediaSettings()
             } else {
                 qDebug() << QString("Failed to auto-mount D%1:").arg(i + 1);
             }
+            }
         }
+    } else {
+        qDebug() << "NetSIO enabled - skipping saved disk loading (FujiNet will provide drive state)";
     }
 
     // Update cartridge widget from emulator state
@@ -3070,37 +3326,72 @@ void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
         qWarning() << "Cannot mount disk - emulator or D1 drive not initialized";
         return;
     }
-    
+
     QFileInfo fileInfo(filename);
     qDebug() << "Mounting disk image dropped on emulator to D1:" << filename;
-    
-    // Enable D1 drive if it's currently disabled
+
+#ifndef Q_OS_WIN
+    // Check if we should use FujiNet mode
+    if (m_netSIOEnabled && m_diskDrive1->getDriveMode() == DiskDriveWidget::FUJINET) {
+        // FujiNet mode - copy to SD and mount via FujiNet API
+        QSettings settings;
+        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+
+        if (sdPath.isEmpty() || !QDir(sdPath).exists()) {
+            QMessageBox::warning(this, "FujiNet Error",
+                "SD card path is not configured. Please configure it in Settings.");
+            return;
+        }
+
+        // Copy file to SD folder
+        QString destPath = sdPath + "/" + fileInfo.fileName();
+        if (QFile::exists(destPath)) {
+            QFile::remove(destPath);
+        }
+        if (!QFile::copy(filename, destPath)) {
+            QMessageBox::warning(this, "FujiNet Error",
+                QString("Failed to copy disk image to SD folder:\n%1").arg(destPath));
+            return;
+        }
+
+        qDebug() << "Copied disk to SD folder for FujiNet:" << destPath;
+
+        // Mount via FujiNet API (D1 = slot 0, hostslot 0)
+        QString sdRelativePath = "/" + fileInfo.fileName();
+        m_fujinetService->mount(0, 0, sdRelativePath, false);
+
+        statusBar()->showMessage(QString("Mounting via FujiNet: %1").arg(fileInfo.fileName()), 3000);
+        return;
+    }
+#endif
+
+    // Local mode - enable D1 drive if it's currently disabled
     if (!m_diskDrive1->isDriveEnabled()) {
         qDebug() << "Enabling D1 drive for dropped disk";
         m_diskDrive1->setDriveEnabled(true);
         saveDriveStateToSettings(1, true);
     }
-    
+
     // Mount the disk image to D1
     if (m_emulator->mountDiskImage(1, filename, false)) {
         qDebug() << "Successfully mounted disk to D1:" << fileInfo.fileName();
-        
+
         // Save disk to settings
         saveDiskToSettings(1, filename, false);
-        
+
         // Update D1 widget UI to reflect the new disk
         if (m_diskDrive1) {
             m_diskDrive1->updateFromEmulator();
             qDebug() << "Updated D1 widget state to reflect mounted disk";
         }
-        
+
         // Show status message
         statusBar()->showMessage(QString("Disk mounted to D1: %1 - Rebooting...").arg(fileInfo.fileName()), 3000);
-        
+
         // Perform cold restart to boot from the new disk
         m_emulator->coldRestart();
         qDebug() << "Cold restart triggered after mounting disk to D1";
-        
+
     } else {
         qWarning() << "Failed to mount disk image to D1:" << filename;
         statusBar()->showMessage(QString("Failed to mount disk: %1").arg(fileInfo.fileName()), 5000);
@@ -3436,6 +3727,14 @@ void MainWindow::startFujiNetWithSavedSettings()
     qDebug() << "  SD Path:" << sdPath;
 
     m_fujinetProcessManager->start(binaryPath, arguments);
+
+    // Start FujiNet service health check after starting the process
+    if (m_fujinetService) {
+        QString serverUrl = QString("http://localhost:%1").arg(httpPort);
+        m_fujinetService->setServerUrl(serverUrl);
+        m_fujinetService->startHealthCheck(3000);
+        qDebug() << "Started FujiNet service health check for" << serverUrl;
+    }
 }
 
 void MainWindow::onFujiNetProcessStateChanged(int state)
@@ -3532,26 +3831,169 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
     QSettings settings;
     int launchBehavior = settings.value("fujinet/launchBehavior", 0).toInt(); // 0=Auto, 1=Detect, 2=Manual
 
-    if (launchBehavior != 0) {
-        // Not in auto-launch mode, don't automatically start/stop
-        qDebug() << "NetSIO toggled but launch behavior is not Auto - no action taken";
-        return;
-    }
-
     if (enabled) {
-        // NetSIO enabled - start FujiNet-PC if not already running
-        if (!m_fujinetProcessManager->isRunning()) {
+        // Switch drives to FujiNet mode
+        switchDrivesToFujiNetMode();
+        updateStatusBarForDriveMode();
+
+        // Start FujiNet service if connected
+        if (m_fujinetService->isConnected()) {
+            m_fujinetService->startDrivePolling();
+        }
+
+        // Start FujiNet-PC if not already running (auto-launch mode only)
+        if (launchBehavior == 0 && !m_fujinetProcessManager->isRunning()) {
             qDebug() << "NetSIO enabled - auto-starting FujiNet-PC with saved settings...";
             startFujiNetWithSavedSettings();
         } else {
-            qDebug() << "NetSIO enabled but FujiNet-PC already running";
+            qDebug() << "NetSIO enabled but FujiNet-PC already running or not in auto-launch mode";
         }
     } else {
-        // NetSIO disabled - stop FujiNet-PC if we started it
-        if (m_fujinetProcessManager->isRunning()) {
+        // Switch drives back to local mode
+        switchDrivesToLocalMode();
+        updateStatusBarForDriveMode();
+
+        // Stop FujiNet service polling
+        m_fujinetService->stopDrivePolling();
+
+        // Stop FujiNet-PC if we started it (auto-launch mode only)
+        if (launchBehavior == 0 && m_fujinetProcessManager->isRunning()) {
             qDebug() << "NetSIO disabled - stopping FujiNet-PC...";
             m_fujinetProcessManager->stop();
         }
+    }
+}
+
+void MainWindow::onFujiNetConnected()
+{
+    qDebug() << "FujiNet service connected";
+
+    // Clear intentional restart flag and show appropriate message
+    if (m_fujinetIntentionalRestart) {
+        m_fujinetIntentionalRestart = false;
+        statusBar()->showMessage("FujiNet-PC restarted successfully", 3000);
+        qDebug() << "Intentional restart completed successfully";
+    } else {
+        statusBar()->showMessage("Connected to FujiNet-PC", 3000);
+    }
+
+    // Get FujiNet settings
+    QSettings settings;
+    QString sdPath = settings.value("fujinet/sdPath", "").toString();
+    int httpPort = settings.value("fujinet/httpPort", 8000).toInt();
+
+    // Configure FujiNet service
+    QString serverUrl = QString("http://localhost:%1").arg(httpPort);
+    m_fujinetService->setServerUrl(serverUrl);
+
+    // Switch drives to FujiNet mode and start polling if NetSIO is enabled
+    if (m_netSIOEnabled) {
+        switchDrivesToFujiNetMode();
+        updateStatusBarForDriveMode();
+        m_fujinetService->startDrivePolling();
+    }
+}
+
+void MainWindow::onFujiNetDisconnected()
+{
+    qDebug() << "FujiNet service disconnected";
+
+    // Stop polling
+    m_fujinetService->stopDrivePolling();
+
+    // Check if this is an intentional restart or unexpected disconnect
+    if (m_netSIOEnabled && !m_fujinetIntentionalRestart) {
+        // Unexpected disconnect - show error and switch to local mode
+        statusBar()->showMessage("Disconnected from FujiNet-PC", 3000);
+        switchDrivesToLocalMode();
+        updateStatusBarForDriveMode();
+
+        // Show warning that FujiNet disconnected unexpectedly
+        QMessageBox::warning(this, "FujiNet Disconnected",
+                           "FujiNet-PC has disconnected. Drive operations have been switched back to local mode.\n\n"
+                           "Network drives are no longer accessible. You can reconnect by restarting FujiNet-PC "
+                           "from the Settings dialog.");
+    } else if (m_fujinetIntentionalRestart) {
+        // Intentional restart - just show progress message
+        statusBar()->showMessage("Restarting FujiNet-PC...", 0);  // 0 = stays until cleared
+        qDebug() << "Intentional restart in progress - suppressing disconnect error";
+    } else {
+        // Not in NetSIO mode
+        statusBar()->showMessage("Disconnected from FujiNet-PC", 3000);
+    }
+}
+
+void MainWindow::onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives)
+{
+    // Update drive widgets with FujiNet status
+    if (!m_netSIOEnabled) {
+        return;  // Only update if in NetSIO mode
+    }
+
+    // Update D1 (toolbar drive)
+    if (m_diskDrive1 && drives.size() > 0) {
+        m_diskDrive1->updateFromFujiNet(drives[0]);
+    }
+
+    // Update D2-D8 (media peripherals dock drives)
+    if (m_mediaPeripheralsDock) {
+        for (int i = 1; i < drives.size() && i < 8; i++) {
+            // Media peripherals dock has drives D3-D8 (indices 2-7)
+            // We need to get the drive widget for each
+            DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(i + 1);
+            if (driveWidget) {
+                driveWidget->updateFromFujiNet(drives[i]);
+            }
+        }
+    }
+}
+
+void MainWindow::switchDrivesToFujiNetMode()
+{
+    qDebug() << "Switching drives to FujiNet mode";
+
+    // Switch D1 (toolbar)
+    if (m_diskDrive1) {
+        m_diskDrive1->setDriveMode(DiskDriveWidget::FUJINET);
+    }
+
+    // Switch D2-D8 (media peripherals dock)
+    if (m_mediaPeripheralsDock) {
+        for (int i = 2; i <= 8; i++) {
+            DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(i);
+            if (driveWidget) {
+                driveWidget->setDriveMode(DiskDriveWidget::FUJINET);
+            }
+        }
+    }
+}
+
+void MainWindow::switchDrivesToLocalMode()
+{
+    qDebug() << "Switching drives to Local mode";
+
+    // Switch D1 (toolbar)
+    if (m_diskDrive1) {
+        m_diskDrive1->setDriveMode(DiskDriveWidget::LOCAL);
+    }
+
+    // Switch D2-D8 (media peripherals dock)
+    if (m_mediaPeripheralsDock) {
+        for (int i = 2; i <= 8; i++) {
+            DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(i);
+            if (driveWidget) {
+                driveWidget->setDriveMode(DiskDriveWidget::LOCAL);
+            }
+        }
+    }
+}
+
+void MainWindow::updateStatusBarForDriveMode()
+{
+    if (m_netSIOEnabled) {
+        statusBar()->showMessage("Drives: FujiNet (NetSIO enabled)", 5000);
+    } else {
+        statusBar()->showMessage("Drives: Local", 3000);
     }
 }
 #endif

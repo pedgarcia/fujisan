@@ -41,7 +41,11 @@ class SettingsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager, QWidget *parent = nullptr);
+    explicit SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager,
+#ifndef Q_OS_WIN
+                            FujiNetService* fujinetService,
+#endif
+                            QWidget *parent = nullptr);
 
     // Public methods for external synchronization
     void loadSettings();
@@ -347,7 +351,7 @@ private:
     QLabel* m_fujinetRestartWarningLabel;
 
     // FujiNet service classes (shared with MainWindow - not owned)
-    FujiNetService* m_fujinetService;  // Dialog-only (owned)
+    FujiNetService* m_fujinetService;  // Shared pointer (not owned)
     FujiNetProcessManager* m_fujinetProcessManager;  // Shared pointer (not owned)
     FujiNetBinaryManager* m_fujinetBinaryManager;    // Shared pointer (not owned)
 

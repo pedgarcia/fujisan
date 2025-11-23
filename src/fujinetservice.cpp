@@ -10,6 +10,9 @@
 #include <QUrlQuery>
 #include <QRegularExpression>
 #include <QDebug>
+#include <QFile>
+#include <QFileInfo>
+#include <QDir>
 
 FujiNetService::FujiNetService(QObject *parent)
     : QObject(parent)
@@ -17,8 +20,10 @@ FujiNetService::FujiNetService(QObject *parent)
     , m_serverUrl("http://localhost:8000")
     , m_isConnected(false)
     , m_healthCheckTimer(new QTimer(this))
+    , m_drivePollingTimer(new QTimer(this))
 {
     connect(m_healthCheckTimer, &QTimer::timeout, this, &FujiNetService::checkConnection);
+    connect(m_drivePollingTimer, &QTimer::timeout, this, &FujiNetService::queryDriveStatus);
 }
 
 FujiNetService::~FujiNetService()
@@ -62,6 +67,17 @@ void FujiNetService::stopHealthCheck()
     abortAllRequests();
 }
 
+void FujiNetService::startDrivePolling(int intervalMs)
+{
+    m_drivePollingTimer->start(intervalMs);
+    queryDriveStatus();  // Query immediately
+}
+
+void FujiNetService::stopDrivePolling()
+{
+    m_drivePollingTimer->stop();
+}
+
 void FujiNetService::abortAllRequests()
 {
     // Abort all pending mount requests
@@ -96,15 +112,18 @@ void FujiNetService::abortAllRequests()
 
 void FujiNetService::mount(int deviceSlot, int hostSlot, const QString& filename, bool readOnly)
 {
+    // API expects: GET /mount?deviceslot=N&host=H&file=/path&mode=r|w
     QMap<QString, QString> params;
-    params["hostslot"] = QString::number(hostSlot);
     params["deviceslot"] = QString::number(deviceSlot);
-    params["filename"] = filename;
-    params["mode"] = readOnly ? "1" : "2";
+    params["host"] = QString::number(hostSlot);
+    params["file"] = filename;
+    params["mode"] = readOnly ? "r" : "w";  // Changed from "1"/"2" to "r"/"w"
 
     QUrl url = buildUrl("/mount", params);
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
+
+    qDebug() << "FujiNet mount request:" << url.toString();
 
     QNetworkReply* reply = m_networkManager->get(request);
     m_pendingMounts[reply] = deviceSlot;
@@ -146,6 +165,71 @@ void FujiNetService::mountAll()
             this, &FujiNetService::onNetworkError);
 }
 
+QString FujiNetService::copyToSD(const QString& localPath, const QString& sdFolderPath)
+{
+    // Copy local disk image file to FujiNet SD folder
+    QFileInfo localFile(localPath);
+
+    if (!localFile.exists()) {
+        QString error = QString("Source file does not exist: %1").arg(localPath);
+        qDebug() << "FujiNet copy failed:" << error;
+        emit copyFailed(error);
+        return QString();
+    }
+
+    // Ensure SD folder exists
+    QDir sdDir(sdFolderPath);
+    if (!sdDir.exists()) {
+        QString error = QString("SD folder does not exist: %1").arg(sdFolderPath);
+        qDebug() << "FujiNet copy failed:" << error;
+        emit copyFailed(error);
+        return QString();
+    }
+
+    // Determine destination filename
+    QString baseFilename = localFile.fileName();
+    QString destPath = sdDir.filePath(baseFilename);
+
+    // If file already exists, remove it (overwrite behavior)
+    if (QFile::exists(destPath)) {
+        qDebug() << "File already exists, removing old version:" << destPath;
+        if (!QFile::remove(destPath)) {
+            QString error = QString("Failed to remove existing file: %1").arg(destPath);
+            qDebug() << "FujiNet copy failed:" << error;
+            emit copyFailed(error);
+            return QString();
+        }
+    }
+
+    // Get file size for progress tracking
+    qint64 fileSize = localFile.size();
+    QString filename = QFileInfo(destPath).fileName();
+
+    // Emit initial progress
+    emit copyProgress(0, filename);
+
+    // Copy the file
+    qDebug() << "Copying" << localPath << "to" << destPath;
+
+    bool success = QFile::copy(localPath, destPath);
+
+    if (success) {
+        // Emit completion
+        emit copyProgress(100, filename);
+
+        // Return SD-relative path (with leading /)
+        QString sdRelativePath = "/" + filename;
+        qDebug() << "Copy successful, SD path:" << sdRelativePath;
+        emit copySuccess(sdRelativePath);
+        return sdRelativePath;
+    } else {
+        QString error = QString("Failed to copy file to SD folder: %1").arg(destPath);
+        qDebug() << "FujiNet copy failed:" << error;
+        emit copyFailed(error);
+        return QString();
+    }
+}
+
 void FujiNetService::getHosts()
 {
     QUrl url(m_serverUrl + "/hosts");
@@ -176,13 +260,26 @@ void FujiNetService::setHost(int hostSlot, const QString& hostname)
 
 void FujiNetService::queryMountStatus()
 {
-    // Use the /slot endpoint to query all mount status
+    // Use the /slot endpoint to query all mount status (legacy endpoint)
     QUrl url(m_serverUrl + "/slot");
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
 
     QNetworkReply* reply = m_networkManager->get(request);
     connect(reply, &QNetworkReply::finished, this, &FujiNetService::onMountStatusReply);
+    connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::errorOccurred),
+            this, &FujiNetService::onNetworkError);
+}
+
+void FujiNetService::queryDriveStatus()
+{
+    // Use the root / endpoint to query drive status (new format)
+    QUrl url(m_serverUrl + "/");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
+
+    QNetworkReply* reply = m_networkManager->get(request);
+    connect(reply, &QNetworkReply::finished, this, &FujiNetService::onDriveStatusReply);
     connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::errorOccurred),
             this, &FujiNetService::onNetworkError);
 }
@@ -332,6 +429,21 @@ void FujiNetService::onMountStatusReply()
     reply->deleteLater();
 }
 
+void FujiNetService::onDriveStatusReply()
+{
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply) return;
+
+    if (reply->error() == QNetworkReply::NoError) {
+        QString html = reply->readAll();
+        parseDriveStatus(html);
+    } else {
+        qDebug() << "Drive status query failed:" << reply->errorString();
+    }
+
+    reply->deleteLater();
+}
+
 void FujiNetService::onBrowseReply()
 {
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
@@ -438,4 +550,74 @@ void FujiNetService::parseMountStatus(const QString& html)
     }
 
     emit mountStatusUpdated(diskSlots);
+}
+
+void FujiNetService::parseDriveStatus(const QString& html)
+{
+    // Parse the HTML returned by / (root) endpoint
+    // Format: <div data-mountslot="N" data-mount="/filename (R/W)" or data-mount="(Empty)">
+
+    QVector<FujiNetDrive> drives;
+
+    // Parse data-mount attributes for each drive slot (0-7)
+    // Example: data-mountslot="1" data-mount="/ANIMALS.XEX (R)"
+    QRegularExpression slotRegex("data-mountslot=\"(\\d+)\"\\s+data-mountslotname=\"[^\"]*\"\\s+data-mount=\"([^\"]*)\"",
+                                 QRegularExpression::CaseInsensitiveOption);
+
+    QRegularExpressionMatchIterator i = slotRegex.globalMatch(html);
+    while (i.hasNext()) {
+        QRegularExpressionMatch match = i.next();
+
+        FujiNetDrive drive;
+        drive.slotNumber = match.captured(1).toInt();
+        QString mountStr = match.captured(2);  // e.g., "(Empty)" or "/ANIMALS.XEX (R)" or "/DISK.ATR (W)"
+
+        if (mountStr == "(Empty)" || mountStr.isEmpty()) {
+            drive.isEmpty = true;
+            drive.filename = QString();
+            drive.isReadOnly = true;
+        } else {
+            drive.isEmpty = false;
+
+            // Parse the mount string: "/filename (R)" or "/filename (W)"
+            QRegularExpression mountRegex("^(.+?)\\s+\\((R|W)\\)$");
+            QRegularExpressionMatch mountMatch = mountRegex.match(mountStr);
+
+            if (mountMatch.hasMatch()) {
+                drive.filename = mountMatch.captured(1);  // e.g., "/ANIMALS.XEX"
+                QString mode = mountMatch.captured(2);
+                drive.isReadOnly = (mode == "R");
+            } else {
+                // Fallback: just use the whole string as filename
+                drive.filename = mountStr;
+                drive.isReadOnly = true;
+            }
+        }
+
+        drives.append(drive);
+    }
+
+    // Ensure we have all 8 drives (D1-D8)
+    // Sort by slot number and fill in missing slots
+    QMap<int, FujiNetDrive> driveMap;
+    for (const auto& drive : drives) {
+        driveMap[drive.slotNumber] = drive;
+    }
+
+    QVector<FujiNetDrive> completeDrives;
+    for (int i = 0; i < 8; i++) {
+        if (driveMap.contains(i)) {
+            completeDrives.append(driveMap[i]);
+        } else {
+            // Create empty drive for missing slots
+            FujiNetDrive emptyDrive;
+            emptyDrive.slotNumber = i;
+            emptyDrive.isEmpty = true;
+            completeDrives.append(emptyDrive);
+        }
+    }
+
+    // Drive status parsed - emit signal (debug logging removed to reduce noise)
+
+    emit driveStatusUpdated(completeDrives);
 }

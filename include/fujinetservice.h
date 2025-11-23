@@ -17,7 +17,7 @@
 #include <QStringList>
 #include <functional>
 
-// Structure to hold disk slot information
+// Structure to hold disk slot information (legacy format)
 struct FujiNetDiskSlot {
     int slotNumber;          // 0-7 for D1-D8
     QString filename;        // Mounted image filename
@@ -28,6 +28,17 @@ struct FujiNetDiskSlot {
 
     FujiNetDiskSlot()
         : slotNumber(-1), hostSlot(0xFF), accessMode(1), isEmpty(true) {}
+};
+
+// Simplified drive structure for UI integration
+struct FujiNetDrive {
+    int slotNumber;          // 0-7 for D1-D8
+    QString filename;        // Mounted image filename (e.g., "/ANIMALS.XEX")
+    bool isEmpty;            // True if no disk mounted
+    bool isReadOnly;         // True for (R), false for (W)
+
+    FujiNetDrive()
+        : slotNumber(-1), isEmpty(true), isReadOnly(true) {}
 };
 
 // Structure to hold host slot information
@@ -58,10 +69,17 @@ public:
     void stopHealthCheck();
     void abortAllRequests();  // Abort all pending network requests
 
+    // Drive polling
+    void startDrivePolling(int intervalMs = 2500);  // Poll drive status every 2.5 seconds
+    void stopDrivePolling();
+
     // Mount operations
     void mount(int deviceSlot, int hostSlot, const QString& filename, bool readOnly);
     void unmount(int deviceSlot);
     void mountAll();  // Mount all pre-configured images
+
+    // File operations
+    QString copyToSD(const QString& localPath, const QString& sdFolderPath);  // Copy file to SD, return SD-relative path
 
     // Host configuration
     void getHosts();
@@ -69,6 +87,7 @@ public:
 
     // Status queries
     void queryMountStatus();  // Query all disk slots D1-D8
+    void queryDriveStatus();  // Query drive status from root / endpoint (new format)
 
     // Browse files on host
     void browseHost(int hostSlot);
@@ -85,8 +104,14 @@ signals:
     void unmountSuccess(int deviceSlot);
     void unmountFailed(int deviceSlot, const QString& error);
 
+    // File copy signals
+    void copyProgress(int percent, const QString& filename);
+    void copySuccess(const QString& sdPath);
+    void copyFailed(const QString& error);
+
     // Status update signals
     void mountStatusUpdated(const QVector<FujiNetDiskSlot>& diskSlots);
+    void driveStatusUpdated(const QVector<FujiNetDrive>& drives);  // New simplified format
     void hostsUpdated(const QVector<FujiNetHostSlot>& hosts);
 
     // File browse signals
@@ -99,6 +124,7 @@ private slots:
     void onHostsReply();
     void onSetHostReply();
     void onMountStatusReply();
+    void onDriveStatusReply();  // New handler for / endpoint
     void onBrowseReply();
     void onNetworkError(QNetworkReply::NetworkError error);
 
@@ -107,12 +133,14 @@ private:
     void sendRequest(const QString& endpoint, std::function<void()> onSuccess);
     QUrl buildUrl(const QString& endpoint, const QMap<QString, QString>& params = QMap<QString, QString>());
     void parseMountStatus(const QString& html);
+    void parseDriveStatus(const QString& html);  // New parser for / endpoint
     QStringList parseHosts(const QString& response);
 
     QNetworkAccessManager* m_networkManager;
     QString m_serverUrl;
     bool m_isConnected;
     QTimer* m_healthCheckTimer;
+    QTimer* m_drivePollingTimer;  // New timer for drive status polling
 
     // Track pending operations for reply handling
     QMap<QNetworkReply*, int> m_pendingMounts;      // reply -> deviceSlot
