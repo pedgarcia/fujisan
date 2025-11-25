@@ -308,7 +308,10 @@ public:
     // Caps lock control
     void setCapsLock(bool enabled);  // Set caps lock to specific state
     bool getCapsLockState() const;   // Get current caps lock state
-    
+
+    // Screen memory inspection
+    bool isConfigDriveSlotsScreen() const;  // Check if FujiNet CONFIG drive slots screen is displayed
+
     // Debug/execution control
     void pauseEmulation();
     void resumeEmulation();

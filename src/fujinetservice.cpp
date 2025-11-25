@@ -112,18 +112,25 @@ void FujiNetService::abortAllRequests()
 
 void FujiNetService::mount(int deviceSlot, int hostSlot, const QString& filename, bool readOnly)
 {
-    // API expects: GET /mount?deviceslot=N&host=H&file=/path&mode=r|w
-    QMap<QString, QString> params;
-    params["deviceslot"] = QString::number(deviceSlot);
-    params["host"] = QString::number(hostSlot);
-    params["file"] = filename;
-    params["mode"] = readOnly ? "r" : "w";  // Changed from "1"/"2" to "r"/"w"
+    // Use stock FujiNet-PC browse API: GET /browse/host/{H}/path?action=newmount&slot={D}&mode=r|w
+    // Note: Browse API uses 1-indexed host and slot numbers
+    int hostNum = hostSlot + 1;  // Convert 0-indexed to 1-indexed
+    int slotNum = deviceSlot + 1;  // Convert 0-indexed to 1-indexed
 
-    QUrl url = buildUrl("/mount", params);
+    // Build the browse URL path: /browse/host/N/filename
+    QString urlPath = QString("/browse/host/%1%2").arg(hostNum).arg(filename);
+
+    // Build query parameters
+    QMap<QString, QString> params;
+    params["action"] = "newmount";
+    params["slot"] = QString::number(slotNum);
+    params["mode"] = readOnly ? "r" : "w";
+
+    QUrl url = buildUrl(urlPath, params);
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
 
-    qDebug() << "FujiNet mount request:" << url.toString();
+    qDebug() << "FujiNet mount request (browse API):" << url.toString();
 
     QNetworkReply* reply = m_networkManager->get(request);
     m_pendingMounts[reply] = deviceSlot;
@@ -135,12 +142,22 @@ void FujiNetService::mount(int deviceSlot, int hostSlot, const QString& filename
 
 void FujiNetService::unmount(int deviceSlot)
 {
-    QMap<QString, QString> params;
-    params["deviceslot"] = QString::number(deviceSlot);
+    // Use stock FujiNet-PC browse API: GET /browse/host/1/?action=eject&slot={D}
+    // Note: Browse API uses 1-indexed slot numbers
+    // Host doesn't matter for eject, but we need a valid host path
+    int slotNum = deviceSlot + 1;  // Convert 0-indexed to 1-indexed
 
-    QUrl url = buildUrl("/unmount", params);
+    // Build query parameters
+    QMap<QString, QString> params;
+    params["action"] = "eject";
+    params["slot"] = QString::number(slotNum);
+
+    // Use host 1 (SD card) as the base path for eject
+    QUrl url = buildUrl("/browse/host/1/", params);
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
+
+    qDebug() << "FujiNet unmount request (browse API):" << url.toString();
 
     QNetworkReply* reply = m_networkManager->get(request);
     m_pendingUnmounts[reply] = deviceSlot;
@@ -190,7 +207,19 @@ QString FujiNetService::copyToSD(const QString& localPath, const QString& sdFold
     QString baseFilename = localFile.fileName();
     QString destPath = sdDir.filePath(baseFilename);
 
-    // If file already exists, remove it (overwrite behavior)
+    // Check if file is already in the SD folder (same canonical path)
+    QString srcCanonical = localFile.canonicalFilePath();
+    QString destCanonical = QFileInfo(destPath).canonicalFilePath();
+
+    // If canonical paths match, or source is already in SD folder, skip copy
+    if (srcCanonical == destCanonical || localFile.canonicalPath() == sdDir.canonicalPath()) {
+        qDebug() << "File is already in SD folder, skipping copy:" << localPath;
+        QString sdRelativePath = "/" + baseFilename;
+        emit copySuccess(sdRelativePath);
+        return sdRelativePath;
+    }
+
+    // If file already exists at destination, remove it (overwrite behavior)
     if (QFile::exists(destPath)) {
         qDebug() << "File already exists, removing old version:" << destPath;
         if (!QFile::remove(destPath)) {

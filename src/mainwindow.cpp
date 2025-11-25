@@ -155,15 +155,16 @@ MainWindow::MainWindow(QWidget *parent)
                     driveWidget->showCopyProgress(false);
                 }
 
-                // Auto-refresh FujiNet CONFIG if it's showing drive slots
-                // Send two TABs to force CONFIG to refresh the drive list
-                // If CONFIG isn't running or is on a different screen, TABs are harmless
-                QTimer::singleShot(100, this, [this]() {
-                    m_emulator->injectAKey(AKEY_TAB);
-                });
-                QTimer::singleShot(200, this, [this]() {
-                    m_emulator->injectAKey(AKEY_TAB);
-                });
+                // Auto-refresh FujiNet CONFIG if it's showing drive slots screen
+                // Only inject TABs if CONFIG is actually on the drive slots screen
+                if (m_emulator->isConfigDriveSlotsScreen()) {
+                    QTimer::singleShot(100, this, [this]() {
+                        m_emulator->injectAKey(AKEY_TAB);
+                    });
+                    QTimer::singleShot(200, this, [this]() {
+                        m_emulator->injectAKey(AKEY_TAB);
+                    });
+                }
             });
     connect(m_fujinetService, &FujiNetService::mountFailed,
             this, [this](int deviceSlot, const QString& error) {
@@ -201,15 +202,16 @@ MainWindow::MainWindow(QWidget *parent)
                 int driveNumber = deviceSlot + 1;
                 statusBar()->showMessage(QString("Successfully ejected disk from FujiNet D%1").arg(driveNumber), 3000);
 
-                // Auto-refresh FujiNet CONFIG if it's showing drive slots
-                // Send two TABs to force CONFIG to refresh the drive list
-                // If CONFIG isn't running or is on a different screen, TABs are harmless
-                QTimer::singleShot(100, this, [this]() {
-                    m_emulator->injectAKey(AKEY_TAB);
-                });
-                QTimer::singleShot(200, this, [this]() {
-                    m_emulator->injectAKey(AKEY_TAB);
-                });
+                // Auto-refresh FujiNet CONFIG if it's showing drive slots screen
+                // Only inject TABs if CONFIG is actually on the drive slots screen
+                if (m_emulator->isConfigDriveSlotsScreen()) {
+                    QTimer::singleShot(100, this, [this]() {
+                        m_emulator->injectAKey(AKEY_TAB);
+                    });
+                    QTimer::singleShot(200, this, [this]() {
+                        m_emulator->injectAKey(AKEY_TAB);
+                    });
+                }
             });
     connect(m_fujinetService, &FujiNetService::unmountFailed,
             this, [this](int deviceSlot, const QString& error) {

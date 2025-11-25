@@ -2543,6 +2543,45 @@ bool AtariEmulator::getCapsLockState() const
     return m_capsLockEnabled;
 }
 
+bool AtariEmulator::isConfigDriveSlotsScreen() const
+{
+    // Check if FujiNet CONFIG's "DRIVE SLOTS" screen is displayed
+    // by searching screen memory for the text "DRIVE SLOTS"
+
+    // Get pointer to emulator memory
+    unsigned char* mem = libatari800_get_main_memory_ptr();
+    if (!mem) {
+        return false;
+    }
+
+    // Internal screen codes for "DRIVE SLOTS":
+    // D=36(0x24), R=50(0x32), I=41(0x29), V=54(0x36), E=37(0x25), space=0(0x00)
+    // S=51(0x33), L=44(0x2C), O=47(0x2F), T=52(0x34), S=51(0x33)
+    static const unsigned char driveSlots[] = {
+        0x24, 0x32, 0x29, 0x36, 0x25, 0x00,  // "DRIVE "
+        0x33, 0x2C, 0x2F, 0x34, 0x33         // "SLOTS"
+    };
+    static const int patternLen = sizeof(driveSlots);
+
+    // Search all of memory for "DRIVE SLOTS" text
+    // This is simpler and more reliable than parsing display lists
+    for (int addr = 0; addr < 0x10000 - patternLen; addr++) {
+        bool match = true;
+        for (int j = 0; j < patternLen; j++) {
+            // Mask off inverse video bit (bit 7) for comparison
+            if ((mem[addr + j] & 0x7F) != driveSlots[j]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void AtariEmulator::pauseEmulation()
 {
     if (!m_emulationPaused) {
