@@ -1982,6 +1982,43 @@ void MainWindow::createMediaPeripheralsDock()
         }
     });
 
+#ifndef Q_OS_WIN
+    // Connect FujiNet disk I/O signals (reuse same handlers as local drives)
+    connect(m_fujinetProcessManager, &FujiNetProcessManager::diskIOStart,
+            this, [this](int driveNumber, bool isWriting) {
+        if (driveNumber == 1 && m_diskDrive1) {
+            if (isWriting) {
+                m_diskDrive1->turnOnWriteLED();
+            } else {
+                m_diskDrive1->turnOnReadLED();
+            }
+        }
+        else if (driveNumber >= 2 && driveNumber <= 8) {
+            DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+            if (driveWidget) {
+                if (isWriting) {
+                    driveWidget->turnOnWriteLED();
+                } else {
+                    driveWidget->turnOnReadLED();
+                }
+            }
+        }
+    });
+
+    connect(m_fujinetProcessManager, &FujiNetProcessManager::diskIOEnd,
+            this, [this](int driveNumber) {
+        if (driveNumber == 1 && m_diskDrive1) {
+            m_diskDrive1->turnOffActivityLED();
+        }
+        else if (driveNumber >= 2 && driveNumber <= 8) {
+            DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(driveNumber);
+            if (driveWidget) {
+                driveWidget->turnOffActivityLED();
+            }
+        }
+    });
+#endif
+
     connect(m_mediaToggleButton, &QPushButton::clicked, this, &MainWindow::toggleMediaDock);
 
     // Create separate D1 container
@@ -3855,8 +3892,9 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
         switchDrivesToLocalMode();
         updateStatusBarForDriveMode();
 
-        // Stop FujiNet service polling
+        // Stop FujiNet service polling and health checks
         m_fujinetService->stopDrivePolling();
+        m_fujinetService->stopHealthCheck();
 
         // Stop FujiNet-PC if we started it (auto-launch mode only)
         if (launchBehavior == 0 && m_fujinetProcessManager->isRunning()) {

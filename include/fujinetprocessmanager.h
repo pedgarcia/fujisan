@@ -12,6 +12,8 @@
 #include <QProcess>
 #include <QString>
 #include <QTimer>
+#include <QMap>
+#include <QDateTime>
 
 class FujiNetProcessManager : public QObject
 {
@@ -73,6 +75,10 @@ signals:
     void stdoutReceived(const QString& output);
     void stderrReceived(const QString& output);
 
+    // FujiNet disk I/O signals (for LED activity)
+    void diskIOStart(int driveNumber, bool isWriting);
+    void diskIOEnd(int driveNumber);
+
 private slots:
     void onProcessStarted();
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -80,11 +86,27 @@ private slots:
     void onReadyReadStdout();
     void onReadyReadStderr();
     void onStartTimeout();
+    void onDriveOperationTimeout(int driveNumber);
 
 private:
+    // FujiNet disk I/O state tracking (for LED activity)
+    struct DriveIOState {
+        bool isPending = false;
+        bool isWriting = false;
+        QTimer* timeoutTimer = nullptr;
+        qint64 startTime = 0;
+    };
+
     void setState(ProcessState newState);
     QString processErrorToString(QProcess::ProcessError error);
     bool shouldFilterLogMessage(const QString& message);
+
+    // FujiNet log parsing for LED activity
+    void parseFujiNetLogsForLEDActivity(const QString& output);
+    void parseDeviceId(const QString& line);
+    void startDriveOperation(int driveNumber, bool isWriting);
+    void parseCompletion(const QString& line);
+    void completeDriveOperation(int driveNumber);
 
     QProcess* m_process;
     ProcessState m_state;
@@ -103,6 +125,10 @@ private:
     // Start timeout
     QTimer* m_startTimer;
     static const int START_TIMEOUT_MS = 10000;  // 10 seconds
+
+    // FujiNet disk I/O state tracking (for LED activity)
+    QMap<int, DriveIOState> m_driveStates;  // D1-D8 state tracking
+    int m_lastDeviceId = -1;                // Temporary device ID storage
 };
 
 #endif // FUJINETPROCESSMANAGER_H

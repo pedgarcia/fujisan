@@ -239,6 +239,9 @@ void FujiNetProcessManager::onReadyReadStdout()
             m_stdoutBuffer = m_stdoutBuffer.right(MAX_BUFFER_SIZE / 2);
         }
 
+        // Parse for LED activity (works regardless of log/hideFujiNetLogs setting)
+        parseFujiNetLogsForLEDActivity(output);
+
         // Check if FujiNet-PC logs should be hidden
         QSettings settings("8bitrelics", "Fujisan");
         bool hideFujiNetLogs = settings.value("log/hideFujiNetLogs", false).toBool();
@@ -361,4 +364,138 @@ bool FujiNetProcessManager::shouldFilterLogMessage(const QString& message)
     }
 
     return false;  // Don't filter this message
+}
+
+// FujiNet log parsing for LED activity
+void FujiNetProcessManager::parseFujiNetLogsForLEDActivity(const QString& output)
+{
+    // Split into lines and parse each one
+    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+    for (const QString& line : lines) {
+        QString trimmed = line.trimmed();
+        if (trimmed.isEmpty()) continue;
+
+        // Step 1: Device ID detection
+        if (trimmed.contains("CF:")) {
+            parseDeviceId(trimmed);
+            continue;
+        }
+
+        // Step 2: Operation detection (requires cached device ID)
+        if (m_lastDeviceId != -1) {
+            if (trimmed.contains("ATR READ")) {
+                int drive = m_lastDeviceId - 0x30;
+                if (drive >= 1 && drive <= 8) {
+                    startDriveOperation(drive, false); // READ
+                    m_lastDeviceId = -1;
+                }
+                continue;
+            }
+            if (trimmed.contains("ATR WRITE")) {
+                int drive = m_lastDeviceId - 0x30;
+                if (drive >= 1 && drive <= 8) {
+                    startDriveOperation(drive, true); // WRITE
+                    m_lastDeviceId = -1;
+                }
+                continue;
+            }
+        }
+
+        // Step 3: Completion detection
+        if (trimmed.contains("COMPLETE")) {
+            parseCompletion(trimmed);
+        }
+    }
+}
+
+void FujiNetProcessManager::parseDeviceId(const QString& line)
+{
+    // Extract from "CF: 31 52 6c 01 f0"
+    int cfIndex = line.indexOf("CF:");
+    if (cfIndex == -1) return;
+
+    QString afterCF = line.mid(cfIndex + 3).trimmed();
+    QStringList bytes = afterCF.split(' ', Qt::SkipEmptyParts);
+    if (bytes.isEmpty()) return;
+
+    bool ok;
+    int deviceId = bytes[0].toInt(&ok, 16);  // Parse hex
+    if (ok && deviceId >= 0x31 && deviceId <= 0x38) {
+        m_lastDeviceId = deviceId;
+
+        // 500ms timeout to clear stale device ID
+        QTimer::singleShot(500, this, [this, deviceId]() {
+            if (m_lastDeviceId == deviceId) {
+                m_lastDeviceId = -1;
+            }
+        });
+    }
+}
+
+void FujiNetProcessManager::startDriveOperation(int driveNumber, bool isWriting)
+{
+    // Force-complete any pending operation on this drive
+    if (m_driveStates.contains(driveNumber) && m_driveStates[driveNumber].isPending) {
+        completeDriveOperation(driveNumber);
+    }
+
+    // Initialize state structure if needed
+    if (!m_driveStates.contains(driveNumber)) {
+        DriveIOState state;
+        state.timeoutTimer = new QTimer(this);
+        state.timeoutTimer->setSingleShot(true);
+        connect(state.timeoutTimer, &QTimer::timeout, this, [this, driveNumber]() {
+            onDriveOperationTimeout(driveNumber);
+        });
+        m_driveStates[driveNumber] = state;
+    }
+
+    // Start operation
+    m_driveStates[driveNumber].isPending = true;
+    m_driveStates[driveNumber].isWriting = isWriting;
+    m_driveStates[driveNumber].startTime = QDateTime::currentMSecsSinceEpoch();
+    m_driveStates[driveNumber].timeoutTimer->start(2000);
+
+    // Turn LED ON
+    emit diskIOStart(driveNumber, isWriting);
+}
+
+void FujiNetProcessManager::parseCompletion(const QString& line)
+{
+    Q_UNUSED(line);
+
+    // Find first pending operation (FujiNet is typically sequential)
+    for (auto it = m_driveStates.begin(); it != m_driveStates.end(); ++it) {
+        if (it.value().isPending) {
+            completeDriveOperation(it.key());
+            return;
+        }
+    }
+}
+
+void FujiNetProcessManager::completeDriveOperation(int driveNumber)
+{
+    if (!m_driveStates.contains(driveNumber)) return;
+
+    DriveIOState& state = m_driveStates[driveNumber];
+    if (!state.isPending) return;
+
+    // Cancel timeout
+    state.timeoutTimer->stop();
+
+    // Debug logging
+    qint64 duration = QDateTime::currentMSecsSinceEpoch() - state.startTime;
+    qDebug() << "FujiNet D" << driveNumber << (state.isWriting ? "WRITE" : "READ")
+             << "completed in" << duration << "ms";
+
+    state.isPending = false;
+
+    // Turn LED OFF
+    emit diskIOEnd(driveNumber);
+}
+
+void FujiNetProcessManager::onDriveOperationTimeout(int driveNumber)
+{
+    qWarning() << "FujiNet D" << driveNumber << "operation timeout (2000ms) - forcing LED off";
+    completeDriveOperation(driveNumber);
 }
