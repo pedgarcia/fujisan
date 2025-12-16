@@ -73,6 +73,12 @@ public:
     void startDrivePolling(int intervalMs = 2500);  // Poll drive status every 2.5 seconds
     void stopDrivePolling();
 
+    // Printer operations
+    void configurePrinter(const QString& printerType, bool enabled);
+    void getPrinterOutput();
+    void startPrinterPolling();
+    void stopPrinterPolling();
+
     // Mount operations
     void mount(int deviceSlot, int hostSlot, const QString& filename, bool readOnly);
     void unmount(int deviceSlot);
@@ -117,6 +123,11 @@ signals:
     // File browse signals
     void fileListReceived(int hostSlot, const QStringList& files);
 
+    // Printer signals
+    void printerOutputReceived(const QByteArray& data, const QString& contentType);
+    void printerError(const QString& error);
+    void printerBusy();
+
 private slots:
     void onHealthCheckReply();
     void onMountReply();
@@ -135,12 +146,19 @@ private:
     void parseMountStatus(const QString& html);
     void parseDriveStatus(const QString& html);  // New parser for / endpoint
     QStringList parseHosts(const QString& response);
+    QString mapPrinterTypeToAPI(const QString& type);
 
     QNetworkAccessManager* m_networkManager;
     QString m_serverUrl;
     bool m_isConnected;
     QTimer* m_healthCheckTimer;
     QTimer* m_drivePollingTimer;  // New timer for drive status polling
+    QTimer* m_printerPollTimer;   // Timer for printer output polling
+
+    // Printer state
+    bool m_printerEnabled;
+    QString m_currentPrinterType;
+    static const int PRINTER_POLL_INTERVAL_MS = 2000;  // 2 seconds - allows complete output generation
 
     // Track pending operations for reply handling
     QMap<QNetworkReply*, int> m_pendingMounts;      // reply -> deviceSlot

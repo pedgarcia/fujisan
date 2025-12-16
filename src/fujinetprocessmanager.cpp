@@ -485,8 +485,6 @@ void FujiNetProcessManager::completeDriveOperation(int driveNumber)
 
     // Debug logging
     qint64 duration = QDateTime::currentMSecsSinceEpoch() - state.startTime;
-    qDebug() << "FujiNet D" << driveNumber << (state.isWriting ? "WRITE" : "READ")
-             << "completed in" << duration << "ms";
 
     state.isPending = false;
 

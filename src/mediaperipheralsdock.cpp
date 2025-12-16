@@ -142,19 +142,21 @@ void MediaPeripheralsDock::createDiskDrivesSection()
 
 void MediaPeripheralsDock::createPrinterSection()
 {
-    // Printer widget - DISABLED (P: device not working in atari800 core)
-    // TODO: Re-enable when P: device emulation is fixed
-    /*
+    // Printer widget - FujiNet-PC only (hidden until NetSIO enabled)
     m_printerGroup = new QGroupBox("Printer (P:)", this);
     QVBoxLayout* printerLayout = new QVBoxLayout(m_printerGroup);
-    printerLayout->setContentsMargins(2, WIDGET_SPACING, 2, WIDGET_SPACING); // Reduced left/right margins
-    
+    printerLayout->setContentsMargins(4, 8, 4, 4);
+    printerLayout->setSpacing(4);
+
     // Create printer widget
     m_printerWidget = new PrinterWidget(this);
     printerLayout->addWidget(m_printerWidget);
-    
+
+    // Add to main layout
     m_mainLayout->addWidget(m_printerGroup);
-    */
+
+    // Initially hidden - only show when NetSIO is enabled
+    m_printerGroup->setVisible(false);
 }
 
 void MediaPeripheralsDock::connectSignals()
@@ -172,17 +174,15 @@ void MediaPeripheralsDock::connectSignals()
             this, &MediaPeripheralsDock::onCassetteEjected);
     connect(m_cassetteWidget, &CassetteWidget::cassetteStateChanged,
             this, &MediaPeripheralsDock::onCassetteStateChanged);
-    
-    // Connect printer signals - DISABLED
-    /*
+
+    // Connect printer signals (FujiNet-PC only)
     connect(m_printerWidget, &PrinterWidget::printerEnabledChanged,
             this, &MediaPeripheralsDock::onPrinterEnabledChanged);
     connect(m_printerWidget, &PrinterWidget::outputFormatChanged,
             this, &MediaPeripheralsDock::onPrinterOutputFormatChanged);
     connect(m_printerWidget, &PrinterWidget::printerTypeChanged,
             this, &MediaPeripheralsDock::onPrinterTypeChanged);
-    */
-    
+
     // Connect disk drive signals
     for (int i = 0; i < 7; i++) {
         if (m_driveWidgets[i]) {
@@ -318,4 +318,12 @@ void MediaPeripheralsDock::updateDriveButtonStates()
     // Enable/disable buttons based on current state
     m_addDriveButton->setEnabled(m_visibleDrives < 7);    // Can add if less than 7 drives visible
     m_removeDriveButton->setEnabled(m_visibleDrives > 3); // Can remove if more than 3 drives visible
+}
+
+void MediaPeripheralsDock::setNetSIOEnabled(bool enabled)
+{
+    // Show/hide printer UI based on NetSIO state (FujiNet-PC only)
+    if (m_printerGroup) {
+        m_printerGroup->setVisible(enabled);
+    }
 }

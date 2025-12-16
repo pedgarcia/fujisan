@@ -86,6 +86,7 @@ private slots:
     void onFujiNetConnected();
     void onFujiNetDisconnected();
     void onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives);
+    void onPrinterReconfigureRequested();
 #endif
 
     // State save/load slots

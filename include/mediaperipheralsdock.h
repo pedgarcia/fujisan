@@ -39,6 +39,9 @@ public:
     // Update all devices from emulator state
     void updateAllDevices();
 
+    // FujiNet printer control
+    void setNetSIOEnabled(bool enabled);
+
 signals:
     void diskInserted(int driveNumber, const QString& diskPath);
     void diskEjected(int driveNumber);

@@ -21,6 +21,9 @@ FujiNetService::FujiNetService(QObject *parent)
     , m_isConnected(false)
     , m_healthCheckTimer(new QTimer(this))
     , m_drivePollingTimer(new QTimer(this))
+    , m_printerPollTimer(nullptr)
+    , m_printerEnabled(false)
+    , m_currentPrinterType("Atari 825")
 {
     connect(m_healthCheckTimer, &QTimer::timeout, this, &FujiNetService::checkConnection);
     connect(m_drivePollingTimer, &QTimer::timeout, this, &FujiNetService::queryDriveStatus);
@@ -649,4 +652,123 @@ void FujiNetService::parseDriveStatus(const QString& html)
     // Drive status parsed - emit signal (debug logging removed to reduce noise)
 
     emit driveStatusUpdated(completeDrives);
+}
+
+// Printer operations
+
+void FujiNetService::configurePrinter(const QString& printerType, bool enabled)
+{
+    if (!m_networkManager) return;
+
+    QUrl url(m_serverUrl + "/config");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader,
+                     "application/x-www-form-urlencoded");
+
+    // Map Fujisan type to FujiNet API string
+    QString apiPrinterType = mapPrinterTypeToAPI(printerType);
+
+    QString postData = QString("printermodel1=%1&printer_enabled=%2")
+        .arg(QString(QUrl::toPercentEncoding(apiPrinterType)))
+        .arg(enabled ? "1" : "0");
+
+    qDebug() << "Configuring printer:" << apiPrinterType << "enabled:" << enabled;
+
+    QNetworkReply* reply = m_networkManager->post(request, postData.toUtf8());
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            qDebug() << "Printer configured successfully";
+        } else {
+            emit printerError("Failed to configure printer: " + reply->errorString());
+        }
+        reply->deleteLater();
+    });
+
+    m_printerEnabled = enabled;
+    m_currentPrinterType = printerType;
+}
+
+void FujiNetService::getPrinterOutput()
+{
+    if (!m_networkManager || !m_printerEnabled) return;
+
+    QUrl url(m_serverUrl + "/print");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
+
+    QNetworkReply* reply = m_networkManager->get(request);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray data = reply->readAll();
+
+            // Empty response means no print job ready
+            if (data.isEmpty()) {
+                reply->deleteLater();
+                return;
+            }
+
+            QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString();
+
+            // qDebug() << "Printer output received, content-type:" << contentType << "size:" << data.size();
+            emit printerOutputReceived(data, contentType);
+        }
+        else if (reply->errorString().contains("busy", Qt::CaseInsensitive)) {
+            emit printerBusy();
+        }
+        else {
+            // Silently ignore errors during polling (don't spam logs)
+            qDebug() << "Printer output error:" << reply->errorString();
+        }
+        reply->deleteLater();
+    });
+}
+
+void FujiNetService::startPrinterPolling()
+{
+    if (!m_printerPollTimer) {
+        m_printerPollTimer = new QTimer(this);
+        connect(m_printerPollTimer, &QTimer::timeout, this, &FujiNetService::getPrinterOutput);
+    }
+
+    qDebug() << "Starting printer polling every" << PRINTER_POLL_INTERVAL_MS << "ms";
+    m_printerPollTimer->start(PRINTER_POLL_INTERVAL_MS);
+
+    // Get output immediately
+    getPrinterOutput();
+}
+
+void FujiNetService::stopPrinterPolling()
+{
+    if (m_printerPollTimer) {
+        qDebug() << "Stopping printer polling";
+        m_printerPollTimer->stop();
+    }
+}
+
+QString FujiNetService::mapPrinterTypeToAPI(const QString& type)
+{
+    // Map from display name to API string
+    static QMap<QString, QString> typeMap = {
+        {"file printer (TRIM)", "file printer (TRIM)"},
+        {"file printer (ASCII)", "file printer (ASCII)"},
+        {"Atari 820", "Atari 820"},
+        {"Atari 822", "Atari 822"},
+        {"Atari 825", "Atari 825"},
+        {"Atari 1020", "Atari 1020"},
+        {"Atari 1025", "Atari 1025"},
+        {"Atari 1027", "Atari 1027"},
+        {"Atari 1029", "Atari 1029"},
+        {"Atari XMM801", "Atari XMM801"},
+        {"Atari XDM121", "Atari XDM121"},
+        {"Epson 80", "Epson 80"},
+        {"Epson PrintShop", "Epson PrintShop"},
+        {"Okimate 10", "Okimate 10"},
+        {"GRANTIC", "GRANTIC"},
+        {"HTML printer", "HTML printer"},
+        {"HTML ATASCII printer", "HTML ATASCII printer"}
+    };
+
+    return typeMap.value(type, "Atari 825");  // Default
 }

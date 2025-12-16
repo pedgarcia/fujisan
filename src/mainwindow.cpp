@@ -239,6 +239,11 @@ MainWindow::MainWindow(QWidget *parent)
     m_netSIOEnabled = netSIOEnabled;
     updateBasicToggleState();
 
+    // Sync printer UI visibility with NetSIO state (FujiNet-PC only)
+    if (m_mediaPeripheralsDock) {
+        m_mediaPeripheralsDock->setNetSIOEnabled(m_netSIOEnabled);
+    }
+
     int launchBehavior = settings.value("fujinet/launchBehavior", 0).toInt(); // 0=Auto, 1=Detect, 2=Manual
 
     if (netSIOEnabled && launchBehavior == 0) { // Auto-launch mode
@@ -2017,6 +2022,40 @@ void MainWindow::createMediaPeripheralsDock()
             }
         }
     });
+
+    // Connect FujiNet printer output handling
+    connect(m_fujinetService, &FujiNetService::printerOutputReceived,
+            this, [this](const QByteArray& data, const QString& contentType) {
+        PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
+        if (printer) {
+            printer->showPrintingActivity();
+            printer->displayPrinterOutput(data, contentType);
+        }
+    });
+
+    connect(m_fujinetService, &FujiNetService::printerError,
+            this, [this](const QString& error) {
+        qWarning() << "FujiNet printer error:" << error;
+        statusBar()->showMessage("Printer error: " + error, 3000);
+    });
+
+    connect(m_fujinetService, &FujiNetService::printerBusy,
+            this, []() {
+        qDebug() << "FujiNet printer busy, will retry on next poll";
+    });
+
+    // Connect printer polling pause/resume signals
+    if (m_mediaPeripheralsDock) {
+        PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
+        if (printer) {
+            connect(printer, &PrinterWidget::requestPausePrinterPolling,
+                    m_fujinetService, &FujiNetService::stopPrinterPolling);
+            connect(printer, &PrinterWidget::requestResumePrinterPolling,
+                    m_fujinetService, &FujiNetService::startPrinterPolling);
+            connect(printer, &PrinterWidget::requestPrinterReconfigure,
+                    this, &MainWindow::onPrinterReconfigureRequested);
+        }
+    }
 #endif
 
     connect(m_mediaToggleButton, &QPushButton::clicked, this, &MainWindow::toggleMediaDock);
@@ -3439,27 +3478,28 @@ void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
 
 void MainWindow::onPrinterEnabledChanged(bool enabled)
 {
-    if (m_emulator) {
-        m_emulator->setPrinterEnabled(enabled);
-        
+#ifndef Q_OS_WIN
+    // FujiNet-PC printer (network printing)
+    if (m_fujinetService) {
+        QString printerType = m_mediaPeripheralsDock
+                            ->getPrinterWidget()
+                            ->getPrinterType();
+
+        m_fujinetService->configurePrinter(printerType, enabled);
+
         if (enabled) {
-            // Set up the printer output callback to capture text
-            PrinterWidget* printerWidget = m_mediaPeripheralsDock->getPrinterWidget();
-            if (printerWidget) {
-                m_emulator->setPrinterOutputCallback([printerWidget](const QString& text) {
-                    printerWidget->appendText(text);
-                });
-            }
-            
-            statusBar()->showMessage("Printer enabled - P: device ready", 2000);
-            qDebug() << "Printer enabled via MainWindow";
+            m_fujinetService->startPrinterPolling();
+            statusBar()->showMessage("FujiNet printer enabled - polling for output", 2000);
+            qDebug() << "FujiNet printer enabled via MainWindow";
         } else {
-            // Clear the callback
-            m_emulator->setPrinterOutputCallback(nullptr);
-            statusBar()->showMessage("Printer disabled", 2000);
-            qDebug() << "Printer disabled via MainWindow";
+            m_fujinetService->stopPrinterPolling();
+            statusBar()->showMessage("FujiNet printer disabled", 2000);
+            qDebug() << "FujiNet printer disabled via MainWindow";
         }
     }
+#endif
+
+    // Note: Local P: device printer is disabled (not working in atari800 core)
 }
 
 void MainWindow::onPrinterOutputFormatChanged(const QString& format)
@@ -3471,8 +3511,17 @@ void MainWindow::onPrinterOutputFormatChanged(const QString& format)
 void MainWindow::onPrinterTypeChanged(const QString& type)
 {
     qDebug() << "Printer type changed to:" << type;
-    // Printer type changes are handled internally by PrinterWidget for now
-    // Future: could configure emulator for specific printer characteristics
+
+#ifndef Q_OS_WIN
+    // Update FujiNet-PC printer configuration
+    if (m_fujinetService) {
+        bool enabled = m_mediaPeripheralsDock
+                      ->getPrinterWidget()
+                      ->isPrinterEnabled();
+
+        m_fujinetService->configurePrinter(type, enabled);
+    }
+#endif
 }
 
 void MainWindow::toggleTCPServer()
@@ -3880,6 +3929,22 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
             m_fujinetService->startDrivePolling();
         }
 
+#ifndef Q_OS_WIN
+        // Show printer UI and start polling if printer is enabled AND FujiNet is connected
+        if (m_fujinetService && m_mediaPeripheralsDock) {
+            m_mediaPeripheralsDock->setNetSIOEnabled(true);
+
+            // Only start polling if FujiNet service is already connected
+            if (m_fujinetService->isConnected()) {
+                PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
+                if (printer && printer->isPrinterEnabled()) {
+                    m_fujinetService->startPrinterPolling();
+                    qDebug() << "Started FujiNet printer polling";
+                }
+            }
+        }
+#endif
+
         // Start FujiNet-PC if not already running (auto-launch mode only)
         if (launchBehavior == 0 && !m_fujinetProcessManager->isRunning()) {
             qDebug() << "NetSIO enabled - auto-starting FujiNet-PC with saved settings...";
@@ -3895,6 +3960,15 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
         // Stop FujiNet service polling and health checks
         m_fujinetService->stopDrivePolling();
         m_fujinetService->stopHealthCheck();
+
+#ifndef Q_OS_WIN
+        // Hide printer UI and stop polling
+        if (m_fujinetService && m_mediaPeripheralsDock) {
+            m_mediaPeripheralsDock->setNetSIOEnabled(false);
+            m_fujinetService->stopPrinterPolling();
+            qDebug() << "Stopped FujiNet printer polling and hid printer UI";
+        }
+#endif
 
         // Stop FujiNet-PC if we started it (auto-launch mode only)
         if (launchBehavior == 0 && m_fujinetProcessManager->isRunning()) {
@@ -3931,6 +4005,23 @@ void MainWindow::onFujiNetConnected()
         switchDrivesToFujiNetMode();
         updateStatusBarForDriveMode();
         m_fujinetService->startDrivePolling();
+
+#ifndef Q_OS_WIN
+        // Configure and start printer polling if printer is enabled
+        if (m_mediaPeripheralsDock) {
+            PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
+            if (printer && printer->isPrinterEnabled()) {
+                // Configure the printer on FujiNet-PC first
+                QString printerType = printer->getPrinterType();
+                m_fujinetService->configurePrinter(printerType, true);
+                qDebug() << "Configured FujiNet printer on startup:" << printerType;
+
+                // Then start polling
+                m_fujinetService->startPrinterPolling();
+                qDebug() << "Started FujiNet printer polling after connection";
+            }
+        }
+#endif
     }
 }
 
@@ -3961,6 +4052,28 @@ void MainWindow::onFujiNetDisconnected()
         // Not in NetSIO mode
         statusBar()->showMessage("Disconnected from FujiNet-PC", 3000);
     }
+}
+
+void MainWindow::onPrinterReconfigureRequested()
+{
+    // Perform disable/re-enable cycle to reset FujiNet-PC printer buffer
+    // This simulates clearing the server-side buffer since no clear endpoint exists
+    if (!m_mediaPeripheralsDock) return;
+
+    PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
+    if (!printer) return;
+
+    QString printerType = printer->getPrinterType();
+    qDebug() << "Printer reconfigure requested - performing disable/enable cycle";
+
+    // Disable printer
+    m_fujinetService->configurePrinter(printerType, false);
+
+    // Re-enable after brief delay (100ms)
+    QTimer::singleShot(100, this, [this, printerType]() {
+        m_fujinetService->configurePrinter(printerType, true);
+        qDebug() << "Printer reconfigured - buffer should be reset";
+    });
 }
 
 void MainWindow::onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives)
