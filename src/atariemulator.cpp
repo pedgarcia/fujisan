@@ -1561,12 +1561,14 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 
 void AtariEmulator::coldBoot()
 {
-    qDebug() << "[NETSIO] COLD BOOT START";
+    qDebug() << "[NETSIO] COLD BOOT START *** BUILD 2025-01-01-POLLING-FIX ***";
     qDebug() << "[NETSIO] m_netSIOEnabled:" << m_netSIOEnabled;
 
 #ifdef NETSIO
+    extern int fujinet_known;  // Declared in netsio.c, set when first packet received from FujiNet-PC
     qDebug() << "[NETSIO] Compiled: YES [v0.9.5 WITH SO_REUSEPORT FIX]";
     qDebug() << "[NETSIO] netsio_enabled (core variable):" << netsio_enabled;
+    qDebug() << "[NETSIO] fujinet_known (received packets):" << fujinet_known;
 #else
     qDebug() << "[NETSIO] Compiled: NO";
 #endif
@@ -1574,17 +1576,57 @@ void AtariEmulator::coldBoot()
     // CRITICAL: Send cold reset notification to FujiNet-PC BEFORE resetting emulator
     // This tells FujiNet-PC to reset its state (boot_config=true, status_wait_count=5)
 #ifdef NETSIO
-    if (m_netSIOEnabled && netsio_enabled) {
-        qDebug() << "[NETSIO] Sending cold reset to FujiNet-PC (0xFF packet)";
-        int resetResult = netsio_cold_reset();
-        qDebug() << "[NETSIO] netsio_cold_reset() returned:" << resetResult;
-    } else {
-        if (!m_netSIOEnabled) {
-            qDebug() << "[NETSIO] WARNING: m_netSIOEnabled is FALSE - NetSIO disabled in Fujisan";
-        }
+    if (m_netSIOEnabled) {
+        extern int fujinet_known;
+
+        // PHASE 1: Wait for NetSIO socket initialization (netsio_enabled)
         if (!netsio_enabled) {
-            qDebug() << "[NETSIO] WARNING: netsio_enabled is FALSE - NetSIO not enabled in atari800 core";
+            qDebug() << "[NETSIO] Waiting for NetSIO socket initialization (port 9997)...";
+            QElapsedTimer timer;
+            timer.start();
+            while (!netsio_enabled && timer.elapsed() < 2000) {
+                QCoreApplication::processEvents();
+                QThread::msleep(50);
+            }
+
+            if (!netsio_enabled) {
+                qWarning() << "[NETSIO] TIMEOUT: NetSIO socket not initialized after 2 seconds";
+                qWarning() << "[NETSIO] FujiNet boot will FAIL - netsio_enabled is still 0";
+            } else {
+                qDebug() << "[NETSIO] NetSIO socket initialized after" << timer.elapsed() << "ms";
+            }
         }
+
+        // PHASE 2: Wait for FujiNet-PC first packet (fujinet_known)
+        if (netsio_enabled && !fujinet_known) {
+            qDebug() << "[NETSIO] Waiting for FujiNet-PC first packet (fujinet_known)...";
+            QElapsedTimer timer;
+            timer.start();
+            while (!fujinet_known && timer.elapsed() < 2000) {
+                QCoreApplication::processEvents();
+                QThread::msleep(50);
+            }
+
+            if (!fujinet_known) {
+                qWarning() << "[NETSIO] TIMEOUT: No packets from FujiNet-PC after 2 seconds";
+                qWarning() << "[NETSIO] Reset packet will NOT be sent - FujiNet boot will FAIL";
+            } else {
+                qDebug() << "[NETSIO] FujiNet-PC responded after" << timer.elapsed() << "ms";
+            }
+        }
+
+        // SEND RESET: Only if both conditions are met
+        if (netsio_enabled && fujinet_known) {
+            qDebug() << "[NETSIO] Sending cold reset to FujiNet-PC (0xFF packet)";
+            int resetResult = netsio_cold_reset();
+            qDebug() << "[NETSIO] netsio_cold_reset() returned:" << resetResult;
+        } else {
+            qWarning() << "[NETSIO] CANNOT SEND RESET - Conditions not met:";
+            qWarning() << "[NETSIO]   netsio_enabled:" << netsio_enabled << "(need: 1)";
+            qWarning() << "[NETSIO]   fujinet_known:" << fujinet_known << "(need: 1)";
+        }
+    } else {
+        qDebug() << "[NETSIO] NetSIO disabled - skipping FujiNet reset";
     }
 #else
     qDebug() << "[NETSIO] WARNING: Not compiled - NetSIO not available";
