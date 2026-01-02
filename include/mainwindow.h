@@ -86,7 +86,6 @@ private slots:
     void onFujiNetConnected();
     void onFujiNetDisconnected();
     void onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives);
-    void onPrinterReconfigureRequested();
 #endif
 
     // State save/load slots
@@ -162,6 +161,7 @@ private:
     void switchDrivesToFujiNetMode();
     void switchDrivesToLocalMode();
     void updateStatusBarForDriveMode();
+    QString getFujiNetSDPath() const;  // Get SD path with default computation
 #endif
 
     AtariEmulator* m_emulator;

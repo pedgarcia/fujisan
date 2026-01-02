@@ -1,18 +1,20 @@
-# Fujisan - Modern Atari Emulator
+# Fujisan - Fujinet-ready Atari Emulator
 
 ![Fujisan Logo](images/fujisanlogo.png)
 
-A modern frontend for the Atari800 emulator, providing a native desktop experience with full keyboard support, machine configuration, and authentic Atari behavior.
-
 **Motivation**
 
-"Do we really need a new emulator?" some of you might be asking. And a simple answer is, "no, not really". But, to be precise, Fujisan is a UI built on top of Atari800, so it is not really a new emulator, but a new way to use Atari800. Users have plenty of good options with Altirra, Atari800 (vanilla), Atari800MacX and Mame. One thing that Atari800 has that is great, but it throws some users off, is its built-in UI inside the emulator window. A lot of users prefer to have the native feeling like Altirra on Windows, and Atari800MacX on macOS delivers. 
+Initially built as a modern frontend for the Atari800 emulator, Fujisan has pivoted to be a Fujinet-first Atari 8-bit emulator.
 
-Fujisan is an exercise and hobby for me, to build an emulator tailored to my personal use, with fewer customization available but ready to go for 90% of the use cases. Hopefully it will attract more people like me. Also, the fact that the users will have the same native experience in Windows, MacOS or Linux is a differentiator compared to the other emulators.
+Users have plenty of good options with Altirra, Atari800 (vanilla), Atari800MacX and Mame. One thing that Atari800 has that is great, but it throws some users off, is its built-in UI inside the emulator window. A lot of users prefer to have the native feeling like Altirra on Windows, and Atari800MacX on macOS delivers. 
+
+Fujisan is an exercise and hobby for me, to build an emulator tailored to my personal use, with fewer customization available but ready to go for 90% of the use cases. Hopefully it will attract more people like me. Also, the fact that the users will have the same native experience in MacOS or Linux.
 
 Another important objective is to always use **libatari800** so there is never incompatibility between the Atari800 source code and Fujisan (as much as possible). There are some patches I had to apply, but I am set to always make it easier for anyone that wants to build Fujisan, to be able to reproduce my steps and patch atari800 properly (There is a patches folder with detailed instructions).
 
-I guess, the big difference is that Fujisan is a UI-based emulator that is available for Windows, Mac, and Linux. Overtime, with some features that will help software development, so if you see something wrong or have a request, use Github issue tracker.
+I guess, the big difference is that Fujisan is a UI-based emulator that is available for ~Windows~, Mac, and Linux. Overtime, with some features that will help software development, so if you see something wrong or have a request, use Github issue tracker.
+
+*IMPORTANT*: For the time-being, I am dropping the Windows support. The fact that Atari800 doesn't support Fujinet on Windows makes it pointless to make efforts to run Fujisan on Windows. Users have great support with Altirra, anyways. I will keep Windows instructions available for people that might want to build and try it on that platform.
 
 
 ![Fujisan Screenshot](images/screenshot1.png)
@@ -24,6 +26,18 @@ I guess, the big difference is that Fujisan is a UI-based emulator that is avail
 - **Authentic Display**: 384x240 full screen resolution with proper Atari colors
 - **Pixel Perfect Scaling**: Integer scaling for crisp, retro graphics
 - **Real-time Performance**: Proper 49.86 FPS (PAL) / 59.92 FPS (NTSC) timing
+- **Fujinet-first**: Fujisan has deep integration with Fujinet PC. It comes bundle with it so you don't even have to run fujinet-pc separatelly - It also let you use Fujisan's disk and printer UI to handle fujinet media!
+
+### Built-in FujiNet-PC
+- **Bundled Binary**: FujiNet-PC comes pre-installed with Fujisan - no separate installation needed
+- **Multi-Platform**: Automatically bundled for macOS (ARM64/x86_64) and Linux (x86_64/ARM64)
+- **Automatic Launch**: Starts automatically when NetSIO is enabled in Settings
+- **Automatic Management**: Health monitoring with auto-restart on crash
+- **8 Network Drives**: D1-D8 with real-time status updates and activity LEDs
+- **Smart File Handling**: Automatic copy of local disk images to FujiNet SD folder
+- **Dual Drive Modes**: Seamless switching between LOCAL (Atari800) and FUJINET modes
+- **Process Control**: Start, stop, restart via Settings → FujiNet dialog
+- **Zero Setup**: No configuration needed - just enable NetSIO and go
 
 ### User Interface
 - **Native Menus**: Standard desktop menu bar and dialogs
@@ -33,7 +47,7 @@ I guess, the big difference is that Fujisan is a UI-based emulator that is avail
 
 ### Developer Friendly
 
-- Built-in TCP Server API - Fujisan includes a powerful TCP server for remote control and automation. This enables IDE integration, automated testing, and programmatic control of all emulator features. See usage below for more details
+- Built-in TCP Server API - Fujisan includes a TCP server for remote control and automation, enabling IDE integration, automated testing, and programmatic control of all emulator features. See usage below for more details
 
 ### Keyboard Input
 - **Full Keyboard Support**: All letters, numbers, and symbols
@@ -49,19 +63,29 @@ I guess, the big difference is that Fujisan is a UI-based emulator that is avail
 - **ROM Loading**: Support for .rom, .bin, .car, .atr files
 
 ### Network Features
-- **NetSIO/FujiNet Support**: Connect to FujiNet-PC for network-enabled Atari programs
-- **Automatic Configuration**: Auto-disable BASIC and local disks when NetSIO enabled
-- **Smart Restart**: Seamless NetSIO toggle without application restart
-- **Boot Priority**: FujiNet devices take precedence over local disk images
+- **Bundled FujiNet-PC**: Pre-installed FujiNet-PC binary for macOS and Linux, no separate installation required
+- **Automatic Launch**: FujiNet-PC starts automatically when NetSIO is enabled (configurable)
+- **Process Management**: Built-in health monitoring, auto-restart on crashes, process control in Settings
+- **Smart Configuration**: Auto-configure BASIC disable and drive priorities for FujiNet boot
+- **8 Network Drives**: Full D1-D8 support with real-time mount status from FujiNet web API
+- **Drive Activity LEDs**: Visual read/write indicators driven by FujiNet-PC process logs
+- **File Management**: Drag-and-drop disk images with automatic copy to FujiNet SD folder
+- **Dual Drive Modes**:
+  - **LOCAL**: Uses Atari800 core disk emulation
+  - **FUJINET**: Connects to FujiNet-PC network drives
+- **HTTP API Integration**: Communicates via FujiNet-PC HTTP server (default port 8000)
+- **Connection Monitoring**: Continuous health checks with automatic reconnection
+- **Cross-Platform**: Works seamlessly on macOS (ARM64, x86_64) and Linux (x86_64, ARM64)
 
 ### Printer Support
-- **P: Device Status**: Currently disabled due to limitations in atari800 core P: device emulation
-- **Error 138 Issue**: LPRINT and LIST "P:" commands result in device timeout errors
-- **Implementation Ready**: Full printer UI and backend code implemented but commented out
-- **Future Support**: Will be re-enabled when P: device emulation is fixed in atari800 core
+- **FujiNet-PC Integration**: Full printer emulation via bundled FujiNet-PC
+- **17 Printer Models**: Atari 820/822/825/1020/1025/1027/1029, Epson, and more
+- **Visual Output**: Animated printer form display with continuous feed simulation
+- **Output Formats**: PNG, PDF, ASCII text, and raw binary
+- **Print Management**: View, save, and clear printer output with tear-off animation
 
 ### Debugging & Development
-- **Integrated Debugger**: Comprehensive 6502 debugging with breakpoints, stepping, and memory inspection
+- **Integrated Debugger**: 6502 debugging with breakpoints, stepping, and memory inspection
 - **Breakpoint System**: Set/remove breakpoints with automatic execution pause and visual indicators
 - **CPU State Monitoring**: Real-time register display (A, X, Y, PC, SP, P) in hex format
 - **Memory Viewer**: Hex dump with ASCII display for full 64KB address space analysis
@@ -137,7 +161,7 @@ sudo yum install qt5-qtbase-devel cmake gcc-c++
 sudo dnf install qt5-qtbase-devel cmake gcc-c++
 ```
 
-#### **Windows**
+#### **Windows (supported removed for now) **
 1. **Install Qt5**: Download from [qt.io](https://www.qt.io/download-qt-installer)
    - Choose Qt 5.15.x or later
    - Select "MSVC 2019 64-bit" or "MinGW" kit
@@ -376,12 +400,58 @@ fujisan.exe
 - **System → Enable BASIC**: Toggle BASIC ROM loading
 - **System → Restart**: Apply BASIC setting changes
 
-### NetSIO/FujiNet Usage
-- **Settings → Hardware → NetSIO**: Enable network connectivity to FujiNet-PC
-- **Automatic Setup**: BASIC is auto-disabled when NetSIO enabled (required for FujiNet boot)
-- **Disk Priority**: Local disk images are auto-dismounted to ensure FujiNet boot priority
-- **FujiNet-PC**: Must be running on UDP port 9997 for connection
-- **Network Programs**: Access to online services, file sharing, and multiplayer games
+### FujiNet-PC Usage
+
+#### Getting Started
+1. **Enable NetSIO**: Settings → Hardware → NetSIO checkbox
+2. **Automatic Setup**:
+   - FujiNet-PC launches automatically (if auto-launch enabled)
+   - BASIC is auto-disabled (required for FujiNet boot)
+   - Drives switch to FUJINET mode
+   - Connection health monitoring starts
+3. **Use Network Drives**:
+   - Access online services, file sharing, multiplayer games
+   - D1-D8 network drives available
+   - Real-time status updates in drive widgets
+
+#### Managing Drives
+- **Insert Disk**: Click drive widget, select .atr/.xfd/.dcm file
+  - Files automatically copied to FujiNet SD folder (with progress indicator)
+  - Mounted to selected drive after successful copy
+  - Activity LEDs show read/write operations
+- **Eject Disk**: Right-click drive widget → Eject
+- **Drive Status**: Blue background indicates FUJINET mode
+- **D3-D8 Access**: Click drawer icon to expand additional drives
+
+#### Printer Integration
+- **Enable Printer**: Settings → FujiNet → Enable Printer checkbox
+- **Select Model**: Choose from 17 printer types (Atari 820-1029, Epson, etc.)
+- **View Output**: Printer icon appears in toolbar when output ready
+  - Click to view animated printer form
+  - Save as PNG/PDF or view ASCII text
+  - Tear-off animation when clearing output
+
+#### Process Control
+- **Settings → FujiNet Tab**:
+  - View FujiNet-PC status (running/stopped)
+  - Start/Stop/Restart buttons
+  - View process output (stdout/stderr)
+  - Configure SD folder path
+  - Set HTTP API port (default: 8000)
+  - Set NetSIO UDP port (default: 9997)
+  - Choose launch behavior: Auto/Detect Existing/Manual
+
+#### Connection Status
+- **Status Bar Indicators**:
+  - "Drives: FujiNet (NetSIO enabled)" - Connected and ready
+  - "FujiNet Disconnected" (with spinner) - Attempting reconnection
+  - "Copying disk.atr to FujiNet... 45%" - File transfer progress
+  - Drive mount success/failure messages
+
+#### Requirements
+- **Ports**: HTTP API on 8000, NetSIO UDP on 9997 (configurable)
+- **SD Folder**: Defaults to `<fujinet-binary-path>/SD/`
+- **Network**: Localhost communication between Fujisan and FujiNet-PC
 
 ### Keyboard Input
 - **Letters**: Automatically converted to uppercase (Atari standard)
@@ -392,7 +462,7 @@ fujisan.exe
 - **Shift+Numbers**: Access symbols `!@#$%^&*()`
 
 ### Known Limitations
-- **Printer Support**: P: device (printer) functionality is currently disabled due to Error 138 (Device Timeout) issues in the atari800 core. Commands like `LPRINT` and `LIST "P:"` will not work. This limitation also affects the official atari800 emulator and is not specific to Fujisan.
+- **Local Printer (P: device)**: Direct P: device emulation is disabled due to Error 138 (Device Timeout) issues in the atari800 core. Use FujiNet-PC printer integration instead for full printer functionality.
 
 ## Configuration Files
 
@@ -438,9 +508,41 @@ C:\Users\<username>\AppData\Roaming\Fujisan\profiles\*.profile
 
 Profiles contain complete machine configurations including hardware settings, memory configuration, peripherals, and media paths. They can be managed through the Settings dialog's profile system.
 
+### FujiNet-PC Settings
+
+FujiNet-PC configuration and process control available in Settings dialog (FujiNet tab).
+
+**Binary Configuration:**
+- Binary path (bundled with Fujisan, platform-specific)
+- Version detection and display
+- Platform: macOS (ARM64/x86_64), Linux (x64/ARM64)
+
+**SD Card Settings:**
+- SD folder path (default: `<binary-path>/SD/`)
+- Custom path configuration for virtual SD card storage
+
+**Server Configuration:**
+- HTTP API port (default: 8000, used for drive/printer communication)
+- NetSIO UDP port (default: 9997, used by Atari800 core)
+- Launch behavior:
+  - **Auto Launch**: Start FujiNet-PC when NetSIO enabled
+  - **Detect Existing**: Connect to already-running FujiNet-PC
+  - **Manual**: User controls start/stop
+
+**Process Management:**
+- Real-time status display (running/stopped)
+- Start/Stop/Restart buttons
+- Process output viewer (stdout/stderr with scrollback)
+- Auto-restart on NetSIO enable (if auto-launch mode)
+
+**Configuration File:**
+- Location: `<binary-path>/fnconfig.ini`
+- Auto-updated with NetSIO port before launch
+- Contains printer, network, and device settings
+
 ## TCP Server API
 
-Fujisan includes a powerful TCP server for remote control and automation. This enables IDE integration, automated testing, and programmatic control of all emulator features.
+Fujisan includes a TCP server for remote control and automation, enabling IDE integration, automated testing, and programmatic control of all emulator features.
 
 ### Enabling the Server
 1. Go to **Tools → TCP Server** in the menu
@@ -466,11 +568,11 @@ echo '{"command": "input.send_text", "params": {"text": "LOAD \"D:*\"\n"}}' | nc
 ```
 
 ### Complete Documentation
-See **[TCP_SERVER_API.md](TCP_SERVER_API.md)** for comprehensive API documentation with examples for all 34+ available commands covering media control, debugging, configuration, and automation.
+See **[TCP_SERVER_API.md](TCP_SERVER_API.md)** for complete API documentation with examples for all 34+ available commands covering media control, debugging, configuration, and automation.
 
 ## Debugging
 
-Fujisan includes a comprehensive debugger for analyzing and debugging Atari 8-bit programs. Access it via **Tools → Debug Window** in the menu bar.
+Fujisan includes an integrated debugger for Atari 8-bit programs. Access it via **Tools → Debug Window** in the menu bar.
 
 ### Debugger Features
 
@@ -604,7 +706,7 @@ Understanding 6502 assembly helps with debugging:
 - **PIA**: Joystick and keyboard input
 - **Device Handlers**: Disk, cassette, printer operations
 
-The debugger provides powerful tools for understanding and debugging Atari 8-bit programs, from simple BASIC programs to complex assembly language applications.
+The debugger offers extensive capabilities for understanding and debugging Atari 8-bit programs.
 
 ## Architecture
 
@@ -612,7 +714,7 @@ The debugger provides powerful tools for understanding and debugging Atari 8-bit
 - **AtariEmulator**: Core emulator integration and input handling
 - **EmulatorWidget**: Qt widget for display and input capture
 - **MainWindow**: Application window with menus and layout
-- **DebuggerWidget**: Comprehensive debugging interface with breakpoints and execution control
+- **DebuggerWidget**: Debugging interface with breakpoints and execution control
 - **main.cpp**: Application entry point and initialization
 
 ### Design Principles

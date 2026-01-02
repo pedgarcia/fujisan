@@ -367,8 +367,8 @@ private:
     QString m_basicRomPath;
     
     // Joystick keyboard emulation settings
-    bool m_kbdJoy0Enabled = true;   // Default true to match SDL
-    bool m_kbdJoy1Enabled = false;  // Default false to match SDL
+    bool m_kbdJoy0Enabled = false;  // Default false - keyboard joysticks disabled by default
+    bool m_kbdJoy1Enabled = false;  // Default false - keyboard joysticks disabled by default
     bool m_swapJoysticks = false;   // Default false: Joy0=Numpad, Joy1=WASD
     float m_targetFps = 59.92f;
     float m_frameTimeMs = 16.67f;

@@ -7,6 +7,7 @@
 
 #include "diskdrivewidget.h"
 #include "atariemulator.h"
+#include "fujinetbinarymanager.h"
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QDebug>
@@ -543,10 +544,16 @@ void DiskDriveWidget::onInsertDisk()
         // In FujiNet mode, default to SD card path
         QSettings settings;
         QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+
+        // If not configured, use default
+        if (sdPath.isEmpty()) {
+            sdPath = FujiNetBinaryManager::getDefaultSDPath();
+        }
+
         if (!sdPath.isEmpty() && QDir(sdPath).exists()) {
             startDir = sdPath;
         } else {
-            // Fallback to home if SD path not configured
+            // Fallback to home if SD path doesn't exist
             startDir = QDir::homePath();
         }
     } else {

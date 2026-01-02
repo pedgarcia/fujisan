@@ -251,8 +251,7 @@ void PrinterWidget::setPrinterEnabled(bool enabled)
             m_lastReceivedHash.clear();
             m_duplicateCount = 0;
             qDebug() << "Cleared deduplication state (printer re-enabled)";
-            qDebug() << "Resuming printer polling (printer enabled)";
-            emit requestResumePrinterPolling();
+            // Note: Printer connection (SSE/polling) is handled by configurePrinter()
         }
     }
 }
@@ -373,11 +372,10 @@ void PrinterWidget::clearOutput()
 
         qDebug() << "Tear complete - display cleared, hash preserved to prevent re-showing torn data";
 
-        // Request printer reconfiguration to reset FujiNet-PC buffer state
-        emit requestPrinterReconfigure();
+        // Request clear of FujiNet-PC printer buffer
+        emit requestClearPrinterBuffer();
 
-        // Resume polling
-        emit requestResumePrinterPolling();
+        // Note: No need to resume polling - SSE connection is continuous
 
         // Update output display if viewer is open
         if (m_outputDisplay) {
@@ -394,6 +392,13 @@ void PrinterWidget::clearOutput()
     });
 
     tearGroup->start();
+}
+
+void PrinterWidget::resetDeduplicationHash()
+{
+    qDebug() << "Resetting deduplication hash - server buffer cleared";
+    m_lastReceivedHash.clear();
+    m_duplicateCount = 0;
 }
 
 QString PrinterWidget::getOutputText() const
@@ -570,13 +575,8 @@ void PrinterWidget::onPrinterTypeChanged(const QString& type)
             updateViewerForCurrentState();
         }
 
-        // Resume polling when printer type changes (clears any paused state)
-        // This ensures that changing printer type will fetch new output format
-        if (m_printerEnabled) {
-            qDebug() << "Resuming printer polling (printer type changed)";
-            emit requestResumePrinterPolling();
-        }
-
+        // Printer connection will be handled by configurePrinter() in MainWindow
+        // when printerTypeChanged signal is received
         emit printerTypeChanged(type);
         saveSettings();
         qDebug() << "Printer type changed to:" << type;

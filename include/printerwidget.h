@@ -57,6 +57,7 @@ public:
     // FujiNet printer output handling
     void displayPrinterOutput(const QByteArray& data, const QString& contentType);
     void showPrintingActivity();
+    void resetDeduplicationHash();  // Clear hash to allow new prints after buffer cleared
 
 signals:
     void printerEnabledChanged(bool enabled);
@@ -65,7 +66,7 @@ signals:
     void printerCommandChanged(const QString& command);
     void requestPausePrinterPolling();
     void requestResumePrinterPolling();
-    void requestPrinterReconfigure();  // Request disable/enable cycle to reset server buffer
+    void requestClearPrinterBuffer();  // Request clear of server-side printer buffer
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;

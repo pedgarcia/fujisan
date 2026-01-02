@@ -637,7 +637,7 @@ void MainWindow::createJoystickToolbarSection()
     m_joystickSwapWidget->setEnabled(joystickEnabled);
     
     // Load keyboard joystick settings (checkboxes keep their state)
-    bool kbdJoy0Checked = settings.value("input/kbdJoy0Enabled", true).toBool();
+    bool kbdJoy0Checked = settings.value("input/kbdJoy0Enabled", false).toBool();
     bool kbdJoy1Checked = settings.value("input/kbdJoy1Enabled", false).toBool();
     m_kbdJoy0Check->setChecked(kbdJoy0Checked);
     m_kbdJoy1Check->setChecked(kbdJoy1Checked);
@@ -1149,7 +1149,7 @@ void MainWindow::restartEmulator()
 
     // Load input settings for keyboard joystick emulation
     bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();  // Main joystick support
-    bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", true).toBool();     // Saved kbd joy0 state
+    bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", false).toBool();     // Saved kbd joy0 state
     bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();    // Saved kbd joy1 state
     bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();     // Default false: Joy0=Numpad, Joy1=WASD
     
@@ -1432,7 +1432,7 @@ void MainWindow::updateToolbarFromSettings()
     // Update joystick settings from saved state
     if (m_emulator && m_joystickEnabledCheck && m_kbdJoy0Check && m_kbdJoy1Check && m_joystickSwapWidget) {
         bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();
-        bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", true).toBool();
+        bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", false).toBool();
         bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();
         bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();
         
@@ -2044,6 +2044,15 @@ void MainWindow::createMediaPeripheralsDock()
         qDebug() << "FujiNet printer busy, will retry on next poll";
     });
 
+    connect(m_fujinetService, &FujiNetService::printerBufferCleared,
+            this, [this]() {
+        qDebug() << "FujiNet printer buffer cleared - resetting deduplication";
+        PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
+        if (printer) {
+            printer->resetDeduplicationHash();
+        }
+    });
+
     // Connect printer polling pause/resume signals
     if (m_mediaPeripheralsDock) {
         PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
@@ -2052,8 +2061,8 @@ void MainWindow::createMediaPeripheralsDock()
                     m_fujinetService, &FujiNetService::stopPrinterPolling);
             connect(printer, &PrinterWidget::requestResumePrinterPolling,
                     m_fujinetService, &FujiNetService::startPrinterPolling);
-            connect(printer, &PrinterWidget::requestPrinterReconfigure,
-                    this, &MainWindow::onPrinterReconfigureRequested);
+            connect(printer, &PrinterWidget::requestClearPrinterBuffer,
+                    m_fujinetService, &FujiNetService::clearPrinterBuffer);
         }
     }
 #endif
@@ -2454,14 +2463,23 @@ void MainWindow::onDiskInserted(int driveNumber, const QString& diskPath)
         // FujiNet mode - copy file to SD and mount via API
         qDebug() << "FujiNet mode: copying" << diskPath << "to SD and mounting on D" << driveNumber;
 
-        // Get SD path from settings
-        QSettings settings;
-        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+        // Get SD path (with default computation)
+        QString sdPath = getFujiNetSDPath();
 
         if (sdPath.isEmpty()) {
-            statusBar()->showMessage("Error: FujiNet SD path not configured", 5000);
-            qWarning() << "FujiNet SD path not configured";
+            statusBar()->showMessage("Error: FujiNet binary not found", 5000);
+            qWarning() << "Cannot determine FujiNet SD path - binary not found";
             return;
+        }
+
+        // Ensure SD directory exists
+        QDir sdDir(sdPath);
+        if (!sdDir.exists()) {
+            if (!sdDir.mkpath(".")) {
+                statusBar()->showMessage("Error: Cannot create SD directory", 5000);
+                qWarning() << "Failed to create SD directory:" << sdPath;
+                return;
+            }
         }
 
         // Show copy progress on the drive widget
@@ -2548,8 +2566,7 @@ void MainWindow::onDriveStateChanged(int driveNumber, bool enabled)
 #ifndef Q_OS_WIN
     // If NetSIO is enabled, sync the enable/disable state to FujiNet config
     if (m_netSIOEnabled && m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
-        QSettings settings;
-        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+        QString sdPath = getFujiNetSDPath();
 
         if (!sdPath.isEmpty()) {
             // fnconfig.ini is in the parent directory of the SD folder
@@ -2691,7 +2708,7 @@ void MainWindow::loadInitialSettings()
 
     // Load input settings for keyboard joystick emulation
     bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();  // Main joystick support
-    bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", true).toBool();     // Saved kbd joy0 state
+    bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", false).toBool();     // Saved kbd joy0 state
     bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();    // Saved kbd joy1 state
     bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();     // Default false: Joy0=Numpad, Joy1=WASD
     
@@ -3412,13 +3429,21 @@ void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
     // Check if we should use FujiNet mode
     if (m_netSIOEnabled && m_diskDrive1->getDriveMode() == DiskDriveWidget::FUJINET) {
         // FujiNet mode - copy to SD and mount via FujiNet API
-        QSettings settings;
-        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+        QString sdPath = getFujiNetSDPath();
 
-        if (sdPath.isEmpty() || !QDir(sdPath).exists()) {
+        if (sdPath.isEmpty()) {
             QMessageBox::warning(this, "FujiNet Error",
-                "SD card path is not configured. Please configure it in Settings.");
+                "Cannot determine FujiNet SD path. Please check FujiNet installation.");
             return;
+        }
+
+        QDir sdDir(sdPath);
+        if (!sdDir.exists()) {
+            if (!sdDir.mkpath(".")) {
+                QMessageBox::warning(this, "FujiNet Error",
+                    QString("Cannot create SD directory: %1").arg(sdPath));
+                return;
+            }
         }
 
         // Copy file to SD folder
@@ -3488,11 +3513,9 @@ void MainWindow::onPrinterEnabledChanged(bool enabled)
         m_fujinetService->configurePrinter(printerType, enabled);
 
         if (enabled) {
-            m_fujinetService->startPrinterPolling();
-            statusBar()->showMessage("FujiNet printer enabled - polling for output", 2000);
+            statusBar()->showMessage("FujiNet printer enabled - real-time notifications active", 2000);
             qDebug() << "FujiNet printer enabled via MainWindow";
         } else {
-            m_fujinetService->stopPrinterPolling();
             statusBar()->showMessage("FujiNet printer disabled", 2000);
             qDebug() << "FujiNet printer disabled via MainWindow";
         }
@@ -3934,12 +3957,11 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
         if (m_fujinetService && m_mediaPeripheralsDock) {
             m_mediaPeripheralsDock->setNetSIOEnabled(true);
 
-            // Only start polling if FujiNet service is already connected
+            // Printer connection (SSE or polling) is handled automatically by configurePrinter()
             if (m_fujinetService->isConnected()) {
                 PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
                 if (printer && printer->isPrinterEnabled()) {
-                    m_fujinetService->startPrinterPolling();
-                    qDebug() << "Started FujiNet printer polling";
+                    qDebug() << "FujiNet printer already configured, using existing connection";
                 }
             }
         }
@@ -4011,14 +4033,11 @@ void MainWindow::onFujiNetConnected()
         if (m_mediaPeripheralsDock) {
             PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
             if (printer && printer->isPrinterEnabled()) {
-                // Configure the printer on FujiNet-PC first
+                // Configure the printer on FujiNet-PC (will use SSE or polling fallback automatically)
                 QString printerType = printer->getPrinterType();
                 m_fujinetService->configurePrinter(printerType, true);
                 qDebug() << "Configured FujiNet printer on startup:" << printerType;
-
-                // Then start polling
-                m_fujinetService->startPrinterPolling();
-                qDebug() << "Started FujiNet printer polling after connection";
+                qDebug() << "Printer connection established (SSE with polling fallback)";
             }
         }
 #endif
@@ -4052,28 +4071,6 @@ void MainWindow::onFujiNetDisconnected()
         // Not in NetSIO mode
         statusBar()->showMessage("Disconnected from FujiNet-PC", 3000);
     }
-}
-
-void MainWindow::onPrinterReconfigureRequested()
-{
-    // Perform disable/re-enable cycle to reset FujiNet-PC printer buffer
-    // This simulates clearing the server-side buffer since no clear endpoint exists
-    if (!m_mediaPeripheralsDock) return;
-
-    PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
-    if (!printer) return;
-
-    QString printerType = printer->getPrinterType();
-    qDebug() << "Printer reconfigure requested - performing disable/enable cycle";
-
-    // Disable printer
-    m_fujinetService->configurePrinter(printerType, false);
-
-    // Re-enable after brief delay (100ms)
-    QTimer::singleShot(100, this, [this, printerType]() {
-        m_fujinetService->configurePrinter(printerType, true);
-        qDebug() << "Printer reconfigured - buffer should be reset";
-    });
 }
 
 void MainWindow::onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives)
@@ -4148,5 +4145,26 @@ void MainWindow::updateStatusBarForDriveMode()
     } else {
         statusBar()->showMessage("Drives: Local", 3000);
     }
+}
+
+QString MainWindow::getFujiNetSDPath() const
+{
+    QSettings settings;
+    QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
+
+    if (!sdPath.isEmpty()) {
+        return sdPath;
+    }
+
+    // Compute default: SD subdirectory next to FujiNet binary
+    if (m_fujinetBinaryManager) {
+        QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
+        if (!binaryPath.isEmpty() && QFile::exists(binaryPath)) {
+            QFileInfo fileInfo(binaryPath);
+            return fileInfo.absolutePath() + "/SD";
+        }
+    }
+
+    return QString();
 }
 #endif

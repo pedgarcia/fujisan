@@ -68,10 +68,21 @@ QString FujiNetBinaryManager::getStoragePath()
     // macOS: Store in app bundle Resources
     return QCoreApplication::applicationDirPath() + "/../Resources/fujinet-pc";
 #else
-    // Linux: Store in user data directory
+    // Linux: Check bundled location first (for distributed packages)
+    QString bundledPath = QCoreApplication::applicationDirPath() + "/fujinet-pc";
+    if (QDir(bundledPath).exists()) {
+        return bundledPath;
+    }
+
+    // Fall back to user data directory (for user-installed binaries)
     QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     return dataPath + "/fujinet-pc";
 #endif
+}
+
+QString FujiNetBinaryManager::getDefaultSDPath()
+{
+    return getStoragePath() + "/SD";
 }
 
 QString FujiNetBinaryManager::getBinaryPath() const

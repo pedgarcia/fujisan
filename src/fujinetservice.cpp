@@ -13,6 +13,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 FujiNetService::FujiNetService(QObject *parent)
     : QObject(parent)
@@ -24,6 +26,7 @@ FujiNetService::FujiNetService(QObject *parent)
     , m_printerPollTimer(nullptr)
     , m_printerEnabled(false)
     , m_currentPrinterType("Atari 825")
+    , m_sseConnection(nullptr)
 {
     connect(m_healthCheckTimer, &QTimer::timeout, this, &FujiNetService::checkConnection);
     connect(m_drivePollingTimer, &QTimer::timeout, this, &FujiNetService::queryDriveStatus);
@@ -32,6 +35,7 @@ FujiNetService::FujiNetService(QObject *parent)
 FujiNetService::~FujiNetService()
 {
     stopHealthCheck();
+    disconnectFromPrinterEvents();
 }
 
 void FujiNetService::setServerUrl(const QString& url)
@@ -676,10 +680,19 @@ void FujiNetService::configurePrinter(const QString& printerType, bool enabled)
 
     QNetworkReply* reply = m_networkManager->post(request, postData.toUtf8());
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, enabled]() {
         if (reply->error() == QNetworkReply::NoError) {
             qDebug() << "Printer configured successfully";
+
+            if (enabled) {
+                stopPrinterPolling();
+                connectToPrinterEvents();
+            } else {
+                disconnectFromPrinterEvents();
+                stopPrinterPolling();
+            }
         } else {
+            qDebug() << "Printer config failed:" << reply->errorString();
             emit printerError("Failed to configure printer: " + reply->errorString());
         }
         reply->deleteLater();
@@ -687,6 +700,33 @@ void FujiNetService::configurePrinter(const QString& printerType, bool enabled)
 
     m_printerEnabled = enabled;
     m_currentPrinterType = printerType;
+}
+
+void FujiNetService::checkPrinterStatus()
+{
+    if (!m_networkManager || !m_printerEnabled) return;
+
+    QUrl url(m_serverUrl + "/printer/status");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
+
+    QNetworkReply* reply = m_networkManager->get(request);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray data = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            QJsonObject obj = doc.object();
+
+            bool hasOutput = obj["has_output"].toBool();
+            bool ready = obj["ready"].toBool();
+
+            if (hasOutput && ready) {
+                getPrinterOutput();
+            }
+        }
+        reply->deleteLater();
+    });
 }
 
 void FujiNetService::getPrinterOutput()
@@ -703,22 +743,18 @@ void FujiNetService::getPrinterOutput()
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray data = reply->readAll();
 
-            // Empty response means no print job ready
             if (data.isEmpty()) {
                 reply->deleteLater();
                 return;
             }
 
             QString contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString();
-
-            // qDebug() << "Printer output received, content-type:" << contentType << "size:" << data.size();
             emit printerOutputReceived(data, contentType);
         }
         else if (reply->errorString().contains("busy", Qt::CaseInsensitive)) {
             emit printerBusy();
         }
         else {
-            // Silently ignore errors during polling (don't spam logs)
             qDebug() << "Printer output error:" << reply->errorString();
         }
         reply->deleteLater();
@@ -729,14 +765,13 @@ void FujiNetService::startPrinterPolling()
 {
     if (!m_printerPollTimer) {
         m_printerPollTimer = new QTimer(this);
-        connect(m_printerPollTimer, &QTimer::timeout, this, &FujiNetService::getPrinterOutput);
+        connect(m_printerPollTimer, &QTimer::timeout, this, &FujiNetService::checkPrinterStatus);
     }
 
     qDebug() << "Starting printer polling every" << PRINTER_POLL_INTERVAL_MS << "ms";
     m_printerPollTimer->start(PRINTER_POLL_INTERVAL_MS);
 
-    // Get output immediately
-    getPrinterOutput();
+    checkPrinterStatus();
 }
 
 void FujiNetService::stopPrinterPolling()
@@ -744,6 +779,122 @@ void FujiNetService::stopPrinterPolling()
     if (m_printerPollTimer) {
         qDebug() << "Stopping printer polling";
         m_printerPollTimer->stop();
+    }
+}
+
+void FujiNetService::clearPrinterBuffer()
+{
+    if (!m_networkManager) return;
+
+    QUrl url(m_serverUrl + "/printer/clear");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentLengthHeader, "0");
+
+    QNetworkReply* reply = m_networkManager->post(request, QByteArray());
+
+    connect(reply, &QNetworkReply::finished, this, [reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            qDebug() << "Printer buffer cleared successfully";
+        } else {
+            qDebug() << "Failed to clear printer buffer:" << reply->errorString();
+        }
+        reply->deleteLater();
+    });
+}
+
+void FujiNetService::connectToPrinterEvents()
+{
+    if (!m_networkManager) {
+        qDebug() << "Cannot connect to printer events: no network manager";
+        return;
+    }
+
+    if (m_sseConnection) {
+        qDebug() << "SSE connection already active";
+        return;
+    }
+
+    QUrl url(m_serverUrl + "/printer/events");
+    QNetworkRequest request(url);
+    request.setRawHeader("Accept", "text/event-stream");
+    request.setRawHeader("Cache-Control", "no-cache");
+    request.setRawHeader("Connection", "keep-alive");
+
+    qDebug() << "Connecting to printer SSE:" << url.toString();
+
+    m_sseConnection = m_networkManager->get(request);
+    m_sseBuffer.clear();
+
+    connect(m_sseConnection, &QIODevice::readyRead, this, [this]() {
+        if (!m_sseConnection) return;
+
+        QByteArray data = m_sseConnection->readAll();
+        m_sseBuffer.append(data);
+        parseSSEData(m_sseBuffer);
+    });
+
+    connect(m_sseConnection, &QNetworkReply::finished, this, [this]() {
+        qDebug() << "SSE connection closed, reconnecting in 2s";
+        m_sseConnection = nullptr;
+
+        if (m_printerEnabled) {
+            QTimer::singleShot(2000, this, &FujiNetService::connectToPrinterEvents);
+        }
+    });
+
+    connect(m_sseConnection, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::errorOccurred),
+            this, [this](QNetworkReply::NetworkError error) {
+        qDebug() << "SSE connection error:" << error << "- falling back to polling";
+
+        if (error != QNetworkReply::OperationCanceledError) {
+            disconnectFromPrinterEvents();
+            startPrinterPolling();
+        }
+    });
+}
+
+void FujiNetService::disconnectFromPrinterEvents()
+{
+    if (m_sseConnection) {
+        qDebug() << "Disconnecting from printer SSE events";
+        m_sseConnection->abort();
+        m_sseConnection->deleteLater();
+        m_sseConnection = nullptr;
+        m_sseBuffer.clear();
+    }
+}
+
+void FujiNetService::parseSSEData(QByteArray& buffer)
+{
+    // SSE messages end with double newline: either \n\n or \r\n\r\n
+    QString delimiter = "\n\n";
+    if (!buffer.contains(delimiter.toLatin1())) {
+        delimiter = "\r\n\r\n";
+    }
+
+    while (buffer.contains(delimiter.toLatin1())) {
+        int endPos = buffer.indexOf(delimiter.toLatin1());
+        QByteArray message = buffer.left(endPos);
+        buffer.remove(0, endPos + delimiter.length());
+
+        if (message.startsWith("data: ")) {
+            QByteArray jsonData = message.mid(6).trimmed();
+
+            QJsonDocument doc = QJsonDocument::fromJson(jsonData);
+            if (doc.isNull()) {
+                qDebug() << "Failed to parse SSE JSON:" << jsonData;
+                continue;
+            }
+
+            QJsonObject obj = doc.object();
+            QString event = obj["event"].toString();
+
+            if (event == "printer_ready") {
+                getPrinterOutput();
+            } else if (event == "printer_cleared") {
+                emit printerBufferCleared();
+            }
+        }
     }
 }
 

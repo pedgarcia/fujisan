@@ -310,6 +310,42 @@ mkdir -p fujisan-linux/usr/lib/fujisan/plugins/mediaservice
 mkdir -p fujisan-linux/usr/lib/fujisan/plugins/imageformats
 mkdir -p fujisan-linux/usr/lib/fujisan/plugins/xcbglintegrations
 
+# Bundle FujiNet-PC for .deb package
+mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc
+mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/data
+mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/SD
+
+# Determine FujiNet source directory based on architecture
+if [ "$ARCH" = "amd64" ]; then
+    FUJINET_SOURCE="/build/fujisan/fujinet/ubuntu-22.04"
+elif [ "$ARCH" = "arm64" ]; then
+    FUJINET_SOURCE="/build/fujisan/fujinet/ubuntu-22.04-arm64"
+fi
+
+# Copy FujiNet binary and files if source exists
+if [ -d "$FUJINET_SOURCE" ]; then
+    echo "Bundling FujiNet-PC from $FUJINET_SOURCE..."
+    cp "$FUJINET_SOURCE/fujinet" fujisan-linux/usr/lib/fujisan/fujinet-pc/
+    chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet
+
+    # Copy data folder if it exists
+    if [ -d "$FUJINET_SOURCE/data" ]; then
+        cp -r "$FUJINET_SOURCE/data"/* fujisan-linux/usr/lib/fujisan/fujinet-pc/data/
+    fi
+
+    # Copy config if it exists
+    if [ -f "$FUJINET_SOURCE/fnconfig.ini" ]; then
+        cp "$FUJINET_SOURCE/fnconfig.ini" fujisan-linux/usr/lib/fujisan/fujinet-pc/
+    fi
+
+    # Create SD directory with README
+    echo "SD Card Storage Directory" > fujisan-linux/usr/lib/fujisan/fujinet-pc/SD/README.txt
+
+    echo "✓ FujiNet-PC bundled for .deb"
+else
+    echo "⚠ Warning: FujiNet-PC binaries not found at $FUJINET_SOURCE"
+fi
+
 # Copy binary to lib directory (real binary)
 cp Fujisan fujisan-linux/usr/lib/fujisan/Fujisan
 chmod 755 fujisan-linux/usr/lib/fujisan/Fujisan
@@ -472,6 +508,37 @@ if [ "$BUILD_TARBALL" = "true" ]; then
 [Paths]
 Plugins = ../plugins
 QTCONF_EOF
+
+    # Bundle FujiNet-PC for portable package
+    mkdir -p fujisan-portable/bin/fujinet-pc
+    mkdir -p fujisan-portable/bin/fujinet-pc/data
+    mkdir -p fujisan-portable/bin/fujinet-pc/SD
+
+    # Determine FujiNet source directory based on architecture
+    if [ "$ARCH" = "amd64" ]; then
+        FUJINET_SOURCE="/build/fujisan/fujinet/ubuntu-22.04"
+    elif [ "$ARCH" = "arm64" ]; then
+        FUJINET_SOURCE="/build/fujisan/fujinet/ubuntu-22.04-arm64"
+    fi
+
+    # Copy FujiNet binary and files
+    if [ -d "$FUJINET_SOURCE" ]; then
+        echo "Bundling FujiNet-PC for portable package..."
+        cp "$FUJINET_SOURCE/fujinet" fujisan-portable/bin/fujinet-pc/
+        chmod +x fujisan-portable/bin/fujinet-pc/fujinet
+
+        if [ -d "$FUJINET_SOURCE/data" ]; then
+            cp -r "$FUJINET_SOURCE/data"/* fujisan-portable/bin/fujinet-pc/data/
+        fi
+
+        if [ -f "$FUJINET_SOURCE/fnconfig.ini" ]; then
+            cp "$FUJINET_SOURCE/fnconfig.ini" fujisan-portable/bin/fujinet-pc/
+        fi
+
+        echo "FujiNet-PC Storage Directory" > fujisan-portable/bin/fujinet-pc/SD/README.txt
+
+        echo "✓ FujiNet-PC bundled in portable package"
+    fi
 
     # Copy Qt libraries
     mkdir -p fujisan-portable/lib

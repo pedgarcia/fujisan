@@ -75,9 +75,13 @@ public:
 
     // Printer operations
     void configurePrinter(const QString& printerType, bool enabled);
+    void checkPrinterStatus();
     void getPrinterOutput();
+    void clearPrinterBuffer();
     void startPrinterPolling();
     void stopPrinterPolling();
+    void connectToPrinterEvents();
+    void disconnectFromPrinterEvents();
 
     // Mount operations
     void mount(int deviceSlot, int hostSlot, const QString& filename, bool readOnly);
@@ -127,6 +131,7 @@ signals:
     void printerOutputReceived(const QByteArray& data, const QString& contentType);
     void printerError(const QString& error);
     void printerBusy();
+    void printerBufferCleared();  // Emitted when server confirms buffer cleared
 
 private slots:
     void onHealthCheckReply();
@@ -147,6 +152,7 @@ private:
     void parseDriveStatus(const QString& html);  // New parser for / endpoint
     QStringList parseHosts(const QString& response);
     QString mapPrinterTypeToAPI(const QString& type);
+    void parseSSEData(QByteArray& buffer);
 
     QNetworkAccessManager* m_networkManager;
     QString m_serverUrl;
@@ -159,6 +165,10 @@ private:
     bool m_printerEnabled;
     QString m_currentPrinterType;
     static const int PRINTER_POLL_INTERVAL_MS = 2000;  // 2 seconds - allows complete output generation
+
+    // SSE connection for printer events
+    QNetworkReply* m_sseConnection;
+    QByteArray m_sseBuffer;
 
     // Track pending operations for reply handling
     QMap<QNetworkReply*, int> m_pendingMounts;      // reply -> deviceSlot

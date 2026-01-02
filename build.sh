@@ -915,7 +915,7 @@ case $PLATFORM in
             build_macos_x86_64
         fi
         # Always build Windows and Linux (cross-platform builds)
-        build_windows
+        # build_windows  # DISABLED: Windows build has libatari800 type conflicts with MinGW
         build_linux "amd64"
         build_linux "arm64"
         ;;
