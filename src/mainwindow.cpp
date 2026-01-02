@@ -991,6 +991,10 @@ void MainWindow::coldBoot()
             statusBar()->showMessage("Cold boot completed - FujiNet-PC ready", 2000);
             qDebug() << "Cold boot with FujiNet-PC restart completed";
         });
+        // Restore focus to emulator widget (fixes Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
         return;
     }
 #endif
@@ -998,12 +1002,20 @@ void MainWindow::coldBoot()
     // Normal cold boot (no NetSIO or not running FujiNet-PC)
     m_emulator->coldBoot();
     statusBar()->showMessage("Cold boot performed", 2000);
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::warmBoot()
 {
     m_emulator->warmBoot();
     statusBar()->showMessage("Warm boot performed", 2000);
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::toggleBasic(bool enabled)
@@ -1051,6 +1063,10 @@ void MainWindow::toggleAltirraOS(bool enabled)
     QString message = enabled ? "Altirra OS enabled - restarting..." : "Original Atari OS enabled - restarting...";
     statusBar()->showMessage(message, 3000);
     restartEmulator();
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::toggleAltirraBASIC(bool enabled)
@@ -1059,6 +1075,10 @@ void MainWindow::toggleAltirraBASIC(bool enabled)
     QString message = enabled ? "Altirra BASIC enabled - restarting..." : "Original Atari BASIC enabled - restarting...";
     statusBar()->showMessage(message, 3000);
     restartEmulator();
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::onMachineTypeChanged(int index)
@@ -1307,6 +1327,11 @@ void MainWindow::showSettings()
     }
 
     dialog.exec();
+
+    // Restore focus to emulator widget after settings dialog closes (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::onSettingsChanged()
@@ -2234,6 +2259,11 @@ void MainWindow::createMediaPeripheralsDock()
             m_emulator->handleKeyRelease(&releaseEvent);
             qDebug() << "*** START button F2 released ***";
         });
+
+        // Restore focus to emulator widget (fixes Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
     connect(m_selectButton, &QPushButton::clicked, this, [this]() {
         QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F3, Qt::NoModifier);
@@ -2246,6 +2276,11 @@ void MainWindow::createMediaPeripheralsDock()
             m_emulator->handleKeyRelease(&releaseEvent);
             qDebug() << "*** SELECT button F3 released ***";
         });
+
+        // Restore focus to emulator widget (fixes Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
     connect(m_optionButton, &QPushButton::clicked, this, [this]() {
         QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F4, Qt::NoModifier);
@@ -2258,6 +2293,11 @@ void MainWindow::createMediaPeripheralsDock()
             m_emulator->handleKeyRelease(&releaseEvent);
             qDebug() << "*** OPTION button F4 released ***";
         });
+
+        // Restore focus to emulator widget (fixes Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
     connect(m_breakButton, &QPushButton::clicked, this, [this]() {
         QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier);
@@ -2270,6 +2310,11 @@ void MainWindow::createMediaPeripheralsDock()
             m_emulator->handleKeyRelease(&releaseEvent);
             qDebug() << "*** BREAK button F7 released ***";
         });
+
+        // Restore focus to emulator widget (fixes Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
     
     // Connect system button signals
@@ -2280,6 +2325,11 @@ void MainWindow::createMediaPeripheralsDock()
     connect(inverseButton, &QPushButton::clicked, this, [this]() {
         m_emulator->injectAKey(AKEY_ATARI);
         qDebug() << "*** INVERSE button clicked - AKEY_ATARI injected ***";
+
+        // Restore focus to emulator widget (fixes Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
     });
     
     // Connect pause button
@@ -2449,6 +2499,10 @@ void MainWindow::toggleMediaDock()
     } else {
         m_mediaPeripheralsDockWidget->show();
         m_mediaToggleButton->setChecked(true);
+    }
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
     }
 }
 
@@ -3057,6 +3111,10 @@ void MainWindow::toggleDebugger()
         m_debuggerWidget->updateCPUState();
         m_debuggerWidget->updateMemoryView();
     }
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::quickSaveState()
@@ -3104,41 +3162,46 @@ void MainWindow::quickLoadState()
 
 void MainWindow::saveState()
 {
-    QString filename = QFileDialog::getSaveFileName(this, 
-        "Save State", 
-        QDir::homePath(), 
+    QString filename = QFileDialog::getSaveFileName(this,
+        "Save State",
+        QDir::homePath(),
         "Atari State Files (*.a8s);;All Files (*)");
-    
+
     if (!filename.isEmpty()) {
         // Ensure .a8s extension
         if (!filename.endsWith(".a8s", Qt::CaseInsensitive)) {
             filename += ".a8s";
         }
-        
+
         // Update emulator with current profile name
         QString profileName = m_profileCombo->currentText();
         m_emulator->setCurrentProfileName(profileName);
-        
+
         if (m_emulator->saveState(filename)) {
             statusBar()->showMessage(QString("State saved to %1").arg(QFileInfo(filename).fileName()), 3000);
         } else {
             QMessageBox::warning(this, "Save Failed", "Failed to save state");
         }
     }
+
+    // Restore focus to emulator widget after file dialog closes (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::loadState()
 {
-    QString filename = QFileDialog::getOpenFileName(this, 
-        "Load State", 
-        QDir::homePath(), 
+    QString filename = QFileDialog::getOpenFileName(this,
+        "Load State",
+        QDir::homePath(),
         "Atari State Files (*.a8s);;All Files (*)");
-    
+
     if (!filename.isEmpty()) {
         if (m_emulator->loadState(filename)) {
             // Get the profile name from the loaded state
             QString profileName = m_emulator->getCurrentProfileName();
-            
+
             // Try to select the profile in the combo box
             int index = m_profileCombo->findText(profileName);
             if (index >= 0) {
@@ -3146,11 +3209,16 @@ void MainWindow::loadState()
             } else if (!profileName.isEmpty() && profileName != "Default") {
                 statusBar()->showMessage(QString("Profile '%1' not found, using current").arg(profileName), 3000);
             }
-            
+
             statusBar()->showMessage(QString("State loaded from %1").arg(QFileInfo(filename).fileName()), 3000);
         } else {
             QMessageBox::warning(this, "Load Failed", "Failed to load state");
         }
+    }
+
+    // Restore focus to emulator widget after file dialog closes (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
     }
 }
 
@@ -3165,10 +3233,18 @@ void MainWindow::pasteText()
 
     if (text.isEmpty()) {
         qDebug() << "Clipboard is empty, nothing to paste";
+        // Restore focus to emulator widget (fixes Linux focus loss)
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setFocus();
+        }
         return;
     }
 
     sendTextToEmulator(text);
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
 }
 
 void MainWindow::sendTextToEmulator(const QString& text)
@@ -3555,20 +3631,20 @@ void MainWindow::toggleTCPServer()
         m_tcpServerAction->setChecked(false);
         m_tcpServerAction->setText("&TCP Server");
         m_tcpServerAction->setToolTip("Start TCP server for remote control");
-        
+
         statusBar()->showMessage("TCP Server stopped", 3000);
         qDebug() << "TCP Server stopped by user";
     } else {
         // Start the TCP server
         QSettings settings;
         int tcpPort = settings.value("emulator/tcpServerPort", 6502).toInt();
-        
+
         bool success = m_tcpServer->startServer(tcpPort);
         if (success) {
             m_tcpServerAction->setChecked(true);
             m_tcpServerAction->setText("&TCP Server (Running)");
             m_tcpServerAction->setToolTip(QString("Stop TCP server (currently running on localhost:%1)").arg(tcpPort));
-            
+
             statusBar()->showMessage(QString("TCP Server started on localhost:%1").arg(tcpPort), 5000);
             qDebug() << "TCP Server started successfully on port" << tcpPort;
         } else {
@@ -3576,6 +3652,10 @@ void MainWindow::toggleTCPServer()
             statusBar()->showMessage(QString("Failed to start TCP Server on port %1").arg(tcpPort), 5000);
             qDebug() << "Failed to start TCP Server on port" << tcpPort;
         }
+    }
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
     }
 }
 
@@ -3718,6 +3798,10 @@ void MainWindow::togglePause()
         m_pauseAction->setText("&Resume");
         m_pauseAction->setChecked(true);
         statusBar()->showMessage("Emulation paused", 2000);
+    }
+    // Restore focus to emulator widget (fixes Linux focus loss)
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
     }
 }
 

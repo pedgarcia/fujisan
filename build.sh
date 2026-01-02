@@ -194,7 +194,13 @@ EOF
             codesign --force --timestamp --options runtime --sign "$dev_id" "$plugin" 2>/dev/null || true
         done
     fi
-    
+
+    # Sign FujiNet-PC binary if bundled
+    if [[ -f "$app_path/Contents/Resources/fujinet-pc/fujinet" ]]; then
+        echo_info "Signing bundled FujiNet-PC binary..."
+        codesign --force --timestamp --options runtime --sign "$dev_id" "$app_path/Contents/Resources/fujinet-pc/fujinet"
+    fi
+
     # Sign the main executable
     codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$dev_id" "$app_path/Contents/MacOS/Fujisan"
     
@@ -541,20 +547,25 @@ build_macos_arm64() {
     echo_info "Copying images to app bundle..."
     mkdir -p "Fujisan.app/Contents/Resources/images"
     cp -r "$PROJECT_ROOT/images/"*.png "Fujisan.app/Contents/Resources/images/" 2>/dev/null || true
-    
-    # Sign with Developer ID or ad-hoc
+
+    # Bundle FujiNet-PC if requested (MUST be done BEFORE signing)
     local dev_id=""
+    if [[ "$BUNDLE_FUJINET" == "true" ]]; then
+        if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
+            dev_id=$(find_developer_id)
+        fi
+        bundle_fujinet_pc "$ARM64_BUILD_DIR/Fujisan.app" "arm64" "$dev_id"
+    fi
+
+    # Sign with Developer ID or ad-hoc (AFTER bundling FujiNet)
     if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
-        dev_id=$(find_developer_id)
+        if [[ -z "$dev_id" ]]; then
+            dev_id=$(find_developer_id)
+        fi
         sign_app_bundle "Fujisan.app" "$dev_id"
     else
         echo_info "Ad-hoc signing app..."
         codesign --force --deep --sign - "Fujisan.app"
-    fi
-
-    # Bundle FujiNet-PC if requested
-    if [[ "$BUNDLE_FUJINET" == "true" ]]; then
-        bundle_fujinet_pc "$ARM64_BUILD_DIR/Fujisan.app" "arm64" "$dev_id"
     fi
 
     # Verify architecture
@@ -627,20 +638,25 @@ build_macos_x86_64() {
     echo_info "Copying images to app bundle..."
     mkdir -p "Fujisan.app/Contents/Resources/images"
     cp -r "$PROJECT_ROOT/images/"*.png "Fujisan.app/Contents/Resources/images/" 2>/dev/null || true
-    
-    # Sign with Developer ID or ad-hoc
+
+    # Bundle FujiNet-PC if requested (MUST be done BEFORE signing)
     local dev_id=""
+    if [[ "$BUNDLE_FUJINET" == "true" ]]; then
+        if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
+            dev_id=$(find_developer_id)
+        fi
+        bundle_fujinet_pc "$X86_64_BUILD_DIR/Fujisan.app" "x86_64" "$dev_id"
+    fi
+
+    # Sign with Developer ID or ad-hoc (AFTER bundling FujiNet)
     if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
-        dev_id=$(find_developer_id)
+        if [[ -z "$dev_id" ]]; then
+            dev_id=$(find_developer_id)
+        fi
         sign_app_bundle "Fujisan.app" "$dev_id"
     else
         echo_info "Ad-hoc signing app..."
         codesign --force --deep --sign - "Fujisan.app"
-    fi
-
-    # Bundle FujiNet-PC if requested
-    if [[ "$BUNDLE_FUJINET" == "true" ]]; then
-        bundle_fujinet_pc "$X86_64_BUILD_DIR/Fujisan.app" "x86_64" "$dev_id"
     fi
 
     # Verify architecture
