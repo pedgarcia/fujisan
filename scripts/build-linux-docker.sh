@@ -480,6 +480,7 @@ EOF
     find fujisan-linux -type d -exec chmod 755 {} \;
     find fujisan-linux -type f -exec chmod 644 {} \;
     chmod 755 fujisan-linux/usr/bin/fujisan
+    chmod 755 fujisan-linux/usr/lib/fujisan/Fujisan
     
     # Build .deb package
     dpkg-deb --build fujisan-linux "fujisan_${VERSION_CLEAN}_${ARCH}.deb"
