@@ -79,6 +79,7 @@ MainWindow::MainWindow(QWidget *parent)
     createEmulatorWidget();
     createDebugger();
     createMediaPeripheralsDock();
+    createStatusBarWidgets();
 
     // Enable hybrid disk activity system
     m_emulator->setDiskActivityCallback([](int driveNumber, bool isWriting) {
@@ -895,6 +896,27 @@ void MainWindow::createLogoSection()
     m_toolBar->addWidget(m_logoLabel);
 }
 
+void MainWindow::createStatusBarWidgets()
+{
+    // Create speed status label
+    m_speedStatusLabel = new QLabel();
+    m_speedStatusLabel->setStyleSheet("QLabel { padding: 0 10px; }");
+    statusBar()->addPermanentWidget(m_speedStatusLabel);
+
+#ifndef Q_OS_WIN
+    // Create FujiNet status label
+    m_fujinetStatusLabel = new QLabel();
+    m_fujinetStatusLabel->setStyleSheet("QLabel { padding: 0 10px; }");
+    statusBar()->addPermanentWidget(m_fujinetStatusLabel);
+#endif
+
+    // Initial update
+    updateSpeedStatus();
+#ifndef Q_OS_WIN
+    updateFujiNetStatus();
+#endif
+}
+
 void MainWindow::createEmulatorWidget()
 {
     // Create a container widget for the emulator
@@ -914,6 +936,47 @@ void MainWindow::createEmulatorWidget()
     // Give the emulator widget focus by default
     m_emulatorWidget->setFocus();
 }
+
+void MainWindow::updateSpeedStatus()
+{
+    if (!m_speedStatusLabel || !m_emulator) {
+        return;
+    }
+
+    QString speedText;
+    int speedPercent = m_emulator->getCurrentEmulationSpeed();
+
+    if (speedPercent == 0) {
+        speedText = "Speed: MAX";
+    } else if (speedPercent == 50) {
+        speedText = "Speed: 0.5x";
+    } else {
+        int multiplier = speedPercent / 100;
+        speedText = QString("Speed: %1x").arg(multiplier);
+    }
+
+    m_speedStatusLabel->setText(speedText);
+}
+
+#ifndef Q_OS_WIN
+void MainWindow::updateFujiNetStatus()
+{
+    if (!m_fujinetStatusLabel) {
+        return;
+    }
+
+    QString statusText;
+    if (!m_netSIOEnabled) {
+        statusText = "FujiNet: Disabled";
+    } else if (m_fujinetService && m_fujinetService->isConnected()) {
+        statusText = "FujiNet: Connected";
+    } else {
+        statusText = "FujiNet: Disconnected";
+    }
+
+    m_fujinetStatusLabel->setText(statusText);
+}
+#endif
 
 void MainWindow::createDebugger()
 {
@@ -1268,13 +1331,18 @@ void MainWindow::onVideoSystemToggled(bool isPAL)
 
 void MainWindow::onSpeedToggled(bool isFullSpeed)
 {
+    QSettings settings("8bitrelics", "Fujisan");
+
     if (isFullSpeed) {
         // Full speed mode (toggle ON) - unlimited host speed
         m_emulator->setEmulationSpeed(0); // 0 = unlimited/host speed
+        settings.setValue("machine/turboMode", true);
         statusBar()->showMessage("Emulation speed set to Full (unlimited host speed)", 2000);
     } else {
         // Real speed mode (toggle OFF) - authentic Atari timing
         m_emulator->setEmulationSpeed(100);
+        settings.setValue("machine/turboMode", false);
+        settings.setValue("machine/emulationSpeedIndex", 1);  // Always 1x when toggling off
         statusBar()->showMessage("Emulation speed set to Real (authentic Atari speed)", 2000);
     }
 
@@ -1282,6 +1350,9 @@ void MainWindow::onSpeedToggled(bool isFullSpeed)
     if (m_emulatorWidget) {
         m_emulatorWidget->setFocus();
     }
+
+    // Update status bar to reflect new speed
+    updateSpeedStatus();
 }
 
 void MainWindow::showSettings()
@@ -1332,6 +1403,9 @@ void MainWindow::showSettings()
     if (m_emulatorWidget) {
         m_emulatorWidget->setFocus();
     }
+
+    // Update status bar to reflect any speed changes made in settings
+    updateSpeedStatus();
 }
 
 void MainWindow::onSettingsChanged()
@@ -1491,6 +1565,9 @@ void MainWindow::updateToolbarFromSettings()
                  << "Joy1:" << (joystickEnabled && kbdJoy1Saved)
                  << "Swap:" << swapJoysticks;
     }
+
+    // Update status bar to reflect current speed settings
+    updateSpeedStatus();
 
     qDebug() << "Toolbar updated - Machine:" << machineType << "BASIC:" << m_emulator->isBasicEnabled()
              << "Video:" << m_emulator->getVideoSystem() << "Volume:" << volume
@@ -3442,6 +3519,9 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
         m_speedToggle->blockSignals(false);
     }
 
+    // Update status bar to reflect profile speed
+    updateSpeedStatus();
+
     // Update UI to reflect changes
     updateToolbarFromSettings();
 
@@ -4082,6 +4162,9 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
             m_fujinetProcessManager->stop();
         }
     }
+
+    // Update status bar to reflect FujiNet state change
+    updateFujiNetStatus();
 }
 
 void MainWindow::onFujiNetConnected()
@@ -4126,6 +4209,9 @@ void MainWindow::onFujiNetConnected()
         }
 #endif
     }
+
+    // Update status bar to reflect FujiNet connection state
+    updateFujiNetStatus();
 }
 
 void MainWindow::onFujiNetDisconnected()
@@ -4155,6 +4241,9 @@ void MainWindow::onFujiNetDisconnected()
         // Not in NetSIO mode
         statusBar()->showMessage("Disconnected from FujiNet-PC", 3000);
     }
+
+    // Update status bar to reflect FujiNet disconnection
+    updateFujiNetStatus();
 }
 
 void MainWindow::onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives)

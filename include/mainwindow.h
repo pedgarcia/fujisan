@@ -134,6 +134,7 @@ private:
     void createAudioToolbarSection();
     void createProfileToolbarSection();
     void createLogoSection();
+    void createStatusBarWidgets();
     void createEmulatorWidget();
     void createDebugger();
     void createMediaPeripheralsDock();
@@ -154,7 +155,11 @@ private:
     void refreshProfileList();
     void applyProfileToEmulator(const ConfigurationProfile& profile);
 
+    // Status bar update methods
+    void updateSpeedStatus();
 #ifndef Q_OS_WIN
+    void updateFujiNetStatus();
+
     // FujiNet helper methods
     void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
     void startFujiNetWithSavedSettings();
@@ -227,6 +232,12 @@ private:
     
     // Logo toolbar section
     QLabel* m_logoLabel;
+
+    // Status bar widgets
+    QLabel* m_speedStatusLabel;
+#ifndef Q_OS_WIN
+    QLabel* m_fujinetStatusLabel;
+#endif
 
     // Menu actions
     QAction* m_loadRomAction;
