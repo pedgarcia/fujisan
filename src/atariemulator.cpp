@@ -1423,6 +1423,23 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
     } else if (key == Qt::Key_F7 || key == Qt::Key_Pause) {
         // F7 or Pause = Break - libatari800 does: lastkey = -input->special
         m_currentInput.special = -AKEY_BREAK;  // Convert -5 to +5
+    } else if (key == Qt::Key_Insert) {
+        // Insert = Insert character, Shift+Insert = Insert line
+        if (shiftPressed) {
+            m_currentInput.keycode = AKEY_INSERT_LINE;
+        } else {
+            m_currentInput.keycode = AKEY_INSERT_CHAR;
+        }
+    } else if (key == Qt::Key_Delete) {
+        // Delete = Delete character, Shift+Delete = Delete line
+        if (shiftPressed) {
+            m_currentInput.keycode = AKEY_DELETE_LINE;
+        } else {
+            m_currentInput.keycode = AKEY_DELETE_CHAR;
+        }
+    } else if (key == Qt::Key_Home && shiftPressed) {
+        // Shift+Home = Clear screen
+        m_currentInput.keycode = AKEY_CLEAR;
     } else if (key == Qt::Key_Exclam) {
         m_currentInput.keychar = '!';
         // Special character: !
@@ -1746,6 +1763,8 @@ unsigned char AtariEmulator::convertQtKeyToAtari(int key, Qt::KeyboardModifiers 
         case Qt::Key_Left: return AKEY_LEFT;
         case Qt::Key_Right: return AKEY_RIGHT;
         case Qt::Key_F1: return AKEY_F1;
+        case Qt::Key_Insert: return AKEY_INSERT_CHAR;
+        case Qt::Key_Delete: return AKEY_DELETE_CHAR;
         default: return 0;
     }
 }
