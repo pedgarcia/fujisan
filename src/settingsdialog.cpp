@@ -54,7 +54,8 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
     setWindowTitle("Settings");
 #endif
     setModal(true);
-    resize(850, 500);
+    setFixedHeight(710);
+    resize(850, 800);
     
     // Store original settings for cancel functionality
     m_originalSettings.machineType = m_emulator->getMachineType();
@@ -714,147 +715,110 @@ void SettingsDialog::createVideoDisplayTab()
     
     QVBoxLayout* tabLayout = new QVBoxLayout(m_videoTab);
     
-    // General Video Group - 3 column layout for space efficiency
+    // General Video Group - single horizontal row
     QGroupBox* generalGroup = new QGroupBox("General Video");
-    QHBoxLayout* generalMainLayout = new QHBoxLayout(generalGroup);
-    
-    // Column 1: Artifacting and Core Settings
-    QVBoxLayout* generalCol1 = new QVBoxLayout();
-    
-    QHBoxLayout* artifactRow = new QHBoxLayout();
-    artifactRow->addWidget(new QLabel("Artifacting:"));
+    QHBoxLayout* generalLayout = new QHBoxLayout(generalGroup);
+
+    // Artifacting dropdown
+    generalLayout->addWidget(new QLabel("Artifacting:"));
     m_artifactingMode = new QComboBox();
     m_artifactingMode->addItem("None", "none");
     m_artifactingMode->addItem("NTSC Old", "ntsc-old");
     m_artifactingMode->addItem("NTSC New", "ntsc-new");
-    // Note: ntsc-full and pal-blend disabled in current build
     m_artifactingMode->setToolTip("Color artifacting simulation mode (NTSC modes work in NTSC video, PAL Simple available for PAL)");
-    artifactRow->addWidget(m_artifactingMode);
-    artifactRow->addStretch();
-    generalCol1->addLayout(artifactRow);
-    
+    generalLayout->addWidget(m_artifactingMode);
+    generalLayout->addSpacing(15);
+
     // Connect artifact mode for real-time updates
     connect(m_artifactingMode, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int) {
         QString artifactMode = m_artifactingMode->currentData().toString();
         m_emulator->updateArtifactSettings(artifactMode);
     });
-    
-    m_showFPS = new QCheckBox("Show FPS Counter");
+
+    // All checkboxes inline
+    m_showFPS = new QCheckBox("Show FPS");
     m_showFPS->setToolTip("Display frames per second in the corner");
-    generalCol1->addWidget(m_showFPS);
-    generalCol1->addStretch();
-    
-    // Column 2: Scaling and Aspect Settings
-    QVBoxLayout* generalCol2 = new QVBoxLayout();
+    generalLayout->addWidget(m_showFPS);
 
-    m_scalingFilter = new QCheckBox("Enable Scaling Filter");
+    m_scalingFilter = new QCheckBox("Scaling Filter");
     m_scalingFilter->setToolTip("Apply smoothing when scaling the display");
-    generalCol2->addWidget(m_scalingFilter);
+    generalLayout->addWidget(m_scalingFilter);
 
-    m_integerScaling = new QCheckBox("Integer Scaling (Pixel-Perfect)");
+    m_integerScaling = new QCheckBox("Integer Scaling");
     m_integerScaling->setToolTip("Scale only in whole multiples (2x, 3x, 4x) for crisp, evenly-sized pixels");
-    generalCol2->addWidget(m_integerScaling);
+    generalLayout->addWidget(m_integerScaling);
 
-    m_keepAspectRatio = new QCheckBox("Keep 4:3 Aspect Ratio");
+    m_keepAspectRatio = new QCheckBox("Keep 4:3 Aspect");
     m_keepAspectRatio->setToolTip("Maintain authentic 4:3 display proportions when resizing window");
-    generalCol2->addWidget(m_keepAspectRatio);
-    generalCol2->addStretch();
-    
-    // Column 3: Fullscreen Settings
-    QVBoxLayout* generalCol3 = new QVBoxLayout();
-    
-    m_fullscreenMode = new QCheckBox("Start in Fullscreen Mode");
+    generalLayout->addWidget(m_keepAspectRatio);
+
+    m_fullscreenMode = new QCheckBox("Fullscreen");
     m_fullscreenMode->setToolTip("Launch application in fullscreen mode for immersive retro experience");
-    generalCol3->addWidget(m_fullscreenMode);
-    generalCol3->addStretch();
-    
-    // Add columns to main layout
-    generalMainLayout->addLayout(generalCol1, 1);
-    generalMainLayout->addLayout(generalCol2, 1);
-    generalMainLayout->addLayout(generalCol3, 1);
+    generalLayout->addWidget(m_fullscreenMode);
+    generalLayout->addStretch();
     
     tabLayout->addWidget(generalGroup);
     
-    // Screen Display Options Group - 3 column layout for space efficiency
+    // Screen Display Options Group - single row layout
     QGroupBox* displayGroup = new QGroupBox("Screen Display Options");
-    QHBoxLayout* displayMainLayout = new QHBoxLayout(displayGroup);
-    
-    // Column 1: Area Controls
-    QVBoxLayout* displayCol1 = new QVBoxLayout();
-    
-    QHBoxLayout* horizAreaRow = new QHBoxLayout();
-    horizAreaRow->addWidget(new QLabel("Horizontal Area:"));
+    QHBoxLayout* displayLayout = new QHBoxLayout(displayGroup);
+
+    // All controls in one row
+    displayLayout->addWidget(new QLabel("H Area:"));
     m_horizontalArea = new QComboBox();
     m_horizontalArea->addItem("Narrow", "narrow");
     m_horizontalArea->addItem("TV Safe Area", "tv");
     m_horizontalArea->addItem("Full Width", "full");
     m_horizontalArea->setToolTip("Set horizontal visible area (narrow=320px, tv=336px, full=384px)");
-    horizAreaRow->addWidget(m_horizontalArea);
-    displayCol1->addLayout(horizAreaRow);
-    
-    QHBoxLayout* vertAreaRow = new QHBoxLayout();
-    vertAreaRow->addWidget(new QLabel("Vertical Area:"));
+    displayLayout->addWidget(m_horizontalArea);
+    displayLayout->addSpacing(8);
+
+    displayLayout->addWidget(new QLabel("V Area:"));
     m_verticalArea = new QComboBox();
     m_verticalArea->addItem("Short", "short");
     m_verticalArea->addItem("TV Safe Area", "tv");
     m_verticalArea->addItem("Full Height", "full");
     m_verticalArea->setToolTip("Set vertical visible area (short=200px, tv=240px, full=300px)");
-    vertAreaRow->addWidget(m_verticalArea);
-    displayCol1->addLayout(vertAreaRow);
-    displayCol1->addStretch();
-    
-    // Column 2: Shift Controls
-    QVBoxLayout* displayCol2 = new QVBoxLayout();
-    
-    QHBoxLayout* horizShiftRow = new QHBoxLayout();
-    horizShiftRow->addWidget(new QLabel("H Shift:"));
-    m_horizontalShift = new QSpinBox();
-    m_horizontalShift->setRange(-384, 384);
-    m_horizontalShift->setValue(0);
-    m_horizontalShift->setSuffix(" px");
-    m_horizontalShift->setToolTip("Shift display horizontally (-384 to 384 pixels)");
-    horizShiftRow->addWidget(m_horizontalShift);
-    displayCol2->addLayout(horizShiftRow);
-    
-    QHBoxLayout* vertShiftRow = new QHBoxLayout();
-    vertShiftRow->addWidget(new QLabel("V Shift:"));
-    m_verticalShift = new QSpinBox();
-    m_verticalShift->setRange(-300, 300);
-    m_verticalShift->setValue(0);
-    m_verticalShift->setSuffix(" px");
-    m_verticalShift->setToolTip("Shift display vertically (-300 to 300 pixels)");
-    vertShiftRow->addWidget(m_verticalShift);
-    displayCol2->addLayout(vertShiftRow);
-    displayCol2->addStretch();
-    
-    // Column 3: Mode Controls
-    QVBoxLayout* displayCol3 = new QVBoxLayout();
-    
-    QHBoxLayout* fitScreenRow = new QHBoxLayout();
-    fitScreenRow->addWidget(new QLabel("Fit Screen:"));
+    displayLayout->addWidget(m_verticalArea);
+    displayLayout->addSpacing(8);
+
+    displayLayout->addWidget(new QLabel("Fit:"));
     m_fitScreen = new QComboBox();
     m_fitScreen->addItem("Fit Width", "width");
     m_fitScreen->addItem("Fit Height", "height");
     m_fitScreen->addItem("Fit Both", "both");
     m_fitScreen->setToolTip("Method for fitting image to screen size");
-    fitScreenRow->addWidget(m_fitScreen);
-    displayCol3->addLayout(fitScreenRow);
-    
-    m_show80Column = new QCheckBox("Enable 80-Column Display");
+    displayLayout->addWidget(m_fitScreen);
+    displayLayout->addSpacing(12);
+
+    displayLayout->addWidget(new QLabel("H Shift:"));
+    m_horizontalShift = new QSpinBox();
+    m_horizontalShift->setRange(-384, 384);
+    m_horizontalShift->setValue(0);
+    m_horizontalShift->setSuffix(" px");
+    m_horizontalShift->setToolTip("Shift display horizontally (-384 to 384 pixels)");
+    displayLayout->addWidget(m_horizontalShift);
+    displayLayout->addSpacing(8);
+
+    displayLayout->addWidget(new QLabel("V Shift:"));
+    m_verticalShift = new QSpinBox();
+    m_verticalShift->setRange(-300, 300);
+    m_verticalShift->setValue(0);
+    m_verticalShift->setSuffix(" px");
+    m_verticalShift->setToolTip("Shift display vertically (-300 to 300 pixels)");
+    displayLayout->addWidget(m_verticalShift);
+    displayLayout->addSpacing(12);
+
+    m_show80Column = new QCheckBox("80-Column");
     m_show80Column->setToolTip("Show 80-column text mode (Currently disabled - needs more work)");
     m_show80Column->setChecked(false);
     m_show80Column->setEnabled(false);
-    displayCol3->addWidget(m_show80Column);
-    
-    m_vSyncEnabled = new QCheckBox("Enable Vertical Sync");
+    displayLayout->addWidget(m_show80Column);
+
+    m_vSyncEnabled = new QCheckBox("V-Sync");
     m_vSyncEnabled->setToolTip("Synchronize display to monitor refresh rate (reduces tearing)");
-    displayCol3->addWidget(m_vSyncEnabled);
-    displayCol3->addStretch();
-    
-    // Add columns to main layout
-    displayMainLayout->addLayout(displayCol1, 1);
-    displayMainLayout->addLayout(displayCol2, 1);
-    displayMainLayout->addLayout(displayCol3, 1);
+    displayLayout->addWidget(m_vSyncEnabled);
+    displayLayout->addStretch();
     
     tabLayout->addWidget(displayGroup);
     
@@ -1838,7 +1802,7 @@ void SettingsDialog::createFujiNetTab()
     m_tabWidget->addTab(m_fujinetTab, "FujiNet");
 
     QVBoxLayout* mainLayout = new QVBoxLayout(m_fujinetTab);
-    mainLayout->setSpacing(20);
+    mainLayout->setSpacing(10);
 
     // FujiNetService is shared from MainWindow (passed via constructor)
     // Process and Binary managers are also shared via setFujiNetManagers()
@@ -1847,65 +1811,78 @@ void SettingsDialog::createFujiNetTab()
     // GROUP 1: Binary & Storage
     QGroupBox* binaryStorageGroup = new QGroupBox("Binary & Storage");
     QFormLayout* binaryStorageLayout = new QFormLayout(binaryStorageGroup);
+    binaryStorageLayout->setVerticalSpacing(6);
+    binaryStorageLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
-    // Binary Path
+    // Binary Path with version inline
     QHBoxLayout* binaryPathLayout = new QHBoxLayout();
     m_fujinetBinaryPath = new QLineEdit();
     m_fujinetBinaryPath->setReadOnly(true);
     m_fujinetBinaryPath->setPlaceholderText("Not configured");
-    m_fujinetBinaryPath->setMinimumWidth(400);  // Make it much wider
+    m_fujinetBinaryPath->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_fujinetBrowseButton = new QPushButton("Browse...");
-    m_fujinetBrowseButton->setMaximumWidth(100);
+    m_fujinetBrowseButton->setMaximumWidth(80);
 
-    binaryPathLayout->addWidget(m_fujinetBinaryPath, 1);  // Stretch factor = 1 makes it wider
-    binaryPathLayout->addWidget(m_fujinetBrowseButton);
-    binaryStorageLayout->addRow("Binary Path:", binaryPathLayout);
-
-    // Binary Version
+    // Version label inline with binary path
     m_fujinetVersionLabel = new QLabel("Not found");
     m_fujinetVersionLabel->setStyleSheet("color: #666;");
-    binaryStorageLayout->addRow("Version:", m_fujinetVersionLabel);
+    m_fujinetVersionLabel->setMinimumWidth(80);
+
+    binaryPathLayout->addWidget(m_fujinetBinaryPath, 1);
+    binaryPathLayout->addWidget(m_fujinetBrowseButton);
+    binaryPathLayout->addWidget(m_fujinetVersionLabel);
+    binaryStorageLayout->addRow("Binary Path:", binaryPathLayout);
 
     // SD Card Folder
     QHBoxLayout* sdPathLayout = new QHBoxLayout();
     m_fujinetSDPath = new QLineEdit();
     m_fujinetSDPath->setReadOnly(true);
     m_fujinetSDPath->setPlaceholderText("Using default SD folder");
-    m_fujinetSDPath->setMinimumWidth(400);  // Make it much wider
+    m_fujinetSDPath->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_fujinetBrowseSDButton = new QPushButton("Browse...");
-    m_fujinetBrowseSDButton->setMaximumWidth(100);
+    m_fujinetBrowseSDButton->setMaximumWidth(80);
 
-    sdPathLayout->addWidget(m_fujinetSDPath, 1);  // Stretch factor = 1 makes it wider
+    sdPathLayout->addWidget(m_fujinetSDPath, 1);
     sdPathLayout->addWidget(m_fujinetBrowseSDButton);
     binaryStorageLayout->addRow("SD Card Folder:", sdPathLayout);
 
     mainLayout->addWidget(binaryStorageGroup);
 
-    // GROUP 2: Server Configuration
+    // GROUP 2: Server Configuration (all in one row)
     QGroupBox* serverGroup = new QGroupBox("Server Configuration");
-    QFormLayout* serverLayout = new QFormLayout(serverGroup);
+    QHBoxLayout* serverLayout = new QHBoxLayout(serverGroup);
 
     // HTTP API Port
+    QLabel* httpLabel = new QLabel("HTTP Port:");
     m_fujinetApiPort = new QSpinBox();
     m_fujinetApiPort->setRange(1, 65535);
     m_fujinetApiPort->setValue(8000);
     m_fujinetApiPort->setToolTip("Port for FujiNet-PC HTTP API (default: 8000)");
-    serverLayout->addRow("HTTP API Port:", m_fujinetApiPort);
 
     // NetSIO Port
+    QLabel* netsioLabel = new QLabel("NetSIO Port:");
     m_fujinetNetsioPort = new QSpinBox();
     m_fujinetNetsioPort->setRange(1, 65535);
     m_fujinetNetsioPort->setValue(9997);
     m_fujinetNetsioPort->setToolTip("Port for FujiNet-PC NetSIO protocol (default: 9997)");
-    serverLayout->addRow("NetSIO Port:", m_fujinetNetsioPort);
 
     // Launch Behavior
+    QLabel* launchLabel = new QLabel("Launch:");
     m_fujinetLaunchBehavior = new QComboBox();
     m_fujinetLaunchBehavior->addItem("Auto-launch when NetSIO enabled", 0);
     m_fujinetLaunchBehavior->addItem("Detect existing FujiNet-PC process", 1);
     m_fujinetLaunchBehavior->addItem("Manual control", 2);
     m_fujinetLaunchBehavior->setToolTip("How Fujisan should manage the FujiNet-PC process");
-    serverLayout->addRow("Launch Behavior:", m_fujinetLaunchBehavior);
+
+    serverLayout->addWidget(httpLabel);
+    serverLayout->addWidget(m_fujinetApiPort);
+    serverLayout->addSpacing(15);
+    serverLayout->addWidget(netsioLabel);
+    serverLayout->addWidget(m_fujinetNetsioPort);
+    serverLayout->addSpacing(15);
+    serverLayout->addWidget(launchLabel);
+    serverLayout->addWidget(m_fujinetLaunchBehavior);
+    serverLayout->addStretch();
 
     mainLayout->addWidget(serverGroup);
 
@@ -1943,42 +1920,36 @@ void SettingsDialog::createFujiNetTab()
 
     mainLayout->addWidget(configGroup);
 
-    // GROUP 4: Process Control
+    // GROUP 4: Process Control (all in one row)
     QGroupBox* processGroup = new QGroupBox("Process Control");
-    QVBoxLayout* processVLayout = new QVBoxLayout(processGroup);
+    QHBoxLayout* processLayout = new QHBoxLayout(processGroup);
 
     // Status label
     m_fujinetStatusLabel = new QLabel("Not connected");
     m_fujinetStatusLabel->setStyleSheet("color: #666;");
-    processVLayout->addWidget(m_fujinetStatusLabel);
+    processLayout->addWidget(m_fujinetStatusLabel);
+    processLayout->addSpacing(15);
 
-    // Start/Stop buttons with restart warning
-    QHBoxLayout* processLayout = new QHBoxLayout();
+    // Start/Stop buttons
     m_fujinetStartButton = new QPushButton("Start");
     m_fujinetStopButton = new QPushButton("Stop");
-
     processLayout->addWidget(m_fujinetStartButton);
     processLayout->addWidget(m_fujinetStopButton);
     processLayout->addStretch();
 
     // Restart warning label (hidden by default)
-    m_fujinetRestartWarningLabel = new QLabel("⚠ Restart FujiNet to apply changes");
+    m_fujinetRestartWarningLabel = new QLabel("Restart FujiNet to apply changes");
     m_fujinetRestartWarningLabel->setStyleSheet("color: #ff8800; font-weight: bold; font-size: 11px;");
     m_fujinetRestartWarningLabel->setVisible(false);
     processLayout->addWidget(m_fujinetRestartWarningLabel);
 
-    processVLayout->addLayout(processLayout);
-
     mainLayout->addWidget(processGroup);
 
-    // Description
+    // Description (compact single line)
     QLabel* description = new QLabel(
-        "FujiNet-PC provides network-based disk drive emulation for the Atari 8-bit.\n"
-        "When enabled with NetSIO, all disk drives (D1-D8) are served by FujiNet-PC.\n\n"
-        "Note: FujiNet support is not available on Windows."
+        "FujiNet-PC provides network-based disk emulation. When NetSIO is enabled, D1-D8 are served by FujiNet-PC. Not available on Windows."
     );
-    description->setWordWrap(true);
-    description->setStyleSheet("color: #666; font-size: 11px; margin-top: 10px;");
+    description->setStyleSheet("color: #666; font-size: 11px;");
     mainLayout->addWidget(description);
 
     mainLayout->addStretch();
