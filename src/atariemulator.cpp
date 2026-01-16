@@ -1339,7 +1339,8 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
     bool shiftPressed = modifiers & Qt::ShiftModifier;
     bool ctrlPressed = modifiers & Qt::ControlModifier;
     bool metaPressed = modifiers & Qt::MetaModifier;
-    
+    bool altPressed = modifiers & Qt::AltModifier;
+
     // On macOS, support both Ctrl and Cmd keys for control codes
     bool controlKeyPressed = ctrlPressed || metaPressed;
     
@@ -1349,22 +1350,21 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
     // Build modifier bits like atari800 SDL does
     if (controlKeyPressed && key >= Qt::Key_A && key <= Qt::Key_Z) {
         unsigned char baseKey = convertQtKeyToAtari(key, Qt::NoModifier);
-        if (baseKey != 0) {
-            // Build shiftctrl modifier bits
-            int shiftctrl = 0;
-            if (shiftPressed) shiftctrl |= AKEY_SHFT;
-            if (controlKeyPressed) shiftctrl |= AKEY_CTRL;
-            
-            m_currentInput.keycode = baseKey | shiftctrl;
+        // Build shiftctrl modifier bits
+        // Note: Even if baseKey is 0 (like AKEY_l), the final keycode will be non-zero
+        // because of the modifier bits (AKEY_CTRL = 0x80)
+        int shiftctrl = 0;
+        if (shiftPressed) shiftctrl |= AKEY_SHFT;
+        if (controlKeyPressed) shiftctrl |= AKEY_CTRL;
 
-            if (shiftPressed && ctrlPressed) {
-                qDebug() << "Key press with shift+ctrl:"
-                         << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(pure control)";
-            } else {
-                qDebug() << "Key press:"
-                         << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(display control)";
-            }
+        m_currentInput.keycode = baseKey | shiftctrl;
+
+        if (shiftPressed && ctrlPressed) {
+            qDebug() << "Key press with shift+ctrl:"
+                     << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(pure control)";
         } else {
+            qDebug() << "Key press:"
+                     << "base:" << (int)baseKey << "shiftctrl:" << (int)shiftctrl << "(display control)";
         }
     } else if (key == Qt::Key_CapsLock) {
         // Send CAPS LOCK toggle to the emulator to change its internal state
@@ -1411,18 +1411,41 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
     } else if (key == Qt::Key_F4) {
         // F4 = Option
         m_currentInput.option = 1;
-    } else if (key == Qt::Key_F5 && shiftPressed) {
-        // Shift+F5 = Cold Reset (Power) - libatari800 does: lastkey = -input->special
-        m_currentInput.special = -AKEY_COLDSTART;  // Convert -3 to +3
-    } else if (key == Qt::Key_F5 && !shiftPressed) {
-        // F5 = Warm Reset - libatari800 does: lastkey = -input->special  
-        m_currentInput.special = -AKEY_WARMSTART;  // Convert -2 to +2
+    } else if (key == Qt::Key_F5) {
+        if (altPressed) {
+            // Option/Alt+F5 = Insert character; Shift+Option/Alt+F5 = Insert line (macOS mapping)
+            if (shiftPressed) {
+                m_currentInput.keycode = AKEY_INSERT_LINE;
+            } else {
+                m_currentInput.keycode = AKEY_INSERT_CHAR;
+            }
+        } else if (shiftPressed) {
+            // Shift+F5 = Cold Reset (Power) - libatari800 does: lastkey = -input->special
+            m_currentInput.special = -AKEY_COLDSTART;  // Convert -3 to +3
+        } else {
+            // F5 = Warm Reset - libatari800 does: lastkey = -input->special
+            m_currentInput.special = -AKEY_WARMSTART;  // Convert -2 to +2
+        }
     } else if (key == Qt::Key_F6) {
-        // F6 = Help
-        m_currentInput.keycode = AKEY_HELP;
+        if (altPressed) {
+            // Option/Alt+F6 = Delete character; Shift+Option/Alt+F6 = Delete line (macOS mapping)
+            if (shiftPressed) {
+                m_currentInput.keycode = AKEY_DELETE_LINE;
+            } else {
+                m_currentInput.keycode = AKEY_DELETE_CHAR;
+            }
+        } else {
+            // F6 = Help
+            m_currentInput.keycode = AKEY_HELP;
+        }
     } else if (key == Qt::Key_F7 || key == Qt::Key_Pause) {
-        // F7 or Pause = Break - libatari800 does: lastkey = -input->special
-        m_currentInput.special = -AKEY_BREAK;  // Convert -5 to +5
+        if (altPressed && key == Qt::Key_F7) {
+            // Option/Alt+F7 = Clear screen (macOS mapping)
+            m_currentInput.keycode = AKEY_CLEAR;
+        } else {
+            // F7 or Pause = Break - libatari800 does: lastkey = -input->special
+            m_currentInput.special = -AKEY_BREAK;  // Convert -5 to +5
+        }
     } else if (key == Qt::Key_Insert) {
         // Insert = Insert character, Shift+Insert = Insert line
         if (shiftPressed) {
@@ -2406,35 +2429,35 @@ void AtariEmulator::injectCharacter(char ch)
     m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
     
     if (ch >= 'A' && ch <= 'Z') {
-        // Uppercase letters - use keycode approach
+        // Uppercase letters - use AKEY_A through AKEY_Z (includes SHIFT modifier)
         unsigned char atariKey = 0;
         switch (ch) {
-            case 'A': atariKey = AKEY_a; break;
-            case 'B': atariKey = AKEY_b; break;
-            case 'C': atariKey = AKEY_c; break;
-            case 'D': atariKey = AKEY_d; break;
-            case 'E': atariKey = AKEY_e; break;
-            case 'F': atariKey = AKEY_f; break;
-            case 'G': atariKey = AKEY_g; break;
-            case 'H': atariKey = AKEY_h; break;
-            case 'I': atariKey = AKEY_i; break;
-            case 'J': atariKey = AKEY_j; break;
-            case 'K': atariKey = AKEY_k; break;
-            case 'L': m_currentInput.keychar = 'l'; break;
-            case 'M': atariKey = AKEY_m; break;
-            case 'N': atariKey = AKEY_n; break;
-            case 'O': atariKey = AKEY_o; break;
-            case 'P': atariKey = AKEY_p; break;
-            case 'Q': atariKey = AKEY_q; break;
-            case 'R': atariKey = AKEY_r; break;
-            case 'S': atariKey = AKEY_s; break;
-            case 'T': atariKey = AKEY_t; break;
-            case 'U': atariKey = AKEY_u; break;
-            case 'V': atariKey = AKEY_v; break;
-            case 'W': atariKey = AKEY_w; break;
-            case 'X': atariKey = AKEY_x; break;
-            case 'Y': atariKey = AKEY_y; break;
-            case 'Z': atariKey = AKEY_z; break;
+            case 'A': atariKey = AKEY_A; break;
+            case 'B': atariKey = AKEY_B; break;
+            case 'C': atariKey = AKEY_C; break;
+            case 'D': atariKey = AKEY_D; break;
+            case 'E': atariKey = AKEY_E; break;
+            case 'F': atariKey = AKEY_F; break;
+            case 'G': atariKey = AKEY_G; break;
+            case 'H': atariKey = AKEY_H; break;
+            case 'I': atariKey = AKEY_I; break;
+            case 'J': atariKey = AKEY_J; break;
+            case 'K': atariKey = AKEY_K; break;
+            case 'L': atariKey = AKEY_L; break;
+            case 'M': atariKey = AKEY_M; break;
+            case 'N': atariKey = AKEY_N; break;
+            case 'O': atariKey = AKEY_O; break;
+            case 'P': atariKey = AKEY_P; break;
+            case 'Q': atariKey = AKEY_Q; break;
+            case 'R': atariKey = AKEY_R; break;
+            case 'S': atariKey = AKEY_S; break;
+            case 'T': atariKey = AKEY_T; break;
+            case 'U': atariKey = AKEY_U; break;
+            case 'V': atariKey = AKEY_V; break;
+            case 'W': atariKey = AKEY_W; break;
+            case 'X': atariKey = AKEY_X; break;
+            case 'Y': atariKey = AKEY_Y; break;
+            case 'Z': atariKey = AKEY_Z; break;
         }
         if (atariKey != 0) {
             m_currentInput.keycode = atariKey;
@@ -2533,6 +2556,39 @@ void AtariEmulator::injectCharacter(char ch)
     } else if (ch == '\'') {
         // Apostrophe
         m_currentInput.keychar = '\'';
+    } else if (ch == '_') {
+        // Underscore
+        m_currentInput.keycode = AKEY_UNDERSCORE;
+    } else if (ch == '$') {
+        // Dollar sign
+        m_currentInput.keycode = AKEY_DOLLAR;
+    } else if (ch == '@') {
+        // At sign
+        m_currentInput.keycode = AKEY_AT;
+    } else if (ch == '#') {
+        // Hash
+        m_currentInput.keycode = AKEY_HASH;
+    } else if (ch == '%') {
+        // Percent
+        m_currentInput.keycode = AKEY_PERCENT;
+    } else if (ch == '&') {
+        // Ampersand
+        m_currentInput.keycode = AKEY_AMPERSAND;
+    } else if (ch == '[') {
+        // Left bracket
+        m_currentInput.keycode = AKEY_BRACKETLEFT;
+    } else if (ch == ']') {
+        // Right bracket
+        m_currentInput.keycode = AKEY_BRACKETRIGHT;
+    } else if (ch == '\\') {
+        // Backslash
+        m_currentInput.keycode = AKEY_BACKSLASH;
+    } else if (ch == '|') {
+        // Pipe
+        m_currentInput.keycode = AKEY_BAR;
+    } else if (ch == '^') {
+        // Circumflex
+        m_currentInput.keycode = AKEY_CIRCUMFLEX;
     } else {
         return;
     }

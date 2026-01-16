@@ -22,6 +22,7 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QTimer>
+#include <QThread>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QDateTime>
@@ -3344,6 +3345,11 @@ void MainWindow::sendTextToEmulator(const QString& text)
     // Use fixed timer interval optimized for 200% speed
     m_pasteTimer->setInterval(37);  // ~37ms per character at 2x speed
 
+    // Turn off CAPS LOCK before pasting to ensure correct case handling
+    // CAPS LOCK state affects whether lowercase/uppercase works correctly
+    m_emulator->injectAKey(AKEY_CAPSTOGGLE);
+    QThread::msleep(100);  // Give CAPS LOCK toggle time to process
+
     // Setup the paste buffer
     m_pasteBuffer = text;
     m_pasteIndex = 0;
@@ -3361,8 +3367,9 @@ void MainWindow::sendNextCharacter()
 
     // Check if we've finished all characters
     if (m_pasteIndex >= m_pasteBuffer.length()) {
-        // Finished pasting - restore original emulation speed
+        // Finished pasting - restore CAPS LOCK state and original emulation speed
         m_pasteTimer->stop();
+        m_emulator->injectAKey(AKEY_CAPSTOGGLE);
         m_emulator->setEmulationSpeed(m_originalEmulationSpeed);
         m_pasteBuffer.clear();
         m_pasteIndex = 0;
