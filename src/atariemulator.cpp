@@ -331,30 +331,39 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         }
     }
 
-    // Configure BASIC ROM (Altirra, External, or None)
-    if (basicEnabled) {
-        if (m_altirraBASICEnabled) {
-            argList << "-basic-rev" << "altirra";
+    // Configure BASIC ROM according to user settings
+    // This ensures OS disks can access BASIC when needed (e.g., SmartDOS with FujiNet)
+    if (m_altirraBASICEnabled) {
+        // User explicitly wants Altirra BASIC
+        argList << "-basic-rev" << "altirra";
+        qDebug() << "  -> Configured Altirra BASIC ROM";
+    } else if (!m_basicRomPath.isEmpty()) {
+        // User specified an external BASIC ROM
+        QFileInfo basicRomFile(m_basicRomPath);
+        if (basicRomFile.exists()) {
+            // CRITICAL: Must set -basic-rev AUTO BEFORE the ROM file to reset any previously cached revision
+            // NOTE: Do NOT quote - we're using char* array, not shell string
+            argList << "-basic-rev" << "AUTO";
+            argList << "-basic_rom" << m_basicRomPath;
+            qDebug() << "  -> Configured external BASIC ROM:" << m_basicRomPath;
         } else {
-            if (!m_basicRomPath.isEmpty()) {
-                QFileInfo basicRomFile(m_basicRomPath);
-                if (basicRomFile.exists()) {
-                    // CRITICAL: Must set -basic-rev AUTO BEFORE the ROM file to reset any previously cached revision
-                    // NOTE: Do NOT quote - we're using char* array, not shell string
-                    argList << "-basic-rev" << "AUTO";
-                    argList << "-basic_rom" << m_basicRomPath;
-                } else {
-                    // File doesn't exist - fallback to Altirra BASIC
-                    qWarning() << "BASIC ROM file not found at" << m_basicRomPath << "- Loading Altirra BASIC";
-                    argList << "-basic-rev" << "altirra";
-                }
-            } else {
-                argList << "-basic-rev" << "altirra";
-            }
+            qWarning() << "BASIC ROM file not found at" << m_basicRomPath;
+            qDebug() << "  -> No BASIC ROM configured";
+            // Don't configure any BASIC ROM - just use OS
         }
-        argList << "-basic";  // Actually enable BASIC mode
     } else {
-        argList << "-nobasic";
+        // No BASIC ROM preference specified - just use OS
+        qDebug() << "  -> No BASIC ROM configured - OS only";
+        // Don't add any BASIC ROM configuration
+    }
+
+    // Separately control whether to boot into BASIC mode
+    if (basicEnabled) {
+        argList << "-basic";  // Boot into BASIC prompt
+        qDebug() << "  -> Boot mode: BASIC prompt";
+    } else {
+        argList << "-nobasic";  // Boot to OS/DOS (don't go to BASIC prompt)
+        qDebug() << "  -> Boot mode: OS/DOS (no BASIC prompt)";
     }
 
     // Convert QStringList to char* array
@@ -603,30 +612,40 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         }
     }
 
-    // Configure BASIC ROM (Altirra, External, or None)
-    if (basicEnabled) {
-        if (m_altirraBASICEnabled) {
-            argList << "-basic-rev" << "altirra";
+    // Configure BASIC ROM according to user settings
+    // This ensures OS disks (like SmartDOS + FujiNet) can access BASIC when needed
+    if (m_altirraBASICEnabled) {
+        // User explicitly wants Altirra BASIC
+        argList << "-basic-rev" << "altirra";
+        qDebug() << "  -> Configured Altirra BASIC ROM";
+    } else if (!m_basicRomPath.isEmpty()) {
+        // User specified an external BASIC ROM
+        QFileInfo basicRomFile(m_basicRomPath);
+        if (basicRomFile.exists()) {
+            // CRITICAL: Must set -basic-rev AUTO BEFORE the ROM file to reset any previously cached revision
+            // NOTE: Do NOT quote - we're using char* array, not shell string
+            argList << "-basic-rev" << "AUTO";
+            argList << "-basic_rom" << m_basicRomPath;
+            qDebug() << "  -> Configured external BASIC ROM:" << m_basicRomPath;
         } else {
-            if (!m_basicRomPath.isEmpty()) {
-                QFileInfo basicRomFile(m_basicRomPath);
-                if (basicRomFile.exists()) {
-                    // CRITICAL: Must set -basic-rev AUTO BEFORE the ROM file to reset any previously cached revision
-                    // NOTE: Do NOT quote - we're using char* array, not shell string
-                    argList << "-basic-rev" << "AUTO";
-                    argList << "-basic_rom" << m_basicRomPath;
-                    qDebug() << "  -> Added arguments: -basic-rev AUTO -basic_rom" << m_basicRomPath;
-                } else {
-                    qWarning() << "BASIC ROM file not found at" << m_basicRomPath << "- Loading Altirra BASIC";
-                    argList << "-basic-rev" << "altirra";
-                }
-            } else {
-                argList << "-basic-rev" << "altirra";
-            }
+            qWarning() << "BASIC ROM file not found at" << m_basicRomPath;
+            qDebug() << "  -> No BASIC ROM configured";
+            // Don't configure any BASIC ROM - just use OS
         }
-        argList << "-basic";  // Actually enable BASIC mode
     } else {
-        argList << "-nobasic";
+        // No BASIC ROM preference specified - just use OS
+        qDebug() << "  -> No BASIC ROM configured - OS only";
+        // Don't add any BASIC ROM configuration
+    }
+
+    // Separately control whether to boot into BASIC mode
+    // When NetSIO/FujiNet is enabled, use -nobasic so OS can boot properly
+    if (basicEnabled) {
+        argList << "-basic";  // Boot into BASIC prompt
+        qDebug() << "  -> Boot mode: BASIC prompt";
+    } else {
+        argList << "-nobasic";  // Boot to OS/DOS (don't go to BASIC prompt)
+        qDebug() << "  -> Boot mode: OS/DOS (no BASIC prompt) - Required for FujiNet/NetSIO";
     }
     
     // Add NetSIO support if enabled
