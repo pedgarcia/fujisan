@@ -103,7 +103,7 @@ MainWindow::MainWindow(QWidget *parent)
     QSettings settings;
     bool tcpEnabled = settings.value("emulator/tcpServerEnabled", true).toBool();
     int tcpPort = settings.value("emulator/tcpServerPort", 6502).toInt();
-    
+
     if (tcpEnabled && m_tcpServer && !m_tcpServer->isRunning()) {
         bool success = m_tcpServer->startServer(tcpPort);
         if (success) {
@@ -360,32 +360,32 @@ void MainWindow::createMenus()
     systemMenu->addAction(m_altirraBASICAction);
 
     systemMenu->addSeparator();
-    
+
     // State save/load actions
     m_quickSaveStateAction = new QAction("&Quick Save State", this);
     m_quickSaveStateAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
     m_quickSaveStateAction->setToolTip("Quick save current state (Shift+F5)");
     connect(m_quickSaveStateAction, &QAction::triggered, this, &MainWindow::quickSaveState);
     systemMenu->addAction(m_quickSaveStateAction);
-    
+
     m_quickLoadStateAction = new QAction("Quick &Load State", this);
     m_quickLoadStateAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F9));
     m_quickLoadStateAction->setToolTip("Quick load saved state (Shift+F9)");
     connect(m_quickLoadStateAction, &QAction::triggered, this, &MainWindow::quickLoadState);
     systemMenu->addAction(m_quickLoadStateAction);
-    
+
     systemMenu->addSeparator();
-    
+
     m_saveStateAction = new QAction("Save State...", this);
     m_saveStateAction->setToolTip("Save current state to file");
     connect(m_saveStateAction, &QAction::triggered, this, &MainWindow::saveState);
     systemMenu->addAction(m_saveStateAction);
-    
+
     m_loadStateAction = new QAction("Load State...", this);
     m_loadStateAction->setToolTip("Load state from file");
     connect(m_loadStateAction, &QAction::triggered, this, &MainWindow::loadState);
     systemMenu->addAction(m_loadStateAction);
-    
+
     systemMenu->addSeparator();
 
 #ifdef Q_OS_MACOS
@@ -426,7 +426,7 @@ void MainWindow::createMenus()
 
     // Tools menu
     QMenu* toolsMenu = menuBar()->addMenu("&Tools");
-    
+
     m_tcpServerAction = new QAction("&TCP Server", this);
     m_tcpServerAction->setToolTip("Start/stop TCP server for remote control (port configurable in settings)");
     m_tcpServerAction->setCheckable(true);
@@ -632,19 +632,19 @@ void MainWindow::createJoystickToolbarSection()
     QSettings settings;
     bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();
     m_joystickEnabledCheck->setChecked(joystickEnabled);
-    
+
     // Set keyboard joystick controls enabled state based on main joystick enabled state
     m_kbdJoy0Check->setEnabled(joystickEnabled);
     m_kbdJoy1Check->setEnabled(joystickEnabled);
     m_joystickSwapWidget->setEnabled(joystickEnabled);
-    
+
     // Load keyboard joystick settings (checkboxes keep their state)
     bool kbdJoy0Checked = settings.value("input/kbdJoy0Enabled", false).toBool();
     bool kbdJoy1Checked = settings.value("input/kbdJoy1Enabled", false).toBool();
     m_kbdJoy0Check->setChecked(kbdJoy0Checked);
     m_kbdJoy1Check->setChecked(kbdJoy1Checked);
     m_joystickSwapWidget->setSwapped(settings.value("input/swapJoysticks", false).toBool());
-    
+
     // Apply effective keyboard joystick state to emulator (only if main joystick is enabled)
     if (m_emulator) {
         m_emulator->setKbdJoy0Enabled(joystickEnabled && kbdJoy0Checked);
@@ -748,15 +748,15 @@ void MainWindow::createProfileToolbarSection()
 
     // Add load button to the same row as the profile dropdown
     m_loadProfileButton = new QPushButton("LOAD");
-    
+
     // Create adaptive button style using system palette colors for dark mode compatibility
     QPalette pal = QApplication::palette();
     QColor buttonColor = pal.color(QPalette::Button);
     QColor windowColor = pal.color(QPalette::Window);
-    
+
     // Check if we're in dark mode
     bool isDarkMode = windowColor.lightness() < 128;
-    
+
     // Explicitly set text color based on theme
     QColor buttonTextColor;
     if (isDarkMode) {
@@ -764,12 +764,12 @@ void MainWindow::createProfileToolbarSection()
     } else {
         buttonTextColor = QColor(0, 0, 0);  // Black text for light mode
     }
-    
+
     // Create slightly lighter/darker versions for hover and pressed states
     QColor buttonHoverColor;
     QColor buttonPressedColor;
     QColor borderColor;
-    
+
     if (isDarkMode) {
         // Dark mode: make hover lighter and pressed even lighter
         buttonHoverColor = buttonColor.lighter(120);
@@ -781,7 +781,7 @@ void MainWindow::createProfileToolbarSection()
         buttonPressedColor = buttonColor.darker(120);
         borderColor = buttonColor.darker(150);
     }
-    
+
     QString profileButtonStyle = QString(
         "QPushButton {"
         "    font-size: 9px;"
@@ -808,7 +808,7 @@ void MainWindow::createProfileToolbarSection()
             .arg(buttonHoverColor.name())
             .arg(buttonPressedColor.name())
             .arg(borderColor.darker(120).name());
-    
+
     m_loadProfileButton->setStyleSheet(profileButtonStyle);
     m_loadProfileButton->setToolTip("Load selected profile");
     topLayout->addWidget(m_loadProfileButton, 0, Qt::AlignVCenter);
@@ -820,13 +820,13 @@ void MainWindow::createProfileToolbarSection()
     QHBoxLayout* bottomLayout = new QHBoxLayout(bottomRow);
     bottomLayout->setContentsMargins(0, 0, 0, 0);
     bottomLayout->setSpacing(2);
-    
+
     // Add quick save/load buttons
     m_quickSaveButton = new QPushButton("STATE SAVE");
     m_quickSaveButton->setStyleSheet(profileButtonStyle);  // Use same adaptive style
     m_quickSaveButton->setToolTip("Quick Save State (Shift+F5)");
     bottomLayout->addWidget(m_quickSaveButton);
-    
+
     m_quickLoadButton = new QPushButton("STATE LOAD");
     m_quickLoadButton->setStyleSheet(profileButtonStyle);  // Use same adaptive style
     m_quickLoadButton->setToolTip("Quick Load State (Shift+F9)");
@@ -853,7 +853,7 @@ void MainWindow::createLogoSection()
 {
     // Create logo label
     m_logoLabel = new QLabel();
-    
+
     // Try to load Fujisan logo from multiple paths
     QStringList imagePaths = {
         "./images/fujisanlogo.png",                 // Correct filename in images folder
@@ -870,17 +870,17 @@ void MainWindow::createLogoSection()
         "/Users/pgarcia/Downloads/fujisanlogo.png",  // Fallback to Downloads
         ":/images/fujisanlogo.png"
     };
-    
+
     QPixmap logoPixmap;
     bool logoLoaded = false;
-    
+
     for (const QString& path : imagePaths) {
         if (logoPixmap.load(path)) {
             logoLoaded = true;
             break;
         }
     }
-    
+
     if (!logoLoaded) {
         // Create a simple text-based logo as fallback
         m_logoLabel->setText("FUJISAN");
@@ -893,7 +893,7 @@ void MainWindow::createLogoSection()
         m_logoLabel->setToolTip("Fujisan - Modern Atari Emulator");
         m_logoLabel->setContentsMargins(6, 2, 10, 2);
     }
-    
+
     m_toolBar->addWidget(m_logoLabel);
 }
 
@@ -983,7 +983,7 @@ void MainWindow::createDebugger()
 {
     // Create debugger widget
     m_debuggerWidget = new DebuggerWidget(m_emulator, this);
-    
+
     // Connect debugger to TCP server for remote debugging
     m_tcpServer->setDebuggerWidget(m_debuggerWidget);
 
@@ -1084,21 +1084,8 @@ void MainWindow::warmBoot()
 
 void MainWindow::toggleBasic(bool enabled)
 {
-    // Defensive check - prevent enabling BASIC when NetSIO is active
-    // (This shouldn't happen if UI is disabled correctly, but safety first)
-    if (m_netSIOEnabled && enabled) {
-        qWarning() << "Attempted to enable BASIC while NetSIO is active - ignoring";
-        m_basicToggle->blockSignals(true);
-        m_basicToggle->setChecked(false);
-        m_basicToggle->blockSignals(false);
-        if (m_basicAction) {
-            m_basicAction->blockSignals(true);
-            m_basicAction->setChecked(false);
-            m_basicAction->blockSignals(false);
-        }
-        statusBar()->showMessage("Cannot enable BASIC while NetSIO is active", 3000);
-        return;
-    }
+    // BASIC toggle now works with NetSIO enabled
+    // SmartDOS/MyDOS will use the configured BASIC ROM
 
     m_emulator->setBasicEnabled(enabled);
     QString message = enabled ? "BASIC enabled - restarting..." : "BASIC disabled - restarting...";
@@ -1236,12 +1223,12 @@ void MainWindow::restartEmulator()
     bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", false).toBool();     // Saved kbd joy0 state
     bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();    // Saved kbd joy1 state
     bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();     // Default false: Joy0=Numpad, Joy1=WASD
-    
+
     qDebug() << "=== LOADED JOYSTICK SETTINGS FROM QSETTINGS ===";
     qDebug() << "Main joystick enabled from settings:" << joystickEnabled;
     qDebug() << "Kbd Joy0 saved state:" << kbdJoy0Saved;
     qDebug() << "Kbd Joy1 saved state:" << kbdJoy1Saved;
-    
+
     // Only enable keyboard joysticks if main joystick support is enabled
     bool kbdJoy0Enabled = joystickEnabled && kbdJoy0Saved;
     bool kbdJoy1Enabled = joystickEnabled && kbdJoy1Saved;
@@ -1287,12 +1274,12 @@ void MainWindow::restartEmulator()
                          .arg(m_emulator->isBasicEnabled() ? "enabled" : "disabled");
         statusBar()->showMessage(message, 3000);
         qDebug() << message;
-        
+
         // Ensure keyboard joystick state is properly applied after restart
         m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
         m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
         qDebug() << "Applied keyboard joystick state after restart - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
-        
+
         // Update toolbar to reflect actual BASIC state (may have been auto-disabled for FujiNet)
         updateToolbarFromSettings();
     } else {
@@ -1428,17 +1415,17 @@ void MainWindow::onSettingsChanged()
 
     // Reload media settings to sync disk widgets with any changes made in settings dialog
     loadAndApplyMediaSettings();
-    
+
     // Sync printer settings from QSettings to PrinterWidget
     if (m_mediaPeripheralsDock && m_mediaPeripheralsDock->getPrinterWidget()) {
         QSettings settings;
         bool printerEnabled = settings.value("printer/enabled", false).toBool();
         QString outputFormat = settings.value("printer/outputFormat", "Text").toString();
         QString printerType = settings.value("printer/type", "Generic").toString();
-        
-        qDebug() << "Syncing printer settings to widget - Enabled:" << printerEnabled 
+
+        qDebug() << "Syncing printer settings to widget - Enabled:" << printerEnabled
                  << "Format:" << outputFormat << "Type:" << printerType;
-        
+
         auto* printerWidget = m_mediaPeripheralsDock->getPrinterWidget();
         printerWidget->setPrinterEnabled(printerEnabled);
         printerWidget->setOutputFormat(outputFormat);
@@ -1481,7 +1468,7 @@ void MainWindow::updateToolbarFromSettings()
     m_videoToggle->blockSignals(true);
     m_videoToggle->setChecked(isPAL);
     m_videoToggle->blockSignals(false);
-    
+
 
     // Update speed toggle from settings
     QSettings speedSettings("8bitrelics", "Fujisan");
@@ -1517,13 +1504,13 @@ void MainWindow::updateToolbarFromSettings()
     if (m_emulator) {
         m_emulator->enableAudio(true);
     }
-    
+
     // Update joystick checkbox from settings
     bool joystickEnabled = settings.value("input/joystickEnabled", true).toBool();
     m_joystickEnabledCheck->blockSignals(true);
     m_joystickEnabledCheck->setChecked(joystickEnabled);
     m_joystickEnabledCheck->blockSignals(false);
-    
+
     // Enable/disable keyboard joystick checkboxes based on main joystick state
     m_kbdJoy0Check->setEnabled(joystickEnabled);
     m_kbdJoy1Check->setEnabled(joystickEnabled);
@@ -1535,7 +1522,7 @@ void MainWindow::updateToolbarFromSettings()
         bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", false).toBool();
         bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();
         bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();
-        
+
         m_joystickEnabledCheck->blockSignals(true);
         m_joystickEnabledCheck->setChecked(joystickEnabled);
         m_joystickEnabledCheck->blockSignals(false);
@@ -1549,18 +1536,18 @@ void MainWindow::updateToolbarFromSettings()
         m_kbdJoy1Check->blockSignals(false);
 
         m_joystickSwapWidget->setSwapped(swapJoysticks);
-        
+
         // Enable/disable keyboard joystick checkboxes based on main joystick state
         m_kbdJoy0Check->setEnabled(joystickEnabled);
         m_kbdJoy1Check->setEnabled(joystickEnabled);
         m_joystickSwapWidget->setEnabled(joystickEnabled);
-        
+
         // Apply the effective joystick state to the emulator
         // Only enable keyboard joysticks if main joystick support is enabled
         m_emulator->setKbdJoy0Enabled(joystickEnabled && kbdJoy0Saved);
         m_emulator->setKbdJoy1Enabled(joystickEnabled && kbdJoy1Saved);
         m_emulator->setJoysticksSwapped(swapJoysticks);
-        
+
         qDebug() << "Applied effective joystick state - MainJoystick:" << joystickEnabled
                  << "Joy0:" << (joystickEnabled && kbdJoy0Saved)
                  << "Joy1:" << (joystickEnabled && kbdJoy1Saved)
@@ -1581,71 +1568,59 @@ void MainWindow::updateBasicToggleState()
 {
     if (!m_basicToggle || !m_emulator) return;
 
+    // BASIC toggle works normally even with NetSIO enabled
+    // SmartDOS/MyDOS use the BASIC ROM configuration
+    m_basicToggle->setEnabled(true);
+
+    // Update tooltip based on NetSIO state
     if (m_netSIOEnabled) {
-        // NetSIO enabled - disable BASIC toggle and force it to OFF (OS mode)
-        m_basicToggle->blockSignals(true);
-        m_basicToggle->setChecked(false);  // Force to OS mode
-        m_basicToggle->blockSignals(false);
-        m_basicToggle->setEnabled(false);  // Gray out the toggle
-        m_basicToggle->setToolTip("BASIC automatically disabled when NetSIO is enabled\n"
-                                  "FujiNet requires BASIC disabled to boot properly");
-
-        // Also update menu action
-        if (m_basicAction) {
-            m_basicAction->blockSignals(true);
-            m_basicAction->setChecked(false);
-            m_basicAction->blockSignals(false);
-        }
-
-        qDebug() << "BASIC toggle disabled - NetSIO is enabled";
+        m_basicToggle->setToolTip("Toggle BASIC mode (SmartDOS/MyDOS will use configured BASIC ROM)");
     } else {
-        // NetSIO disabled - re-enable BASIC toggle
-        m_basicToggle->setEnabled(true);
         m_basicToggle->setToolTip("Toggle between BASIC and OS-only modes");
-
-        // Restore actual BASIC state from emulator
-        bool basicEnabled = m_emulator->isBasicEnabled();
-        m_basicToggle->blockSignals(true);
-        m_basicToggle->setChecked(basicEnabled);
-        m_basicToggle->blockSignals(false);
-
-        // Also update menu action
-        if (m_basicAction) {
-            m_basicAction->blockSignals(true);
-            m_basicAction->setChecked(basicEnabled);
-            m_basicAction->blockSignals(false);
-        }
-
-        qDebug() << "BASIC toggle enabled - NetSIO is disabled, BASIC state:" << basicEnabled;
     }
+
+    // Restore actual BASIC state from emulator
+    bool basicEnabled = m_emulator->isBasicEnabled();
+    m_basicToggle->blockSignals(true);
+    m_basicToggle->setChecked(basicEnabled);
+    m_basicToggle->blockSignals(false);
+
+    // Also update menu action
+    if (m_basicAction) {
+        m_basicAction->blockSignals(true);
+        m_basicAction->setChecked(basicEnabled);
+        m_basicAction->blockSignals(false);
+    }
+
+    qDebug() << "BASIC toggle enabled, BASIC state:" << basicEnabled;
 }
 
 void MainWindow::updateToolbarLogo()
 {
     if (!m_logoLabel) return;
-    
+
     // Check if we have a logo pixmap stored
     QVariant pixmapVariant = m_logoLabel->property("originalPixmap");
     if (pixmapVariant.isNull()) return;
-    
+
     QPixmap originalPixmap = pixmapVariant.value<QPixmap>();
     if (originalPixmap.isNull()) return;
-    
+
     // Scale logo to appropriate toolbar size
     QPixmap scaledLogo = originalPixmap.scaled(QSize(80, 40), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    
+
     // Check if we're in dark mode
     QPalette palette = QApplication::palette();
     QColor windowColor = palette.color(QPalette::Window);
     bool isDarkMode = windowColor.lightness() < 128;
-    
+
     if (isDarkMode) {
         // Invert the logo for dark mode
         QImage img = scaledLogo.toImage();
         img.invertPixels();
         scaledLogo = QPixmap::fromImage(img);
     }
-    
+
     m_logoLabel->setPixmap(scaledLogo);
 }
 
@@ -1655,10 +1630,10 @@ void MainWindow::updateToolbarButtonStyles()
     QPalette pal = QApplication::palette();
     QColor buttonColor = pal.color(QPalette::Button);
     QColor windowColor = pal.color(QPalette::Window);
-    
+
     // Check if we're in dark mode
     bool isDarkMode = windowColor.lightness() < 128;
-    
+
     // Explicitly set text color based on theme
     QColor buttonTextColor;
     if (isDarkMode) {
@@ -1666,12 +1641,12 @@ void MainWindow::updateToolbarButtonStyles()
     } else {
         buttonTextColor = QColor(0, 0, 0);  // Black text for light mode
     }
-    
+
     // Create slightly lighter/darker versions for hover and pressed states
     QColor buttonHoverColor;
     QColor buttonPressedColor;
     QColor borderColor;
-    
+
     if (isDarkMode) {
         // Dark mode: make hover lighter and pressed even lighter
         buttonHoverColor = buttonColor.lighter(120);
@@ -1683,7 +1658,7 @@ void MainWindow::updateToolbarButtonStyles()
         buttonPressedColor = buttonColor.darker(120);
         borderColor = buttonColor.darker(150);
     }
-    
+
     // Create button style for console and system buttons
     QString buttonStyle = QString(
         "QPushButton {"
@@ -1711,14 +1686,14 @@ void MainWindow::updateToolbarButtonStyles()
             .arg(buttonHoverColor.name())
             .arg(buttonPressedColor.name())
             .arg(borderColor.darker(120).name());
-    
+
     // Apply style to console buttons if they exist
     if (m_startButton) m_startButton->setStyleSheet(buttonStyle);
     if (m_selectButton) m_selectButton->setStyleSheet(buttonStyle);
     if (m_optionButton) m_optionButton->setStyleSheet(buttonStyle);
     if (m_breakButton) m_breakButton->setStyleSheet(buttonStyle);
     if (m_pauseButton) m_pauseButton->setStyleSheet(buttonStyle);
-    
+
     // Apply to other buttons that may exist in the dock
     QList<QPushButton*> allButtons = findChildren<QPushButton*>();
     for (QPushButton* button : allButtons) {
@@ -1727,7 +1702,7 @@ void MainWindow::updateToolbarButtonStyles()
             button->setStyleSheet(buttonStyle);
         }
     }
-    
+
     // Create profile button style (slightly wider for longer text)
     QString profileButtonStyle = QString(
         "QPushButton {"
@@ -1755,7 +1730,7 @@ void MainWindow::updateToolbarButtonStyles()
             .arg(buttonHoverColor.name())
             .arg(buttonPressedColor.name())
             .arg(borderColor.darker(120).name());
-    
+
     // Apply style to profile buttons if they exist
     if (m_loadProfileButton) m_loadProfileButton->setStyleSheet(profileButtonStyle);
     if (m_quickSaveButton) m_quickSaveButton->setStyleSheet(profileButtonStyle);
@@ -1853,7 +1828,7 @@ void MainWindow::showAbout()
 
     // Logo
     QLabel* logoLabel = new QLabel();
-    
+
     // Try to load Fujisan logo from multiple paths (same as toolbar)
     QStringList imagePaths = {
         "./images/fujisanlogo.png",
@@ -1869,33 +1844,33 @@ void MainWindow::showAbout()
 #endif
         ":/images/fujisanlogo.png"
     };
-    
+
     QPixmap logo;
     bool logoLoaded = false;
-    
+
     for (const QString& path : imagePaths) {
         if (logo.load(path)) {
             logoLoaded = true;
             break;
         }
     }
-    
+
     if (logoLoaded) {
         // Scale logo to fit nicely in the dialog
         QPixmap scaledLogo = logo.scaled(300, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        
+
         // Check if we're in dark mode and invert the logo if needed
         QPalette palette = QApplication::palette();
         QColor windowColor = palette.color(QPalette::Window);
         bool isDarkMode = windowColor.lightness() < 128;
-        
+
         if (isDarkMode) {
             // Invert the logo for dark mode
             QImage img = scaledLogo.toImage();
             img.invertPixels();
             scaledLogo = QPixmap::fromImage(img);
         }
-        
+
         logoLabel->setPixmap(scaledLogo);
         logoLabel->setAlignment(Qt::AlignCenter);
     } else {
@@ -2018,7 +1993,7 @@ void MainWindow::createMediaPeripheralsDock()
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::printerOutputFormatChanged, this, &MainWindow::onPrinterOutputFormatChanged);
     connect(m_mediaPeripheralsDock, &MediaPeripheralsDock::printerTypeChanged, this, &MainWindow::onPrinterTypeChanged);
     // Note: Cartridge signals connected to toolbar cartridge widget above
-    
+
     // Connect TCP server signals for GUI integration
     connect(m_tcpServer, &TCPServer::diskInserted, this, &MainWindow::onDiskInserted);
     connect(m_tcpServer, &TCPServer::diskEjected, this, &MainWindow::onDiskEjected);
@@ -2217,13 +2192,13 @@ void MainWindow::createMediaPeripheralsDock()
     m_selectButton = new QPushButton("SELECT", this);
     m_optionButton = new QPushButton("OPTION", this);
     m_breakButton = new QPushButton("BREAK", this);
-    
+
     // Create reset/system buttons section
     QWidget* systemButtonsContainer = new QWidget(this);
     QVBoxLayout* systemButtonsLayout = new QVBoxLayout(systemButtonsContainer);
     systemButtonsLayout->setContentsMargins(2, 2, 2, 2);
     systemButtonsLayout->setSpacing(1);
-    
+
     // Create system buttons - same style as console buttons
     QPushButton* coldBootButton = new QPushButton("COLD", this);
     QPushButton* warmBootButton = new QPushButton("WARM", this);
@@ -2234,10 +2209,10 @@ void MainWindow::createMediaPeripheralsDock()
     QPalette pal = QApplication::palette();
     QColor buttonColor = pal.color(QPalette::Button);
     QColor windowColor = pal.color(QPalette::Window);
-    
+
     // Check if we're in dark mode
     bool isDarkMode = windowColor.lightness() < 128;
-    
+
     // Explicitly set text color based on theme
     QColor buttonTextColor;
     if (isDarkMode) {
@@ -2245,12 +2220,12 @@ void MainWindow::createMediaPeripheralsDock()
     } else {
         buttonTextColor = QColor(0, 0, 0);  // Black text for light mode
     }
-    
+
     // Create slightly lighter/darker versions for hover and pressed states
     QColor buttonHoverColor;
     QColor buttonPressedColor;
     QColor borderColor;
-    
+
     if (isDarkMode) {
         // Dark mode: make hover lighter and pressed even lighter
         buttonHoverColor = buttonColor.lighter(120);
@@ -2262,7 +2237,7 @@ void MainWindow::createMediaPeripheralsDock()
         buttonPressedColor = buttonColor.darker(120);
         borderColor = buttonColor.darker(150);
     }
-    
+
     QString buttonStyle = QString(
         "QPushButton {"
         "    font-size: 9px;"
@@ -2294,7 +2269,7 @@ void MainWindow::createMediaPeripheralsDock()
     m_selectButton->setStyleSheet(buttonStyle);
     m_optionButton->setStyleSheet(buttonStyle);
     m_breakButton->setStyleSheet(buttonStyle);
-    
+
     // Apply same style to system buttons
     coldBootButton->setStyleSheet(buttonStyle);
     warmBootButton->setStyleSheet(buttonStyle);
@@ -2306,7 +2281,7 @@ void MainWindow::createMediaPeripheralsDock()
     m_selectButton->setToolTip("SELECT button (F3)");
     m_optionButton->setToolTip("OPTION button (F4)");
     m_breakButton->setToolTip("BREAK key (F7)");
-    
+
     // Add tooltips for system buttons
     coldBootButton->setToolTip("Cold boot (complete restart)");
     warmBootButton->setToolTip("Warm boot (soft reset)");
@@ -2318,7 +2293,7 @@ void MainWindow::createMediaPeripheralsDock()
     buttonsLayout->addWidget(m_selectButton);
     buttonsLayout->addWidget(m_startButton);
     buttonsLayout->addWidget(m_breakButton);
-    
+
     // Add system buttons to layout
     systemButtonsLayout->addWidget(coldBootButton);
     systemButtonsLayout->addWidget(warmBootButton);
@@ -2394,11 +2369,11 @@ void MainWindow::createMediaPeripheralsDock()
             m_emulatorWidget->setFocus();
         }
     });
-    
+
     // Connect system button signals
     connect(coldBootButton, &QPushButton::clicked, this, &MainWindow::coldBoot);
     connect(warmBootButton, &QPushButton::clicked, this, &MainWindow::warmBoot);
-    
+
     // Connect inverse key - send AKEY_ATARI directly for inverse video toggle
     connect(inverseButton, &QPushButton::clicked, this, [this]() {
         m_emulator->injectAKey(AKEY_ATARI);
@@ -2409,7 +2384,7 @@ void MainWindow::createMediaPeripheralsDock()
             m_emulatorWidget->setFocus();
         }
     });
-    
+
     // Connect pause button
     connect(m_pauseButton, &QPushButton::clicked, this, &MainWindow::togglePause);
 
@@ -2547,7 +2522,7 @@ void MainWindow::createMediaPeripheralsDock()
     m_toolBar->insertSeparator(m_toolBar->actions().at(3));
     m_toolBar->insertWidget(m_toolBar->actions().at(4), machineControlsContainer);
     m_toolBar->insertSeparator(m_toolBar->actions().at(5));
-    
+
     // Find the spacer widget index (it's after joystick, audio, profile sections)
     // Count widgets: joystick(1) + sep(1) + audio(1) + sep(1) + profile(1) + sep(1) + spacer(1) = 7
     // Plus the ones we just inserted: d1(1) + sep(1) + cart(1) + sep(1) + machine(1) + sep(1) = 6
@@ -2555,7 +2530,7 @@ void MainWindow::createMediaPeripheralsDock()
 
     // Insert console and system buttons after the spacer (logo will be added at the very end)
     int insertIndex = 12;
-    
+
     m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex), consoleButtonsContainer);
     m_toolBar->insertSeparator(m_toolBar->actions().at(insertIndex + 1));
     m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex + 2), systemButtonsContainer);
@@ -2799,28 +2774,28 @@ void MainWindow::loadInitialSettings()
 
     // Debug checkbox state vs settings
     if (m_joystickEnabledCheck) {
-        qDebug() << "=== JOYSTICK CHECKBOX STATE AT STARTUP ===";
+        qDebug() << "=== JOYSTICK CHECKBOX STATE DURING STARTUP ===";
         qDebug() << "Checkbox visual state:" << m_joystickEnabledCheck->isChecked();
         qDebug() << "Settings value:" << settings.value("input/joystickEnabled", true).toBool();
     }
 
     // Sync before reading to ensure we get fresh values from disk
     settings.sync();
-    
+
 #ifdef Q_OS_MACOS
     // Force refresh on macOS to avoid cached values
     QSettings::setDefaultFormat(QSettings::NativeFormat);
 #endif
-    
+
     // Load saved settings or use defaults
     QString machineType = settings.value("machine/type", "-xl").toString();
     QString videoSystem = settings.value("machine/videoSystem", "-pal").toString();
     bool basicEnabled = settings.value("machine/basicEnabled", true).toBool();
     bool altirraOSEnabled = settings.value("machine/altirraOS", false).toBool();
     bool altirraBASICEnabled = settings.value("machine/altirraBASIC", false).toBool();
-    
-    qDebug() << "MainWindow loading settings - BASIC:" << basicEnabled 
-             << "Altirra OS:" << altirraOSEnabled 
+
+    qDebug() << "MainWindow loading settings - BASIC:" << basicEnabled
+             << "Altirra OS:" << altirraOSEnabled
              << "Altirra BASIC:" << altirraBASICEnabled
              << "Settings file:" << settings.fileName();
     bool audioEnabled = settings.value("audio/enabled", true).toBool();
@@ -2843,12 +2818,12 @@ void MainWindow::loadInitialSettings()
     bool kbdJoy0Saved = settings.value("input/kbdJoy0Enabled", false).toBool();     // Saved kbd joy0 state
     bool kbdJoy1Saved = settings.value("input/kbdJoy1Enabled", false).toBool();    // Saved kbd joy1 state
     bool swapJoysticks = settings.value("input/swapJoysticks", false).toBool();     // Default false: Joy0=Numpad, Joy1=WASD
-    
+
     qDebug() << "=== LOADED JOYSTICK SETTINGS FROM QSETTINGS ===";
     qDebug() << "Main joystick enabled from settings:" << joystickEnabled;
     qDebug() << "Kbd Joy0 saved state:" << kbdJoy0Saved;
     qDebug() << "Kbd Joy1 saved state:" << kbdJoy1Saved;
-    
+
     // Only enable keyboard joysticks if main joystick support is enabled
     bool kbdJoy0Enabled = joystickEnabled && kbdJoy0Saved;
     bool kbdJoy1Enabled = joystickEnabled && kbdJoy1Saved;
@@ -2871,7 +2846,7 @@ void MainWindow::loadInitialSettings()
     m_emulator->setOSRomPath(osRomPath);
     m_emulator->setBasicRomPath(basicRomPath);
     m_emulator->enableAudio(audioEnabled);
-    
+
     qDebug() << "ROM paths - OS:" << osRomPath << "BASIC:" << basicRomPath;
     qDebug() << "Altirra OS enabled:" << altirraOSEnabled;
     qDebug() << "Altirra BASIC enabled:" << altirraBASICEnabled;
@@ -2886,7 +2861,7 @@ void MainWindow::loadInitialSettings()
         QApplication::quit();
         return;
     }
-    
+
     // Ensure keyboard joystick state is properly applied after initialization
     // This is needed because the initial state from command line args might not match
     // the effective state we want (main joystick disabled should disable kbd joy)
@@ -3410,7 +3385,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 void MainWindow::changeEvent(QEvent *event)
 {
     QMainWindow::changeEvent(event);
-    
+
     if (event->type() == QEvent::PaletteChange) {
         // Update the toolbar logo when the theme changes
         updateToolbarLogo();
@@ -3425,11 +3400,11 @@ void MainWindow::refreshProfileList()
 
     QString currentProfile = m_profileCombo->currentText();
     m_profileCombo->clear();
-    
+
     m_profileManager->refreshProfileList();
     QStringList profiles = m_profileManager->getProfileNames();
     m_profileCombo->addItems(profiles);
-    
+
     // Restore selection if possible
     if (!currentProfile.isEmpty()) {
         int index = m_profileCombo->findText(currentProfile);
@@ -3437,7 +3412,7 @@ void MainWindow::refreshProfileList()
             m_profileCombo->setCurrentIndex(index);
         }
     }
-    
+
     // Always update to show current profile from ProfileManager
     QString currentProfileName = m_profileManager->getCurrentProfileName();
     if (!currentProfileName.isEmpty()) {
@@ -3824,12 +3799,12 @@ bool MainWindow::enableDriveViaTCP(int driveNumber, bool enabled)
 bool MainWindow::insertCartridgeViaTCP(const QString& cartridgePath)
 {
     qDebug() << "MainWindow::insertCartridgeViaTCP called with path:" << cartridgePath;
-    
+
     if (m_cartridgeWidget) {
         m_cartridgeWidget->loadCartridge(cartridgePath);
         return true;
     }
-    
+
     qDebug() << "MainWindow::insertCartridgeViaTCP failed - cartridge widget not available";
     return false;
 }
@@ -3837,12 +3812,12 @@ bool MainWindow::insertCartridgeViaTCP(const QString& cartridgePath)
 bool MainWindow::ejectCartridgeViaTCP()
 {
     qDebug() << "MainWindow::ejectCartridgeViaTCP called";
-    
+
     if (m_cartridgeWidget) {
         m_cartridgeWidget->ejectCartridge();
         return true;
     }
-    
+
     qDebug() << "MainWindow::ejectCartridgeViaTCP failed - cartridge widget not available";
     return false;
 }
@@ -3850,15 +3825,15 @@ bool MainWindow::ejectCartridgeViaTCP()
 void MainWindow::applyProfileViaTCP(const ConfigurationProfile& profile)
 {
     qDebug() << "MainWindow::applyProfileViaTCP called for profile:" << profile.name;
-    
+
     // Apply the profile using the existing private method
     applyProfileToEmulator(profile);
-    
+
     // Update current profile name in the manager
     if (m_profileManager) {
         m_profileManager->setCurrentProfileName(profile.name);
     }
-    
+
     // Update the profile combo box to reflect the change
     if (m_profileCombo) {
         int index = m_profileCombo->findText(profile.name);

@@ -2235,14 +2235,11 @@ void SettingsDialog::onAltirraBASICChanged()
 void SettingsDialog::onNetSIOToggled(bool enabled)
 {
     if (enabled) {
-        // NetSIO/FujiNet requires BASIC to be disabled
-        m_basicEnabledCheck->setChecked(false);
-        m_basicEnabledCheck->setEnabled(false);
-        m_basicEnabledCheck->setToolTip("BASIC automatically disabled when NetSIO is enabled\n"
-                                       "FujiNet requires BASIC disabled to boot properly");
+        // Update tooltip - BASIC still works with FujiNet (SmartDOS/MyDOS use it)
+        m_basicEnabledCheck->setToolTip("BASIC setting applies to SmartDOS/MyDOS\n"
+                                       "SmartDOS/MyDOS will use the configured BASIC ROM");
     } else {
-        // Re-enable BASIC checkbox when NetSIO is disabled
-        m_basicEnabledCheck->setEnabled(true);
+        // Restore normal tooltip
         m_basicEnabledCheck->setToolTip("Enable or disable the Atari BASIC interpreter");
     }
 

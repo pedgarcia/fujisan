@@ -781,19 +781,12 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
     m_netSIOEnabled = netSIOEnabled;
     qDebug() << "[NETSIO] Updated m_netSIOEnabled to:" << m_netSIOEnabled;
 
-    // CRITICAL: NetSIO/FujiNet requires BASIC to be disabled for proper booting
-    bool actualBasicEnabled = basicEnabled;
-    if (netSIOEnabled && basicEnabled) {
-        actualBasicEnabled = false;
-        // Update the emulator's internal BASIC state to reflect the auto-disable
-        setBasicEnabled(false);
-    } else {
-        // Ensure emulator's internal state matches the requested setting when NetSIO is disabled
-        setBasicEnabled(basicEnabled);
-    }
-    
+    // Track NetSIO state - no longer force BASIC disabled
+    // SmartDOS/MyDOS will handle BASIC loading the same way as physical disks
+    setBasicEnabled(basicEnabled);
+
     // Start with basic initialization first
-    if (!initializeWithInputConfig(actualBasicEnabled, machineType, videoSystem, artifactMode,
+    if (!initializeWithInputConfig(basicEnabled, machineType, videoSystem, artifactMode,
                                  horizontalArea, verticalArea, horizontalShift, verticalShift,
                                  fitScreen, show80Column, vSyncEnabled,
                                  kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks, netSIOEnabled)) {
@@ -807,8 +800,7 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
     if (netSIOEnabled) {
         qDebug() << "[NETSIO] Initialization in progress...";
 
-        // CRITICAL: Dismount all local disks to give FujiNet boot priority
-        // When NetSIO is enabled, FujiNet devices should take precedence over local ATR files
+        // Dismount all local disks to give FujiNet boot priority
         for (int i = 1; i <= 8; i++) {
             dismountDiskImage(i);
         }
@@ -1620,7 +1612,7 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 
 void AtariEmulator::coldBoot()
 {
-    qDebug() << "[NETSIO] COLD BOOT START *** BUILD 2025-01-01-POLLING-FIX ***";
+    qDebug() << "[NETSIO] COLD BOOT START";
     qDebug() << "[NETSIO] m_netSIOEnabled:" << m_netSIOEnabled;
 
 #ifdef NETSIO
@@ -1716,7 +1708,6 @@ void AtariEmulator::warmBoot()
     // Preserve BASIC disabled state across warm boot
     if (Atari800_disable_basic) {
         GTIA_consol_override = 2;  // Hold Option for 2 console reads
-        qDebug() << "[NETSIO] Preserving BASIC-disabled state (GTIA_consol_override = 2)";
     }
 
     // CRITICAL: Send warm reset notification to FujiNet-PC BEFORE resetting emulator
@@ -1738,11 +1729,8 @@ void AtariEmulator::warmBoot()
 #endif
 
     // Reset the Atari
-    qDebug() << "Calling Atari800_Warmstart()...";
     Atari800_Warmstart();
-    qDebug() << "Atari800_Warmstart() completed";
-
-    qDebug() << "=== WARM BOOT COMPLETE ===";
+    qDebug() << "[NETSIO] WARM BOOT COMPLETE";
 }
 
 char AtariEmulator::getShiftedSymbol(int key, bool shiftPressed)
