@@ -4116,6 +4116,7 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
         // Start FujiNet-PC if not already running (auto-launch mode only)
         if (launchBehavior == 0 && !m_fujinetProcessManager->isRunning()) {
             qDebug() << "NetSIO enabled - auto-starting FujiNet-PC with saved settings...";
+            m_fujinetIntentionalRestart = true;  // Suppress disconnect messages during startup
             startFujiNetWithSavedSettings();
         } else {
             qDebug() << "NetSIO enabled but FujiNet-PC already running or not in auto-launch mode";
@@ -4308,16 +4309,20 @@ QString MainWindow::getFujiNetSDPath() const
     QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
 
     if (!sdPath.isEmpty()) {
+        QDir sdDir(sdPath);
+        if (!sdDir.exists()) {
+            sdDir.mkpath(".");
+        }
         return sdPath;
     }
 
-    // Compute default: SD subdirectory next to FujiNet binary
     if (m_fujinetBinaryManager) {
-        QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
-        if (!binaryPath.isEmpty() && QFile::exists(binaryPath)) {
-            QFileInfo fileInfo(binaryPath);
-            return fileInfo.absolutePath() + "/SD";
+        QString defaultPath = m_fujinetBinaryManager->getDefaultSDPath();
+        QDir defaultDir(defaultPath);
+        if (!defaultDir.exists()) {
+            defaultDir.mkpath(".");
         }
+        return defaultPath;
     }
 
     return QString();

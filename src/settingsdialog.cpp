@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDesktopServices>
+#include <QUrl>
 #include <QProcess>
 #include <QDir>
 #include <QTextStream>
@@ -64,10 +65,14 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
     m_originalSettings.altirraOSEnabled = m_emulator->isAltirraOSEnabled();
     m_originalSettings.altirraBASICEnabled = m_emulator->isAltirraBASICEnabled();
     
+#ifndef Q_OS_WIN
     // Store original NetSIO state for restart detection
     QSettings settings;
     m_originalSettings.netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
-    
+#else
+    QSettings settings;
+#endif
+
     // Store original printer state for restart detection
     m_originalSettings.printerEnabled = settings.value("printer/enabled", false).toBool();
     
@@ -384,16 +389,18 @@ void SettingsDialog::createHardwareTab()
     rDeviceLayout->addStretch();
     
     specialLayout->addLayout(rDeviceLayout);
-    
+
+#ifndef Q_OS_WIN
     m_netSIOEnabled = new QCheckBox("Enable NetSIO (FujiNet-PC Support)");
     m_netSIOEnabled->setToolTip("Enable NetSIO for FujiNet-PC network functionality\n\n"
                                "IMPORTANT: FujiNet requires BASIC to be disabled to boot properly.\n"
                                "BASIC will be automatically disabled when NetSIO is enabled.");
     specialLayout->addWidget(m_netSIOEnabled);
-    
+
     // Connect NetSIO checkbox to update BASIC checkbox state
     connect(m_netSIOEnabled, &QCheckBox::toggled, this, &SettingsDialog::onNetSIOToggled);
-    
+#endif
+
     m_rtimeEnabled = new QCheckBox("Enable R-Time 8 Real-Time Clock");
     m_rtimeEnabled->setToolTip("Enable R-Time 8 cartridge emulation for real-time clock");
     specialLayout->addWidget(m_rtimeEnabled);
@@ -1842,8 +1849,19 @@ void SettingsDialog::createFujiNetTab()
     m_fujinetBrowseSDButton = new QPushButton("Browse...");
     m_fujinetBrowseSDButton->setMaximumWidth(80);
 
+    QPushButton* openSDButton = new QPushButton();
+#ifdef Q_OS_MACOS
+    openSDButton->setText("Show in Finder");
+#else
+    openSDButton->setText("Show in Explorer");
+#endif
+    openSDButton->setToolTip("Open the FujiNet SD card folder in your file manager");
+    openSDButton->setMaximumWidth(120);
+    connect(openSDButton, &QPushButton::clicked, this, &SettingsDialog::onFujiNetOpenSDFolder);
+
     sdPathLayout->addWidget(m_fujinetSDPath, 1);
     sdPathLayout->addWidget(m_fujinetBrowseSDButton);
+    sdPathLayout->addWidget(openSDButton);
     binaryStorageLayout->addRow("SD Card Folder:", sdPathLayout);
 
     mainLayout->addWidget(binaryStorageGroup);
@@ -2232,20 +2250,21 @@ void SettingsDialog::onAltirraBASICChanged()
     m_basicRomBrowse->setEnabled(!altirraBASICEnabled);
 }
 
+#ifndef Q_OS_WIN
 void SettingsDialog::onNetSIOToggled(bool enabled)
 {
     if (enabled) {
-        // Update tooltip - BASIC still works with FujiNet (SmartDOS/MyDOS use it)
+        checkAndMigrateFujiNetSD();
+
         m_basicEnabledCheck->setToolTip("BASIC setting applies to SmartDOS/MyDOS\n"
                                        "SmartDOS/MyDOS will use the configured BASIC ROM");
     } else {
-        // Restore normal tooltip
         m_basicEnabledCheck->setToolTip("Enable or disable the Atari BASIC interpreter");
     }
 
-    // Emit signal to notify MainWindow of NetSIO state change
     emit netSIOEnabledChanged(enabled);
 }
+#endif
 
 void SettingsDialog::setupFilePathTooltip(QLineEdit* lineEdit)
 {
@@ -2652,7 +2671,9 @@ void SettingsDialog::loadSettings()
     
     // Special Devices (R: device is already loaded in Hardware Extensions)
     m_rDeviceName->setText(settings.value("media/rDeviceName", "R").toString());
+#ifndef Q_OS_WIN
     m_netSIOEnabled->setChecked(settings.value("media/netSIOEnabled", false).toBool());
+#endif
     m_rtimeEnabled->setChecked(settings.value("media/rtimeEnabled", false).toBool());
     
     // Printer Configuration - DISABLED
@@ -2671,9 +2692,11 @@ void SettingsDialog::loadSettings()
     m_logFilterString->setText(settings.value("log/filterString", "").toString());
     m_logFilterRegex->setChecked(settings.value("log/useRegex", false).toBool());
 
+#ifndef Q_OS_WIN
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
-    
+#endif
+
     // Update PAL/NTSC dependent controls
     updateVideoSystemDependentControls();
     
@@ -2851,7 +2874,11 @@ void SettingsDialog::saveSettings()
     
     // Special Devices (R: device enabled state is saved in Hardware Extensions)
     settings.setValue("media/rDeviceName", m_rDeviceName->text());
+#ifndef Q_OS_WIN
     settings.setValue("media/netSIOEnabled", m_netSIOEnabled->isChecked());
+#else
+    settings.setValue("media/netSIOEnabled", false);  // NetSIO not available on Windows
+#endif
     settings.setValue("media/rtimeEnabled", m_rtimeEnabled->isChecked());
     
     // Printer Configuration - DISABLED
@@ -2895,11 +2922,15 @@ void SettingsDialog::saveSettings()
         }
     }
 #endif
-    
+
+    qDebug() << "Settings saved to persistent storage - Machine:" << machineType
+             << "Video:" << videoSystem << "BASIC:" << basicEnabled;
+
+#ifndef Q_OS_WIN
     // Check if NetSIO setting has changed (requires emulator restart)
     bool currentNetSIOState = m_netSIOEnabled->isChecked();
     bool netSIOStateChanged = (currentNetSIOState != m_originalSettings.netSIOEnabled);
-    
+
     // Check if Printer setting has changed (requires emulator restart) - DISABLED
     /*
     bool currentPrinterState = m_printerEnabled->isChecked();
@@ -2907,36 +2938,36 @@ void SettingsDialog::saveSettings()
     */
     bool currentPrinterState = false; // Force disabled
     bool printerStateChanged = false; // No state changes when disabled
-    
-    qDebug() << "Settings saved to persistent storage - Machine:" << machineType 
-             << "Video:" << videoSystem << "BASIC:" << basicEnabled;
-    qDebug() << "NetSIO state - Original:" << m_originalSettings.netSIOEnabled 
+
+    qDebug() << "NetSIO state - Original:" << m_originalSettings.netSIOEnabled
              << "Current:" << currentNetSIOState << "Changed:" << netSIOStateChanged;
-    qDebug() << "Printer state - Original:" << m_originalSettings.printerEnabled 
+    qDebug() << "Printer state - Original:" << m_originalSettings.printerEnabled
              << "Current:" << currentPrinterState << "Changed:" << printerStateChanged;
-    
+
     // Handle NetSIO or Printer state changes - both require emulator restart
     if (netSIOStateChanged || printerStateChanged) {
         if (netSIOStateChanged) {
             qDebug() << "*** NetSIO setting changed - triggering emulator restart to update SIO patch ***";
-            qDebug() << "NetSIO" << (currentNetSIOState ? "ENABLED" : "DISABLED") 
+            qDebug() << "NetSIO" << (currentNetSIOState ? "ENABLED" : "DISABLED")
                      << "- Disk access will be" << (currentNetSIOState ? "REALISTIC (hardware timing)" : "FAST (emulated)");
         }
-        
+
         if (printerStateChanged) {
             qDebug() << "*** Printer setting changed - triggering emulator restart to install P: device ***";
-            qDebug() << "Printer" << (currentPrinterState ? "ENABLED" : "DISABLED") 
+            qDebug() << "Printer" << (currentPrinterState ? "ENABLED" : "DISABLED")
                      << "- P: device will be" << (currentPrinterState ? "AVAILABLE" : "UNAVAILABLE");
         }
-        
+
         // Trigger immediate emulator reinitialization with new settings
         triggerNetSIORestart(currentNetSIOState);
-        
+
         // Update original settings to prevent repeated restarts
         m_originalSettings.netSIOEnabled = currentNetSIOState;
         m_originalSettings.printerEnabled = currentPrinterState;
-    } else {
-        // No NetSIO change - apply settings normally
+    } else
+#endif
+    {
+        // No NetSIO change (or Windows) - apply settings normally
         qDebug() << "[SETTINGS] Applying settings without restart:";
         qDebug() << "[SETTINGS]   Machine type:" << machineType;
         qDebug() << "[SETTINGS]   Video system:" << videoSystem;
@@ -3134,11 +3165,13 @@ void SettingsDialog::applySettings()
         qDebug() << "  BASIC ROM path:" << basicRomPath;
 
         qDebug() << "=== SETTINGS DIALOG RESTART START ===";
+#ifndef Q_OS_WIN
         qDebug() << "NetSIO enabled from UI:" << m_netSIOEnabled->isChecked();
+#endif
 
         // Full restart needed for machine/video/OS settings
         m_emulator->shutdown();
-        
+
         // Get artifact settings from UI
         QString artifactMode = m_artifactingMode->currentData().toString();
 
@@ -3152,7 +3185,11 @@ void SettingsDialog::applySettings()
         bool vSyncEnabled = m_vSyncEnabled->isChecked();
 
         // Get special device settings from UI
+#ifndef Q_OS_WIN
         bool netSIOEnabled = m_netSIOEnabled->isChecked();
+#else
+        bool netSIOEnabled = false;  // NetSIO not available on Windows
+#endif
         bool rtimeEnabled = m_rtimeEnabled->isChecked();
 
         qDebug() << "*** ABOUT TO CALL initializeWithNetSIOConfig with NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
@@ -3255,15 +3292,16 @@ void SettingsDialog::reject()
     QDialog::reject();
 }
 
+#ifndef Q_OS_WIN
 void SettingsDialog::triggerNetSIORestart(bool netSIOEnabled)
 {
     qDebug() << "Triggering emulator restart for NetSIO state change...";
-    
+
     if (!m_emulator) {
         qDebug() << "Error: No emulator instance available for restart";
         return;
     }
-    
+
     // Gather current settings for restart
     QString machineType = m_machineTypeCombo->currentData().toString();
     QString videoSystem = m_videoSystemCombo->currentData().toString();
@@ -3281,31 +3319,32 @@ void SettingsDialog::triggerNetSIORestart(bool netSIOEnabled)
     bool kbdJoy1Enabled = m_emulator->isKbdJoy1Enabled();
     bool swapJoysticks = m_emulator->isJoysticksSwapped();
     bool rtimeEnabled = m_rtimeEnabled->isChecked();
-    
-    qDebug() << "Restarting emulator with NetSIO:" << netSIOEnabled 
+
+    qDebug() << "Restarting emulator with NetSIO:" << netSIOEnabled
              << "RTime:" << rtimeEnabled << "Machine:" << machineType << "Video:" << videoSystem;
-    
+
     // Reinitialize emulator with new NetSIO configuration
     if (m_emulator->initializeWithNetSIOConfig(basicEnabled, machineType, videoSystem, artifactMode,
                                              horizontalArea, verticalArea, horizontalShift, verticalShift,
                                              fitScreen, show80Column, vSyncEnabled,
                                              kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
                                              netSIOEnabled, rtimeEnabled)) {
-        qDebug() << "✓ Emulator restarted successfully with NetSIO" << (netSIOEnabled ? "ENABLED" : "DISABLED");
-        qDebug() << "✓ SIO patch updated - Disk access is now" << (netSIOEnabled ? "REALISTIC" : "FAST");
-        
+        qDebug() << "Emulator restarted successfully with NetSIO" << (netSIOEnabled ? "ENABLED" : "DISABLED");
+        qDebug() << "SIO patch updated - Disk access is now" << (netSIOEnabled ? "REALISTIC" : "FAST");
+
         // Apply other settings that don't require restart
         m_emulator->enableAudio(m_soundEnabled->isChecked());
-        
+
         // Apply media settings (cartridges, disks, etc.)
         applyMediaSettings();
-        
+
         // Emit signal to update UI components
         emit settingsChanged();
     } else {
-        qDebug() << "✗ Failed to restart emulator with new NetSIO configuration";
+        qDebug() << "Failed to restart emulator with new NetSIO configuration";
     }
 }
+#endif
 
 void SettingsDialog::updateVideoSystemDependentControls()
 {
@@ -3466,19 +3505,23 @@ void SettingsDialog::restoreDefaults()
     
     // Special Devices - all disabled by default (R: device is handled in Hardware Extensions)
     m_rDeviceName->setText("R");
+#ifndef Q_OS_WIN
     m_netSIOEnabled->setChecked(false);
+#endif
     m_rtimeEnabled->setChecked(false);
-    
+
     // Printer Configuration - all defaults - DISABLED
     /*
     m_printerEnabled->setChecked(false);
     m_printerOutputFormat->setCurrentText("Text");
     m_printerType->setCurrentText("Generic");
     */
-    
+
+#ifndef Q_OS_WIN
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
-    
+#endif
+
     // Update PAL/NTSC dependent controls
     updateVideoSystemDependentControls();
 }
@@ -3650,9 +3693,13 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     
     // Special Devices
     profile.rDeviceName = m_rDeviceName->text();
+#ifndef Q_OS_WIN
     profile.netSIOEnabled = m_netSIOEnabled->isChecked();
+#else
+    profile.netSIOEnabled = false;  // NetSIO not available on Windows
+#endif
     profile.rtimeEnabled = m_rtimeEnabled->isChecked();
-    
+
     // Printer Configuration - DISABLED
     /*
     profile.printer.enabled = m_printerEnabled->isChecked();
@@ -3934,19 +3981,23 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     
     // Special Devices
     m_rDeviceName->setText(profile.rDeviceName);
+#ifndef Q_OS_WIN
     m_netSIOEnabled->setChecked(profile.netSIOEnabled);
+#endif
     m_rtimeEnabled->setChecked(profile.rtimeEnabled);
-    
+
     // Printer Configuration - DISABLED
     /*
     m_printerEnabled->setChecked(profile.printer.enabled);
     m_printerOutputFormat->setCurrentText(profile.printer.outputFormat);
     m_printerType->setCurrentText(profile.printer.printerType);
     */
-    
+
+#ifndef Q_OS_WIN
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
-    
+#endif
+
     // Hardware Extensions
     // 80-column options disabled until properly implemented
     // m_xep80Enabled->setChecked(profile.xep80Enabled);
@@ -4212,6 +4263,141 @@ void SettingsDialog::onFujiNetBrowseSDFolder()
         m_fujinetSDPath->setText(dirPath);
         qDebug() << "FujiNet-PC SD folder configured:" << dirPath;
     }
+}
+
+void SettingsDialog::onFujiNetOpenSDFolder()
+{
+    QString sdPath = m_fujinetSDPath->text();
+
+    if (sdPath.isEmpty() && m_fujinetBinaryManager) {
+        sdPath = m_fujinetBinaryManager->getDefaultSDPath();
+    }
+
+    QDir sdDir(sdPath);
+    if (!sdDir.exists()) {
+        sdDir.mkpath(".");
+    }
+
+    QDesktopServices::openUrl(QUrl::fromLocalFile(sdPath));
+}
+
+void SettingsDialog::checkAndMigrateFujiNetSD()
+{
+    if (!m_netSIOEnabled->isChecked()) {
+        return;
+    }
+
+    QSettings settings;
+
+    if (settings.value("fujinet/sdPathMigrated", false).toBool()) {
+        return;
+    }
+
+    QString currentPath = settings.value("fujinet/sdCardPath", "").toString();
+    QString legacyPath = m_fujinetBinaryManager->getLegacySDPath();
+    QString newDefaultPath = m_fujinetBinaryManager->getDefaultSDPath();
+
+    bool isUsingLegacyPath = (currentPath.isEmpty() || currentPath == legacyPath);
+
+    if (!isUsingLegacyPath) {
+        settings.setValue("fujinet/sdPathMigrated", true);
+        return;
+    }
+
+    QDir legacyDir(legacyPath);
+    bool hasLegacyContent = legacyDir.exists() && !legacyDir.isEmpty();
+
+    QMessageBox msgBox(this);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.setWindowTitle("FujiNet SD Card Location");
+
+    if (hasLegacyContent) {
+        msgBox.setText("FujiNet SD card folder needs to be moved to a safer location.");
+        msgBox.setInformativeText(
+            QString("Current location: %1\n\n"
+                   "This folder is inside the application bundle and will be deleted when updating Fujisan.\n\n"
+                   "Recommended new location: %2\n\n"
+                   "What would you like to do?")
+            .arg(legacyPath)
+            .arg(newDefaultPath)
+        );
+
+        QPushButton* moveButton = msgBox.addButton("Move Files", QMessageBox::AcceptRole);
+        QPushButton* startFreshButton = msgBox.addButton("Start Fresh", QMessageBox::DestructiveRole);
+        QPushButton* keepButton = msgBox.addButton("Keep Current (Not Recommended)", QMessageBox::RejectRole);
+
+        msgBox.setDefaultButton(moveButton);
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == moveButton) {
+            if (migrateFujiNetSDContents(legacyPath, newDefaultPath)) {
+                m_fujinetSDPath->setText(newDefaultPath);
+                settings.setValue("fujinet/sdCardPath", newDefaultPath);
+                settings.setValue("fujinet/sdPathMigrated", true);
+
+                QMessageBox::information(this, "Migration Complete",
+                    "FujiNet SD card files have been successfully moved to the new location.");
+            } else {
+                QMessageBox::warning(this, "Migration Failed",
+                    "Could not move SD card files. Please select a location manually.");
+            }
+        } else if (msgBox.clickedButton() == startFreshButton) {
+            m_fujinetSDPath->setText(newDefaultPath);
+            settings.setValue("fujinet/sdCardPath", newDefaultPath);
+            settings.setValue("fujinet/sdPathMigrated", true);
+        }
+
+    } else {
+        msgBox.setText("FujiNet SD card folder location has been updated.");
+        msgBox.setInformativeText(
+            QString("New location: %1\n\n"
+                   "This location is safer and won't be deleted when updating Fujisan.")
+            .arg(newDefaultPath)
+        );
+        msgBox.setStandardButtons(QMessageBox::Ok);
+        msgBox.exec();
+
+        m_fujinetSDPath->setText(newDefaultPath);
+        settings.setValue("fujinet/sdCardPath", newDefaultPath);
+        settings.setValue("fujinet/sdPathMigrated", true);
+    }
+}
+
+bool SettingsDialog::migrateFujiNetSDContents(const QString& fromPath, const QString& toPath)
+{
+    QDir sourceDir(fromPath);
+    if (!sourceDir.exists()) {
+        return false;
+    }
+
+    QDir destDir(toPath);
+
+    if (!destDir.exists()) {
+        if (!destDir.mkpath(".")) {
+            return false;
+        }
+    }
+
+    QFileInfoList entries = sourceDir.entryInfoList(QDir::NoDotAndDotDot | QDir::Files | QDir::Dirs);
+
+    for (const QFileInfo& entry : entries) {
+        QString destPath = toPath + "/" + entry.fileName();
+
+        if (entry.isDir()) {
+            if (!QDir().mkpath(destPath)) {
+                return false;
+            }
+            if (!migrateFujiNetSDContents(entry.absoluteFilePath(), destPath)) {
+                return false;
+            }
+        } else {
+            if (!QFile::copy(entry.absoluteFilePath(), destPath)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 void SettingsDialog::onFujiNetBrowseConfig()

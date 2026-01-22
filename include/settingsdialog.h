@@ -59,7 +59,9 @@ public:
 signals:
     void settingsChanged();
     void syncPrinterStateRequested();
+#ifndef Q_OS_WIN
     void netSIOEnabledChanged(bool enabled);
+#endif
 
 private slots:
     void accept() override;
@@ -77,8 +79,10 @@ private slots:
     void onMachineTypeChanged();
     void onAltirraOSChanged();
     void onAltirraBASICChanged();
+#ifndef Q_OS_WIN
     void onNetSIOToggled(bool enabled);
-    
+#endif
+
     // Profile management slots
     void onProfileChangeRequested(const QString& profileName);
     void onSaveCurrentProfile(const QString& profileName);
@@ -89,6 +93,7 @@ private slots:
     // FujiNet slots
     void onFujiNetBrowseBinary();
     void onFujiNetBrowseSDFolder();
+    void onFujiNetOpenSDFolder();
     void onFujiNetBrowseConfig();
     void onFujiNetOpenConfigFolder();
     void onFujiNetCustomConfigToggled(bool enabled);
@@ -114,7 +119,9 @@ private:
     void saveSettings();
     void applySettings();
     void applyMediaSettings();
+#ifndef Q_OS_WIN
     void triggerNetSIORestart(bool netSIOEnabled);
+#endif
     void updateVideoSystemDependentControls();
     void setupFilePathTooltip(QLineEdit* lineEdit);
     void populateCartridgeTypes(QComboBox* combo);
@@ -298,7 +305,9 @@ private:
     
     // Special Devices
     QLineEdit* m_rDeviceName;
+#ifndef Q_OS_WIN
     QCheckBox* m_netSIOEnabled;
+#endif
     QCheckBox* m_rtimeEnabled;
     
     // Printer Configuration
@@ -358,6 +367,8 @@ private:
     // Helper functions
     void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
     void checkFujiNetRestartRequired();
+    void checkAndMigrateFujiNetSD();
+    bool migrateFujiNetSDContents(const QString& fromPath, const QString& toPath);
 #endif
 
     // Store original settings for cancel functionality

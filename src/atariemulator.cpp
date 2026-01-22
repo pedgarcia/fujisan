@@ -1471,6 +1471,12 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
         } else {
             m_currentInput.keycode = AKEY_DELETE_CHAR;
         }
+#ifdef Q_OS_MACOS
+    } else if (key == Qt::Key_Backspace && shiftPressed) {
+        // On macOS, the physical "delete" key sends Backspace, not Delete
+        // Shift+Delete (Backspace) = Delete line
+        m_currentInput.keycode = AKEY_DELETE_LINE;
+#endif
     } else if (key == Qt::Key_Home && shiftPressed) {
         // Shift+Home = Clear screen
         m_currentInput.keycode = AKEY_CLEAR;

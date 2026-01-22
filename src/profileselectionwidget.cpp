@@ -310,7 +310,11 @@ void ProfileSelectionWidget::onRenameClicked()
 void ProfileSelectionWidget::setupUI()
 {
     // Create group box
-    m_groupBox = new QGroupBox("Configuration Profiles");
+#ifdef Q_OS_MACOS
+    m_groupBox = new QGroupBox("Preference Profiles");
+#else
+    m_groupBox = new QGroupBox("Settings Profiles");
+#endif
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     mainLayout->addWidget(m_groupBox);
     mainLayout->setContentsMargins(0, 0, 0, 0);

@@ -39,7 +39,8 @@ public:
 
     // Storage paths
     static QString getStoragePath();       // Get directory where FujiNet-PC is stored
-    static QString getDefaultSDPath();     // Get default SD card path (storage path + "/SD")
+    static QString getDefaultSDPath();     // Get default SD card path (platform-specific user directory)
+    static QString getLegacySDPath();      // Get legacy SD path (storage path + "/SD") for migration
     static QString getDefaultReleaseUrl(); // Default GitHub releases URL
 
     // Version detection (public for manual binary configuration)
