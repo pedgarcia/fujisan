@@ -2,9 +2,11 @@
 
 Quick reference to key files and functions for understanding FujiNet-PC SIO handling.
 
+> **Note:** For comprehensive FujiNet-PC integration information including binary management, build procedures, and detailed source code locations, see `docs_local/FUJINET_PC.md` (private documentation).
+
 ## File Locations
 
-All paths relative to: `/Users/pgarcia/dev/atari/fujinet-firmware/`
+All paths relative to fujinet-firmware repository root.
 
 ## Core SIO Communication
 

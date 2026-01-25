@@ -17,14 +17,20 @@
 #   all            - Build for all platforms
 #
 # Options:
-#   --clean        - Clean before building
-#   --sign         - Sign macOS builds (requires certificates)
-#   --notarize     - Notarize macOS builds after signing
-#   --developer-id - Specify Developer ID for signing
-#   --version X    - Set version (default: from git)
-#   --help         - Show this help
+#   --clean              - Clean before building
+#   --sign               - Sign macOS builds (requires certificates)
+#   --notarize           - Notarize macOS builds after signing
+#   --build-fujinet-pc   - Build FujiNet-PC from source (requires fujinet-firmware repo)
+#   --developer-id       - Specify Developer ID for signing
+#   --version X          - Set version (default: from git)
+#   --help               - Show this help
+#
+# Environment Variables:
+#   FUJINET_SOURCE_DIR   - Path to fujinet-firmware repo (default: ../fujinet-firmware)
 #
 # All outputs go to: dist/
+#
+# For FujiNet-PC build details, see: docs_local/BUILD_FUJINET_PC.md
 #
 
 set -e
@@ -90,18 +96,20 @@ Platforms:
   all            Build for all platforms
 
 Options:
-  --clean        Clean before building
-  --sign         Sign macOS builds with Developer ID
-  --notarize     Notarize macOS builds (implies --sign)
-  --developer-id ID  Specify Developer ID certificate
-  --version X    Set version
-  --help         Show this help
+  --clean              Clean before building
+  --sign               Sign macOS builds with Developer ID
+  --notarize           Notarize macOS builds (implies --sign)
+  --build-fujinet-pc   Build FujiNet-PC from source before Fujisan
+  --developer-id ID    Specify Developer ID certificate
+  --version X          Set version
+  --help               Show this help
 
 Examples:
-  $0 macos                    # Build both Mac versions
-  $0 macos --sign --notarize   # Build, sign, and notarize
-  $0 windows --clean           # Clean build for Windows
-  $0 all --version v1.2.0      # Build all platforms
+  $0 macos                              # Build both Mac versions
+  $0 macos --sign --notarize            # Build, sign, and notarize
+  $0 macos --build-fujinet-pc           # Build FujiNet-PC first, then Fujisan
+  $0 all --version v1.2.0               # Build all platforms
+  $0 all --build-fujinet-pc --sign      # Build FujiNet-PC and sign all
 
 Output:
   All builds output to: dist/
@@ -692,6 +700,115 @@ build_macos_x86_64() {
 }
 
 # Build Windows
+# Build FujiNet-PC from source
+build_fujinet_pc() {
+    local PLATFORM_ARG="$1"  # macos-arm64, macos-x86_64, linux-x86_64, linux-arm64
+
+    echo_step "Building FujiNet-PC for $PLATFORM_ARG"
+
+    # Determine FujiNet source directory (default to parent directory)
+    local FUJINET_SRC="${FUJINET_SOURCE_DIR:-./../fujinet-firmware}"
+
+    if [[ ! -d "$FUJINET_SRC" ]]; then
+        echo_error "FujiNet-PC source not found at: $FUJINET_SRC"
+        echo_info "Set FUJINET_SOURCE_DIR environment variable or clone to: $FUJINET_SRC"
+        return 1
+    fi
+
+    echo_info "Using FujiNet source: $FUJINET_SRC"
+
+    # Determine target directory based on platform
+    local TARGET_DIR=""
+    case "$PLATFORM_ARG" in
+        macos-arm64)
+            TARGET_DIR="fujinet/macos-arm64"
+            ;;
+        macos-x86_64)
+            TARGET_DIR="fujinet/macos-x86_64"
+            ;;
+        linux-x86_64|linux-amd64)
+            TARGET_DIR="fujinet/ubuntu-22.04"
+            ;;
+        linux-arm64|linux-aarch64)
+            TARGET_DIR="fujinet/ubuntu-22.04-arm64"
+            ;;
+        *)
+            echo_error "Unknown platform for FujiNet-PC: $PLATFORM_ARG"
+            return 1
+            ;;
+    esac
+
+    mkdir -p "$TARGET_DIR"
+
+    # Build FujiNet-PC
+    cd "$FUJINET_SRC"
+
+    local BUILD_DIR="build-${PLATFORM_ARG}"
+    rm -rf "$BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
+    cd "$BUILD_DIR"
+
+    echo_info "Configuring FujiNet-PC for $PLATFORM_ARG..."
+
+    # CMake configuration with platform-specific settings
+    local CMAKE_OPTS="-DBUILD_ATARI=ON -DCMAKE_BUILD_TYPE=Release"
+
+    case "$PLATFORM_ARG" in
+        macos-arm64)
+            CMAKE_OPTS="$CMAKE_OPTS -DCMAKE_OSX_ARCHITECTURES=arm64"
+            ;;
+        macos-x86_64)
+            CMAKE_OPTS="$CMAKE_OPTS -DCMAKE_OSX_ARCHITECTURES=x86_64"
+            ;;
+    esac
+
+    if ! cmake .. $CMAKE_OPTS; then
+        echo_error "CMake configuration failed"
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
+
+    echo_info "Building FujiNet-PC..."
+    local NUM_CORES=1
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        NUM_CORES=$(sysctl -n hw.ncpu)
+    else
+        NUM_CORES=$(nproc 2>/dev/null || echo 1)
+    fi
+
+    if ! make -j"$NUM_CORES"; then
+        echo_error "FujiNet-PC build failed"
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
+
+    # Find and copy the fujinet binary
+    if [[ -f "fujinet" ]]; then
+        echo_info "Copying FujiNet-PC binary to: $PROJECT_ROOT/$TARGET_DIR"
+        cp fujinet "$PROJECT_ROOT/$TARGET_DIR/"
+        chmod +x "$PROJECT_ROOT/$TARGET_DIR/fujinet"
+        echo_success "FujiNet-PC binary copied"
+    else
+        echo_error "FujiNet binary not found after build"
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
+
+    # Copy configuration and data files if present
+    if [[ -f "fnconfig.ini" ]]; then
+        cp fnconfig.ini "$PROJECT_ROOT/$TARGET_DIR/"
+        echo_info "Copied fnconfig.ini"
+    fi
+
+    if [[ -d "data" ]]; then
+        cp -r data "$PROJECT_ROOT/$TARGET_DIR/" || true
+        echo_info "Copied data directory"
+    fi
+
+    cd "$PROJECT_ROOT"
+    echo_success "FujiNet-PC build complete for $PLATFORM_ARG"
+}
+
 build_windows() {
     echo_step "Building Windows"
     echo_info "Starting Windows build function..."
@@ -817,6 +934,7 @@ PLATFORM=""
 CLEAN=false
 SIGN=false
 NOTARIZE=false
+BUILD_FUJINET_PC=false
 BUNDLE_FUJINET=true  # Default to bundling FujiNet-PC (core feature)
 DEVELOPER_ID=""
 
@@ -833,6 +951,10 @@ while [[ $# -gt 0 ]]; do
         --notarize)
             NOTARIZE=true
             SIGN=true  # Notarization requires signing
+            shift
+            ;;
+        --build-fujinet-pc)
+            BUILD_FUJINET_PC=true
             shift
             ;;
         --bundle-fujinet)
@@ -902,7 +1024,46 @@ fi
 if [[ "$NOTARIZE" == "true" ]]; then
     echo_info "Notarization: Enabled"
 fi
+if [[ "$BUILD_FUJINET_PC" == "true" ]]; then
+    echo_info "FujiNet-PC Build: Enabled"
+fi
 echo ""
+
+# Build FujiNet-PC if requested
+if [[ "$BUILD_FUJINET_PC" == "true" ]]; then
+    echo_step "Building FujiNet-PC Binaries"
+    case $PLATFORM in
+        macos-arm64)
+            build_fujinet_pc "macos-arm64"
+            ;;
+        macos-x86_64)
+            build_fujinet_pc "macos-x86_64"
+            ;;
+        macos)
+            build_fujinet_pc "macos-arm64"
+            build_fujinet_pc "macos-x86_64"
+            ;;
+        windows)
+            # Windows FujiNet-PC build would go here if needed
+            echo_info "FujiNet-PC build for Windows not yet implemented"
+            ;;
+        linux|linux-x86_64|linux-amd64)
+            build_fujinet_pc "linux-x86_64"
+            ;;
+        linux-arm64|linux-aarch64)
+            build_fujinet_pc "linux-arm64"
+            ;;
+        all)
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                build_fujinet_pc "macos-arm64"
+                build_fujinet_pc "macos-x86_64"
+            fi
+            build_fujinet_pc "linux-x86_64"
+            build_fujinet_pc "linux-arm64"
+            ;;
+    esac
+    echo ""
+fi
 
 case $PLATFORM in
     macos-arm64)

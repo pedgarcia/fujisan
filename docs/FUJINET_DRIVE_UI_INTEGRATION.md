@@ -1,5 +1,7 @@
 # FujiNet Drive UI Integration Plan
 
+> **Note:** For comprehensive FujiNet-PC information including binary management, protocol details, and source code locations, see `docs_local/FUJINET_PC.md` (private documentation).
+
 ## Overview
 Integrate Fujisan's drive UI (D1-D8) with FujiNet-PC's web API to show and manage FujiNet drives when NetSIO is enabled.
 

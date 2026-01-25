@@ -181,7 +181,61 @@ The easiest way to build Fujisan:
 
 # Cross-platform build
 ./build.sh all
+
+# Build FujiNet-PC from source, then Fujisan
+./build.sh macos --build-fujinet-pc
+
+# Build everything with signing and notarization
+./build.sh all --build-fujinet-pc --sign --notarize --version v1.2.0
 ```
+
+#### Using Pre-built FujiNet-PC Binaries (Default)
+
+Fujisan comes with pre-downloaded FujiNet-PC binaries. To use the latest nightly builds:
+
+```bash
+# Download latest FujiNet-PC binaries from GitHub
+./scripts/download-fujinet-pc.sh
+
+# Then build Fujisan (binaries are automatically bundled)
+./build.sh macos
+```
+
+#### Building FujiNet-PC from Source (Optional)
+
+If you want to build FujiNet-PC from source:
+
+**Requirements:**
+- Clone FujiNet-PC repository (one level above Fujisan):
+  ```bash
+  cd /Users/pgarcia/dev/atari/
+  git clone https://github.com/FujiNetWIFI/fujinet-firmware.git
+  ```
+- Or specify custom location with `FUJINET_SOURCE_DIR` environment variable
+
+**Build options:**
+
+```bash
+# Build FujiNet-PC and Fujisan for macOS (both architectures)
+./build.sh macos --build-fujinet-pc
+
+# Build FujiNet-PC and Fujisan for all platforms
+./build.sh all --build-fujinet-pc
+
+# Build with Developer ID signing and notarization
+./build.sh macos --build-fujinet-pc --sign --notarize --version v1.2.0
+
+# Custom FujiNet-PC source location
+FUJINET_SOURCE_DIR=/path/to/fujinet-firmware ./build.sh macos --build-fujinet-pc
+```
+
+**What happens:**
+1. FujiNet-PC is built for the requested platform(s)
+2. Binaries are copied to `fujisan/fujinet/<platform>/`
+3. Configuration and data files are copied alongside
+4. Fujisan is then built with bundled FujiNet-PC binaries
+
+For detailed FujiNet-PC build information, see **[docs_local/BUILD_FUJINET_PC.md](docs_local/BUILD_FUJINET_PC.md)**.
 
 ### Manual Build Steps
 
@@ -371,6 +425,57 @@ xcrun notarytool store-credentials "fujisan-notarization" \
 ```
 
 **Note**: For development and testing, use `./build.sh macos` without `--sign` for ad-hoc signing.
+
+### FujiNet-PC Binary Management
+
+Fujisan bundles FujiNet-PC binaries for automatic network gaming and disk access. You have three options:
+
+#### **Option 1: Use Pre-downloaded Binaries (Default & Recommended)**
+
+Fujisan comes with pre-downloaded FujiNet-PC binaries in the `fujinet/` directory. To update to latest nightly builds:
+
+```bash
+./scripts/download-fujinet-pc.sh
+```
+
+This downloads the latest FujiNet-PC nightly releases for all platforms and organizes them by platform subdirectories.
+
+#### **Option 2: Build FujiNet-PC from Source**
+
+If you need a custom build or want to build from source:
+
+```bash
+# Clone the FujiNet-PC source repository
+cd /Users/pgarcia/dev/atari/
+git clone https://github.com/FujiNetWIFI/fujinet-firmware.git
+
+# Build FujiNet-PC and Fujisan together
+cd fujisan
+./build.sh macos --build-fujinet-pc
+```
+
+The build script will:
+- Build FujiNet-PC for your platform
+- Copy binaries to `fujisan/fujinet/<platform>/`
+- Build Fujisan with bundled binaries
+
+#### **Option 3: Skip FujiNet-PC**
+
+If you don't need FujiNet support, you can build without bundled binaries:
+
+```bash
+./build.sh macos --no-fujinet
+```
+
+#### **FujiNet-PC Documentation**
+
+For comprehensive information about:
+- Binary management and versions
+- Building FujiNet-PC from source
+- Technical protocol details
+- Troubleshooting
+
+See: **[docs_local/FUJINET_PC.md](docs_local/FUJINET_PC.md)** and **[docs_local/BUILD_FUJINET_PC.md](docs_local/BUILD_FUJINET_PC.md)**
 
 ### Running
 ```bash

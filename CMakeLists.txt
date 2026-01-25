@@ -189,21 +189,35 @@ else()
     set(ATARI800_BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make -j4)
 endif()
 
+# Set up patch command based on platform
+if(CMAKE_CROSSCOMPILING AND WIN32)
+    # For Windows cross-compilation, set CC to enable Windows-specific patches
+    set(ATARI800_PATCH_COMMAND
+        ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/patches"
+        "<SOURCE_DIR>/fujisan-patches"
+        COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
+        ${CMAKE_COMMAND} -E env ATARI800_SRC_PATH=<SOURCE_DIR> CC=x86_64-w64-mingw32-gcc
+        bash fujisan-patches/apply-patches.sh)
+else()
+    set(ATARI800_PATCH_COMMAND
+        ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/patches"
+        "<SOURCE_DIR>/fujisan-patches"
+        COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
+        ${CMAKE_COMMAND} -E env ATARI800_SRC_PATH=<SOURCE_DIR>
+        bash fujisan-patches/apply-patches.sh)
+endif()
+
 # Download and build atari800 with Fujisan patches
 ExternalProject_Add(atari800_external
     GIT_REPOSITORY https://github.com/atari800/atari800.git
     GIT_TAG fcb6e799734c749f9e326640f4d506abf854e95c  # Includes merged PR #252 (disk API)
     SOURCE_DIR ${ATARI800_SOURCE_DIR}
     BINARY_DIR ${ATARI800_BINARY_DIR}
-    
+
     # Apply Fujisan patches during patch step
-    # First copy the patches directory, then apply them
-    PATCH_COMMAND ${CMAKE_COMMAND} -E copy_directory 
-                  "${CMAKE_CURRENT_SOURCE_DIR}/patches" 
-                  "<SOURCE_DIR>/fujisan-patches"
-          COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> 
-                  ${CMAKE_COMMAND} -E env ATARI800_SRC_PATH=<SOURCE_DIR>
-                  bash fujisan-patches/apply-patches.sh
+    PATCH_COMMAND ${ATARI800_PATCH_COMMAND}
     
     CONFIGURE_COMMAND ${ATARI800_CONFIGURE_COMMAND}
     

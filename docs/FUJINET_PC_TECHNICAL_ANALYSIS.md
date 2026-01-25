@@ -1,5 +1,7 @@
 # FujiNet-PC: SIO Connection, Timing, and Protocol Analysis
 
+> **Note:** For comprehensive FujiNet-PC integration information including binary management, build procedures, and source code locations, see `docs_local/FUJINET_PC.md` (private documentation).
+
 ## Overview
 
 FujiNet-PC is the desktop/emulator version of the FujiNet firmware that communicates with Atari emulators over two possible connection types:
@@ -83,8 +85,8 @@ NetSIO is a **UDP-based protocol** running on port **9997** that mimics SIO bus 
 **Data Block Packet**: 1 + up to 512 bytes
 - `[0x02] [data...]`
 
-### Located in: 
-`/Users/pgarcia/dev/atari/fujinet-firmware/lib/bus/sio/siocom/netsio_proto.h`
+### Located in:
+`lib/bus/sio/siocom/netsio_proto.h` (fujinet-firmware repository)
 
 ---
 
