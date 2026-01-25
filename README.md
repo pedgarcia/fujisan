@@ -12,9 +12,9 @@ Fujisan is an exercise and hobby for me, to build an emulator tailored to my per
 
 Another important objective is to always use **libatari800** so there is never incompatibility between the Atari800 source code and Fujisan (as much as possible). There are some patches I had to apply, but I am set to always make it easier for anyone that wants to build Fujisan, to be able to reproduce my steps and patch atari800 properly (There is a patches folder with detailed instructions).
 
-I guess, the big difference is that Fujisan is a UI-based emulator that is available for ~Windows~, Mac, and Linux. Overtime, with some features that will help software development, so if you see something wrong or have a request, use Github issue tracker.
+I guess, the big difference is that Fujisan is a UI-based emulator that is available for Windows, Mac, and Linux. Overtime, with some features that will help software development, so if you see something wrong or have a request, use Github issue tracker.
 
-*IMPORTANT*: For the time-being, I am dropping the Windows support. The fact that Atari800 doesn't support Fujinet on Windows makes it pointless to make efforts to run Fujisan on Windows. Users have great support with Altirra, anyways. I will keep Windows instructions available for people that might want to build and try it on that platform.
+*IMPORTANT*: Windows support - The fact that Atari800 doesn't support Fujinet on Windows makes impossible to bundle Fujinet support for this version. I will be releasing the Windows versions again, but the tests are limited. If you see something wrong, please report it in the Issue tracker.
 
 
 ![Fujisan Screenshot](images/screenshot1.png)
@@ -161,7 +161,7 @@ sudo yum install qt5-qtbase-devel cmake gcc-c++
 sudo dnf install qt5-qtbase-devel cmake gcc-c++
 ```
 
-#### **Windows (supported removed for now) **
+#### **Windows**
 1. **Install Qt5**: Download from [qt.io](https://www.qt.io/download-qt-installer)
    - Choose Qt 5.15.x or later
    - Select "MSVC 2019 64-bit" or "MinGW" kit
