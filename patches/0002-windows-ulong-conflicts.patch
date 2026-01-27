@@ -1,16 +1,22 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Claude Code <noreply@example.com>
-Date: Wed, 6 Aug 2025 00:00:00 +0000
+From 238143a8c0dc767f57ad4b180c4c1f332c3c8004 Mon Sep 17 00:00:00 2001
+From: Paulo Garcia <pedgarcia@gmail.com>
+Date: Sun, 25 Jan 2026 17:58:11 -0500
 Subject: [PATCH] Fix Windows ULONG type conflicts
 
 Windows headers define ULONG as unsigned long (8 bytes) while
 atari800 expects unsigned int (4 bytes). This causes compilation
 errors and ABI mismatches in function signatures.
 
-Also removes conflicting ANTIC lookup table definitions.
+The actual fixes are applied via sed in build-libatari800-autotools.sh
+because the patch format has issues matching the source context.
+
+This patch only removes the conflicting ANTIC lookup table definitions.
+---
+ src/antic.c | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/src/antic.c b/src/antic.c
-index 1234567..abcdef0 100644
+index 242b33b9..a4d26488 100644
 --- a/src/antic.c
 +++ b/src/antic.c
 @@ -523,8 +523,6 @@ static UBYTE an_scanline[Screen_WIDTH / 2 + 8];
@@ -22,19 +28,5 @@ index 1234567..abcdef0 100644
  static UBYTE playfield_lookup[257];
  static UBYTE mode_e_an_lookup[256];
  
-diff --git a/src/atari.h b/src/atari.h
-index 1234567..abcdef0 100644
---- a/src/atari.h
-+++ b/src/atari.h
-@@ -5,6 +5,11 @@
- #include <stdio.h> /* FILENAME_MAX */
- #ifdef HAVE_WINDOWS_H
- #include <windows.h>
-+/* Force atari800 ULONG definition to override Windows */
-+#ifdef ULONG
-+#undef ULONG
-+#endif
-+#define ULONG unsigned int
- #endif
- 
- /* Fundamental declarations ---------------------------------------------- */
+-- 
+2.50.1 (Apple Git-155)

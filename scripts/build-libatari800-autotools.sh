@@ -19,6 +19,15 @@ cd "$ATARI800_SRC_PATH"
 export PATH="/usr/sbin:/usr/bin:$PATH"
 echo "Updated PATH for MinGW-w64: $PATH"
 
+# Set cross-compilation environment variables BEFORE applying patches
+# so that the patch script can detect Windows builds via CC variable
+export CC="x86_64-w64-mingw32-gcc"
+export CXX="x86_64-w64-mingw32-g++"
+export AR="x86_64-w64-mingw32-ar"
+export RANLIB="x86_64-w64-mingw32-ranlib"
+export STRIP="x86_64-w64-mingw32-strip"
+export PKG_CONFIG_PATH="/usr/x86_64-w64-mingw32/lib/pkgconfig"
+
 # Ensure Fujisan patches are applied for required API functions
 if [ -d "fujisan-patches" ] && [ -f "fujisan-patches/apply-patches.sh" ]; then
     echo "Applying Fujisan patches for API functions..."
@@ -53,14 +62,6 @@ fi
 # Configure for libatari800 target with MinGW cross-compilation
 echo "Configuring for libatari800 target..."
 
-# Set cross-compilation environment variables
-export CC="x86_64-w64-mingw32-gcc"
-export CXX="x86_64-w64-mingw32-g++"
-export AR="x86_64-w64-mingw32-ar"
-export RANLIB="x86_64-w64-mingw32-ranlib"
-export STRIP="x86_64-w64-mingw32-strip"
-export PKG_CONFIG_PATH="/usr/x86_64-w64-mingw32/lib/pkgconfig"
-
 # Configure with appropriate flags for Windows cross-compilation
 ./configure \
     --host=x86_64-w64-mingw32 \
@@ -87,25 +88,48 @@ export PKG_CONFIG_PATH="/usr/x86_64-w64-mingw32/lib/pkgconfig"
 
 echo "=== Configuration completed ==="
 
-# Apply Windows-specific fixes for ULONG type conflicts
+# Apply Windows-specific fixes
 echo "Applying Windows-specific fixes..."
-# First, ensure ULONG is defined correctly in atari.h
-sed -i 's/#include <windows\.h>/#include <windows.h>\n\/* Force atari800 ULONG definition to override Windows *\/\n#ifdef ULONG\n#undef ULONG\n#endif\n#define ULONG unsigned int/g' src/atari.h
 
-# Instead of deleting the ANTIC_lookup_gtia definitions, we need to ensure they use the correct ULONG type
-# Check if the lines exist and if so, make sure they're using the right type
-if grep -q '^ULONG ANTIC_lookup_gtia9\[16\];$' src/antic.c; then
-    echo "ANTIC_lookup_gtia arrays already defined with ULONG type"
-else
-    # If they're defined with a different type or missing, ensure they exist
-    if ! grep -q 'ANTIC_lookup_gtia9\[16\]' src/antic.c; then
-        echo "Adding ANTIC_lookup_gtia9 definition..."
-        echo "ULONG ANTIC_lookup_gtia9[16];" >> src/antic.c
-    fi
-    if ! grep -q 'ANTIC_lookup_gtia11\[16\]' src/antic.c; then
-        echo "Adding ANTIC_lookup_gtia11 definition..."
-        echo "ULONG ANTIC_lookup_gtia11[16];" >> src/antic.c
-    fi
+# On MinGW x64, ULONG is 32-bit (LLP64). Do NOT redefine ULONG; that breaks
+# Windows API (VerSetConditionMask) and causes "conflicting types" (ANTIC_VideoMemset).
+# Ensure libatari800.h does not define ULONG on Windows (use Windows' typedef).
+
+if ! grep -q "defined(_WIN32)" src/libatari800/libatari800.h; then
+    echo "Patching libatari800.h: ensure Windows ULONG is available..."
+    awk '
+    /^#define LIBATARI800_H_$/ {
+        print
+        print ""
+        print "#if defined(_WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(HAVE_WINDOWS_H)"
+        print "#include <windows.h>"
+        print "#endif"
+        next
+    }
+    /^#ifndef ULONG$/ {
+        print "#ifndef ULONG"
+        print "#if !(defined(_WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(HAVE_WINDOWS_H))"
+        print "/* On Windows, use Windows ULONG; do not define here */"
+        print "#include <stdint.h>"
+        print "#define ULONG uint32_t"
+        print "#endif"
+        print "#endif"
+        getline; getline; getline  # skip original #include, #define, #endif
+        next
+    }
+    { print }
+    ' src/libatari800/libatari800.h > src/libatari800/libatari800.h.new
+    mv src/libatari800/libatari800.h.new src/libatari800/libatari800.h
+fi
+
+# 0002 patch removes ANTIC_lookup_gtia9/11 from antic.c, but antic.h still
+# declares them extern and antic.c uses them. Restore the definitions if missing.
+if ! grep -q '^ULONG ANTIC_lookup_gtia9\[16\];' src/antic.c; then
+    echo "Restoring ANTIC_lookup_gtia arrays in antic.c..."
+    sed -i.bak '/static UWORD lookup2\[256\];/a\
+ULONG ANTIC_lookup_gtia9[16];\
+ULONG ANTIC_lookup_gtia11[16];
+' src/antic.c
 fi
 
 # Build libatari800
