@@ -56,7 +56,7 @@ struct ConfigurationProfile {
     QString artifactingMode = "none";
     bool showFPS = false;
     bool scalingFilter = true;
-    bool integerScaling = false;
+    bool integerScaling = true;
     bool keepAspectRatio = true;
     bool fullscreenMode = false;
     

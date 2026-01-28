@@ -3058,7 +3058,7 @@ void MainWindow::loadVideoSettings()
     m_startInFullscreen = settings.value("video/fullscreenMode", false).toBool();
 
     // Load scaling settings
-    bool integerScaling = settings.value("video/integerScaling", false).toBool();
+    bool integerScaling = settings.value("video/integerScaling", true).toBool();
     bool scalingFilter = settings.value("video/scalingFilter", true).toBool();
     QString fitScreen = settings.value("video/fitScreen", "both").toString();
 

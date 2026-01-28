@@ -254,7 +254,7 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
         artifactingMode = videoConfig["artifactingMode"].toString("none");
         showFPS = videoConfig["showFPS"].toBool(false);
         scalingFilter = videoConfig["scalingFilter"].toBool(true);
-        integerScaling = videoConfig["integerScaling"].toBool(false);
+        integerScaling = videoConfig["integerScaling"].toBool(true);
         keepAspectRatio = videoConfig["keepAspectRatio"].toBool(true);
         fullscreenMode = videoConfig["fullscreenMode"].toBool(false);
     }

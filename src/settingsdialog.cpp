@@ -2499,7 +2499,7 @@ void SettingsDialog::loadSettings()
     
     m_showFPS->setChecked(settings.value("video/showFPS", false).toBool());
     m_scalingFilter->setChecked(settings.value("video/scalingFilter", true).toBool());
-    m_integerScaling->setChecked(settings.value("video/integerScaling", false).toBool());
+    m_integerScaling->setChecked(settings.value("video/integerScaling", true).toBool());
     m_keepAspectRatio->setChecked(settings.value("video/keepAspectRatio", true).toBool());
     m_fullscreenMode->setChecked(settings.value("video/fullscreenMode", false).toBool());
     
@@ -3433,7 +3433,7 @@ void SettingsDialog::restoreDefaults()
     m_artifactingMode->setCurrentIndex(0); // None
     m_showFPS->setChecked(false);
     m_scalingFilter->setChecked(true);
-    m_integerScaling->setChecked(false);
+    m_integerScaling->setChecked(true);
     m_keepAspectRatio->setChecked(true);
     m_fullscreenMode->setChecked(false);
     
