@@ -665,9 +665,39 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     }
     */
     bool printerEnabled = false; // Force disabled
-    
-    // Add device debugging to help troubleshoot P: device issues
-    argList << "-devbug";
+
+    // Hard Drive (H:) device support via command-line arguments
+    QSettings settings;
+
+    for (int i = 0; i < 4; i++) {
+        QString hdKey = QString("media/hd%1").arg(i + 1);
+        bool enabled = settings.value(hdKey + "Enabled", false).toBool();
+        QString path = settings.value(hdKey + "Path", "").toString();
+
+        if (enabled && !path.isEmpty()) {
+            QFileInfo dirInfo(path);
+            if (dirInfo.exists() && dirInfo.isDir()) {
+                argList << QString("-H%1").arg(i + 1) << path;
+                qDebug() << QString("H%1: enabled with path:").arg(i + 1) << path;
+            } else {
+                qWarning() << QString("H%1: directory not accessible:").arg(i + 1) << path;
+            }
+        }
+    }
+
+    // Optional settings
+    if (settings.value("media/hdReadOnly", false).toBool()) {
+        argList << "-hreadonly";
+        qDebug() << "H: read-only mode enabled";
+    } else {
+        argList << "-hreadwrite";
+    }
+
+    QString deviceName = settings.value("media/hdDeviceName", "H").toString();
+    if (!deviceName.isEmpty() && deviceName != "H") {
+        argList << "-Hdevicename" << deviceName;
+        qDebug() << "H: device name set to:" << deviceName;
+    }
 
     // Convert QStringList to char* array
     QList<QByteArray> argBytes;
@@ -706,7 +736,7 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     if (libatari800_init(argBytes.size(), args.data())) {
         qDebug() << "  libatari800_init() returned SUCCESS";
         libatari800_previously_initialized = true;  // Mark as initialized for future resets
-        
+
         // Verify ROM loading status
         if (!m_altirraOSEnabled && !m_osRomPath.isEmpty()) {
         } else if (m_altirraOSEnabled) {

@@ -2998,14 +2998,16 @@ void MainWindow::loadAndApplyMediaSettings()
         qDebug() << "Cassette auto-load not yet implemented";
     }
 
-    // TODO: Load hard drive settings
+    // Hard drive settings (H1-H4)
+    // Note: H: devices are configured during emulator initialization in atariemulator.cpp
+    // Unlike disk drives, they don't need to be "mounted" - they're active once configured
     for (int i = 0; i < 4; i++) {
         QString hdKey = QString("media/hd%1").arg(i + 1);
         bool hdEnabled = settings.value(hdKey + "Enabled", false).toBool();
         QString hdPath = settings.value(hdKey + "Path", "").toString();
 
         if (hdEnabled && !hdPath.isEmpty()) {
-            qDebug() << QString("H%1: hard drive auto-mount not yet implemented").arg(i + 1);
+            qDebug() << QString("H%1: configured at initialization with path:").arg(i + 1) << hdPath;
         }
     }
 

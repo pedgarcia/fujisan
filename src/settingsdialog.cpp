@@ -3047,12 +3047,18 @@ void SettingsDialog::applyMediaSettings()
         qDebug() << "Cassette support not yet implemented in emulator backend";
     }
     
-    // TODO: Apply hard drive settings
+    // Apply hard drive settings
+    // Note: Hard drive configuration is applied during emulator reinitialization
+    // The global variables are set in atariemulator.cpp before libatari800_init()
     for (int i = 0; i < 4; i++) {
         if (m_hdEnabled[i]->isChecked() && !m_hdPath[i]->text().isEmpty()) {
-            qDebug() << QString("H%1: hard drive support not yet implemented").arg(i + 1);
+            qDebug() << QString("H%1: hard drive configured with path:").arg(i + 1)
+                     << m_hdPath[i]->text();
         }
     }
+
+    qDebug() << "Hard drive options - Read-only:" << m_hdReadOnly->isChecked()
+             << "Device name:" << m_hdDeviceName->text();
     
     // Apply printer settings - DISABLED
     /*
