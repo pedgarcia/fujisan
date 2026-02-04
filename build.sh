@@ -751,7 +751,7 @@ build_fujinet_pc() {
     echo_info "Configuring FujiNet-PC for $PLATFORM_ARG..."
 
     # CMake configuration with platform-specific settings
-    local CMAKE_OPTS="-DBUILD_ATARI=ON -DCMAKE_BUILD_TYPE=Release"
+    local CMAKE_OPTS="-DFUJINET_TARGET=ATARI -DCMAKE_BUILD_TYPE=Release"
 
     case "$PLATFORM_ARG" in
         macos-arm64)
