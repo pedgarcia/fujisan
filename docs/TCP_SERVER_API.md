@@ -1145,6 +1145,38 @@ Apply configuration changes that require restart.
 echo '{"command": "config.apply_restart"}' | nc localhost 6502
 ```
 
+#### `config.set_hard_drive`
+
+Set the path for an H drive (H1-H4). Enables the drive and triggers an emulator restart to apply the change. Useful for IDE integration (e.g., FastBasic debugger mapping H4: to the project's bin folder).
+
+```bash
+# Set H4 to project bin folder (example for FastBasic debugging)
+echo '{
+  "command": "config.set_hard_drive",
+  "params": {"drive": 4, "path": "/path/to/project/bin"}
+}' | nc localhost 6502
+```
+
+**Parameters:**
+- `drive` - Drive number (1-4) corresponding to H1: through H4:
+- `path` - Absolute path to a directory (must exist)
+
+**Response:**
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "drive": 4,
+    "path": "/path/to/project/bin",
+    "restart_required": true,
+    "restarted": true
+  }
+}
+```
+
+**Note:** The path must exist and be a directory. The emulator restarts synchronously; the response is sent after the restart completes.
+
 #### `config.get_profiles`
 
 Get list of available configuration profiles and current profile.

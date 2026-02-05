@@ -3733,6 +3733,41 @@ void MainWindow::requestEmulatorRestart()
     restartEmulator();
 }
 
+bool MainWindow::setHardDrivePathViaTCP(int driveNumber, const QString& path)
+{
+    qDebug() << "MainWindow::setHardDrivePathViaTCP called for drive" << driveNumber << "path:" << path;
+
+    if (driveNumber < 1 || driveNumber > 4) {
+        qWarning() << "Invalid drive number. Must be 1-4.";
+        return false;
+    }
+
+    if (path.isEmpty()) {
+        qWarning() << "Path cannot be empty.";
+        return false;
+    }
+
+    QFileInfo dirInfo(path);
+    if (!dirInfo.exists()) {
+        qWarning() << "Path does not exist:" << path;
+        return false;
+    }
+    if (!dirInfo.isDir()) {
+        qWarning() << "Path is not a directory:" << path;
+        return false;
+    }
+
+    QString canonicalPath = dirInfo.canonicalFilePath();
+    QSettings settings("8bitrelics", "Fujisan");
+    QString hdKey = QString("media/hd%1").arg(driveNumber);
+    settings.setValue(hdKey + "Enabled", true);
+    settings.setValue(hdKey + "Path", canonicalPath);
+
+    qDebug() << QString("H%1: configured via TCP with path:").arg(driveNumber) << canonicalPath;
+    restartEmulator();
+    return true;
+}
+
 bool MainWindow::insertDiskViaTCP(int driveNumber, const QString& diskPath)
 {
     qDebug() << "MainWindow::insertDiskViaTCP called for drive" << driveNumber << "path:" << diskPath;

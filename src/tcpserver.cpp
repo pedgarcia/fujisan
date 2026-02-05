@@ -2127,6 +2127,56 @@ void TCPServer::handleConfigCommand(QTcpSocket* client, const QJsonObject& reque
                         "Profile manager not available");
         }
         
+    } else if (subCommand == "set_hard_drive") {
+        // Set H drive path (H1-H4). Triggers emulator restart to apply.
+        int drive = params["drive"].toInt();
+        QString path = params["path"].toString();
+        
+        if (drive < 1 || drive > 4) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Invalid drive number. Must be 1-4.");
+            return;
+        }
+        
+        if (path.isEmpty()) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Path parameter is required");
+            return;
+        }
+        
+        // Validate path exists and is a directory
+        QFileInfo dirInfo(path);
+        if (!dirInfo.exists()) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Path does not exist: " + path);
+            return;
+        }
+        if (!dirInfo.isDir()) {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Path is not a directory: " + path);
+            return;
+        }
+        
+        bool success = m_mainWindow->setHardDrivePathViaTCP(drive, path);
+        
+        if (success) {
+            QJsonObject result;
+            result["drive"] = drive;
+            result["path"] = dirInfo.canonicalFilePath();
+            result["restart_required"] = true;
+            result["restarted"] = true;
+            sendResponse(client, requestId, true, result);
+            
+            // Send event to all clients
+            QJsonObject eventData;
+            eventData["drive"] = drive;
+            eventData["path"] = dirInfo.canonicalFilePath();
+            sendEventToAllClients("hard_drive_configured", eventData);
+        } else {
+            sendResponse(client, requestId, false, QJsonValue(), 
+                        "Failed to set H" + QString::number(drive) + " path");
+        }
+        
     } else {
         sendResponse(client, requestId, false, QJsonValue(), 
                     "Unknown config command: " + subCommand);

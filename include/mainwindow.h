@@ -127,6 +127,9 @@ public:
     // Public method for TCP server to apply a profile
     void applyProfileViaTCP(const ConfigurationProfile& profile);
 
+    // Public method for TCP server to set H drive path (triggers emulator restart)
+    bool setHardDrivePathViaTCP(int driveNumber, const QString& path);
+
 private:
     void createMenus();
     void createToolBar();
