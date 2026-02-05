@@ -1485,9 +1485,13 @@ void SettingsDialog::createMediaConfigTab()
     // Cartridge Configuration Group
     QGroupBox* cartridgeGroup = new QGroupBox("Cartridge Configuration");
     QVBoxLayout* cartridgeLayout = new QVBoxLayout(cartridgeGroup);
-    cartridgeLayout->setSpacing(4); // Reduce spacing
+    cartridgeLayout->setSpacing(4);
     
-    // Primary cartridge
+    // Horizontal layout: Primary on left, Piggyback on right
+    QHBoxLayout* cartridgeColumnsLayout = new QHBoxLayout();
+    cartridgeColumnsLayout->setSpacing(16);
+    
+    // Left column: Primary cartridge
     QVBoxLayout* cart1Layout = new QVBoxLayout();
     QLabel* cart1Label = new QLabel("Primary Cartridge:");
     cart1Label->setStyleSheet("font-weight: bold;");
@@ -1497,12 +1501,11 @@ void SettingsDialog::createMediaConfigTab()
     m_cartridgeEnabledCheck = new QCheckBox("Enable");
     m_cartridgeEnabledCheck->setMinimumWidth(50);
     cart1PathLayout->addWidget(m_cartridgeEnabledCheck);
-    
-    // Add spacing between checkbox and input field
     cart1PathLayout->addSpacing(8);
     
     m_cartridgePath = new QLineEdit();
     m_cartridgePath->setPlaceholderText("Select cartridge file (.rom, .bin, .car)");
+    m_cartridgePath->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setupFilePathTooltip(m_cartridgePath);
     cart1PathLayout->addWidget(m_cartridgePath, 1);
     
@@ -1512,23 +1515,17 @@ void SettingsDialog::createMediaConfigTab()
     cart1PathLayout->addWidget(m_cartridgeBrowse);
     
     cart1Layout->addLayout(cart1PathLayout);
-    
     QHBoxLayout* cart1TypeLayout = new QHBoxLayout();
-    QLabel* cart1TypeLabel = new QLabel("Type:");
-    cart1TypeLayout->addWidget(cart1TypeLabel);
-    
+    cart1TypeLayout->addWidget(new QLabel("Type:"));
     m_cartridgeTypeCombo = new QComboBox();
     m_cartridgeTypeCombo->setToolTip("Cartridge type - use Auto-detect unless you have issues");
     populateCartridgeTypes(m_cartridgeTypeCombo);
     cart1TypeLayout->addWidget(m_cartridgeTypeCombo, 1);
-    
     cart1Layout->addLayout(cart1TypeLayout);
-    cartridgeLayout->addLayout(cart1Layout);
     
-    // Add spacing between primary and piggyback cartridges
-    cartridgeLayout->addSpacing(12);
+    cartridgeColumnsLayout->addLayout(cart1Layout, 1);
     
-    // Piggyback cartridge
+    // Right column: Piggyback cartridge
     QVBoxLayout* cart2Layout = new QVBoxLayout();
     QLabel* cart2Label = new QLabel("Piggyback Cartridge:");
     cart2Label->setStyleSheet("font-weight: bold;");
@@ -1537,12 +1534,11 @@ void SettingsDialog::createMediaConfigTab()
     QHBoxLayout* cart2PathLayout = new QHBoxLayout();
     m_cartridge2EnabledCheck = new QCheckBox("Enable");
     cart2PathLayout->addWidget(m_cartridge2EnabledCheck);
-    
-    // Add spacing between checkbox and input field
     cart2PathLayout->addSpacing(8);
     
     m_cartridge2Path = new QLineEdit();
     m_cartridge2Path->setPlaceholderText("Select piggyback cartridge file");
+    m_cartridge2Path->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setupFilePathTooltip(m_cartridge2Path);
     cart2PathLayout->addWidget(m_cartridge2Path, 1);
     
@@ -1552,23 +1548,20 @@ void SettingsDialog::createMediaConfigTab()
     cart2PathLayout->addWidget(m_cartridge2Browse);
     
     cart2Layout->addLayout(cart2PathLayout);
-    
     QHBoxLayout* cart2TypeLayout = new QHBoxLayout();
-    QLabel* cart2TypeLabel = new QLabel("Type:");
-    cart2TypeLayout->addWidget(cart2TypeLabel);
-    
+    cart2TypeLayout->addWidget(new QLabel("Type:"));
     m_cartridge2TypeCombo = new QComboBox();
     m_cartridge2TypeCombo->setToolTip("Piggyback cartridge type");
     populateCartridgeTypes(m_cartridge2TypeCombo);
     cart2TypeLayout->addWidget(m_cartridge2TypeCombo, 1);
-    
     cart2Layout->addLayout(cart2TypeLayout);
-    cartridgeLayout->addLayout(cart2Layout);
     
-    // Add spacing before cartridge options
-    cartridgeLayout->addSpacing(8);
+    cartridgeColumnsLayout->addLayout(cart2Layout, 1);
     
-    // Cartridge options
+    cartridgeLayout->addLayout(cartridgeColumnsLayout);
+    cartridgeLayout->addSpacing(4);
+    
+    // Cartridge options - full width at bottom
     m_cartridgeAutoRebootCheck = new QCheckBox("Auto-reboot when cartridge changes");
     m_cartridgeAutoRebootCheck->setToolTip("Automatically restart emulator when cartridges are inserted or removed");
     m_cartridgeAutoRebootCheck->setChecked(true); // Default to enabled
@@ -1724,7 +1717,6 @@ void SettingsDialog::createMediaConfigTab()
     leftColumn->addStretch();
     rightColumn->addStretch();
     
-    // Add both columns to main layout
     mainLayout->addLayout(leftColumn, 1);
     mainLayout->addLayout(rightColumn, 1);
 }
