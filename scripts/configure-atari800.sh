@@ -131,13 +131,31 @@ elif [[ "$OSTYPE" == "msys" ]] || [[ "$MSYSTEM" != "" ]]; then
     export LDFLAGS="${LDFLAGS:-}"
     export CPPFLAGS="${CPPFLAGS:-}"
 else
-    # Linux: Set aggressive optimization flags for performance
+    # Linux: Set optimization flags for performance and compatibility
     echo "Configuring for Linux build with optimizations..."
     echo "Compiler: $(gcc --version | head -1 2>/dev/null || echo 'gcc not found')"
 
-    # Use -O3 for maximum optimization, -march=native for CPU-specific optimizations
-    # Note: In containers, we use the container's native arch (specified by --platform)
-    export CFLAGS="-O3 -march=native -mtune=native ${CFLAGS:-}"
+    BUILD_ARCH=$(uname -m 2>/dev/null || echo "")
+    if [[ "$BUILD_ARCH" == "x86_64" ]] || [[ "$BUILD_ARCH" == "amd64" ]]; then
+        if [[ -n "$FUJISAN_NATIVE_CPU" ]]; then
+            # Native CPU: maximum performance for build host (use only when compatibility not needed)
+            export CFLAGS="-O3 -march=native -mtune=native ${CFLAGS:-}"
+            echo "Using native CPU optimizations (FUJISAN_NATIVE_CPU=1)"
+        else
+            # Default: x86-64-v2 for compatibility with Ivy Bridge (2012) and older CPUs.
+            # Avoids FMA3 (vfmadd*) which causes SIGILL on pre-Haswell.
+            # Override with CFLAGS env var for development builds if needed.
+            export CFLAGS="-O3 -march=x86-64-v2 -mtune=generic ${CFLAGS:-}"
+        fi
+    else
+        # Non-x86 (e.g. aarch64/arm64): use generic optimizations; -march=x86-64-v2 is invalid on ARM
+        if [[ -n "$FUJISAN_NATIVE_CPU" ]]; then
+            export CFLAGS="-O3 -march=native -mtune=native ${CFLAGS:-}"
+            echo "Using native CPU optimizations (FUJISAN_NATIVE_CPU=1)"
+        else
+            export CFLAGS="-O3 ${CFLAGS:-}"
+        fi
+    fi
     export LDFLAGS="${LDFLAGS:-}"
     export CPPFLAGS="${CPPFLAGS:-}"
 

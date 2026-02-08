@@ -155,6 +155,22 @@ make -j$(nproc)
 
 **Note:** Manual builds may fail with version-related CMake errors or missing dependencies. Use the container build for reliable results.
 
+#### Linux CPU Compatibility (x86-64-v2)
+
+Release builds target **x86-64-v2** so they run on Intel Ivy Bridge (2012) and older CPUs (e.g., Mac Mini 2012). This avoids FMA3 instructions that cause SIGILL on pre-Haswell processors.
+
+For maximum performance on a known-modern host (Haswell or newer), set `FUJISAN_NATIVE_CPU=1` before building:
+
+```bash
+FUJISAN_NATIVE_CPU=1 ./build.sh linux
+```
+
+Or override with explicit CFLAGS:
+
+```bash
+CFLAGS="-O3 -march=native -mtune=native" ./build.sh linux
+```
+
 ## Build Documentation
 
 For detailed information, see:
