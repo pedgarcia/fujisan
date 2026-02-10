@@ -251,6 +251,11 @@ public:
     bool isJoysticksSwapped() const { return m_swapJoysticks; }
     void setJoysticksSwapped(bool swapped) { m_swapJoysticks = swapped; }
 
+    void setJoystick0Preset(const QString& preset);
+    void setJoystick1Preset(const QString& preset);
+    QString getJoystick0Preset() const { return m_joystick0Preset; }
+    QString getJoystick1Preset() const { return m_joystick1Preset; }
+
 #ifdef HAVE_SDL2_JOYSTICK
     // Real joystick (SDL2) support
     bool isRealJoysticksEnabled() const { return m_realJoysticksEnabled; }
@@ -370,6 +375,8 @@ private:
     bool m_kbdJoy0Enabled = false;  // Default false - keyboard joysticks disabled by default
     bool m_kbdJoy1Enabled = false;  // Default false - keyboard joysticks disabled by default
     bool m_swapJoysticks = false;   // Default false: Joy0=Numpad, Joy1=WASD
+    QString m_joystick0Preset = "numpad";  // "numpad" | "arrows" | "wasd"
+    QString m_joystick1Preset = "wasd";
     float m_targetFps = 59.92f;
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;

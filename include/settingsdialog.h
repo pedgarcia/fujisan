@@ -88,6 +88,7 @@ private slots:
     void onSaveCurrentProfile(const QString& profileName);
     void onLoadProfile(const QString& profileName);
     void onJoystickDeviceChanged();
+    void onJoystickPresetChanged(int joystickNumber);
 
 #ifndef Q_OS_WIN
     // FujiNet slots
@@ -269,6 +270,8 @@ private:
     QCheckBox* m_joystickEnabled;
     QComboBox* m_joystick1Device;
     QComboBox* m_joystick2Device;
+    QComboBox* m_joystick1Preset;
+    QComboBox* m_joystick2Preset;
     QCheckBox* m_swapJoysticks;
 
     // Keyboard mapping labels (shown when "Keyboard" is selected)

@@ -65,17 +65,17 @@ void JoystickSwapWidget::updateTooltip()
         QString tooltip = QString("Click to swap joystick assignments\n\n");
         if (!m_swapped) {
             tooltip += "Current (Normal):\n";
-            tooltip += "• J1 (Player 1): Numpad (↑←↓→, RCtrl)\n";
+            tooltip += "• J1 (Player 1): Numpad/Arrows (↑←↓→, Enter)\n";
             tooltip += "• J2 (Player 2): WASD (WASD, Space)\n\n";
             tooltip += "Click to swap to:\n";
             tooltip += "• J1 (Player 1): WASD (WASD, Space)\n";
-            tooltip += "• J2 (Player 2): Numpad (↑←↓→, RCtrl)";
+            tooltip += "• J2 (Player 2): Numpad/Arrows (↑←↓→, Enter)";
         } else {
             tooltip += "Current (Swapped):\n";
             tooltip += "• J1 (Player 1): WASD (WASD, Space)\n";
-            tooltip += "• J2 (Player 2): Numpad (↑←↓→, RCtrl)\n\n";
+            tooltip += "• J2 (Player 2): Numpad/Arrows (↑←↓→, Enter)\n\n";
             tooltip += "Click to swap to:\n";
-            tooltip += "• J1 (Player 1): Numpad (↑←↓→, RCtrl)\n";
+            tooltip += "• J1 (Player 1): Numpad/Arrows (↑←↓→, Enter)\n";
             tooltip += "• J2 (Player 2): WASD (WASD, Space)";
         }
         setToolTip(tooltip);
@@ -143,11 +143,11 @@ void JoystickSwapWidget::paintEvent(QPaintEvent *event)
     
     // Draw joystick boxes
     if (!m_swapped) {
-        drawJoystickBox(painter, leftBox, "Player 1", {"↑", "←↓→", "RCtrl"}, true, true);
+        drawJoystickBox(painter, leftBox, "Player 1", {"↑", "←↓→", "Enter"}, true, true);
         drawJoystickBox(painter, rightBox, "Player 2", {"W", "ASD", "Space"}, true, false);
     } else {
         drawJoystickBox(painter, leftBox, "Player 1", {"W", "ASD", "Space"}, true, true);
-        drawJoystickBox(painter, rightBox, "Player 2", {"↑", "←↓→", "RCtrl"}, true, false);
+        drawJoystickBox(painter, rightBox, "Player 2", {"↑", "←↓→", "Enter"}, true, false);
     }
     
     // Draw swap arrows

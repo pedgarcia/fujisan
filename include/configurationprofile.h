@@ -92,6 +92,8 @@ struct ConfigurationProfile {
     bool joyDistinct = false;
     bool kbdJoy0Enabled = false;
     bool kbdJoy1Enabled = false;
+    QString joystick1Preset = "numpad";
+    QString joystick2Preset = "wasd";
     bool swapJoysticks = false;
     bool grabMouse = false;
     QString mouseDevice;
