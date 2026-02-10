@@ -47,8 +47,20 @@ if [ -d .git ]; then
                 patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null
                 echo "✓ Patch applied successfully with patch command"
             else
+                    # For critical patch 0007 (BINLOAD/NetSIO), apply manually
+                    if [[ "$patch_name" == "0007-netsio-binload-priority.patch" ]]; then
+                        echo "Applying BINLOAD/NetSIO priority patch manually..."
+                        if [ -f "src/sio.c" ] && grep 'if (netsio_enabled)' src/sio.c | grep -v BINLOAD | grep -q .; then
+                            if sed --version 2>/dev/null | grep -q GNU; then
+                                sed -i 's/if (netsio_enabled)/if (netsio_enabled \&\& !BINLOAD_start_binloading)/g' src/sio.c
+                            else
+                                sed -i '' 's/if (netsio_enabled)/if (netsio_enabled \&\& !BINLOAD_start_binloading)/g' src/sio.c
+                            fi
+                            echo "✓ BINLOAD/NetSIO priority patch applied manually"
+                        fi
+                        echo "Warning: Patch $patch_name had issues but manual apply attempted"
                     # For critical patch 0003, apply manually
-                    if [[ "$patch_name" == "0003-disk-activity-callback-integration.patch" ]]; then
+                    elif [[ "$patch_name" == "0003-disk-activity-callback-integration.patch" ]]; then
                         echo "Applying disk activity callback patch manually..."
                         
                         # Check if sio.c exists and apply changes

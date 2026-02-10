@@ -16,7 +16,13 @@ The Atari800MacX project has an enhanced NetSIO implementation that properly int
 
 ## Required Patches
 
-### 1. netsio-sio-integration.patch
+### 0007-netsio-binload-priority.patch
+Gives BINLOAD priority over NetSIO during XEX loading. When `media.load_xex` is used via TCP with NetSIO enabled, D1: commands are handled locally by BINLOAD instead of being routed to FujiNet-PC, allowing XEX files to load correctly with FujiNet features (N: device) available after the load.
+
+### 0008-binload-bulk-reads.patch
+Uses bulk fread instead of byte-by-byte fgetc for faster XEX loading when slow XEX loading is disabled.
+
+### 1. netsio-sio-integration.patch (legacy)
 **File**: `src/sio.c`
 **Purpose**: Main SIO system integration with NetSIO
 

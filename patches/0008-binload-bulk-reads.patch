@@ -1,0 +1,104 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Developer <fujisan@atari>
+Date: Sun, 8 Feb 2025 00:00:00 -0800
+Subject: [PATCH] Use bulk fread instead of byte-by-byte fgetc in BINLOAD
+
+Replace the inner load loop's fgetc-per-byte with chunked fread and
+MEMORY_CopyToMem when BINLOAD_slow_xex_loading is disabled. Reduces
+file I/O syscalls and speeds up XEX loading for TCP/IDE integration.
+
+When BINLOAD_slow_xex_loading is enabled (for timing-sensitive demos),
+the original byte-by-byte behavior is preserved.
+---
+ src/binload.c | 52 ++++++++++++++++++++++++++++++++++++----------------
+ 1 file changed, 36 insertions(+), 16 deletions(-)
+
+diff --git a/src/binload.c b/src/binload.c
+--- a/src/binload.c
++++ b/src/binload.c
+@@ -109,8 +109,8 @@ static void loader_cont(void)
+ 			segfinished = FALSE;
+ 		}
+ 		do {
+-			int byte;
+ 			if (BINLOAD_slow_xex_loading) {
++				int byte;
+ 				instr_elapsed++;
+ 				if ((instr_elapsed < 300) || BINLOAD_pause_loading) {
+ 					CPU_regS--;
+@@ -122,23 +122,60 @@ static void loader_cont(void)
+ 				}
+ 				instr_elapsed = 0;
+ 				BINLOAD_wait_active = FALSE;
+-			}
+-			byte = fgetc(BINLOAD_bin_file);
+-			if (byte == EOF) {
+-				fclose(BINLOAD_bin_file);
+-				BINLOAD_bin_file = NULL;
+-				CPU_regPC = MEMORY_dGetWordAligned(0x2e0);
+-				if (MEMORY_dGetByte(0x2e3) != 0xd7) {
+-					/* run INIT routine which RTSes directly to RUN routine */
+-					CPU_regPC--;
+-					MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC >> 8);		/* high */
+-					MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC & 0xff);	/* low */
+-					CPU_regPC = MEMORY_dGetWordAligned(0x2e2);
++				byte = fgetc(BINLOAD_bin_file);
++				if (byte == EOF) {
++					fclose(BINLOAD_bin_file);
++					BINLOAD_bin_file = NULL;
++					CPU_regPC = MEMORY_dGetWordAligned(0x2e0);
++					if (MEMORY_dGetByte(0x2e3) != 0xd7) {
++						CPU_regPC--;
++						MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC >> 8);
++						MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC & 0xff);
++						CPU_regPC = MEMORY_dGetWordAligned(0x2e2);
++					}
++					return;
++				}
++				MEMORY_PutByte(from, (UBYTE) byte);
++				from++;
++			} else {
++				/* Bulk read for faster loading */
++				#define BINLOAD_CHUNK 512
++				UBYTE buf[BINLOAD_CHUNK];
++				size_t bytes_left = to - from;
++				while (bytes_left > 0) {
++					size_t to_read = (bytes_left > BINLOAD_CHUNK) ? BINLOAD_CHUNK : bytes_left;
++					size_t n = fread(buf, 1, to_read, BINLOAD_bin_file);
++					if (n == 0) {
++						fclose(BINLOAD_bin_file);
++						BINLOAD_bin_file = NULL;
++						CPU_regPC = MEMORY_dGetWordAligned(0x2e0);
++						if (MEMORY_dGetByte(0x2e3) != 0xd7) {
++							CPU_regPC--;
++							MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC >> 8);
++							MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC & 0xff);
++							CPU_regPC = MEMORY_dGetWordAligned(0x2e2);
++						}
++						return;
++					}
++					MEMORY_CopyToMem(buf, from, (int)n);
++					from += (UWORD) n;
++					bytes_left -= n;
++					if (n < to_read)
++						break;
++				}
++				if (from != to) {
++					fclose(BINLOAD_bin_file);
++					BINLOAD_bin_file = NULL;
++					CPU_regPC = MEMORY_dGetWordAligned(0x2e0);
++					if (MEMORY_dGetByte(0x2e3) != 0xd7) {
++						CPU_regPC--;
++						MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC >> 8);
++						MEMORY_dPutByte(0x0100 + CPU_regS--, CPU_regPC & 0xff);
++						CPU_regPC = MEMORY_dGetWordAligned(0x2e2);
++					}
++					return;
+ 				}
+-				return;
+ 			}
+-			MEMORY_PutByte(from, (UBYTE) byte);
+-			from++;
+ 		} while (from != to);
+ 		segfinished = TRUE;
+ 	} while (MEMORY_dGetByte(0x2e3) == 0xd7);

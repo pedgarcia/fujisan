@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Developer <fujisan@atari>
+Date: Sun, 8 Feb 2025 00:00:00 -0800
+Subject: [PATCH] Give BINLOAD priority over NetSIO during XEX loading
+
+When NetSIO is enabled, SIO traffic was unconditionally routed to FujiNet-PC.
+This prevented BINLOAD from loading XEX files via TCP because D1: commands
+went to FujiNet (serving the config disk) instead of the local BINLOAD loader.
+
+Fix: Use local SIO handling when BINLOAD_start_binloading is true. During
+XEX load, D1: is handled by BINLOAD_LoaderStart which feeds XEX data from
+the local file. After load completes, NetSIO resumes for N:, P:, etc.
+
+This allows media.load_xex via TCP to work correctly when NetSIO/FujiNet
+is enabled, matching Altirra's behavior of loading XEX with FujiNet features
+available.
+---
+ src/sio.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/sio.c b/src/sio.c
+index 0000000..1111111 100644
+--- a/src/sio.c
++++ b/src/sio.c
+@@ -1673,7 +1673,7 @@ void SIO_PutByte(int byte)
+ {
+ #ifdef NETSIO
+-	if (netsio_enabled)
++	if (netsio_enabled && !BINLOAD_start_binloading)
+ 	{
+ 		NetSIO_PutByte(byte);
+ 		return;
+@@ -1831,7 +1831,7 @@ int SIO_GetByte(void)
+ 	int byte = 0;
+ 
+ #ifdef NETSIO
+-	if (netsio_enabled)
++	if (netsio_enabled && !BINLOAD_start_binloading)
+ 		return NetSIO_GetByte();
+ #endif /* NETSIO */
+ 

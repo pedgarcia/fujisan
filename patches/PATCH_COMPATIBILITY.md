@@ -4,10 +4,10 @@ This document tracks the compatibility of Fujisan patches with specific atari800
 
 ## Current Patch Set
 
-All patches in this directory are compatible with atari800 commit:
-- **SHA**: `575a943b3523bf0f5c9b73ba8641d83cac672f24`
-- **Message**: kbhits is const for SDL2 only
-- **Date**: As of July 31, 2025
+All patches in this directory are compatible with atari800:
+- **Branch**: master (HEAD)
+- **SHA**: `4804056c6a098c5deff1c628c3c081bae17199f7` (Feb 2026)
+- **Note**: If patch 0003 PR is not merged upstream, pin GIT_TAG in CMakeLists.txt to a known-good SHA
 
 ## Required Patches
 

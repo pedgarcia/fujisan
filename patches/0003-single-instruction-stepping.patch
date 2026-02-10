@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Fujisan Developer <fujisan@atari>
-Date: Thu, 14 Aug 2025 12:00:00 -0800
+From: Paulo Garcia <pedgarcia@gmail.com>
+Date: Sun, 8 Feb 2026 00:00:00 -0500
 Subject: [PATCH] Add single-instruction stepping support to libatari800
 
 This patch adds proper single-instruction stepping capability to libatari800
@@ -10,36 +10,34 @@ Previously, the debugger could only step by full frames (thousands of instructio
 making precise debugging impossible. This patch enables true instruction-level control.
 
 ---
- src/cpu.c                    |  12 ++++++++++++
- src/cpu.h                    |   1 +
- src/libatari800/libatari800.h |   3 +++
- src/libatari800/main.c       |  19 +++++++++++++++++++
- src/monitor.c                |   2 ++
- src/monitor.h                |   5 +++++
- 6 files changed, 42 insertions(+)
+ src/cpu.c                    | 12 ++++++++++++
+ src/cpu.h                    |  1 +
+ src/libatari800/api.c       | 28 ++++++++++++++++++++++++++++
+ src/libatari800/libatari800.h|  3 +++
+ src/monitor.c                |  2 ++
+ src/monitor.h                |  5 +++++
+ 6 files changed, 51 insertions(+)
 
 diff --git a/src/cpu.c b/src/cpu.c
-index 1234567..abcdefg 100644
+index 99d63e61..9fdfb6bf 100644
 --- a/src/cpu.c
 +++ b/src/cpu.c
-@@ -445,6 +445,16 @@ void CPU_NMI(void)
- 	}
- }
+@@ -445,6 +445,14 @@ static const int cycles[256] =
+ 	2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7		/* Fx */
+ };
  
 +/* Return the number of cycles used by the last instruction */
 +static int last_instruction_cycles = 0;
 +
 +int CPU_GetInstructionCycles(void)
 +{
-+	/* Return the cycles consumed by the last instruction */
-+	/* This is updated in CPU_GO after each instruction */
 +	return last_instruction_cycles;
 +}
 +
  /* 6502 emulation routine */
  #ifndef NO_GOTO
  __extension__ /* suppress -ansi -pedantic warnings */
-@@ -853,6 +863,8 @@ void CPU_GO(int limit)
+@@ -853,6 +861,8 @@ void CPU_GO(int limit)
  
  #ifndef CYCLES_PER_OPCODE
  		ANTIC_xpos += cycles[insn];
@@ -47,95 +45,82 @@ index 1234567..abcdefg 100644
 +		last_instruction_cycles = cycles[insn];
  #endif
  
- #ifdef NO_GOTO
+ #ifdef MONITOR_PROFILE
 diff --git a/src/cpu.h b/src/cpu.h
-index 1234567..abcdefg 100644
+index 72124a93..b98d7f95 100644
 --- a/src/cpu.h
 +++ b/src/cpu.h
 @@ -48,6 +48,7 @@ void CPU_StateRead(UBYTE SaveVerbose, UBYTE StateVersion);
  void CPU_NMI(void);
  void CPU_GO(int limit);
  #define CPU_GenerateIRQ() (CPU_IRQ = 1)
-+int CPU_GetInstructionCycles(void);  /* Get cycles for last instruction */
++int CPU_GetInstructionCycles(void);
  
  extern UWORD CPU_regPC;
  extern UBYTE CPU_regA;
-diff --git a/src/libatari800/libatari800.h b/src/libatari800/libatari800.h
-index 1234567..abcdefg 100644
---- a/src/libatari800/libatari800.h
-+++ b/src/libatari800/libatari800.h
-@@ -300,6 +300,9 @@ void libatari800_clear_input_array(input_template_t *input);
- 
- void libatari800_get_current_state(emulator_state_t *state);
- 
-+/* Single-instruction stepping for debugger support */
-+void libatari800_step_instruction(void);
-+
- /* Get the 6502 registers and PC from the current emulator state. The value
-    pointed to by the state argument must have already been filled in by
-    libatari800_get_current_state before calling this function. */
-diff --git a/src/libatari800/main.c b/src/libatari800/main.c
-index 1234567..abcdefg 100644
---- a/src/libatari800/main.c
-+++ b/src/libatari800/main.c
-@@ -19,6 +19,7 @@
+diff --git a/src/libatari800/api.c b/src/libatari800/api.c
+index 8b6c34c9..e701d581 100644
+--- a/src/libatari800/api.c
++++ b/src/libatari800/api.c
+@@ -40,6 +40,7 @@
+ #include "antic.h"
  #include "cpu.h"
- #include "devices.h"
- #include "esc.h"
-+#include "monitor.h"
- #include "gtia.h"
- #include "input.h"
- #include "log.h"
-@@ -138,6 +139,24 @@ void libatari800_next_frame(input_template_t *input)
- 	Atari800_nframes++;
+ #include "platform.h"
++#include "../monitor.h"
+ #include "memory.h"
+ #include "screen.h"
+ #include "sio.h"
+@@ -235,6 +236,15 @@ int libatari800_next_frame(input_template_t *input)
+ 	return !libatari800_error_code;
  }
  
 +/* Single-instruction stepping for debugger support */
 +void libatari800_step_instruction(void)
 +{
-+	/* Use the monitor's single-step mechanism */
++#ifdef MONITOR_BREAK
 +	MONITOR_break_step = TRUE;
-+	
-+	/* Execute CPU until the step break is hit (one instruction) */
-+	/* We use a limit of 20 cycles to ensure we have enough for any
-+	   instruction (longest is 7 cycles), but MONITOR_break_step will
-+	   stop us after exactly one instruction */
 +	CPU_GO(20);
-+	
-+	/* Reset the step flag - it's automatically reset by the monitor
-+	   when the break is hit, but we ensure it here for safety */
 +	MONITOR_break_step = FALSE;
-+	
-+	/* ANTIC position is already updated by CPU_GO */
++#endif
 +}
-+
- /* Stub routines to replace text-based UI */
  
- int UI_SelectCartType(int k) {
+ /** Use disk image in a disk drive
+  *
+diff --git a/src/libatari800/libatari800.h b/src/libatari800/libatari800.h
+index 94c56aa8..ebbdc9a2 100644
+--- a/src/libatari800/libatari800.h
++++ b/src/libatari800/libatari800.h
+@@ -316,4 +316,7 @@ void libatari800_set_disk_activity_callback(void (*callback)(int drive, int oper
+ int libatari800_get_sio_patch_enabled(void);
+ int libatari800_set_sio_patch_enabled(int enabled);
+ 
++/* Single-instruction stepping for debugger support */
++void libatari800_step_instruction(void);
++
+ #endif /* LIBATARI800_H_ */
 diff --git a/src/monitor.c b/src/monitor.c
-index 1234567..abcdefg 100644
+index 9da05097..15b745f5 100644
 --- a/src/monitor.c
 +++ b/src/monitor.c
-@@ -137,7 +137,9 @@ static char *get_token(void);
- #ifdef MONITOR_BREAK
+@@ -1129,7 +1129,9 @@ unsigned long MONITOR_coverage_cycles;
  
- UWORD MONITOR_break_addr = 0xffff;
+ #ifdef MONITOR_BREAK
+ UWORD MONITOR_break_addr = 0xd000;
 +#ifndef LIBATARI800
  UBYTE MONITOR_break_step = FALSE;
 +#endif
+ static UBYTE break_over = FALSE;
  UBYTE MONITOR_break_ret = FALSE;
- int MONITOR_ret_nesting = 0;
  UBYTE MONITOR_break_brk = FALSE;
 diff --git a/src/monitor.h b/src/monitor.h
-index 1234567..abcdefg 100644
+index 0c7ad59a..5ebb113e 100644
 --- a/src/monitor.h
 +++ b/src/monitor.h
-@@ -20,7 +20,12 @@
- int MONITOR_Run(void);
+@@ -20,7 +20,11 @@ extern FILE *MONITOR_trace_file;
+ void MONITOR_BBRK_on(void);
  void MONITOR_BPC(char *arg);
  extern UWORD MONITOR_break_addr;
 +#ifdef LIBATARI800
-+/* Made globally accessible for libatari800 single-step support */
 +UBYTE MONITOR_break_step;
 +#else
  extern UBYTE MONITOR_break_step;
@@ -143,5 +128,3 @@ index 1234567..abcdefg 100644
  extern UBYTE MONITOR_break_ret;
  extern UBYTE MONITOR_break_brk;
  extern int MONITOR_ret_nesting;
--- 
-2.34.1
