@@ -1,5 +1,16 @@
 # Fujisan Release Notes
 
+## Version 1.1.5
+
+### New Featires
+
+- Joystick keyboard emulation now lets you select presets to customize which keys are used for each joytick, allowing NumPad, Arrow keys and WASD.
+
+### Bug fixes
+
+
+# Previous Version(s)
+
 ## Version 1.1.4
 
 ### New Features

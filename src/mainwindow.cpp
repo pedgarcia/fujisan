@@ -1278,6 +1278,9 @@ void MainWindow::restartEmulator()
         // Ensure keyboard joystick state is properly applied after restart
         m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
         m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
+        m_emulator->setJoysticksSwapped(swapJoysticks);
+        m_emulator->setJoystick0Preset(settings.value("input/joystick1Preset", "numpad").toString());
+        m_emulator->setJoystick1Preset(settings.value("input/joystick2Preset", "wasd").toString());
         qDebug() << "Applied keyboard joystick state after restart - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
 
         // Update toolbar to reflect actual BASIC state (may have been auto-disabled for FujiNet)
@@ -1547,6 +1550,8 @@ void MainWindow::updateToolbarFromSettings()
         m_emulator->setKbdJoy0Enabled(joystickEnabled && kbdJoy0Saved);
         m_emulator->setKbdJoy1Enabled(joystickEnabled && kbdJoy1Saved);
         m_emulator->setJoysticksSwapped(swapJoysticks);
+        m_emulator->setJoystick0Preset(settings.value("input/joystick1Preset", "numpad").toString());
+        m_emulator->setJoystick1Preset(settings.value("input/joystick2Preset", "wasd").toString());
 
         qDebug() << "Applied effective joystick state - MainJoystick:" << joystickEnabled
                  << "Joy0:" << (joystickEnabled && kbdJoy0Saved)
@@ -2867,6 +2872,9 @@ void MainWindow::loadInitialSettings()
     // the effective state we want (main joystick disabled should disable kbd joy)
     m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
     m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
+    m_emulator->setJoysticksSwapped(swapJoysticks);
+    m_emulator->setJoystick0Preset(settings.value("input/joystick1Preset", "numpad").toString());
+    m_emulator->setJoystick1Preset(settings.value("input/joystick2Preset", "wasd").toString());
     qDebug() << "Applied keyboard joystick state after init - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
 
 #ifdef HAVE_SDL2_JOYSTICK

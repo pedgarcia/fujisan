@@ -454,6 +454,82 @@ EOF
     echo_success "FujiNet-PC $version bundled successfully"
 }
 
+# Bundle and fix OpenSSL dylibs for FujiNet-PC on macOS
+# When built with --build-fujinet-pc, FujiNet may link to Homebrew OpenSSL.
+# This causes Team ID mismatch on user Macs. Solution: bundle OpenSSL inside app.
+bundle_openssl_for_fujinet() {
+    local app_path="$1"
+    local dev_id="$2"  # Optional: Developer ID for signing
+    
+    local fujinet_binary="$app_path/Contents/Resources/fujinet-pc/fujinet"
+    
+    if [[ ! -f "$fujinet_binary" ]]; then
+        echo_warning "FujiNet binary not found, skipping OpenSSL bundling"
+        return 0
+    fi
+    
+    # Check if FujiNet links to external OpenSSL (common when built from source)
+    local openssl_deps=$(otool -L "$fujinet_binary" | grep -E "homebrew.*openssl|usr/local.*openssl" | awk '{print $1}')
+    
+    if [[ -z "$openssl_deps" ]]; then
+        echo_info "FujiNet has no external OpenSSL dependencies - bundling not needed"
+        return 0
+    fi
+    
+    echo_info "FujiNet links to external OpenSSL - bundling dylibs to avoid Team ID issues"
+    
+    # Create lib directory for bundled dylibs
+    local lib_dir="$app_path/Contents/Resources/fujinet-pc/lib"
+    mkdir -p "$lib_dir"
+    
+    # Process each OpenSSL dependency
+    while IFS= read -r dylib_path; do
+        if [[ -z "$dylib_path" ]]; then
+            continue
+        fi
+        
+        local dylib_name=$(basename "$dylib_path")
+        echo_info "Bundling: $dylib_name"
+        
+        # Copy the dylib
+        if [[ ! -f "$dylib_path" ]]; then
+            echo_error "Dylib not found: $dylib_path"
+            return 1
+        fi
+        cp "$dylib_path" "$lib_dir/$dylib_name"
+        chmod 644 "$lib_dir/$dylib_name"
+        
+        # Fix the dylib's install name to be relocatable
+        install_name_tool -id "@rpath/$dylib_name" "$lib_dir/$dylib_name"
+        
+        # Update the FujiNet binary to look for this dylib via @rpath
+        install_name_tool -change "$dylib_path" "@rpath/$dylib_name" "$fujinet_binary"
+        
+        echo_success "Bundled: $dylib_name"
+    done <<< "$openssl_deps"
+    
+    # Set rpath on FujiNet binary to find bundled libs
+    # Use @executable_path/lib so the binary finds libs relative to itself
+    install_name_tool -add_rpath "@executable_path/lib" "$fujinet_binary" 2>/dev/null || true
+    
+    # Sign bundled dylibs if Developer ID provided
+    if [[ -n "$dev_id" ]]; then
+        for dylib in "$lib_dir"/*.dylib; do
+            if [[ -f "$dylib" ]]; then
+                echo_info "Signing bundled dylib: $(basename "$dylib")"
+                codesign --force --timestamp --options runtime --sign "$dev_id" "$dylib"
+            fi
+        done
+        echo_success "Bundled OpenSSL dylibs signed"
+    fi
+    
+    # Verify the changes
+    echo_info "Verifying FujiNet binary now uses bundled OpenSSL:"
+    otool -L "$fujinet_binary" | grep -E "@rpath|@executable_path" | head -5
+    
+    echo_success "OpenSSL bundling complete"
+}
+
 # Function to notarize DMG
 notarize_dmg() {
     local dmg_path="$1"
@@ -563,9 +639,12 @@ build_macos_arm64() {
             dev_id=$(find_developer_id)
         fi
         bundle_fujinet_pc "$ARM64_BUILD_DIR/Fujisan.app" "arm64" "$dev_id"
+        
+        # Bundle OpenSSL if FujiNet was built from source (fixes Homebrew Team ID issue)
+        bundle_openssl_for_fujinet "$ARM64_BUILD_DIR/Fujisan.app" "$dev_id"
     fi
 
-    # Sign with Developer ID or ad-hoc (AFTER bundling FujiNet)
+    # Sign with Developer ID or ad-hoc (AFTER bundling FujiNet and OpenSSL)
     if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
         if [[ -z "$dev_id" ]]; then
             dev_id=$(find_developer_id)
@@ -654,9 +733,12 @@ build_macos_x86_64() {
             dev_id=$(find_developer_id)
         fi
         bundle_fujinet_pc "$X86_64_BUILD_DIR/Fujisan.app" "x86_64" "$dev_id"
+        
+        # Bundle OpenSSL if FujiNet was built from source (fixes Homebrew Team ID issue)
+        bundle_openssl_for_fujinet "$X86_64_BUILD_DIR/Fujisan.app" "$dev_id"
     fi
 
-    # Sign with Developer ID or ad-hoc (AFTER bundling FujiNet)
+    # Sign with Developer ID or ad-hoc (AFTER bundling FujiNet and OpenSSL)
     if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
         if [[ -z "$dev_id" ]]; then
             dev_id=$(find_developer_id)

@@ -1278,9 +1278,9 @@ void TCPServer::handleInputCommand(QTcpSocket* client, const QJsonObject& reques
         result["fire"] = fire;
         result["keyboard_enabled"] = (player == 1) ? m_emulator->isKbdJoy0Enabled() : m_emulator->isKbdJoy1Enabled();
         if (player == 1) {
-            result["keyboard_keys"] = m_emulator->isJoysticksSwapped() ? "wasd" : "numpad";
+            result["keyboard_keys"] = m_emulator->isJoysticksSwapped() ? m_emulator->getJoystick1Preset() : m_emulator->getJoystick0Preset();
         } else {
-            result["keyboard_keys"] = m_emulator->isJoysticksSwapped() ? "numpad" : "wasd";
+            result["keyboard_keys"] = m_emulator->isJoysticksSwapped() ? m_emulator->getJoystick0Preset() : m_emulator->getJoystick1Preset();
         }
         
         sendResponse(client, requestId, true, result);

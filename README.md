@@ -237,6 +237,8 @@ FUJINET_SOURCE_DIR=/path/to/fujinet-firmware ./build.sh macos --build-fujinet-pc
 
 For detailed FujiNet-PC build information, see **[docs_local/BUILD_FUJINET_PC.md](docs_local/BUILD_FUJINET_PC.md)**.
 
+If FujiNet won't start on macOS (OpenSSL/Team ID error), see **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**.
+
 ### Manual Build Steps
 
 If you prefer to build manually or need to customize the process:
