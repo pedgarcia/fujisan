@@ -512,16 +512,30 @@ bundle_openssl_for_fujinet() {
     # Use @executable_path/lib so the binary finds libs relative to itself
     install_name_tool -add_rpath "@executable_path/lib" "$fujinet_binary" 2>/dev/null || true
     
-    # Sign bundled dylibs if Developer ID provided
-    if [[ -n "$dev_id" ]]; then
-        for dylib in "$lib_dir"/*.dylib; do
-            if [[ -f "$dylib" ]]; then
-                echo_info "Signing bundled dylib: $(basename "$dylib")"
+    # Re-sign bundled dylibs (install_name_tool invalidates existing signatures)
+    # Use Developer ID if provided, otherwise ad-hoc sign
+    for dylib in "$lib_dir"/*.dylib; do
+        if [[ -f "$dylib" ]]; then
+            if [[ -n "$dev_id" ]]; then
+                echo_info "Signing bundled dylib with Developer ID: $(basename "$dylib")"
                 codesign --force --timestamp --options runtime --sign "$dev_id" "$dylib"
+            else
+                echo_info "Ad-hoc signing bundled dylib: $(basename "$dylib")"
+                codesign --force --sign - "$dylib"
             fi
-        done
-        echo_success "Bundled OpenSSL dylibs signed"
+        fi
+    done
+    
+    # Re-sign FujiNet binary after modifying with install_name_tool
+    if [[ -n "$dev_id" ]]; then
+        echo_info "Signing FujiNet binary with Developer ID"
+        codesign --force --timestamp --options runtime --sign "$dev_id" "$fujinet_binary"
+    else
+        echo_info "Ad-hoc signing FujiNet binary"
+        codesign --force --sign - "$fujinet_binary"
     fi
+    
+    echo_success "Bundled OpenSSL dylibs signed"
     
     # Verify the changes
     echo_info "Verifying FujiNet binary now uses bundled OpenSSL:"
