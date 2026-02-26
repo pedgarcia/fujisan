@@ -852,12 +852,38 @@ build_fujinet_pc() {
     case "$PLATFORM_ARG" in
         macos-arm64)
             CMAKE_OPTS="$CMAKE_OPTS -DCMAKE_OSX_ARCHITECTURES=arm64"
+            CMAKE_OPTS="$CMAKE_OPTS -DMBEDTLS_ROOT_DIR=/opt/homebrew/opt/mbedtls@3"
+            CMAKE_OPTS="$CMAKE_OPTS -DMBEDTLS_STATIC_LIB=/opt/homebrew/opt/mbedtls@3/lib/libmbedtls.a"
+            CMAKE_OPTS="$CMAKE_OPTS -DMBEDX509_STATIC_LIB=/opt/homebrew/opt/mbedtls@3/lib/libmbedx509.a"
+            CMAKE_OPTS="$CMAKE_OPTS -DMBEDCRYPTO_STATIC_LIB=/opt/homebrew/opt/mbedtls@3/lib/libmbedcrypto.a"
+            CMAKE_OPTS="$CMAKE_OPTS -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@3"
             ;;
         macos-x86_64)
             CMAKE_OPTS="$CMAKE_OPTS -DCMAKE_OSX_ARCHITECTURES=x86_64"
+            local X86_MBEDTLS="/usr/local/opt/mbedtls@3"
+            local X86_OPENSSL="/usr/local/opt/openssl@3"
+            if [[ ! -d "$X86_MBEDTLS" ]]; then
+                echo_error "x86_64 mbedTLS@3 not found. Install with:"
+                echo_error "  arch -x86_64 /usr/local/bin/brew install mbedtls@3"
+                cd "$PROJECT_ROOT"
+                return 1
+            fi
+            if [[ ! -d "$X86_OPENSSL" ]]; then
+                echo_error "x86_64 OpenSSL not found. Install with:"
+                echo_error "  arch -x86_64 /usr/local/bin/brew install openssl@3"
+                cd "$PROJECT_ROOT"
+                return 1
+            fi
+            CMAKE_OPTS="$CMAKE_OPTS -DMBEDTLS_ROOT_DIR=$X86_MBEDTLS"
+            CMAKE_OPTS="$CMAKE_OPTS -DMBEDTLS_STATIC_LIB=$X86_MBEDTLS/lib/libmbedtls.a"
+            CMAKE_OPTS="$CMAKE_OPTS -DMBEDX509_STATIC_LIB=$X86_MBEDTLS/lib/libmbedx509.a"
+            CMAKE_OPTS="$CMAKE_OPTS -DMBEDCRYPTO_STATIC_LIB=$X86_MBEDTLS/lib/libmbedcrypto.a"
+            CMAKE_OPTS="$CMAKE_OPTS -DOPENSSL_ROOT_DIR=$X86_OPENSSL"
             ;;
     esac
 
+    # cmake is invoked with $CMAKE_OPTS unquoted (word-split intentional for multi-flag
+    # string).
     if ! cmake .. $CMAKE_OPTS; then
         echo_error "CMake configuration failed"
         cd "$PROJECT_ROOT"

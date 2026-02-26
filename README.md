@@ -132,8 +132,12 @@ brew install cmake
 # Install autotools for building atari800
 brew install autoconf automake
 
-# For Intel Macs, also install x86_64 version for universal builds
+# Install mbedTLS 3.x (required for FujiNet-PC; Homebrew default is 4.x which has breaking API changes)
+brew install mbedtls@3
+
+# For Intel/universal builds, also install x86_64 versions via Rosetta Homebrew
 arch -x86_64 /usr/local/bin/brew install qt@5
+arch -x86_64 /usr/local/bin/brew install mbedtls@3 openssl@3
 
 # Add Qt5 to PATH (if needed)
 export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
