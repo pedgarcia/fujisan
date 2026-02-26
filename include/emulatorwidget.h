@@ -34,6 +34,7 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    bool event(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;

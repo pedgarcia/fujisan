@@ -132,10 +132,28 @@ void EmulatorWidget::updateScreenTexture()
     }
 }
 
+bool EmulatorWidget::event(QEvent *event)
+{
+    // Intercept Tab/Shift+Tab before Qt's focus navigation machinery
+    // can consume them, so they are forwarded to the emulator.
+    if (event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Tab || keyEvent->key() == Qt::Key_Backtab) {
+            if (m_emulator) {
+                m_emulator->handleKeyPress(keyEvent);
+            }
+            return true;
+        }
+    }
+    return QWidget::event(event);
+}
+
 void EmulatorWidget::keyPressEvent(QKeyEvent *event)
 {
     if (m_emulator) {
         m_emulator->handleKeyPress(event);
+        event->accept();
+        return;
     }
     QWidget::keyPressEvent(event);
 }
