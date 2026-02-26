@@ -79,6 +79,8 @@ BUILD_DEB=true
 BUILD_TARBALL=true
 BUILD_APPIMAGE=false
 KEEP_CONTAINER=false
+BUILD_FUJINET_PC=false
+FUJINET_SRC_DIR=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -101,6 +103,14 @@ while [[ $# -gt 0 ]]; do
         --keep-container)
             KEEP_CONTAINER=true
             shift
+            ;;
+        --build-fujinet-pc)
+            BUILD_FUJINET_PC=true
+            shift
+            ;;
+        --fujinet-src)
+            FUJINET_SRC_DIR="$2"
+            shift 2
             ;;
         --version)
             VERSION="$2"
@@ -312,38 +322,72 @@ mkdir -p fujisan-linux/usr/lib/fujisan/plugins/xcbglintegrations
 
 # Bundle FujiNet-PC for .deb package
 mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc
-mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/data
-mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/SD
 
-# Determine FujiNet source directory based on architecture
+# FUJINET_SOURCE: the platform folder in the fujisan repo — always has data, config, SD, scripts.
+# The binary is either pre-built (from here) or freshly compiled (BUILD_FUJINET_PC=true).
 if [ "$ARCH" = "amd64" ]; then
     FUJINET_SOURCE="/build/fujisan/fujinet/ubuntu-22.04"
 elif [ "$ARCH" = "arm64" ]; then
     FUJINET_SOURCE="/build/fujisan/fujinet/ubuntu-22.04-arm64"
 fi
 
-# Copy FujiNet binary and files if source exists
+# Optionally build the FujiNet-PC binary from source
+FUJINET_BINARY=""
+if [ "$BUILD_FUJINET_PC" = "true" ]; then
+    if [ ! -d "/build/fujinet-firmware" ]; then
+        echo "❌ ERROR: /build/fujinet-firmware not mounted but --build-fujinet-pc was requested"
+        exit 1
+    fi
+    echo "Building FujiNet-PC from source inside container..."
+    mkdir -p /tmp/fujinet-build
+    cd /tmp/fujinet-build
+    cmake /build/fujinet-firmware \
+        -DFUJINET_TARGET=ATARI \
+        -DCMAKE_BUILD_TYPE=Release
+    make -j$(nproc)
+    FUJINET_BINARY="/tmp/fujinet-build/fujinet"
+    echo "✓ FujiNet-PC built: $(file $FUJINET_BINARY)"
+    cd /tmp/fujisan-build/build-release
+fi
+
+# Copy all FujiNet files from source folder (data, config, SD, scripts, etc.)
 if [ -d "$FUJINET_SOURCE" ]; then
     echo "Bundling FujiNet-PC from $FUJINET_SOURCE..."
-    cp "$FUJINET_SOURCE/fujinet" fujisan-linux/usr/lib/fujisan/fujinet-pc/
+
+    # Binary: use freshly built one if available, otherwise use pre-built
+    BINARY_SRC="${FUJINET_BINARY:-$FUJINET_SOURCE/fujinet}"
+    cp "$BINARY_SRC" fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet
     chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet
 
-    # Copy data folder if it exists
+    # Data directory (firmware assets, certs, fonts, etc.)
     if [ -d "$FUJINET_SOURCE/data" ]; then
-        cp -r "$FUJINET_SOURCE/data"/* fujisan-linux/usr/lib/fujisan/fujinet-pc/data/
+        cp -r "$FUJINET_SOURCE/data" fujisan-linux/usr/lib/fujisan/fujinet-pc/
     fi
 
-    # Copy config if it exists
+    # Main config file
     if [ -f "$FUJINET_SOURCE/fnconfig.ini" ]; then
         cp "$FUJINET_SOURCE/fnconfig.ini" fujisan-linux/usr/lib/fujisan/fujinet-pc/
     fi
 
-    # Create SD directory with README
-    echo "SD Card Storage Directory" > fujisan-linux/usr/lib/fujisan/fujinet-pc/SD/README.txt
+    # SD card directory (copy contents, preserving any files already there)
+    mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/SD
+    if [ -d "$FUJINET_SOURCE/SD" ]; then
+        cp -r "$FUJINET_SOURCE/SD/." fujisan-linux/usr/lib/fujisan/fujinet-pc/SD/
+    fi
+
+    # Optional extras
+    [ -f "$FUJINET_SOURCE/run-fujinet.sh" ] && cp "$FUJINET_SOURCE/run-fujinet.sh" fujisan-linux/usr/lib/fujisan/fujinet-pc/
+    [ -f "$FUJINET_SOURCE/run-fujinet" ]    && cp "$FUJINET_SOURCE/run-fujinet"    fujisan-linux/usr/lib/fujisan/fujinet-pc/
+    [ -f "$FUJINET_SOURCE/VERSION" ]        && cp "$FUJINET_SOURCE/VERSION"        fujisan-linux/usr/lib/fujisan/fujinet-pc/
 
     echo "✓ FujiNet-PC bundled for .deb"
+elif [ -n "$FUJINET_BINARY" ]; then
+    echo "⚠ No pre-existing source folder; bundling binary only"
+    cp "$FUJINET_BINARY" fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet
+    chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet
+    mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/SD
 else
-    echo "⚠ Warning: FujiNet-PC binaries not found at $FUJINET_SOURCE"
+    echo "⚠ Warning: No FujiNet-PC found to bundle"
 fi
 
 # Copy binary to lib directory (real binary)
@@ -481,6 +525,9 @@ EOF
     find fujisan-linux -type f -exec chmod 644 {} \;
     chmod 755 fujisan-linux/usr/bin/fujisan
     chmod 755 fujisan-linux/usr/lib/fujisan/Fujisan
+    chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet 2>/dev/null || true
+    chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/run-fujinet.sh 2>/dev/null || true
+    chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/run-fujinet 2>/dev/null || true
     
     # Build .deb package
     dpkg-deb --build fujisan-linux "fujisan_${VERSION_CLEAN}_${ARCH}.deb"
@@ -511,34 +558,38 @@ Plugins = ../plugins
 QTCONF_EOF
 
     # Bundle FujiNet-PC for portable package
+    # FUJINET_SOURCE and FUJINET_BINARY are already set from the .deb section above
     mkdir -p fujisan-portable/bin/fujinet-pc
-    mkdir -p fujisan-portable/bin/fujinet-pc/data
-    mkdir -p fujisan-portable/bin/fujinet-pc/SD
 
-    # Determine FujiNet source directory based on architecture
-    if [ "$ARCH" = "amd64" ]; then
-        FUJINET_SOURCE="/build/fujisan/fujinet/ubuntu-22.04"
-    elif [ "$ARCH" = "arm64" ]; then
-        FUJINET_SOURCE="/build/fujisan/fujinet/ubuntu-22.04-arm64"
-    fi
-
-    # Copy FujiNet binary and files
     if [ -d "$FUJINET_SOURCE" ]; then
         echo "Bundling FujiNet-PC for portable package..."
-        cp "$FUJINET_SOURCE/fujinet" fujisan-portable/bin/fujinet-pc/
+
+        BINARY_SRC="${FUJINET_BINARY:-$FUJINET_SOURCE/fujinet}"
+        cp "$BINARY_SRC" fujisan-portable/bin/fujinet-pc/fujinet
         chmod +x fujisan-portable/bin/fujinet-pc/fujinet
 
         if [ -d "$FUJINET_SOURCE/data" ]; then
-            cp -r "$FUJINET_SOURCE/data"/* fujisan-portable/bin/fujinet-pc/data/
+            cp -r "$FUJINET_SOURCE/data" fujisan-portable/bin/fujinet-pc/
         fi
 
         if [ -f "$FUJINET_SOURCE/fnconfig.ini" ]; then
             cp "$FUJINET_SOURCE/fnconfig.ini" fujisan-portable/bin/fujinet-pc/
         fi
 
-        echo "FujiNet-PC Storage Directory" > fujisan-portable/bin/fujinet-pc/SD/README.txt
+        mkdir -p fujisan-portable/bin/fujinet-pc/SD
+        if [ -d "$FUJINET_SOURCE/SD" ]; then
+            cp -r "$FUJINET_SOURCE/SD/." fujisan-portable/bin/fujinet-pc/SD/
+        fi
+
+        [ -f "$FUJINET_SOURCE/run-fujinet.sh" ] && cp "$FUJINET_SOURCE/run-fujinet.sh" fujisan-portable/bin/fujinet-pc/
+        [ -f "$FUJINET_SOURCE/run-fujinet" ]    && cp "$FUJINET_SOURCE/run-fujinet"    fujisan-portable/bin/fujinet-pc/
+        [ -f "$FUJINET_SOURCE/VERSION" ]        && cp "$FUJINET_SOURCE/VERSION"        fujisan-portable/bin/fujinet-pc/
 
         echo "✓ FujiNet-PC bundled in portable package"
+    elif [ -n "$FUJINET_BINARY" ]; then
+        cp "$FUJINET_BINARY" fujisan-portable/bin/fujinet-pc/fujinet
+        chmod +x fujisan-portable/bin/fujinet-pc/fujinet
+        mkdir -p fujisan-portable/bin/fujinet-pc/SD
     fi
 
     # Copy Qt libraries
@@ -666,6 +717,21 @@ EOSCRIPT
 
 chmod +x "$LINUX_BUILD_DIR/build-in-container.sh"
 
+# Resolve fujinet-firmware path for --build-fujinet-pc
+FUJINET_VOLUME_ARG=""
+if [[ "$BUILD_FUJINET_PC" == "true" ]]; then
+    if [[ -z "$FUJINET_SRC_DIR" ]]; then
+        FUJINET_SRC_DIR="$(dirname "$PROJECT_ROOT")/fujinet-firmware"
+    fi
+    if [[ ! -d "$FUJINET_SRC_DIR" ]]; then
+        echo_error "fujinet-firmware not found at: $FUJINET_SRC_DIR"
+        echo_error "Clone it or set FUJINET_SOURCE_DIR to its path"
+        exit 1
+    fi
+    FUJINET_VOLUME_ARG="-v $FUJINET_SRC_DIR:/build/fujinet-firmware:ro"
+    echo_info "FujiNet-PC source: $FUJINET_SRC_DIR"
+fi
+
 # Run build in container
 echo_step "Building Fujisan in Container"
 
@@ -674,9 +740,11 @@ $CONTAINER_RUNTIME run --rm \
     --platform linux/$ARCH \
     -v "$PROJECT_ROOT:/build/fujisan:ro" \
     -v "$LINUX_BUILD_DIR:/output" \
+    ${FUJINET_VOLUME_ARG:+$FUJINET_VOLUME_ARG} \
     -e VERSION="$VERSION" \
     -e VERSION_CLEAN="$VERSION_CLEAN" \
     -e ARCH="$ARCH" \
+    -e BUILD_FUJINET_PC="$BUILD_FUJINET_PC" \
     fujisan-linux-builder:ubuntu22-$ARCH \
     bash /output/build-in-container.sh "$VERSION" "$VERSION_CLEAN" "$BUILD_DEB" "$BUILD_TARBALL" "$ARCH" || {
     echo_error "Build failed"

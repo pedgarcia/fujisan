@@ -1015,7 +1015,13 @@ build_linux() {
 
     # Use the Docker-based Linux build
     if [[ -f "$SCRIPT_DIR/scripts/build-linux-docker.sh" ]]; then
-        "$SCRIPT_DIR/scripts/build-linux-docker.sh" "$arch" --version "$VERSION"
+        local -a docker_args=("$arch" --version "$VERSION")
+        if [[ "$BUILD_FUJINET_PC" == "true" ]]; then
+            docker_args+=(--build-fujinet-pc)
+            local FUJINET_SRC="${FUJINET_SOURCE_DIR:-./../fujinet-firmware}"
+            docker_args+=(--fujinet-src "$(cd "$FUJINET_SRC" 2>/dev/null && pwd || echo "$FUJINET_SRC")")
+        fi
+        "$SCRIPT_DIR/scripts/build-linux-docker.sh" "${docker_args[@]}"
     else
         echo_error "Linux build script not found"
         return 1
@@ -1169,19 +1175,15 @@ if [[ "$BUILD_FUJINET_PC" == "true" ]]; then
             # Windows FujiNet-PC build would go here if needed
             echo_info "FujiNet-PC build for Windows not yet implemented"
             ;;
-        linux|linux-x86_64|linux-amd64)
-            build_fujinet_pc "linux-x86_64"
-            ;;
-        linux-arm64|linux-aarch64)
-            build_fujinet_pc "linux-arm64"
+        linux|linux-x86_64|linux-amd64|linux-arm64|linux-aarch64)
+            echo_info "FujiNet-PC for Linux is built inside the Docker container (--build-fujinet-pc is passed through)"
             ;;
         all)
             if [[ "$OSTYPE" == "darwin"* ]]; then
                 build_fujinet_pc "macos-arm64"
                 build_fujinet_pc "macos-x86_64"
             fi
-            build_fujinet_pc "linux-x86_64"
-            build_fujinet_pc "linux-arm64"
+            echo_info "FujiNet-PC for Linux is built inside the Docker containers"
             ;;
     esac
     echo ""

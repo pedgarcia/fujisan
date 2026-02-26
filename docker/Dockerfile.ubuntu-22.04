@@ -49,6 +49,13 @@ RUN apt-get update && apt-get install -y \
     libqt5network5 \
     qt5-qmake \
     qtbase5-dev-tools \
+    # For FujiNet-PC build
+    libmbedtls-dev \
+    libssl-dev \
+    zlib1g-dev \
+    libkrb5-dev \
+    python3 \
+    python-is-python3 \
     # For .deb package creation
     dpkg-dev \
     fakeroot \
