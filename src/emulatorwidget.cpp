@@ -7,6 +7,7 @@
 
 #include "emulatorwidget.h"
 #include <QPainter>
+#include <QPalette>
 #include <QDebug>
 #include <QMouseEvent>
 #include <QMimeData>
@@ -35,6 +36,13 @@ EmulatorWidget::EmulatorWidget(QWidget *parent)
 
     // Allow the widget to expand to fill all available space
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    // Prevent resize artifacts on Linux/X11 by ensuring the background
+    // is always filled with black before paintEvent fires
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window, Qt::black);
+    setPalette(pal);
+    setAutoFillBackground(true);
 
     // Enable drag and drop for XEX files
     setAcceptDrops(true);
@@ -164,6 +172,12 @@ void EmulatorWidget::keyReleaseEvent(QKeyEvent *event)
         m_emulator->handleKeyRelease(event);
     }
     QWidget::keyReleaseEvent(event);
+}
+
+void EmulatorWidget::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    repaint();
 }
 
 void EmulatorWidget::focusInEvent(QFocusEvent *event)

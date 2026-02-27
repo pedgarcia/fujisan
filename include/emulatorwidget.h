@@ -13,6 +13,7 @@
 #include <QKeyEvent>
 #include <QTimer>
 #include <QImage>
+#include <QResizeEvent>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDragLeaveEvent>
@@ -34,6 +35,7 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     bool event(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;

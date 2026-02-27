@@ -55,8 +55,7 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
     setWindowTitle("Settings");
 #endif
     setModal(true);
-    setFixedHeight(710);
-    resize(850, 800);
+    setMinimumSize(850, 550);
     
     // Store original settings for cancel functionality
     m_originalSettings.machineType = m_emulator->getMachineType();
@@ -115,6 +114,11 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
     connect(m_defaultsButton, &QPushButton::clicked, this, &SettingsDialog::restoreDefaults);
     
     mainLayout->addWidget(m_buttonBox);
+    
+    // Size dialog based on content needs - takes the larger of default (1000x750) 
+    // or what the layout actually requires (important for Linux where widgets are larger)
+    QSize hint = mainLayout->sizeHint();
+    resize(qMax(1000, hint.width()), qMax(750, hint.height()));
     
     // Debug: Check slider values before loading settings
     qDebug() << "NTSC slider values BEFORE loadSettings() - Sat:" << m_ntscSaturationSlider->value() 
@@ -1023,7 +1027,6 @@ void SettingsDialog::createVideoDisplayTab()
     QHBoxLayout* palResetRow = new QHBoxLayout();
     QPushButton* resetPalColorsButton = new QPushButton("Reset PAL Colors");
     resetPalColorsButton->setToolTip("Reset all PAL color settings to defaults");
-    resetPalColorsButton->setMaximumWidth(150);
     connect(resetPalColorsButton, &QPushButton::clicked, [this]() {
         // Reset all PAL color sliders to defaults
         m_palSaturationSlider->blockSignals(true);
@@ -1301,7 +1304,6 @@ void SettingsDialog::createVideoDisplayTab()
     QHBoxLayout* ntscResetRow = new QHBoxLayout();
     QPushButton* resetNtscColorsButton = new QPushButton("Reset NTSC Colors");
     resetNtscColorsButton->setToolTip("Reset all NTSC color settings to defaults");
-    resetNtscColorsButton->setMaximumWidth(150);
     connect(resetNtscColorsButton, &QPushButton::clicked, [this]() {
         // Reset all NTSC color sliders to defaults
         m_ntscSaturationSlider->blockSignals(true);
@@ -1845,7 +1847,6 @@ void SettingsDialog::createFujiNetTab()
     m_fujinetBinaryPath->setPlaceholderText("Not configured");
     m_fujinetBinaryPath->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_fujinetBrowseButton = new QPushButton("Browse...");
-    m_fujinetBrowseButton->setMaximumWidth(80);
 
     // Version label inline with binary path
     m_fujinetVersionLabel = new QLabel("Not found");
@@ -1864,7 +1865,6 @@ void SettingsDialog::createFujiNetTab()
     m_fujinetSDPath->setPlaceholderText("Using default SD folder");
     m_fujinetSDPath->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_fujinetBrowseSDButton = new QPushButton("Browse...");
-    m_fujinetBrowseSDButton->setMaximumWidth(80);
 
     QPushButton* openSDButton = new QPushButton();
 #ifdef Q_OS_MACOS
@@ -1873,7 +1873,6 @@ void SettingsDialog::createFujiNetTab()
     openSDButton->setText("Show in Explorer");
 #endif
     openSDButton->setToolTip("Open the FujiNet SD card folder in your file manager");
-    openSDButton->setMaximumWidth(120);
     connect(openSDButton, &QPushButton::clicked, this, &SettingsDialog::onFujiNetOpenSDFolder);
 
     sdPathLayout->addWidget(m_fujinetSDPath, 1);
@@ -1933,7 +1932,6 @@ void SettingsDialog::createFujiNetTab()
     defaultConfigLayout->addWidget(m_fujinetDefaultConfigLabel, 1);
 
     m_fujinetOpenConfigFolderButton = new QPushButton("Open Folder");
-    m_fujinetOpenConfigFolderButton->setMaximumWidth(100);
     defaultConfigLayout->addWidget(m_fujinetOpenConfigFolderButton);
     configVLayout->addLayout(defaultConfigLayout);
 
