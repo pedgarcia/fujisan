@@ -31,6 +31,12 @@ if [ -d .git ]; then
                 continue
             fi
 
+            # Skip patches 0005 and 0006 - accepted into atari800 upstream
+            if [[ "$patch_name" == "0005-netsio-so-reuseaddr.patch" ]] || [[ "$patch_name" == "0006-netsio-shutdown.patch" ]]; then
+                echo "Skipping patch $patch_name - already in upstream"
+                continue
+            fi
+
             # Skip Windows-specific patches on non-Windows systems
             # Allow Windows patches when cross-compiling (CC contains mingw)
             if [[ "$patch_name" == *"windows"* ]] && [[ "$OSTYPE" != "msys" ]] && [[ "$MSYSTEM" == "" ]] && [[ "$CC" != *"mingw"* ]]; then
@@ -103,6 +109,12 @@ else
             # Skip patch 0001 - merged into upstream as PR #252 (Oct 13, 2025)
             if [[ "$patch_name" == "0001-libatari800-disk-api.patch" ]]; then
                 echo "Skipping patch 0001 - already in upstream (PR #252 merged)"
+                continue
+            fi
+
+            # Skip patches 0005 and 0006 - accepted into atari800 upstream
+            if [[ "$patch_name" == "0005-netsio-so-reuseaddr.patch" ]] || [[ "$patch_name" == "0006-netsio-shutdown.patch" ]]; then
+                echo "Skipping patch $patch_name - already in upstream"
                 continue
             fi
 

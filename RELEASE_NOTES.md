@@ -2,12 +2,20 @@
 
 ## Version 1.1.5
 
-### New Featires
+### New Features
 
-- Joystick keyboard emulation now lets you select presets to customize which keys are used for each joytick, allowing NumPad, Arrow keys and WASD.
+- **Keyboard joystick presets:** Joystick keyboard emulation now lets you select presets to customize which keys are used for each joystick, with built-in support for NumPad, Arrow keys, and WASD layouts.
+- **Linux FujiNet-PC updated:** Updated fujinet-pc with the latest changes, including important fixes while handling JSON data.
 
-### Bug fixes
+### Bug Fixes
 
+- **Tab key captured by Fujisan instead of emulator:** Tab (and Shift+Tab) keypresses were being intercepted by Fujisan's UI focus system and never sent to the emulated Atari. This prevented using Tab for navigation inside Atari programs — most notably the FujiNet configuration menu. In some cases the stray focus changes inadvertently altered Fujisan's own settings. Fixed by intercepting the key at the Qt event level before focus navigation can grab it.
+- **XEX loading via TCP API broken when FujiNet/NetSIO is active:** When FujiNet was enabled, loading XEX files through the TCP API (e.g. from the fastbasic-debugger VSCode extension) failed because D1: commands were unconditionally routed to FujiNet-PC. BINLOAD now takes priority during XEX load and hands control back to NetSIO afterwards.
+- **macOS FujiNet-PC OpenSSL signing error:** Fixed a code-signing error ("Team ID mismatch") that prevented FujiNet-PC from launching on macOS when built without an Apple Developer certificate. OpenSSL dylibs are now bundled and re-signed as part of the app.
+
+### Improvements
+
+- XEX loading is faster when FujiNet is active — the emulator core now reads XEX data in chunks instead of byte-by-byte, reducing I/O overhead during load.
 
 # Previous Version(s)
 
