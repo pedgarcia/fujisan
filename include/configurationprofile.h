@@ -58,6 +58,7 @@ struct ConfigurationProfile {
     bool scalingFilter = true;
     bool integerScaling = true;
     bool keepAspectRatio = true;
+    double overscanFactor = 1.0;
     bool fullscreenMode = false;
     
     // Screen Display Options

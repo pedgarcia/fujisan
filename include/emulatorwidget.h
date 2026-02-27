@@ -28,7 +28,7 @@ public:
     explicit EmulatorWidget(QWidget *parent = nullptr);
 
     void setEmulator(AtariEmulator* emulator);
-    void setScalingSettings(bool integerScaling, bool scalingFilter, const QString& fitScreen, bool keepAspectRatio);
+    void setScalingSettings(bool integerScaling, bool scalingFilter, const QString& fitScreen, bool keepAspectRatio, double overscanFactor);
 
 signals:
     void diskDroppedOnEmulator(const QString& filename);
@@ -64,6 +64,7 @@ private:
     bool m_scalingFilter;
     QString m_fitScreen;
     bool m_keepAspectRatio;
+    double m_overscanFactor;
     
     // Screen buffer constants - show full screen without cropping
     static const int SCREEN_WIDTH = 384;
@@ -72,6 +73,9 @@ private:
     static const int BORDER_TOP = 0;    // No vertical cropping
     static const int DISPLAY_WIDTH = 384;   // Full width
     static const int DISPLAY_HEIGHT = 240;  // Full height
+    static constexpr double MIN_OVERSCAN_FACTOR = 0.95;
+    static constexpr double MAX_OVERSCAN_FACTOR = 1.05;
+    static constexpr double DEFAULT_OVERSCAN_FACTOR = 1.0;
 };
 
 #endif // EMULATORWIDGET_H

@@ -227,6 +227,7 @@ private:
     QSpinBox* m_horizontalShift;
     QSpinBox* m_verticalShift;
     QComboBox* m_fitScreen;
+    QDoubleSpinBox* m_overscanFactor;
     QCheckBox* m_show80Column;
     QCheckBox* m_vSyncEnabled;
     

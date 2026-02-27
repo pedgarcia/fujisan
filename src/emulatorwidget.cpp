@@ -31,6 +31,7 @@ EmulatorWidget::EmulatorWidget(QWidget *parent)
     , m_scalingFilter(true)
     , m_fitScreen("both")
     , m_keepAspectRatio(true)
+    , m_overscanFactor(DEFAULT_OVERSCAN_FACTOR)
 {
     setFocusPolicy(Qt::StrongFocus);
 
@@ -59,12 +60,18 @@ void EmulatorWidget::setEmulator(AtariEmulator* emulator)
     }
 }
 
-void EmulatorWidget::setScalingSettings(bool integerScaling, bool scalingFilter, const QString& fitScreen, bool keepAspectRatio)
+void EmulatorWidget::setScalingSettings(bool integerScaling, bool scalingFilter, const QString& fitScreen, bool keepAspectRatio, double overscanFactor)
 {
     m_integerScaling = integerScaling;
     m_scalingFilter = scalingFilter;
     m_fitScreen = fitScreen;
     m_keepAspectRatio = keepAspectRatio;
+    m_overscanFactor = overscanFactor;
+    if (m_overscanFactor < MIN_OVERSCAN_FACTOR) {
+        m_overscanFactor = MIN_OVERSCAN_FACTOR;
+    } else if (m_overscanFactor > MAX_OVERSCAN_FACTOR) {
+        m_overscanFactor = MAX_OVERSCAN_FACTOR;
+    }
     update(); // Trigger repaint with new settings
 }
 
@@ -255,9 +262,8 @@ QRect EmulatorWidget::calculateDisplayRect() const
         const double scaleY = widgetHeight / correctedHeight;
         const double scale = qMin(scaleX, scaleY);
 
-        // Use more screen space while keeping small border for clean look
-        const double overscanFactor = 0.98;
-        const double finalScale = scale * overscanFactor;
+        // Adjustable smooth-scaling overscan factor
+        const double finalScale = scale * m_overscanFactor;
 
         // Calculate final display dimensions
         displayWidth = static_cast<int>(correctedWidth * finalScale);

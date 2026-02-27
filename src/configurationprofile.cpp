@@ -75,6 +75,7 @@ QJsonObject ConfigurationProfile::toJson() const {
     videoConfig["scalingFilter"] = scalingFilter;
     videoConfig["integerScaling"] = integerScaling;
     videoConfig["keepAspectRatio"] = keepAspectRatio;
+    videoConfig["overscanFactor"] = overscanFactor;
     videoConfig["fullscreenMode"] = fullscreenMode;
     json["videoConfig"] = videoConfig;
     
@@ -258,6 +259,7 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
         scalingFilter = videoConfig["scalingFilter"].toBool(true);
         integerScaling = videoConfig["integerScaling"].toBool(true);
         keepAspectRatio = videoConfig["keepAspectRatio"].toBool(true);
+        overscanFactor = videoConfig["overscanFactor"].toDouble(1.0);
         fullscreenMode = videoConfig["fullscreenMode"].toBool(false);
     }
     

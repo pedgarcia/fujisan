@@ -800,6 +800,16 @@ void SettingsDialog::createVideoDisplayTab()
     m_fitScreen->addItem("Fit Both", "both");
     m_fitScreen->setToolTip("Method for fitting image to screen size");
     displayLayout->addWidget(m_fitScreen);
+    displayLayout->addSpacing(8);
+
+    displayLayout->addWidget(new QLabel("Overscan:"));
+    m_overscanFactor = new QDoubleSpinBox();
+    m_overscanFactor->setRange(0.95, 1.05);
+    m_overscanFactor->setSingleStep(0.01);
+    m_overscanFactor->setDecimals(2);
+    m_overscanFactor->setValue(1.0);
+    m_overscanFactor->setToolTip("Scale factor for final image size (1.00 = max fit, <1 adds border, >1 crops edges)");
+    displayLayout->addWidget(m_overscanFactor);
     displayLayout->addSpacing(12);
 
     displayLayout->addWidget(new QLabel("H Shift:"));
@@ -2537,6 +2547,7 @@ void SettingsDialog::loadSettings()
     
     m_horizontalShift->setValue(settings.value("video/horizontalShift", 0).toInt());
     m_verticalShift->setValue(settings.value("video/verticalShift", 0).toInt());
+    m_overscanFactor->setValue(settings.value("video/overscanFactor", 1.0).toDouble());
     
     QString fitScreen = settings.value("video/fitScreen", "both").toString();
     for (int i = 0; i < m_fitScreen->count(); ++i) {
@@ -2856,6 +2867,7 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/horizontalShift", m_horizontalShift->value());
     settings.setValue("video/verticalShift", m_verticalShift->value());
     settings.setValue("video/fitScreen", m_fitScreen->currentData().toString());
+    settings.setValue("video/overscanFactor", m_overscanFactor->value());
     // settings.setValue("video/show80Column", m_show80Column->isChecked());
     // Always save as false
     settings.setValue("video/show80Column", false);
@@ -3496,6 +3508,7 @@ void SettingsDialog::restoreDefaults()
     m_horizontalShift->setValue(0);        // No shift
     m_verticalShift->setValue(0);          // No shift
     m_fitScreen->setCurrentIndex(2);       // Fit Both
+    m_overscanFactor->setValue(1.0);
     m_show80Column->setChecked(false);     // Standard display - Disabled until properly implemented
     m_show80Column->setEnabled(false);
     m_vSyncEnabled->setChecked(false);     // VSync off (for performance)
@@ -3679,6 +3692,7 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.horizontalShift = m_horizontalShift->value();
     profile.verticalShift = m_verticalShift->value();
     profile.fitScreen = m_fitScreen->currentData().toString();
+    profile.overscanFactor = m_overscanFactor->value();
     // profile.show80Column = m_show80Column->isChecked();
     profile.show80Column = false;  // Always false until properly implemented
     profile.vSyncEnabled = m_vSyncEnabled->isChecked();
@@ -3900,6 +3914,7 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     
     m_horizontalShift->setValue(profile.horizontalShift);
     m_verticalShift->setValue(profile.verticalShift);
+    m_overscanFactor->setValue(profile.overscanFactor);
     
     for (int i = 0; i < m_fitScreen->count(); ++i) {
         if (m_fitScreen->itemData(i).toString() == profile.fitScreen) {
