@@ -3411,7 +3411,6 @@ void MainWindow::refreshProfileList()
     QString currentProfile = m_profileCombo->currentText();
     m_profileCombo->clear();
 
-    m_profileManager->refreshProfileList();
     QStringList profiles = m_profileManager->getProfileNames();
     m_profileCombo->addItems(profiles);
 
