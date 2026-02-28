@@ -2340,19 +2340,15 @@ void MainWindow::createMediaPeripheralsDock()
             m_emulatorWidget->setFocus();
         }
     });
-    connect(m_optionButton, &QPushButton::clicked, this, [this]() {
+    connect(m_optionButton, &QPushButton::pressed, this, [this]() {
         QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F4, Qt::NoModifier);
         m_emulator->handleKeyPress(&pressEvent);
-        qDebug() << "*** OPTION button clicked - F4 pressed ***";
-
-        // Delay release by one frame
-        QTimer::singleShot(50, [this]() {
-            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F4, Qt::NoModifier);
-            m_emulator->handleKeyRelease(&releaseEvent);
-            qDebug() << "*** OPTION button F4 released ***";
-        });
-
-        // Restore focus to emulator widget (fixes Linux focus loss)
+        qDebug() << "*** OPTION button pressed - F4 held ***";
+    });
+    connect(m_optionButton, &QPushButton::released, this, [this]() {
+        QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F4, Qt::NoModifier);
+        m_emulator->handleKeyRelease(&releaseEvent);
+        qDebug() << "*** OPTION button released - F4 released ***";
         if (m_emulatorWidget) {
             m_emulatorWidget->setFocus();
         }

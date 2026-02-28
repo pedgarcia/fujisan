@@ -1741,11 +1741,6 @@ void AtariEmulator::warmBoot()
     qDebug() << "[NETSIO] WARM BOOT START";
     qDebug() << "[NETSIO] m_netSIOEnabled:" << m_netSIOEnabled;
 
-    // Preserve BASIC disabled state across warm boot
-    if (Atari800_disable_basic) {
-        GTIA_consol_override = 2;  // Hold Option for 2 console reads
-    }
-
     // CRITICAL: Send warm reset notification to FujiNet-PC BEFORE resetting emulator
     // This tells FujiNet-PC to reset its state for warm boot
 #ifdef NETSIO
