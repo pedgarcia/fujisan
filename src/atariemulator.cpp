@@ -1707,6 +1707,25 @@ void AtariEmulator::coldBoot()
             qDebug() << "[NETSIO] Sending cold reset to FujiNet-PC (0xFF packet)";
             int resetResult = netsio_cold_reset();
             qDebug() << "[NETSIO] netsio_cold_reset() returned:" << resetResult;
+            
+            // Reset fujinet_known to wait for FujiNet-PC to restart and reconnect
+            // This fixes the race condition where cold boot proceeds before FujiNet-PC is ready
+            fujinet_known = 0;
+            
+            // Wait for FujiNet-PC to restart and reconnect (up to 3 seconds)
+            qDebug() << "[NETSIO] Waiting for FujiNet-PC to restart...";
+            QElapsedTimer restartTimer;
+            restartTimer.start();
+            while (!fujinet_known && restartTimer.elapsed() < 3000) {
+                QCoreApplication::processEvents();
+                QThread::msleep(50);
+            }
+            
+            if (fujinet_known) {
+                qDebug() << "[NETSIO] FujiNet-PC reconnected after" << restartTimer.elapsed() << "ms";
+            } else {
+                qWarning() << "[NETSIO] TIMEOUT: FujiNet-PC did not reconnect after 3 seconds";
+            }
         } else {
             qWarning() << "[NETSIO] CANNOT SEND RESET - Conditions not met:";
             qWarning() << "[NETSIO]   netsio_enabled:" << netsio_enabled << "(need: 1)";
