@@ -1634,7 +1634,7 @@ void SettingsDialog::createMediaConfigTab()
         QString diskLabel = QString("D%1:").arg(i + 1);
         
         QHBoxLayout* diskLayout = new QHBoxLayout();
-        diskLayout->setContentsMargins(0, 2, 0, 2); // Tighter margins
+        diskLayout->setContentsMargins(2, 2, 0, 2); // Tighter margins
         
         m_diskEnabled[i] = new QCheckBox(diskLabel);
         m_diskEnabled[i]->setMinimumWidth(50);
@@ -1651,6 +1651,7 @@ void SettingsDialog::createMediaConfigTab()
         diskLayout->addWidget(m_diskBrowse[i]);
         
         m_diskReadOnly[i] = new QCheckBox("Read-Only");
+        diskLayout->addSpacing(10);
         diskLayout->addWidget(m_diskReadOnly[i]);
         
         floppyLayout->addLayout(diskLayout);

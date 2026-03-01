@@ -916,16 +916,26 @@ build_fujinet_pc() {
         return 1
     fi
 
-    # Copy configuration and data files if present
-    if [[ -f "fnconfig.ini" ]]; then
-        cp fnconfig.ini "$PROJECT_ROOT/$TARGET_DIR/"
-        echo_info "Copied fnconfig.ini"
+    # Copy data folder from fujinet-firmware source (not from build directory)
+    # The build only produces the binary; data files are in the source repo
+    if [[ -d "$FUJINET_SRC/data" ]]; then
+        echo_info "Copying data folder from fujinet-firmware source..."
+        cp -r "$FUJINET_SRC/data" "$PROJECT_ROOT/$TARGET_DIR/"
+        echo_success "Data folder copied"
+    else
+        echo_error "Warning: $FUJINET_SRC/data not found - FujiNet may not function properly"
     fi
 
-    if [[ -d "data" ]]; then
-        cp -r data "$PROJECT_ROOT/$TARGET_DIR/" || true
-        echo_info "Copied data directory"
+    # Copy fnconfig.ini from ATARI device-specific folder in source
+    if [[ -f "$FUJINET_SRC/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" ]]; then
+        cp "$FUJINET_SRC/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" "$PROJECT_ROOT/$TARGET_DIR/"
+        echo_success "fnconfig.ini copied from BUILD_ATARI"
+    else
+        echo_info "fnconfig.ini not found in source, will use default"
     fi
+
+    # Create SD folder if not present
+    mkdir -p "$PROJECT_ROOT/$TARGET_DIR/SD"
 
     cd "$PROJECT_ROOT"
     echo_success "FujiNet-PC build complete for $PLATFORM_ARG"

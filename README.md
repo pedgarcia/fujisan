@@ -2,6 +2,8 @@
 
 ![Fujisan Logo](images/fujisanlogo.png)
 
+> **ABBUC Software Competition 2026** — Fujisan is an entry in the [ABBUC Software Competition 2026](https://www.abbuc.de).
+
 **Motivation**
 
 Initially built as a modern frontend for the Atari800 emulator, Fujisan has pivoted to be a Fujinet-first Atari 8-bit emulator.
