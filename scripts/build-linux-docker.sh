@@ -382,10 +382,28 @@ if [ -d "$FUJINET_SOURCE" ]; then
 
     echo "✓ FujiNet-PC bundled for .deb"
 elif [ -n "$FUJINET_BINARY" ]; then
-    echo "⚠ No pre-existing source folder; bundling binary only"
+    echo "Bundling FujiNet-PC from source build..."
     cp "$FUJINET_BINARY" fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet
     chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet
     mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/SD
+
+    # When building from source, copy data folder from fujinet-firmware
+    if [ -d "/build/fujinet-firmware/data" ]; then
+        echo "Copying data folder from fujinet-firmware source..."
+        cp -r /build/fujinet-firmware/data fujisan-linux/usr/lib/fujisan/fujinet-pc/
+        echo "✓ Data folder copied"
+    else
+        echo "⚠ Warning: /build/fujinet-firmware/data not found"
+    fi
+
+    # Copy fnconfig.ini from ATARI device-specific folder
+    if [ -f "/build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" ]; then
+        cp /build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini \
+           fujisan-linux/usr/lib/fujisan/fujinet-pc/
+        echo "✓ fnconfig.ini copied from BUILD_ATARI"
+    fi
+
+    echo "✓ FujiNet-PC bundled for .deb (from source)"
 else
     echo "⚠ Warning: No FujiNet-PC found to bundle"
 fi
@@ -587,9 +605,28 @@ QTCONF_EOF
 
         echo "✓ FujiNet-PC bundled in portable package"
     elif [ -n "$FUJINET_BINARY" ]; then
+        echo "Bundling FujiNet-PC for portable package (from source)..."
         cp "$FUJINET_BINARY" fujisan-portable/bin/fujinet-pc/fujinet
         chmod +x fujisan-portable/bin/fujinet-pc/fujinet
         mkdir -p fujisan-portable/bin/fujinet-pc/SD
+
+        # When building from source, copy data folder from fujinet-firmware
+        if [ -d "/build/fujinet-firmware/data" ]; then
+            echo "Copying data folder from fujinet-firmware source..."
+            cp -r /build/fujinet-firmware/data fujisan-portable/bin/fujinet-pc/
+            echo "✓ Data folder copied"
+        else
+            echo "⚠ Warning: /build/fujinet-firmware/data not found"
+        fi
+
+        # Copy fnconfig.ini from ATARI device-specific folder
+        if [ -f "/build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" ]; then
+            cp /build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini \
+               fujisan-portable/bin/fujinet-pc/
+            echo "✓ fnconfig.ini copied from BUILD_ATARI"
+        fi
+
+        echo "✓ FujiNet-PC bundled in portable package (from source)"
     fi
 
     # Copy Qt libraries
