@@ -904,38 +904,50 @@ build_fujinet_pc() {
         return 1
     fi
 
-    # Find and copy the fujinet binary
-    if [[ -f "fujinet" ]]; then
-        echo_info "Copying FujiNet-PC binary to: $PROJECT_ROOT/$TARGET_DIR"
-        cp fujinet "$PROJECT_ROOT/$TARGET_DIR/"
-        chmod +x "$PROJECT_ROOT/$TARGET_DIR/fujinet"
-        echo_success "FujiNet-PC binary copied"
-    else
-        echo_error "FujiNet binary not found after build"
+    # Run the dist target to assemble the distribution (data, fnconfig, etc.)
+    echo_info "Running dist target to assemble FujiNet-PC distribution..."
+    if ! cmake --build . --target dist; then
+        echo_error "Failed to build dist target"
         cd "$PROJECT_ROOT"
         return 1
     fi
 
-    # Copy data folder from fujinet-firmware source (not from build directory)
-    # The build only produces the binary; data files are in the source repo
-    if [[ -d "$FUJINET_SRC/data" ]]; then
-        echo_info "Copying data folder from fujinet-firmware source..."
-        cp -r "$FUJINET_SRC/data" "$PROJECT_ROOT/$TARGET_DIR/"
-        echo_success "Data folder copied"
-    else
-        echo_error "Warning: $FUJINET_SRC/data not found - FujiNet may not function properly"
-    fi
+    # Copy from the assembled dist folder
+    if [[ -d "dist" ]]; then
+        echo_info "Copying FujiNet-PC distribution to: $PROJECT_ROOT/$TARGET_DIR"
 
-    # Copy fnconfig.ini from ATARI device-specific folder in source
-    if [[ -f "$FUJINET_SRC/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" ]]; then
-        cp "$FUJINET_SRC/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" "$PROJECT_ROOT/$TARGET_DIR/"
-        echo_success "fnconfig.ini copied from BUILD_ATARI"
-    else
-        echo_info "fnconfig.ini not found in source, will use default"
-    fi
+        # Copy the fujinet binary
+        cp dist/fujinet "$PROJECT_ROOT/$TARGET_DIR/"
+        chmod +x "$PROJECT_ROOT/$TARGET_DIR/fujinet"
+        echo_success "FujiNet-PC binary copied"
 
-    # Create SD folder if not present
-    mkdir -p "$PROJECT_ROOT/$TARGET_DIR/SD"
+        # Copy data folder
+        if [[ -d "dist/data" ]]; then
+            cp -r dist/data "$PROJECT_ROOT/$TARGET_DIR/"
+            echo_success "Data folder copied"
+        fi
+
+        # Copy fnconfig.ini
+        if [[ -f "dist/fnconfig.ini" ]]; then
+            cp dist/fnconfig.ini "$PROJECT_ROOT/$TARGET_DIR/"
+            echo_success "fnconfig.ini copied"
+        fi
+
+        # Copy SD folder
+        if [[ -d "dist/SD" ]]; then
+            cp -r dist/SD "$PROJECT_ROOT/$TARGET_DIR/"
+        else
+            mkdir -p "$PROJECT_ROOT/$TARGET_DIR/SD"
+        fi
+        echo_success "SD folder ready"
+
+        # Copy run-fujinet script if present
+        [[ -f "dist/run-fujinet" ]] && cp dist/run-fujinet "$PROJECT_ROOT/$TARGET_DIR/"
+    else
+        echo_error "dist folder not found after build"
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
 
     cd "$PROJECT_ROOT"
     echo_success "FujiNet-PC build complete for $PLATFORM_ARG"
