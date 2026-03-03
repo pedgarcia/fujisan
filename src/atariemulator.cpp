@@ -50,6 +50,8 @@ extern int netsio_warm_reset(void);
 // Printer support functions
 void ESC_PatchOS(void);
 void Devices_UpdatePatches(void);
+// H: device patch flag - disabled by -netsio, must re-enable for H: drives
+extern int Devices_enable_h_patch;
 
 // Access to CPU registers for XEX loading
 extern unsigned char CPU_regS;
@@ -668,6 +670,7 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
 
     // Hard Drive (H:) device support via command-line arguments
     QSettings settings;
+    bool anyHDriveEnabled = false;
 
     for (int i = 0; i < 4; i++) {
         QString hdKey = QString("media/hd%1").arg(i + 1);
@@ -678,6 +681,7 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
             QFileInfo dirInfo(path);
             if (dirInfo.exists() && dirInfo.isDir()) {
                 argList << QString("-H%1").arg(i + 1) << path;
+                anyHDriveEnabled = true;
                 qDebug() << QString("H%1: enabled with path:").arg(i + 1) << path;
             } else {
                 qWarning() << QString("H%1: directory not accessible:").arg(i + 1) << path;
@@ -736,6 +740,13 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     if (libatari800_init(argBytes.size(), args.data())) {
         qDebug() << "  libatari800_init() returned SUCCESS";
         libatari800_previously_initialized = true;  // Mark as initialized for future resets
+
+        // H: device is CIO-based; re-enable its patch even when -netsio disabled it
+        if (anyHDriveEnabled) {
+            Devices_enable_h_patch = TRUE;
+            Devices_UpdatePatches();
+            qDebug() << "H: device patch re-enabled after libatari800_init";
+        }
 
         // Verify ROM loading status
         if (!m_altirraOSEnabled && !m_osRomPath.isEmpty()) {

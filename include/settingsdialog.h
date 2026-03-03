@@ -325,7 +325,6 @@ private:
     QSpinBox* m_tcpServerPort;
 
     // Log Filtering controls
-    QCheckBox* m_hideFujiNetLogs;
     QLineEdit* m_logFilterString;
     QCheckBox* m_logFilterRegex;
 
@@ -352,6 +351,8 @@ private:
     QCheckBox* m_fujinetUseCustomConfig;
     QLineEdit* m_fujinetCustomConfigPath;
     QPushButton* m_fujinetBrowseConfigButton;
+    QCheckBox* m_loadConfigOnBoot;
+    QCheckBox* m_hideFujiNetLogs;
 
     // Track original values for change detection
     int m_originalHttpPort;
@@ -359,6 +360,7 @@ private:
     QString m_originalSDPath;
     bool m_originalUseCustomConfig;
     QString m_originalCustomConfigPath;
+    bool m_originalLoadConfigOnBoot;
 
     // Restart warning label
     QLabel* m_fujinetRestartWarningLabel;
@@ -370,6 +372,7 @@ private:
 
     // Helper functions
     void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
+    void updateFujiNetConfigConfigenabled(const QString& configPath, bool enabled);
     void checkFujiNetRestartRequired();
     void checkAndMigrateFujiNetSD();
     bool migrateFujiNetSDContents(const QString& fromPath, const QString& toPath);

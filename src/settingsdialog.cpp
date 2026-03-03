@@ -1799,11 +1799,6 @@ void SettingsDialog::createEmulatorTab()
     QGroupBox* logFilterGroup = new QGroupBox("Console Log Filtering");
     QVBoxLayout* logFilterLayout = new QVBoxLayout(logFilterGroup);
 
-    // Hide FujiNet-PC logs checkbox
-    m_hideFujiNetLogs = new QCheckBox("Hide FujiNet-PC logs");
-    m_hideFujiNetLogs->setToolTip("Hide output from FujiNet-PC process (most verbose log source)");
-    logFilterLayout->addWidget(m_hideFujiNetLogs);
-
     // Filter string input
     QHBoxLayout* filterStringLayout = new QHBoxLayout();
     QLabel* filterLabel = new QLabel("Filter out messages containing:");
@@ -1962,7 +1957,20 @@ void SettingsDialog::createFujiNetTab()
     customConfigLayout->addWidget(m_fujinetBrowseConfigButton);
     configVLayout->addLayout(customConfigLayout);
 
+    // Load CONFIG on boot checkbox
+    m_loadConfigOnBoot = new QCheckBox("Load CONFIG application on boot");
+    m_loadConfigOnBoot->setToolTip("When enabled, FujiNet loads the CONFIG app at startup. Requires FujiNet restart to apply.");
+    configVLayout->addWidget(m_loadConfigOnBoot);
+
     mainLayout->addWidget(configGroup);
+
+    // GROUP 3b: Logs
+    QGroupBox* logsGroup = new QGroupBox("Logs");
+    QVBoxLayout* logsLayout = new QVBoxLayout(logsGroup);
+    m_hideFujiNetLogs = new QCheckBox("Hide FujiNet-PC logs");
+    m_hideFujiNetLogs->setToolTip("Hide output from FujiNet-PC process (most verbose log source)");
+    logsLayout->addWidget(m_hideFujiNetLogs);
+    mainLayout->addWidget(logsGroup);
 
     // GROUP 4: Process Control (all in one row)
     QGroupBox* processGroup = new QGroupBox("Process Control");
@@ -2013,6 +2021,7 @@ void SettingsDialog::createFujiNetTab()
     connect(m_fujinetSDPath, &QLineEdit::textChanged, this, &SettingsDialog::checkFujiNetRestartRequired);
     connect(m_fujinetUseCustomConfig, &QCheckBox::toggled, this, &SettingsDialog::checkFujiNetRestartRequired);
     connect(m_fujinetCustomConfigPath, &QLineEdit::textChanged, this, &SettingsDialog::checkFujiNetRestartRequired);
+    connect(m_loadConfigOnBoot, &QCheckBox::toggled, this, &SettingsDialog::checkFujiNetRestartRequired);
 
     // Connect service signals
     connect(m_fujinetService, &FujiNetService::connected, [this]() { onFujiNetConnectionChanged(true); });
@@ -2040,12 +2049,16 @@ void SettingsDialog::createFujiNetTab()
     m_fujinetCustomConfigPath->setEnabled(useCustomConfig);
     m_fujinetBrowseConfigButton->setEnabled(useCustomConfig);
 
+    // Load CONFIG on boot (checked by default)
+    m_loadConfigOnBoot->setChecked(settings.value("fujinet/loadConfigOnBoot", true).toBool());
+
     // Track original values for change detection
     m_originalHttpPort = m_fujinetApiPort->value();
     m_originalNetsioPort = m_fujinetNetsioPort->value();
     m_originalSDPath = m_fujinetSDPath->text();
     m_originalUseCustomConfig = m_fujinetUseCustomConfig->isChecked();
     m_originalCustomConfigPath = m_fujinetCustomConfigPath->text();
+    m_originalLoadConfigOnBoot = m_loadConfigOnBoot->isChecked();
 
     // Binary path and version will be set when setFujiNetManagers() is called
     // (managers are shared with MainWindow and not available during tab creation)
@@ -2745,11 +2758,11 @@ void SettingsDialog::loadSettings()
     m_tcpServerPort->setValue(settings.value("emulator/tcpServerPort", 6502).toInt());
 
     // Log Filtering Configuration
-    m_hideFujiNetLogs->setChecked(settings.value("log/hideFujiNetLogs", false).toBool());
     m_logFilterString->setText(settings.value("log/filterString", "").toString());
     m_logFilterRegex->setChecked(settings.value("log/useRegex", false).toBool());
 
 #ifndef Q_OS_WIN
+    m_hideFujiNetLogs->setChecked(settings.value("log/hideFujiNetLogs", false).toBool());
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
 #endif
@@ -2955,9 +2968,12 @@ void SettingsDialog::saveSettings()
     settings.setValue("emulator/tcpServerPort", m_tcpServerPort->value());
 
     // Log Filtering Configuration
-    settings.setValue("log/hideFujiNetLogs", m_hideFujiNetLogs->isChecked());
     settings.setValue("log/filterString", m_logFilterString->text());
     settings.setValue("log/useRegex", m_logFilterRegex->isChecked());
+
+#ifndef Q_OS_WIN
+    settings.setValue("log/hideFujiNetLogs", m_hideFujiNetLogs->isChecked());
+#endif
 
     // Force sync to ensure settings are written to disk immediately
     settings.sync();
@@ -3196,6 +3212,23 @@ void SettingsDialog::applySettings()
                  << "Swap:" << swapped;
     }
     
+    // Check H: drive changes — must read OLD values from QSettings before saveSettings()
+    QSettings hdCheckSettings("8bitrelics", "Fujisan");
+    for (int i = 0; i < 4 && !needsRestart; i++) {
+        QString hdKey = QString("media/hd%1").arg(i + 1);
+        if (m_hdEnabled[i]->isChecked() != hdCheckSettings.value(hdKey + "Enabled", false).toBool() ||
+            m_hdPath[i]->text() != hdCheckSettings.value(hdKey + "Path", "").toString()) {
+            needsRestart = true;
+            qDebug() << "[SETTINGS CHECK] H: drive change detected, restart required";
+        }
+    }
+    if (!needsRestart &&
+        (m_hdReadOnly->isChecked() != hdCheckSettings.value("media/hdReadOnly", false).toBool() ||
+         m_hdDeviceName->text() != hdCheckSettings.value("media/hdDeviceName", "H").toString())) {
+        needsRestart = true;
+        qDebug() << "[SETTINGS CHECK] H: drive options change detected, restart required";
+    }
+
     saveSettings();
     
     if (needsRestart) {
@@ -3333,7 +3366,26 @@ void SettingsDialog::accept()
     settings.setValue("fujinet/sdCardPath", m_fujinetSDPath->text());
     settings.setValue("fujinet/useCustomConfig", m_fujinetUseCustomConfig->isChecked());
     settings.setValue("fujinet/customConfigPath", m_fujinetCustomConfigPath->text());
+    settings.setValue("fujinet/loadConfigOnBoot", m_loadConfigOnBoot->isChecked());
 
+    // Update fnconfig.ini with configenabled (takes effect on next FujiNet start)
+    if (m_fujinetBinaryManager) {
+        QString configPath;
+        if (m_fujinetUseCustomConfig->isChecked() && !m_fujinetCustomConfigPath->text().isEmpty()) {
+            configPath = m_fujinetCustomConfigPath->text();
+        } else {
+            QString bundledPath = m_fujinetBinaryManager->getBinaryPath();
+            QString customPath = settings.value("fujinet/customBinaryPath", "").toString();
+            QString binaryPath = QFile::exists(bundledPath) ? bundledPath : customPath;
+            if (!binaryPath.isEmpty() && QFile::exists(binaryPath)) {
+                QFileInfo binaryInfo(binaryPath);
+                configPath = binaryInfo.absolutePath() + "/fnconfig.ini";
+            }
+        }
+        if (!configPath.isEmpty()) {
+            updateFujiNetConfigConfigenabled(configPath, m_loadConfigOnBoot->isChecked());
+        }
+    }
     // Stop FujiNet health check to prevent signals firing during destruction
     if (m_fujinetService) {
         m_fujinetService->stopHealthCheck();
@@ -4603,7 +4655,8 @@ void SettingsDialog::checkFujiNetRestartRequired()
                    m_fujinetNetsioPort->value() != m_originalNetsioPort ||
                    m_fujinetSDPath->text() != m_originalSDPath ||
                    m_fujinetUseCustomConfig->isChecked() != m_originalUseCustomConfig ||
-                   m_fujinetCustomConfigPath->text() != m_originalCustomConfigPath);
+                   m_fujinetCustomConfigPath->text() != m_originalCustomConfigPath ||
+                   m_loadConfigOnBoot->isChecked() != m_originalLoadConfigOnBoot);
 
     // Only show warning if FujiNet is running and settings changed
     bool fujinetRunning = (m_fujinetProcessManager && m_fujinetProcessManager->isRunning());
@@ -4671,6 +4724,65 @@ void SettingsDialog::updateFujiNetConfigFile(const QString& configPath, int nets
     qDebug() << "Updated FujiNet config file" << configPath << "with NetSIO port:" << netsioPort;
 }
 
+void SettingsDialog::updateFujiNetConfigConfigenabled(const QString& configPath, bool enabled)
+{
+    if (!QFile::exists(configPath)) {
+        qDebug() << "Config file not found, skipping configenabled update:" << configPath;
+        return;
+    }
+
+    QFile file(configPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open config file for reading:" << configPath;
+        return;
+    }
+
+    QString content = file.readAll();
+    file.close();
+
+    QStringList lines = content.split('\n');
+    bool inGeneralSection = false;
+    bool configenabledFound = false;
+    QStringList updatedLines;
+
+    for (const QString& line : lines) {
+        QString trimmed = line.trimmed();
+
+        if (trimmed.startsWith('[')) {
+            inGeneralSection = (trimmed == "[General]");
+            updatedLines.append(line);
+            continue;
+        }
+
+        if (inGeneralSection && trimmed.startsWith("configenabled=")) {
+            updatedLines.append(QString("configenabled=%1").arg(enabled ? 1 : 0));
+            configenabledFound = true;
+        } else {
+            updatedLines.append(line);
+        }
+    }
+
+    if (!configenabledFound) {
+        for (int i = 0; i < updatedLines.size(); ++i) {
+            if (updatedLines[i].trimmed() == "[General]") {
+                updatedLines.insert(i + 1, QString("configenabled=%1").arg(enabled ? 1 : 0));
+                break;
+            }
+        }
+    }
+
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open config file for writing:" << configPath;
+        return;
+    }
+
+    QTextStream out(&file);
+    out << updatedLines.join('\n');
+    file.close();
+
+    qDebug() << "Updated fnconfig.ini configenabled=" << (enabled ? 1 : 0) << "at" << configPath;
+}
+
 void SettingsDialog::onFujiNetStart()
 {
     if (!m_fujinetProcessManager || !m_fujinetBinaryManager) {
@@ -4717,9 +4829,10 @@ void SettingsDialog::onFujiNetStart()
         configPath = binaryInfo.absolutePath() + "/fnconfig.ini";
     }
 
-    // Update config file with NetSIO port before starting
+    // Update config file with NetSIO port and configenabled before starting
     int netsioPort = m_fujinetNetsioPort->value();
     updateFujiNetConfigFile(configPath, netsioPort);
+    updateFujiNetConfigConfigenabled(configPath, m_loadConfigOnBoot->isChecked());
 
     // Add config file to arguments (use relative path if default)
     if (m_fujinetUseCustomConfig->isChecked()) {
@@ -4798,6 +4911,14 @@ void SettingsDialog::onFujiNetProcessStateChanged(int state)
     case 2: // Running
         m_fujinetStartButton->setEnabled(false);
         m_fujinetStopButton->setEnabled(true);
+        // FujiNet has started - current UI state is now the "applied" baseline
+        m_originalHttpPort = m_fujinetApiPort->value();
+        m_originalNetsioPort = m_fujinetNetsioPort->value();
+        m_originalSDPath = m_fujinetSDPath->text();
+        m_originalUseCustomConfig = m_fujinetUseCustomConfig->isChecked();
+        m_originalCustomConfigPath = m_fujinetCustomConfigPath->text();
+        m_originalLoadConfigOnBoot = m_loadConfigOnBoot->isChecked();
+        checkFujiNetRestartRequired();
         // Start health check when process is running (with 2-second delay for startup)
         if (m_fujinetService) {
             // Construct server URL from API port
