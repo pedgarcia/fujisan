@@ -65,7 +65,8 @@ void FujiNetService::checkConnection()
 void FujiNetService::startHealthCheck(int intervalMs)
 {
     m_healthCheckTimer->start(intervalMs);
-    checkConnection();  // Check immediately
+    // First check runs after intervalMs; no immediate check to avoid "Connection refused"
+    // when the process has just been started and hasn't bound to the port yet.
 }
 
 void FujiNetService::stopHealthCheck()

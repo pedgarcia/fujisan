@@ -4036,6 +4036,48 @@ void MainWindow::startFujiNetWithSavedSettings()
     }
 }
 
+void MainWindow::stopFujiNetViaTCP()
+{
+#ifndef Q_OS_WIN
+    if (!m_fujinetProcessManager) {
+        qWarning() << "[TCP] FujiNet process manager not initialized - cannot stop";
+        return;
+    }
+
+    qDebug() << "[TCP] Stopping FujiNet-PC via TCP command...";
+    m_fujinetIntentionalRestart = true;
+    if (m_fujinetService) {
+        m_fujinetService->stopHealthCheck();
+        m_fujinetService->stopDrivePolling();
+    }
+    // Reset netsio client state so the emulator stops routing SIO to the dead process.
+    // When FujiNet-PC restarts it will perform a clean handshake from scratch, avoiding
+    // the SIGABRT crash caused by receiving mid-stream SIO data on reconnect.
+    if (m_emulator) {
+        m_emulator->resetNetSIOClientState();
+    }
+    m_fujinetProcessManager->stop();
+#else
+    qWarning() << "[TCP] FujiNet stop requested on unsupported platform";
+#endif
+}
+
+void MainWindow::startFujiNetViaTCP()
+{
+#ifndef Q_OS_WIN
+    if (!m_fujinetProcessManager || !m_fujinetBinaryManager) {
+        qWarning() << "[TCP] FujiNet managers not initialized - cannot start";
+        return;
+    }
+
+    qDebug() << "[TCP] Starting FujiNet-PC via TCP command...";
+    m_fujinetIntentionalRestart = true;
+    startFujiNetWithSavedSettings();
+#else
+    qWarning() << "[TCP] FujiNet start requested on unsupported platform";
+#endif
+}
+
 void MainWindow::onFujiNetProcessStateChanged(int state)
 {
     FujiNetProcessManager::ProcessState processState = static_cast<FujiNetProcessManager::ProcessState>(state);
@@ -4117,6 +4159,12 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
         case FujiNetProcessManager::Error:
             qWarning() << "FujiNet-PC process error";
             statusBar()->showMessage("FujiNet-PC error - check console", 5000);
+            // Stop health check so it doesn't flood logs with "Connection refused"
+            if (m_fujinetService) {
+                m_fujinetService->stopHealthCheck();
+                m_fujinetService->stopDrivePolling();
+            }
+            updateFujiNetStatus();
             break;
     }
 }
@@ -4243,11 +4291,22 @@ void MainWindow::onFujiNetDisconnected()
 {
     qDebug() << "FujiNet service disconnected";
 
+    if (!m_fujinetService) {
+        return;
+    }
+
     // Stop polling
     m_fujinetService->stopDrivePolling();
 
     // Check if this is an intentional restart or unexpected disconnect
-    if (m_netSIOEnabled && !m_fujinetIntentionalRestart) {
+    if (m_fujinetIntentionalRestart) {
+        // Intentional restart - suppress error; onFujiNetConnected() will update status
+        statusBar()->showMessage("Restarting FujiNet-PC...", 0);  // 0 = stays until cleared
+        qDebug() << "Intentional restart in progress - suppressing disconnect error";
+        return;
+    }
+
+    if (m_netSIOEnabled) {
         // Unexpected disconnect - show error and switch to local mode
         statusBar()->showMessage("Disconnected from FujiNet-PC", 3000);
         switchDrivesToLocalMode();
@@ -4258,10 +4317,6 @@ void MainWindow::onFujiNetDisconnected()
                            "FujiNet-PC has disconnected. Drive operations have been switched back to local mode.\n\n"
                            "Network drives are no longer accessible. You can reconnect by restarting FujiNet-PC "
                            "from the Settings dialog.");
-    } else if (m_fujinetIntentionalRestart) {
-        // Intentional restart - just show progress message
-        statusBar()->showMessage("Restarting FujiNet-PC...", 0);  // 0 = stays until cleared
-        qDebug() << "Intentional restart in progress - suppressing disconnect error";
     } else {
         // Not in NetSIO mode
         statusBar()->showMessage("Disconnected from FujiNet-PC", 3000);

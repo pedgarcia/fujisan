@@ -130,6 +130,12 @@ public:
     // Public method for TCP server to set H drive path (triggers emulator restart)
     bool setHardDrivePathViaTCP(int driveNumber, const QString& path);
 
+#ifndef Q_OS_WIN
+    // Public methods for TCP server to stop/start FujiNet-PC (e.g. stop → load XEX → start)
+    void stopFujiNetViaTCP();
+    void startFujiNetViaTCP();
+#endif
+
 private:
     void createMenus();
     void createToolBar();

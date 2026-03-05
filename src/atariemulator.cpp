@@ -882,6 +882,12 @@ void AtariEmulator::shutdown()
     }
     BINLOAD_start_binloading = FALSE;
 
+#ifdef NETSIO
+    // Perform a clean NetSIO shutdown so FujiNet-PC sees a proper
+    // device disconnect before the atari800 core is torn down.
+    netsio_shutdown();
+#endif
+
     libatari800_exit();
 }
 
@@ -1792,6 +1798,21 @@ void AtariEmulator::warmBoot()
     // Reset the Atari
     Atari800_Warmstart();
     qDebug() << "[NETSIO] WARM BOOT COMPLETE";
+}
+
+void AtariEmulator::resetNetSIOClientState()
+{
+#ifdef NETSIO
+    extern int fujinet_known;
+    // Clear netsio client state when FujiNet-PC is stopped externally (e.g. via TCP command).
+    // This prevents the emulator from routing SIO to the dead process, and allows the new
+    // FujiNet-PC process to perform a clean handshake from scratch when it restarts.
+    netsio_enabled = 0;
+    fujinet_known = 0;
+    netsio_sync_wait = 0;
+    netsio_cmd_state = 0;
+    qDebug() << "[NETSIO] Client state reset: netsio_enabled=0, fujinet_known=0, sync_wait=0";
+#endif
 }
 
 char AtariEmulator::getShiftedSymbol(int key, bool shiftPressed)

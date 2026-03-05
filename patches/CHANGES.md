@@ -1,3 +1,26 @@
+# Patch System Changes
+
+## 0009-remove-netsio-cold-reset-from-coldstart.patch (March 2025)
+
+Removes `netsio_cold_reset(0xFF)` entirely from `Atari800_Coldstart()` in the
+atari800 core. `Atari800_Coldstart()` is called from many internal paths:
+`BINLOAD_Loader()` (XEX loading), `libatari800_reboot_with_file()` (debug XEX
+load), cartridge changes, `coldRestart()` (system.restart TCP command), and
+more. In every one of these cases, the unconditional `netsio_cold_reset()`
+fired a full FujiNet-PC process restart as a surprise side-effect with no
+waiting for FujiNet to come back online.
+
+Fujisan's `AtariEmulator::coldBoot()` already handles FujiNet coordination
+explicitly — it sends `netsio_cold_reset(0xFF)`, waits up to 3 seconds for
+FujiNet to reconnect, and only then calls `Atari800_Coldstart()`. The call
+inside `Atari800_Coldstart()` was therefore always a redundant second reset.
+
+After this patch, `netsio_cold_reset()` is only sent when Fujisan's `coldBoot()`
+explicitly triggers it (i.e. the user calls `system.cold_boot` via TCP or
+through the UI). All other cold-start paths leave FujiNet running undisturbed.
+
+---
+
 # Patch System Changes - January 2025
 
 ## Summary of Changes

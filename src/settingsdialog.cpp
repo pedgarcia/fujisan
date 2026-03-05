@@ -4445,6 +4445,17 @@ void SettingsDialog::onFujiNetBrowseSDFolder()
     if (!dirPath.isEmpty()) {
         m_fujinetSDPath->setText(dirPath);
         qDebug() << "FujiNet-PC SD folder configured:" << dirPath;
+
+        if (dirPath.length() > FujiNetBinaryManager::MAX_SD_PATH_LENGTH) {
+            QMessageBox::warning(this, "SD Path Is Long",
+                QString("The selected path is %1 characters long:\n%2\n\n"
+                        "A shorter path is recommended (e.g. %3).\n\n"
+                        "Longer paths will still work, but keeping the path short "
+                        "avoids potential issues in older FujiNet-PC builds.")
+                    .arg(dirPath.length())
+                    .arg(dirPath)
+                    .arg(QDir::homePath() + "/FujiNet-SD"));
+        }
     }
 }
 

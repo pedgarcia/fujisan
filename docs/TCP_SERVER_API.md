@@ -249,6 +249,63 @@ Perform warm boot (soft restart).
 echo '{"command": "system.warm_boot"}' | nc localhost 6502
 ```
 
+#### `system.start_fujinet`
+
+Start the external FujiNet-PC process using the currently saved FujiNet settings from Fujisan (HTTP API port, NetSIO port, SD card folder, and config file path). This is equivalent to clicking **Start FujiNet-PC** in the Settings dialog when NetSIO is enabled.
+
+- On supported desktop platforms (macOS, Linux), this will:
+  - Spawn the `fujinet` binary managed by Fujisan
+  - Update `fnconfig.ini` with the current NetSIO port
+  - Pass the configured SD card folder (`-s` argument)
+  - Start the FujiNet HTTP health check
+- On unsupported platforms (e.g. Windows), the command is accepted but logged as unsupported by the UI (no process is started).
+
+```bash
+echo '{"command": "system.start_fujinet"}' | nc localhost 6502
+```
+
+**Response:**
+
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "started": true
+  }
+}
+```
+
+If FujiNet-PC managers are not initialized or the binary cannot be found, the command returns an error response.
+
+#### `system.stop_fujinet`
+
+Stop the external FujiNet-PC process that is being managed by Fujisan.
+
+When issued on supported platforms (macOS, Linux), this will:
+
+- Stop the FujiNet-PC process via `FujiNetProcessManager`
+- Stop FujiNet HTTP health checks and drive polling
+- Reset the emulator's internal NetSIO client state so that the next FujiNet-PC start performs a clean handshake
+
+```bash
+echo '{"command": "system.stop_fujinet"}' | nc localhost 6502
+```
+
+**Response:**
+
+```json
+{
+  "type": "response",
+  "status": "success",
+  "result": {
+    "stopped": true
+  }
+}
+```
+
+If FujiNet-PC is not managed by Fujisan on the current platform (for example, Windows), the command is accepted but no process is stopped and the UI logs an informational warning.
+
 #### `system.pause` / `system.resume`
 
 Pause or resume emulation.

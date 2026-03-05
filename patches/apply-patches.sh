@@ -65,6 +65,21 @@ if [ -d .git ]; then
                             echo "✓ BINLOAD/NetSIO priority patch applied manually"
                         fi
                         echo "Warning: Patch $patch_name had issues but manual apply attempted"
+                    # For critical patch 0009 (replace netsio_cold_reset with netsio_warm_reset in Atari800_Coldstart), apply manually
+                    elif [[ "$patch_name" == "0009-replace-netsio-cold-with-warm-reset-in-coldstart.patch" ]]; then
+                        echo "Applying netsio_cold_reset -> netsio_warm_reset replacement patch manually..."
+                        if [ -f "src/atari.c" ] && grep -q 'netsio_cold_reset' src/atari.c; then
+                            # Replace netsio_cold_reset() with netsio_warm_reset() in the NETSIO block
+                            # inside Atari800_Coldstart(). A warm reset resets FujiNet-PC's SIO state
+                            # without restarting the process, preventing SIGABRT crashes.
+                            if sed --version 2>/dev/null | grep -q GNU; then
+                                sed -i 's/netsio_cold_reset();/netsio_warm_reset();/g' src/atari.c
+                            else
+                                sed -i '' 's/netsio_cold_reset();/netsio_warm_reset();/g' src/atari.c
+                            fi
+                            echo "✓ netsio_cold_reset -> netsio_warm_reset replacement applied manually"
+                        fi
+                        echo "Warning: Patch $patch_name had issues but manual apply attempted"
                     # For critical patch 0003, apply manually
                     elif [[ "$patch_name" == "0003-disk-activity-callback-integration.patch" ]]; then
                         echo "Applying disk activity callback patch manually..."

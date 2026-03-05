@@ -43,6 +43,11 @@ public:
     static QString getLegacySDPath();      // Get legacy SD path (storage path + "/SD") for migration
     static QString getDefaultReleaseUrl(); // Default GitHub releases URL
 
+    // FujiNet-PC imposes a practical path length limit: the SD basepath gets concatenated
+    // with "/FujiNet/<keyname>.key" inside a fixed buffer.  Warn users when their configured
+    // SD path exceeds this advisory limit.
+    static constexpr int MAX_SD_PATH_LENGTH = 200;
+
     // Version detection (public for manual binary configuration)
     QString parseVersionFromBinary(const QString& binaryPath) const;
 

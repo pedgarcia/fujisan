@@ -218,6 +218,7 @@ public:
     
     void coldBoot();
     void warmBoot();
+    void resetNetSIOClientState();
     
     bool isBasicEnabled() const { return m_basicEnabled; }
     void setBasicEnabled(bool enabled) { m_basicEnabled = enabled; }

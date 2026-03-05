@@ -83,8 +83,10 @@ QString FujiNetBinaryManager::getStoragePath()
 QString FujiNetBinaryManager::getDefaultSDPath()
 {
 #ifdef Q_OS_MACOS
-    QDir appSupportDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
-    return appSupportDir.filePath("FujiNet-SD");
+    // Use ~/FujiNet-SD to keep the path short enough for FujiNet-PC's internal
+    // create_path() buffers (segment[MAX_PATHLEN]) which are sized for the full
+    // basepath + "/FujiNet/<keyname>.key" concatenation.
+    return QDir::homePath() + "/FujiNet-SD";
 #elif defined(Q_OS_LINUX)
     QDir dataDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
     return dataDir.filePath("fujinet-sd");

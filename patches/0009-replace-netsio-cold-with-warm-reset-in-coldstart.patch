@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Developer <fujisan@atari>
+Date: Mon, 3 Mar 2025 00:00:00 -0800
+Subject: [PATCH] Replace netsio_cold_reset with netsio_warm_reset in Atari800_Coldstart
+
+Atari800_Coldstart() is called from many paths inside the atari800 core:
+BINLOAD_Loader(), MEMORY_InitialiseMachine(), libatari800_reboot_with_file(),
+cartridge changes, and more. In all of these cases, the original
+netsio_cold_reset(0xFF) triggered a full FujiNet-PC process restart via
+fnSystem.reboot() -- causing SIGABRT crashes when FujiNet-PC was in the
+middle of a SIO exchange and the emulator cold-reset underneath it.
+
+The correct fix is to replace netsio_cold_reset(0xFF) with
+netsio_warm_reset(0xFE). A warm reset tells FujiNet-PC to reset its SIO
+state machine (boot_config, status_wait_count, pending transactions) without
+restarting the process. This is safe and appropriate for every internal
+cold start path:
+
+  - BINLOAD_Loader(): emulator reboots to run the XEX bootloader. FujiNet-PC
+    needs to reset its SIO state to track the new boot sequence, but the
+    process must keep running for N: and other network devices.
+  - MEMORY_InitialiseMachine(): called during emulator (re)init. Same logic.
+  - cartridge swap, system.restart, etc.: same.
+
+Fujisan's explicit coldBoot() is unchanged -- it still sends
+netsio_cold_reset(0xFF) first, waits up to 3 seconds for FujiNet-PC to
+restart and reconnect, and then calls Atari800_Coldstart(). The subsequent
+netsio_warm_reset(0xFE) from Atari800_Coldstart() arrives after FujiNet-PC
+has already restarted and is harmless.
+
+Atari800_Warmstart() already sends netsio_warm_reset(0xFE) and works
+correctly. Atari800_Coldstart() should do the same.
+---
+ src/atari.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/atari.c b/src/atari.c
+index cef0c10f..d3a4b7c1 100644
+--- a/src/atari.c
++++ b/src/atari.c
+@@ -278,7 +278,7 @@ void Atari800_Coldstart(void)
+ 	}
+ #endif
+ #ifdef NETSIO
+-	if(netsio_enabled)
+-		netsio_cold_reset();
++	if (netsio_enabled)
++		netsio_warm_reset();
+ #endif /* NETSIO */
+ }
+ 
