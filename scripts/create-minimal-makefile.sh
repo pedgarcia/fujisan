@@ -46,7 +46,7 @@ DESIRED_SOURCES="
 afile antic atari cartridge cpu esc gtia memory monitor pbi pia pokey pokeysnd
 sio sound statesav pbi_mio pbi_bb pbi_xld mzpokeysnd votraxsnd votrax pbi_scsi
 rtime cassette compfile cfg log util colours screen input binload devices
-img_tape remez lib artifact ide sysrom videomode
+img_tape remez lib artifact ide sysrom videomode netsiowin
 "
 
 # Check which files actually exist and build the object list
@@ -237,8 +237,10 @@ cat > Makefile << EOF
 
 CC = gcc
 AR = ar
-CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800
+CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800 -DNETSIO
 ARFLAGS = rcs
+
+LDLIBS = -lws2_32
 
 LIBATARI800_OBJS =$EXISTING_OBJS
 
@@ -310,9 +312,9 @@ cat > src/config.h << 'EOF'
 /* Sound system - enable sound for libatari800 */
 #define SOUND 1
 
-/* NetSIO support */
-/* NETSIO officially not supported on Windows platform */
-#undef NETSIO
+/* NetSIO support - enabled via netsiowin.c (Winsock2 implementation) */
+#define NETSIO 1
+#define HAVE_WINDOWS_H 1
 
 /* Screenshot support */
 #define HAVE_LIBPNG 1

@@ -1,5 +1,17 @@
 # Patch System Changes
 
+## 0010-netsio-windows-support.patch (NetSIO on Windows)
+
+Adds FujiNet (NetSIO) support for the atari800 Windows build by providing a Win32-native implementation in `netsiowin.c` (Winsock2, CreateThread, ring-buffer FIFO). The build uses **either** `netsio.c` (POSIX) **or** `netsiowin.c` (Windows), never both.
+
+**Contents:** Patches `configure.ac` (enable NetSIO on Windows, link ws2_32 instead of pthread), `src/Makefile.am` (compile netsiowin.c when building for Windows), `src/netsio.h` (Windows-safe includes and `ssize_t`), and adds `src/netsiowin.c`.
+
+**Phase 1 (vanilla atari800):** Apply to a standalone atari800 tree on Windows (e.g. from atari800 root: `git apply path/to/0010-netsio-windows-support.patch` or set `ATARI800_SRC_PATH` and run `apply-patches.sh`). Then `./configure --enable-netsio`, `make`, and run `atari800.exe -netsio 9997` to test. The script skips this patch on non-Windows unless cross-compiling (patch name contains "windows").
+
+**Phase 2:** After Phase 1 is validated, enable the NetSIO/FujiNet UI in Fujisan on Windows (remove or relax `#ifndef Q_OS_WIN` guards).
+
+---
+
 ## 0009-remove-netsio-cold-reset-from-coldstart.patch (March 2025)
 
 Removes `netsio_cold_reset(0xFF)` entirely from `Atari800_Coldstart()` in the

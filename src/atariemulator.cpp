@@ -650,9 +650,11 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         qDebug() << "  -> Boot mode: OS/DOS (no BASIC prompt) - Required for FujiNet/NetSIO";
     }
     
-    // Add NetSIO support if enabled
+    // Add NetSIO support if enabled (use same port as FujiNet-PC so they match)
     if (netSIOEnabled) {
-        argList << "-netsio";
+        QSettings netSettings("8bitrelics", "Fujisan");
+        int netsioPort = netSettings.value("fujinet/netsioPort", 9997).toInt();
+        argList << "-netsio" << QString::number(netsioPort);
     }
     
     // Initialize printer support - DISABLED (P: device not working in atari800 core)

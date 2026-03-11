@@ -14,13 +14,15 @@ rm -rf build-cross-windows build-windows
 
 echo "Building Windows executable and package..."
 
-# Run entire build in container
+# Run entire build in container (pass BUILD_FASTBASIC_COMPILER and BUILD_FUJINET_PC from env if set)
 podman run --rm \
     -v "$PROJECT_ROOT:/work" \
     --workdir="/work" \
     --platform linux/amd64 \
     --user root \
     -e VERSION="$VERSION" \
+    -e BUILD_FASTBASIC_COMPILER="${BUILD_FASTBASIC_COMPILER:-false}" \
+    -e BUILD_FUJINET_PC="${BUILD_FUJINET_PC:-true}" \
     maxrd2/arch-mingw \
     bash -c '
 set -e
@@ -127,6 +129,51 @@ cp /usr/x86_64-w64-mingw32/lib/qt/plugins/mediaservice/qtmedia_audioengine.dll b
 # Copy images
 mkdir -p build-windows/images
 cp -r images/*.png build-windows/images/ 2>/dev/null || true
+
+# Bundle Fastbasic if requested (download release zip and extract full contents)
+if [ "$BUILD_FASTBASIC_COMPILER" = "true" ]; then
+    echo "Downloading Fastbasic v4.7 win32..."
+    mkdir -p build-windows/fastbasic
+    curl -sL -f -o /tmp/fb-win32.zip "https://github.com/dmsc/fastbasic/releases/download/v4.7/fastbasic-v4.7-win32.zip"
+    unzip -q -o /tmp/fb-win32.zip -d build-windows/fastbasic
+    rm -f /tmp/fb-win32.zip
+    echo "✓ Fastbasic bundled in build-windows/fastbasic/"
+fi
+
+# Bundle FujiNet-PC if requested (copy from host fujinet/windows-x64 or download nightly)
+if [ "$BUILD_FUJINET_PC" != "false" ]; then
+    mkdir -p build-windows/fujinet-pc
+    if [ -f "/work/fujinet/windows-x64/fujinet.exe" ]; then
+        echo "Bundling FujiNet-PC from /work/fujinet/windows-x64..."
+        cp -r /work/fujinet/windows-x64/* build-windows/fujinet-pc/
+        echo "✓ FujiNet-PC bundled from host fujinet/windows-x64"
+    else
+        echo "Downloading FujiNet-PC Windows nightly..."
+        GITHUB_API="https://api.github.com/repos/FujiNetWIFI/fujinet-firmware/releases"
+        TAG=$(curl -s "$GITHUB_API" | grep -o "\"tag_name\"[[:space:]]*:[[:space:]]*\"nightly_fn_pc_[^\"]*\"" | head -n 1 | cut -d "\"" -f 4)
+        if [ -n "$TAG" ]; then
+            TAG_ENCODED=$(echo "$TAG" | sed "s/+/%2B/g")
+            VERSION_PART="${TAG#nightly_fn_pc_}"
+            ZIP_NAME="fujinet-pc-ATARI_${VERSION_PART}_windows-x64.zip"
+            BASE_URL="https://github.com/FujiNetWIFI/fujinet-firmware/releases/download/$TAG_ENCODED"
+            if curl -sL -f -o /tmp/fujinet-win.zip "$BASE_URL/$ZIP_NAME"; then
+                unzip -q -o /tmp/fujinet-win.zip -d /tmp/fujinet-win-extract
+                SUBDIR=$(find /tmp/fujinet-win-extract -maxdepth 1 -type d -name "fujinet-pc-*" | head -n 1)
+                if [ -n "$SUBDIR" ]; then
+                    cp -r "$SUBDIR"/* build-windows/fujinet-pc/
+                else
+                    cp -r /tmp/fujinet-win-extract/* build-windows/fujinet-pc/
+                fi
+                rm -rf /tmp/fujinet-win-extract /tmp/fujinet-win.zip
+                echo "✓ FujiNet-PC bundled (nightly $TAG)"
+            else
+                echo "⚠ Warning: Could not download FujiNet-PC nightly; run scripts/download-fujinet-pc.sh and rebuild with fujinet/windows-x64 present"
+            fi
+        else
+            echo "⚠ Warning: Could not find FujiNet-PC nightly tag; run scripts/download-fujinet-pc.sh and rebuild with fujinet/windows-x64 present"
+        fi
+    fi
+fi
 
 echo "✓ Windows package created in build-windows/"
 '

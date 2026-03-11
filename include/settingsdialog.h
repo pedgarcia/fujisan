@@ -29,12 +29,10 @@
 #include "configurationprofilemanager.h"
 #include "profileselectionwidget.h"
 
-#ifndef Q_OS_WIN
-// FujiNet support (not available on Windows)
+// FujiNet support (NetSIO on Windows when atari800 built with 0010-netsio-windows-support.patch)
 class FujiNetService;
 class FujiNetProcessManager;
 class FujiNetBinaryManager;
-#endif
 
 class SettingsDialog : public QDialog
 {
@@ -42,26 +40,20 @@ class SettingsDialog : public QDialog
 
 public:
     explicit SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager,
-#ifndef Q_OS_WIN
                             FujiNetService* fujinetService,
-#endif
                             QWidget *parent = nullptr);
 
     // Public methods for external synchronization
     void loadSettings();
 
-#ifndef Q_OS_WIN
     // Set shared FujiNet managers (must be called before showing dialog)
     void setFujiNetManagers(FujiNetProcessManager* processManager,
                            FujiNetBinaryManager* binaryManager);
-#endif
 
 signals:
     void settingsChanged();
     void syncPrinterStateRequested();
-#ifndef Q_OS_WIN
     void netSIOEnabledChanged(bool enabled);
-#endif
 
 private slots:
     void accept() override;
@@ -79,9 +71,7 @@ private slots:
     void onMachineTypeChanged();
     void onAltirraOSChanged();
     void onAltirraBASICChanged();
-#ifndef Q_OS_WIN
     void onNetSIOToggled(bool enabled);
-#endif
 
     // Profile management slots
     void onProfileChangeRequested(const QString& profileName);
@@ -90,7 +80,6 @@ private slots:
     void onJoystickDeviceChanged();
     void onJoystickPresetChanged(int joystickNumber);
 
-#ifndef Q_OS_WIN
     // FujiNet slots
     void onFujiNetBrowseBinary();
     void onFujiNetBrowseSDFolder();
@@ -102,7 +91,6 @@ private slots:
     void onFujiNetStop();
     void onFujiNetConnectionChanged(bool connected);
     void onFujiNetProcessStateChanged(int state);
-#endif
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -114,15 +102,11 @@ private:
     void createInputConfigTab();
     void createMediaConfigTab();
     void createEmulatorTab();
-#ifndef Q_OS_WIN
     void createFujiNetTab();
-#endif
     void saveSettings();
     void applySettings();
     void applyMediaSettings();
-#ifndef Q_OS_WIN
     void triggerNetSIORestart(bool netSIOEnabled);
-#endif
     void updateVideoSystemDependentControls();
     void setupFilePathTooltip(QLineEdit* lineEdit);
     void populateCartridgeTypes(QComboBox* combo);
@@ -309,9 +293,7 @@ private:
     
     // Special Devices
     QLineEdit* m_rDeviceName;
-#ifndef Q_OS_WIN
     QCheckBox* m_netSIOEnabled;
-#endif
     QCheckBox* m_rtimeEnabled;
     
     // Printer Configuration
@@ -328,7 +310,12 @@ private:
     QLineEdit* m_logFilterString;
     QCheckBox* m_logFilterRegex;
 
-#ifndef Q_OS_WIN
+    // Fastbasic controls
+    QCheckBox* m_fastbasicUseBundled;
+    QLineEdit* m_fastbasicCompilerPath;
+    QPushButton* m_fastbasicBrowseButton;
+    QCheckBox* m_fastbasicBuildPanelEnabled;
+
     // FujiNet Configuration controls
     QWidget* m_fujinetTab;
     QSpinBox* m_fujinetApiPort;
@@ -376,7 +363,6 @@ private:
     void checkFujiNetRestartRequired();
     void checkAndMigrateFujiNetSD();
     bool migrateFujiNetSDContents(const QString& fromPath, const QString& toPath);
-#endif
 
     // Store original settings for cancel functionality
     struct OriginalSettings {

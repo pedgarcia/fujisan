@@ -19,16 +19,12 @@
 #include "sdl2joystickmanager.h"
 #endif
 
-#ifndef Q_OS_WIN
 #include "fujinetservice.h"
 #include "fujinetprocessmanager.h"
 #include "fujinetbinarymanager.h"
-#endif
 
 SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager,
-#ifndef Q_OS_WIN
                                FujiNetService* fujinetService,
-#endif
                                QWidget *parent)
     : QDialog(parent)
     , m_emulator(emulator)
@@ -43,11 +39,9 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
     , m_basicEnabledCheck(nullptr)
     , m_altirraOSCheck(nullptr)
     , m_altirraBASICCheck(nullptr)
-#ifndef Q_OS_WIN
     , m_fujinetService(fujinetService)
     , m_fujinetProcessManager(nullptr)
     , m_fujinetBinaryManager(nullptr)
-#endif
 {
 #ifdef Q_OS_MACOS
     setWindowTitle("Preferences");
@@ -64,13 +58,9 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
     m_originalSettings.altirraOSEnabled = m_emulator->isAltirraOSEnabled();
     m_originalSettings.altirraBASICEnabled = m_emulator->isAltirraBASICEnabled();
     
-#ifndef Q_OS_WIN
     // Store original NetSIO state for restart detection
     QSettings settings;
     m_originalSettings.netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
-#else
-    QSettings settings;
-#endif
 
     // Store original printer state for restart detection
     m_originalSettings.printerEnabled = settings.value("printer/enabled", false).toBool();
@@ -100,9 +90,7 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
     createInputConfigTab();
     createMediaConfigTab();
     createEmulatorTab();
-#ifndef Q_OS_WIN
     createFujiNetTab();
-#endif
 
     // Create button box with custom buttons
     m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -149,7 +137,6 @@ SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileMana
              << "Tint:" << m_ntscTintSlider->value();
 }
 
-#ifndef Q_OS_WIN
 void SettingsDialog::setFujiNetManagers(FujiNetProcessManager* processManager,
                                          FujiNetBinaryManager* binaryManager)
 {
@@ -201,7 +188,6 @@ void SettingsDialog::setFujiNetManagers(FujiNetProcessManager* processManager,
 
     qDebug() << "FujiNet managers set - using shared instances from MainWindow";
 }
-#endif
 
 void SettingsDialog::createHardwareTab()
 {
@@ -394,16 +380,18 @@ void SettingsDialog::createHardwareTab()
     
     specialLayout->addLayout(rDeviceLayout);
 
-#ifndef Q_OS_WIN
     m_netSIOEnabled = new QCheckBox("Enable NetSIO (FujiNet-PC Support)");
+#ifdef Q_OS_WIN
+    m_netSIOEnabled->setToolTip("FujiNet/NetSIO support is coming in a future Windows release.");
+    m_netSIOEnabled->setEnabled(false);
+#else
     m_netSIOEnabled->setToolTip("Enable NetSIO for FujiNet-PC network functionality\n\n"
                                "IMPORTANT: FujiNet requires BASIC to be disabled to boot properly.\n"
                                "BASIC will be automatically disabled when NetSIO is enabled.");
-    specialLayout->addWidget(m_netSIOEnabled);
-
     // Connect NetSIO checkbox to update BASIC checkbox state
     connect(m_netSIOEnabled, &QCheckBox::toggled, this, &SettingsDialog::onNetSIOToggled);
 #endif
+    specialLayout->addWidget(m_netSIOEnabled);
 
     m_rtimeEnabled = new QCheckBox("Enable R-Time 8 Real-Time Clock");
     m_rtimeEnabled->setToolTip("Enable R-Time 8 cartridge emulation for real-time clock");
@@ -1824,14 +1812,56 @@ void SettingsDialog::createEmulatorTab()
     logFilterLayout->addWidget(logDescription);
 
     mainLayout->addWidget(logFilterGroup);
+
+    // Fastbasic Configuration
+    QGroupBox* fastbasicGroup = new QGroupBox("Fastbasic");
+    QFormLayout* fastbasicLayout = new QFormLayout(fastbasicGroup);
+
+    m_fastbasicUseBundled = new QCheckBox("Use bundled Fastbasic");
+    m_fastbasicUseBundled->setToolTip("Use the Fastbasic compiler bundled with Fujisan (if available).");
+    fastbasicLayout->addRow(m_fastbasicUseBundled);
+
+    QHBoxLayout* fastbasicPathLayout = new QHBoxLayout();
+    m_fastbasicCompilerPath = new QLineEdit();
+    m_fastbasicCompilerPath->setPlaceholderText("Path to fastbasic executable");
+    m_fastbasicCompilerPath->setToolTip("Path to the Fastbasic compiler (used when \"Use bundled Fastbasic\" is unchecked).");
+    m_fastbasicBrowseButton = new QPushButton("Browse...");
+    fastbasicPathLayout->addWidget(m_fastbasicCompilerPath, 1);
+    fastbasicPathLayout->addWidget(m_fastbasicBrowseButton);
+    fastbasicLayout->addRow("Fastbasic path:", fastbasicPathLayout);
+
+    m_fastbasicBuildPanelEnabled = new QCheckBox("Show Fastbasic build panel");
+    m_fastbasicBuildPanelEnabled->setToolTip("Show the build panel above the status bar to compile and run .bas files.");
+    fastbasicLayout->addRow(m_fastbasicBuildPanelEnabled);
+
+    connect(m_fastbasicUseBundled, &QCheckBox::toggled, [this](bool checked) {
+        m_fastbasicCompilerPath->setEnabled(!checked);
+        m_fastbasicBrowseButton->setEnabled(!checked);
+    });
+    connect(m_fastbasicBrowseButton, &QPushButton::clicked, this, [this]() {
+        QString path = QFileDialog::getOpenFileName(this, tr("Select Fastbasic Compiler"),
+            m_fastbasicCompilerPath->text(),
+#ifdef Q_OS_WIN
+            tr("Executables (*.exe);;All Files (*)")
+#else
+            tr("All Files (*)")
+#endif
+        );
+        if (!path.isEmpty()) {
+            m_fastbasicCompilerPath->setText(path);
+        }
+    });
+
+    mainLayout->addWidget(fastbasicGroup);
     mainLayout->addStretch();
 }
 
-#ifndef Q_OS_WIN
 void SettingsDialog::createFujiNetTab()
 {
     m_fujinetTab = new QWidget();
+#ifndef Q_OS_WIN
     m_tabWidget->addTab(m_fujinetTab, "FujiNet");
+#endif
 
     QVBoxLayout* mainLayout = new QVBoxLayout(m_fujinetTab);
     mainLayout->setSpacing(10);
@@ -2069,7 +2099,6 @@ void SettingsDialog::createFujiNetTab()
     m_fujinetStartButton->setEnabled(false);
     m_fujinetStopButton->setEnabled(false);
 }
-#endif
 
 void SettingsDialog::browseDiskImage(int diskNumber)
 {
@@ -2289,7 +2318,6 @@ void SettingsDialog::onAltirraBASICChanged()
     m_basicRomBrowse->setEnabled(!altirraBASICEnabled);
 }
 
-#ifndef Q_OS_WIN
 void SettingsDialog::onNetSIOToggled(bool enabled)
 {
     if (enabled) {
@@ -2303,7 +2331,6 @@ void SettingsDialog::onNetSIOToggled(bool enabled)
 
     emit netSIOEnabledChanged(enabled);
 }
-#endif
 
 void SettingsDialog::setupFilePathTooltip(QLineEdit* lineEdit)
 {
@@ -2741,9 +2768,7 @@ void SettingsDialog::loadSettings()
     
     // Special Devices (R: device is already loaded in Hardware Extensions)
     m_rDeviceName->setText(settings.value("media/rDeviceName", "R").toString());
-#ifndef Q_OS_WIN
     m_netSIOEnabled->setChecked(settings.value("media/netSIOEnabled", false).toBool());
-#endif
     m_rtimeEnabled->setChecked(settings.value("media/rtimeEnabled", false).toBool());
     
     // Printer Configuration - DISABLED
@@ -2757,15 +2782,20 @@ void SettingsDialog::loadSettings()
     m_tcpServerEnabled->setChecked(settings.value("emulator/tcpServerEnabled", true).toBool());
     m_tcpServerPort->setValue(settings.value("emulator/tcpServerPort", 6502).toInt());
 
+    // Fastbasic Configuration
+    m_fastbasicUseBundled->setChecked(settings.value("fastbasic/useBundled", true).toBool());
+    m_fastbasicCompilerPath->setText(settings.value("fastbasic/compilerPath", "").toString());
+    m_fastbasicBuildPanelEnabled->setChecked(settings.value("fastbasic/buildPanelEnabled", false).toBool());
+    m_fastbasicCompilerPath->setEnabled(!m_fastbasicUseBundled->isChecked());
+    m_fastbasicBrowseButton->setEnabled(!m_fastbasicUseBundled->isChecked());
+
     // Log Filtering Configuration
     m_logFilterString->setText(settings.value("log/filterString", "").toString());
     m_logFilterRegex->setChecked(settings.value("log/useRegex", false).toBool());
 
-#ifndef Q_OS_WIN
     m_hideFujiNetLogs->setChecked(settings.value("log/hideFujiNetLogs", false).toBool());
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
-#endif
 
     // Update PAL/NTSC dependent controls
     updateVideoSystemDependentControls();
@@ -2947,11 +2977,7 @@ void SettingsDialog::saveSettings()
     
     // Special Devices (R: device enabled state is saved in Hardware Extensions)
     settings.setValue("media/rDeviceName", m_rDeviceName->text());
-#ifndef Q_OS_WIN
     settings.setValue("media/netSIOEnabled", m_netSIOEnabled->isChecked());
-#else
-    settings.setValue("media/netSIOEnabled", false);  // NetSIO not available on Windows
-#endif
     settings.setValue("media/rtimeEnabled", m_rtimeEnabled->isChecked());
     
     // Printer Configuration - DISABLED
@@ -2967,13 +2993,16 @@ void SettingsDialog::saveSettings()
     settings.setValue("emulator/tcpServerEnabled", m_tcpServerEnabled->isChecked());
     settings.setValue("emulator/tcpServerPort", m_tcpServerPort->value());
 
+    // Fastbasic Configuration
+    settings.setValue("fastbasic/useBundled", m_fastbasicUseBundled->isChecked());
+    settings.setValue("fastbasic/compilerPath", m_fastbasicCompilerPath->text());
+    settings.setValue("fastbasic/buildPanelEnabled", m_fastbasicBuildPanelEnabled->isChecked());
+
     // Log Filtering Configuration
     settings.setValue("log/filterString", m_logFilterString->text());
     settings.setValue("log/useRegex", m_logFilterRegex->isChecked());
 
-#ifndef Q_OS_WIN
     settings.setValue("log/hideFujiNetLogs", m_hideFujiNetLogs->isChecked());
-#endif
 
     // Force sync to ensure settings are written to disk immediately
     settings.sync();
@@ -3002,7 +3031,6 @@ void SettingsDialog::saveSettings()
     qDebug() << "Settings saved to persistent storage - Machine:" << machineType
              << "Video:" << videoSystem << "BASIC:" << basicEnabled;
 
-#ifndef Q_OS_WIN
     // Check if NetSIO setting has changed (requires emulator restart)
     bool currentNetSIOState = m_netSIOEnabled->isChecked();
     bool netSIOStateChanged = (currentNetSIOState != m_originalSettings.netSIOEnabled);
@@ -3041,7 +3069,6 @@ void SettingsDialog::saveSettings()
         m_originalSettings.netSIOEnabled = currentNetSIOState;
         m_originalSettings.printerEnabled = currentPrinterState;
     } else
-#endif
     {
         // No NetSIO change (or Windows) - apply settings normally
         qDebug() << "[SETTINGS] Applying settings without restart:";
@@ -3264,9 +3291,7 @@ void SettingsDialog::applySettings()
         qDebug() << "  BASIC ROM path:" << basicRomPath;
 
         qDebug() << "=== SETTINGS DIALOG RESTART START ===";
-#ifndef Q_OS_WIN
         qDebug() << "NetSIO enabled from UI:" << m_netSIOEnabled->isChecked();
-#endif
 
         // Full restart needed for machine/video/OS settings
         m_emulator->shutdown();
@@ -3284,11 +3309,7 @@ void SettingsDialog::applySettings()
         bool vSyncEnabled = m_vSyncEnabled->isChecked();
 
         // Get special device settings from UI
-#ifndef Q_OS_WIN
         bool netSIOEnabled = m_netSIOEnabled->isChecked();
-#else
-        bool netSIOEnabled = false;  // NetSIO not available on Windows
-#endif
         bool rtimeEnabled = m_rtimeEnabled->isChecked();
 
         qDebug() << "*** ABOUT TO CALL initializeWithNetSIOConfig with NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
@@ -3313,6 +3334,9 @@ void SettingsDialog::applySettings()
             applyMediaSettings();
         } else {
             qDebug() << "Failed to restart emulator with new settings";
+            // Persist NetSIO checkbox so it survives the failure (e.g. port bind error on Windows)
+            QSettings settings("8bitrelics", "Fujisan");
+            settings.setValue("media/netSIOEnabled", m_netSIOEnabled->isChecked());
             return;
         }
     }
@@ -3338,12 +3362,10 @@ void SettingsDialog::accept()
     // Save the current profile name BEFORE applySettings (which might reset it)
     QString profileBeforeApply = m_profileManager->getCurrentProfileName();
 
-#ifndef Q_OS_WIN
     // Read old NetSIO state BEFORE applySettings() saves the new state
     QSettings settings;
     bool oldNetSIOState = settings.value("media/netSIOEnabled", false).toBool();
     bool newNetSIOState = m_netSIOEnabled->isChecked();
-#endif
 
     applySettings();
 
@@ -3353,7 +3375,6 @@ void SettingsDialog::accept()
         m_profileManager->setCurrentProfileName(profileBeforeApply);
     }
 
-#ifndef Q_OS_WIN
     // Emit signal if NetSIO state changed (after applySettings has saved it)
     if (oldNetSIOState != newNetSIOState) {
         emit netSIOEnabledChanged(newNetSIOState);
@@ -3390,7 +3411,6 @@ void SettingsDialog::accept()
     if (m_fujinetService) {
         m_fujinetService->stopHealthCheck();
     }
-#endif
 
     QDialog::accept();
 }
@@ -3400,17 +3420,14 @@ void SettingsDialog::reject()
     // Restore original settings without applying
     qDebug() << "Settings dialog cancelled - restoring original settings";
 
-#ifndef Q_OS_WIN
     // Stop FujiNet health check to prevent signals firing during destruction
     if (m_fujinetService) {
         m_fujinetService->stopHealthCheck();
     }
-#endif
 
     QDialog::reject();
 }
 
-#ifndef Q_OS_WIN
 void SettingsDialog::triggerNetSIORestart(bool netSIOEnabled)
 {
     qDebug() << "Triggering emulator restart for NetSIO state change...";
@@ -3462,7 +3479,6 @@ void SettingsDialog::triggerNetSIORestart(bool netSIOEnabled)
         qDebug() << "Failed to restart emulator with new NetSIO configuration";
     }
 }
-#endif
 
 void SettingsDialog::updateVideoSystemDependentControls()
 {
@@ -3624,9 +3640,7 @@ void SettingsDialog::restoreDefaults()
     
     // Special Devices - all disabled by default (R: device is handled in Hardware Extensions)
     m_rDeviceName->setText("R");
-#ifndef Q_OS_WIN
     m_netSIOEnabled->setChecked(false);
-#endif
     m_rtimeEnabled->setChecked(false);
 
     // Printer Configuration - all defaults - DISABLED
@@ -3636,10 +3650,8 @@ void SettingsDialog::restoreDefaults()
     m_printerType->setCurrentText("Generic");
     */
 
-#ifndef Q_OS_WIN
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
-#endif
 
     // Update PAL/NTSC dependent controls
     updateVideoSystemDependentControls();
@@ -3668,17 +3680,28 @@ void SettingsDialog::onProfileChangeRequested(const QString& profileName)
 
 void SettingsDialog::onSaveCurrentProfile(const QString& profileName)
 {
+    // Write current dialog state to QSettings BEFORE sync. The sync handler calls loadSettings(),
+    // which reloads from QSettings and would otherwise overwrite the form (e.g. NetSIO checkbox
+    // back to the old value). So we persist the current UI state first.
+    {
+        QSettings settings("8bitrelics", "Fujisan");
+        settings.setValue("media/netSIOEnabled", m_netSIOEnabled->isChecked());
+        settings.setValue("media/rtimeEnabled", m_rtimeEnabled->isChecked());
+    }
+
     // Ensure we capture the current PrinterWidget state before saving profile
     // This is important if user modified printer settings but Settings Dialog wasn't refreshed
     emit syncPrinterStateRequested();
-    
+
     ConfigurationProfile profile = getCurrentUIState();
     profile.name = profileName;
     profile.description = QString("Saved on %1").arg(QDateTime::currentDateTime().toString("MMM dd, yyyy"));
     
     bool success = m_profileManager->saveProfile(profileName, profile);
     if (success) {
-        qDebug() << "Profile saved successfully:" << profileName;
+        // Make this profile the current one so it persists as default until user selects another
+        m_profileManager->setCurrentProfileName(profileName);
+        qDebug() << "Profile saved successfully and set as current:" << profileName;
     } else {
         qWarning() << "Failed to save profile:" << profileName;
     }
@@ -3815,11 +3838,7 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     
     // Special Devices
     profile.rDeviceName = m_rDeviceName->text();
-#ifndef Q_OS_WIN
     profile.netSIOEnabled = m_netSIOEnabled->isChecked();
-#else
-    profile.netSIOEnabled = false;  // NetSIO not available on Windows
-#endif
     profile.rtimeEnabled = m_rtimeEnabled->isChecked();
 
     // Printer Configuration - DISABLED
@@ -3847,6 +3866,8 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.proto80Enabled = false;
     profile.voiceboxEnabled = m_voiceboxEnabled->isChecked();
     profile.sioAcceleration = m_sioAcceleration->isChecked();
+    
+    profile.fastbasicBuildPanelEnabled = m_fastbasicBuildPanelEnabled->isChecked();
     
     return profile;
 }
@@ -4121,9 +4142,7 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     
     // Special Devices
     m_rDeviceName->setText(profile.rDeviceName);
-#ifndef Q_OS_WIN
     m_netSIOEnabled->setChecked(profile.netSIOEnabled);
-#endif
     m_rtimeEnabled->setChecked(profile.rtimeEnabled);
 
     // Printer Configuration - DISABLED
@@ -4133,10 +4152,8 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_printerType->setCurrentText(profile.printer.printerType);
     */
 
-#ifndef Q_OS_WIN
     // Update UI state based on NetSIO setting
     onNetSIOToggled(m_netSIOEnabled->isChecked());
-#endif
 
     // Hardware Extensions
     // 80-column options disabled until properly implemented
@@ -4156,6 +4173,8 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_proto80Enabled->setEnabled(false);
     m_voiceboxEnabled->setChecked(profile.voiceboxEnabled);
     m_sioAcceleration->setChecked(profile.sioAcceleration);
+    
+    m_fastbasicBuildPanelEnabled->setChecked(profile.fastbasicBuildPanelEnabled);
     
     // Restore signal blocking state
     blockSignals(wasBlocked);
@@ -4392,7 +4411,6 @@ void SettingsDialog::onJoystickPresetChanged(int joystickNumber)
     onJoystickDeviceChanged();
 }
 
-#ifndef Q_OS_WIN
 // FujiNet slot implementations
 
 void SettingsDialog::onFujiNetBrowseBinary()
@@ -4967,4 +4985,3 @@ void SettingsDialog::onFujiNetProcessStateChanged(int state)
     // Update restart warning visibility
     checkFujiNetRestartRequired();
 }
-#endif

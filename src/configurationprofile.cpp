@@ -194,6 +194,8 @@ QJsonObject ConfigurationProfile::toJson() const {
     hardwareConfig["sioAcceleration"] = sioAcceleration;
     json["hardwareConfig"] = hardwareConfig;
     
+    json["fastbasicBuildPanelEnabled"] = fastbasicBuildPanelEnabled;
+    
     return json;
 }
 
@@ -393,6 +395,8 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
         voiceboxEnabled = hardwareConfig["voiceboxEnabled"].toBool(false);
         sioAcceleration = hardwareConfig["sioAcceleration"].toBool(true);
     }
+    
+    fastbasicBuildPanelEnabled = json["fastbasicBuildPanelEnabled"].toBool(false);
 }
 
 bool ConfigurationProfile::isValid() const {

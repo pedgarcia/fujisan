@@ -720,9 +720,8 @@ void TCPServer::handleSystemCommand(QTcpSocket* client, const QJsonObject& reque
                         "Main window not available to stop FujiNet");
         }
 #else
-        Q_UNUSED(params);
         sendResponse(client, requestId, false, QJsonValue(),
-                    "FujiNet stop is not supported on this platform");
+                    "FujiNet not available on Windows in this release");
 #endif
 
     } else if (subCommand == "start_fujinet") {
@@ -738,9 +737,8 @@ void TCPServer::handleSystemCommand(QTcpSocket* client, const QJsonObject& reque
                         "Main window not available to start FujiNet");
         }
 #else
-        Q_UNUSED(params);
         sendResponse(client, requestId, false, QJsonValue(),
-                    "FujiNet start is not supported on this platform");
+                    "FujiNet not available on Windows in this release");
 #endif
         
     } else if (subCommand == "restart") {

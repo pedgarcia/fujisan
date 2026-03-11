@@ -80,7 +80,9 @@ BUILD_TARBALL=true
 BUILD_APPIMAGE=false
 KEEP_CONTAINER=false
 BUILD_FUJINET_PC=false
+BUILD_FASTBASIC_COMPILER=false
 FUJINET_SRC_DIR=""
+FASTBASIC_SRC_DIR=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -107,6 +109,14 @@ while [[ $# -gt 0 ]]; do
         --build-fujinet-pc)
             BUILD_FUJINET_PC=true
             shift
+            ;;
+        --build-fastbasic-compiler)
+            BUILD_FASTBASIC_COMPILER=true
+            shift
+            ;;
+        --fastbasic-src)
+            FASTBASIC_SRC_DIR="$2"
+            shift 2
             ;;
         --fujinet-src)
             FUJINET_SRC_DIR="$2"
@@ -408,6 +418,40 @@ else
     echo "⚠ Warning: No FujiNet-PC found to bundle"
 fi
 
+# Bundle Fastbasic if requested
+mkdir -p fujisan-linux/usr/lib/fujisan/fastbasic
+if [ "$BUILD_FASTBASIC_COMPILER" = "true" ]; then
+    if [ "$ARCH" = "amd64" ]; then
+        echo "Downloading Fastbasic v4.7 linux64..."
+        curl -sL -f -o /tmp/fb-linux64.zip "https://github.com/dmsc/fastbasic/releases/download/v4.7/fastbasic-v4.7-linux64.zip"
+        unzip -q -o /tmp/fb-linux64.zip -d fujisan-linux/usr/lib/fujisan/fastbasic
+        rm -f /tmp/fb-linux64.zip
+        chmod 755 fujisan-linux/usr/lib/fujisan/fastbasic/fastbasic fujisan-linux/usr/lib/fujisan/fastbasic/fb 2>/dev/null || true
+        echo "✓ Fastbasic (linux64) bundled"
+    elif [ "$ARCH" = "arm64" ] && [ -d "/build/fastbasic" ]; then
+        echo "Building Fastbasic from source (v4.7)..."
+        FB_DEST="/tmp/fujisan-build/build-release/fujisan-linux/usr/lib/fujisan/fastbasic"
+        # The source is mounted read-only and may contain x86_64 build artifacts from
+        # the host. Copy to a writable directory so we can do a clean native ARM64 build.
+        FB_BUILD_DIR="/tmp/fastbasic-src"
+        rm -rf "$FB_BUILD_DIR"
+        cp -r /build/fastbasic "$FB_BUILD_DIR"
+        cd "$FB_BUILD_DIR"
+        git fetch --tags 2>/dev/null || true
+        git checkout v4.7 2>/dev/null || git checkout 4.7 2>/dev/null || true
+        make clean 2>/dev/null || true
+        make -j$(nproc)
+        cp -p build/bin/fastbasic build/bin/fb build/bin/ca65 build/bin/ld65 build/bin/ar65 build/bin/mkatr build/bin/lsatr "$FB_DEST/" 2>/dev/null || true
+        cp -p build/compiler/*.lib build/compiler/*.cfg build/compiler/*.tgt "$FB_DEST/" 2>/dev/null || true
+        cp -r build/compiler/asminc build/compiler/syntax "$FB_DEST/" 2>/dev/null || true
+        chmod 755 "$FB_DEST"/fastbasic "$FB_DEST"/fb 2>/dev/null || true
+        cd /tmp/fujisan-build/build-release
+        echo "✓ Fastbasic (arm64 from source) bundled"
+    elif [ "$ARCH" = "arm64" ]; then
+        echo "⚠ Warning: BUILD_FASTBASIC_COMPILER requested for arm64 but /build/fastbasic not mounted (use --fastbasic-src)"
+    fi
+fi
+
 # Copy binary to lib directory (real binary)
 cp Fujisan fujisan-linux/usr/lib/fujisan/Fujisan
 chmod 755 fujisan-linux/usr/lib/fujisan/Fujisan
@@ -541,11 +585,19 @@ EOF
     # Set proper permissions
     find fujisan-linux -type d -exec chmod 755 {} \;
     find fujisan-linux -type f -exec chmod 644 {} \;
+    # Restore executable bit for all known executables
     chmod 755 fujisan-linux/usr/bin/fujisan
     chmod 755 fujisan-linux/usr/lib/fujisan/Fujisan
+    # Fastbasic executables
+    for fb_bin in fastbasic fb ca65 ld65 ar65 mkatr lsatr; do
+        chmod 755 "fujisan-linux/usr/lib/fujisan/fastbasic/$fb_bin" 2>/dev/null || true
+    done
+    # FujiNet executables
     chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet 2>/dev/null || true
     chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/run-fujinet.sh 2>/dev/null || true
     chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/run-fujinet 2>/dev/null || true
+    # Shared libraries need the execute bit to be loadable
+    find fujisan-linux -name "*.so*" -type f -exec chmod 755 {} \; 2>/dev/null || true
     
     # Build .deb package
     dpkg-deb --build fujisan-linux "fujisan_${VERSION_CLEAN}_${ARCH}.deb"
@@ -628,6 +680,24 @@ QTCONF_EOF
 
         echo "✓ FujiNet-PC bundled in portable package (from source)"
     fi
+
+    # Copy Fastbasic to portable if bundled
+    if [ -d "fujisan-linux/usr/lib/fujisan/fastbasic" ] && [ -f "fujisan-linux/usr/lib/fujisan/fastbasic/fastbasic" ]; then
+        echo "Copying Fastbasic to portable package..."
+        cp -r fujisan-linux/usr/lib/fujisan/fastbasic fujisan-portable/bin/
+        echo "✓ Fastbasic bundled in portable package"
+    fi
+
+    # Fix executable permissions for portable package.
+    # The DEB step may have chmod 644'd everything; re-apply 755 to all executables.
+    chmod 755 fujisan-portable/bin/Fujisan 2>/dev/null || true
+    for fb_bin in fastbasic fb ca65 ld65 ar65 mkatr lsatr; do
+        chmod 755 "fujisan-portable/bin/fastbasic/$fb_bin" 2>/dev/null || true
+    done
+    chmod 755 fujisan-portable/bin/fujinet-pc/fujinet 2>/dev/null || true
+    chmod 755 fujisan-portable/bin/fujinet-pc/run-fujinet.sh 2>/dev/null || true
+    chmod 755 fujisan-portable/bin/fujinet-pc/run-fujinet 2>/dev/null || true
+    find fujisan-portable -name "*.so*" -type f -exec chmod 755 {} \; 2>/dev/null || true
 
     # Copy Qt libraries
     mkdir -p fujisan-portable/lib
@@ -769,6 +839,21 @@ if [[ "$BUILD_FUJINET_PC" == "true" ]]; then
     echo_info "FujiNet-PC source: $FUJINET_SRC_DIR"
 fi
 
+# Resolve fastbasic path for --build-fastbasic-compiler (arm64: build from source)
+FASTBASIC_VOLUME_ARG=""
+if [[ "$BUILD_FASTBASIC_COMPILER" == "true" ]] && [[ "$ARCH" == "arm64" ]]; then
+    if [[ -z "$FASTBASIC_SRC_DIR" ]]; then
+        FASTBASIC_SRC_DIR="$(dirname "$PROJECT_ROOT")/fastbasic"
+    fi
+    if [[ ! -d "$FASTBASIC_SRC_DIR" ]]; then
+        echo_error "fastbasic source not found at: $FASTBASIC_SRC_DIR (required for arm64)"
+        echo_error "Clone it or set --fastbasic-src to its path"
+        exit 1
+    fi
+    FASTBASIC_VOLUME_ARG="-v $FASTBASIC_SRC_DIR:/build/fastbasic:ro"
+    echo_info "Fastbasic source (arm64): $FASTBASIC_SRC_DIR"
+fi
+
 # Run build in container
 echo_step "Building Fujisan in Container"
 
@@ -778,10 +863,12 @@ $CONTAINER_RUNTIME run --rm \
     -v "$PROJECT_ROOT:/build/fujisan:ro" \
     -v "$LINUX_BUILD_DIR:/output" \
     ${FUJINET_VOLUME_ARG:+$FUJINET_VOLUME_ARG} \
+    ${FASTBASIC_VOLUME_ARG:+$FASTBASIC_VOLUME_ARG} \
     -e VERSION="$VERSION" \
     -e VERSION_CLEAN="$VERSION_CLEAN" \
     -e ARCH="$ARCH" \
     -e BUILD_FUJINET_PC="$BUILD_FUJINET_PC" \
+    -e BUILD_FASTBASIC_COMPILER="$BUILD_FASTBASIC_COMPILER" \
     fujisan-linux-builder:ubuntu22-$ARCH \
     bash /output/build-in-container.sh "$VERSION" "$VERSION_CLEAN" "$BUILD_DEB" "$BUILD_TARBALL" "$ARCH" || {
     echo_error "Build failed"

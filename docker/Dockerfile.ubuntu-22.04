@@ -41,6 +41,8 @@ RUN apt-get update && apt-get install -y \
     libsdl2-2.0-0 \
     file \
     wget \
+    curl \
+    unzip \
     fuse \
     # Qt5 packages
     qtbase5-dev \

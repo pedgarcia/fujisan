@@ -38,6 +38,8 @@ RUN apt-get update && apt-get install -y \
     libpulse-dev \
     file \
     wget \
+    curl \
+    unzip \
     fuse \
     # Qt5 packages
     qtbase5-dev \

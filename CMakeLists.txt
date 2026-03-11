@@ -172,13 +172,13 @@ elseif(CMAKE_CROSSCOMPILING AND WIN32)
     # Cross-compilation for Windows (using MinGW on Linux with full autotools)
     message(STATUS "Configuring for Windows cross-compilation with autotools")
     
-    # Check if FujiNet support is requested
-    option(ENABLE_FUJINET "Enable FujiNet/NetSIO support in Windows build" OFF)
+    # Enable FujiNet/NetSIO support for Windows builds by default
+    option(ENABLE_FUJINET "Enable FujiNet/NetSIO support in Windows build" ON)
     if(ENABLE_FUJINET)
         message(STATUS "FujiNet/NetSIO support enabled for Windows build")
         set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libatari800-fujinet.sh <SOURCE_DIR>)
     else()
-        message(STATUS "Using autotools build for Windows cross-compilation")
+        message(STATUS "Using autotools build for Windows cross-compilation (NetSIO disabled)")
         set(ATARI800_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libatari800-autotools.sh <SOURCE_DIR>)
     endif()
     
@@ -300,6 +300,7 @@ set(SOURCES
     src/printerwidget.cpp
     src/mediaperipheralsdock.cpp
     src/tcpserver.cpp
+    src/fastbasicbuildpanel.cpp
     src/fujinetservice.cpp
     src/fujinetprocessmanager.cpp
     src/fujinetbinarymanager.cpp
@@ -327,6 +328,7 @@ set(HEADERS
     include/printerwidget.h
     include/mediaperipheralsdock.h
     include/tcpserver.h
+    include/fastbasicbuildpanel.h
     include/fujinetservice.h
     include/fujinetprocessmanager.h
     include/fujinetbinarymanager.h
@@ -424,21 +426,28 @@ target_link_libraries(${PROJECT_NAME}
 # Link SDL2 only if available (for unified audio backend and/or joystick support)
 if(HAVE_SDL2_AUDIO OR HAVE_SDL2_JOYSTICK)
     if(TARGET SDL2::SDL2)
-        # Try to link with SDL2 target first
-        try_compile(SDL2_TARGET_WORKS
-            ${CMAKE_BINARY_DIR}/test_sdl2_target
-            ${CMAKE_SOURCE_DIR}/cmake/test_sdl2_target.cpp
-            LINK_LIBRARIES SDL2::SDL2
-            OUTPUT_VARIABLE SDL2_TARGET_OUTPUT
-        )
+        # Windows cross-compilation: SDL2::SDL2 try_compile often fails (SDL2main link order
+        # with MinGW), so use fallback directly and skip the test to avoid a noisy warning.
+        if(WIN32 AND CMAKE_CROSSCOMPILING)
+            set(SDL2_TARGET_WORKS OFF)
+        else()
+            try_compile(SDL2_TARGET_WORKS
+                ${CMAKE_BINARY_DIR}/test_sdl2_target
+                ${CMAKE_SOURCE_DIR}/cmake/test_sdl2_target.cpp
+                LINK_LIBRARIES SDL2::SDL2
+                OUTPUT_VARIABLE SDL2_TARGET_OUTPUT
+            )
+        endif()
 
         if(SDL2_TARGET_WORKS)
             message(STATUS "SDL2::SDL2 target linking works")
             target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
         else()
-            message(WARNING "SDL2::SDL2 target linking failed, falling back to library paths")
-            message(STATUS "SDL2 target test output: ${SDL2_TARGET_OUTPUT}")
-            # Fallback to direct library linking for cross-compilation
+            if(NOT (WIN32 AND CMAKE_CROSSCOMPILING))
+                message(WARNING "SDL2::SDL2 target linking failed, falling back to library paths")
+                message(STATUS "SDL2 target test output: ${SDL2_TARGET_OUTPUT}")
+            endif()
+            # Fallback to direct library linking for cross-compilation or when target test fails
             if(WIN32 AND CMAKE_CROSSCOMPILING)
                 find_library(SDL2_FALLBACK_LIB
                     NAMES SDL2 libSDL2.dll.a SDL2.lib libSDL2
@@ -448,7 +457,7 @@ if(HAVE_SDL2_AUDIO OR HAVE_SDL2_JOYSTICK)
                     NO_DEFAULT_PATH
                 )
                 if(SDL2_FALLBACK_LIB)
-                    message(STATUS "Using SDL2 fallback library: ${SDL2_FALLBACK_LIB}")
+                    message(STATUS "Using SDL2 fallback library: ${SDL2_FALLBACK_LIB} (Windows cross-compile)")
                     target_link_libraries(${PROJECT_NAME} ${SDL2_FALLBACK_LIB})
                 else()
                     message(FATAL_ERROR "SDL2 fallback library not found")

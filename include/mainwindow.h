@@ -37,12 +37,11 @@
 #include "mediaperipheralsdock.h"
 #include "configurationprofilemanager.h"
 #include "tcpserver.h"
+#include "fastbasicbuildpanel.h"
 #include "fujinetservice.h"
 
-#ifndef Q_OS_WIN
 class FujiNetProcessManager;
 class FujiNetBinaryManager;
-#endif
 
 class MainWindow : public QMainWindow
 {
@@ -52,6 +51,10 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+public slots:
+    void coldBoot();
+    void warmBoot();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
@@ -60,8 +63,6 @@ protected:
 
 private slots:
     void loadRom();
-    void coldBoot();
-    void warmBoot();
     void toggleBasic(bool enabled);
     void toggleAltirraOS(bool enabled);
     void toggleAltirraBASIC(bool enabled);
@@ -79,14 +80,12 @@ private slots:
     void toggleMediaDock();
     void togglePause();
 
-#ifndef Q_OS_WIN
     // FujiNet slots
     void onFujiNetProcessStateChanged(int state);
     void onNetSIOEnabledChanged(bool enabled);
     void onFujiNetConnected();
     void onFujiNetDisconnected();
     void onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives);
-#endif
 
     // State save/load slots
     void quickSaveState();
@@ -130,11 +129,12 @@ public:
     // Public method for TCP server to set H drive path (triggers emulator restart)
     bool setHardDrivePathViaTCP(int driveNumber, const QString& path);
 
-#ifndef Q_OS_WIN
+    // Public accessor for build panel / tools that need to load XEX or access emulator
+    AtariEmulator* getEmulator() const { return m_emulator; }
+
     // Public methods for TCP server to stop/start FujiNet-PC (e.g. stop → load XEX → start)
     void stopFujiNetViaTCP();
     void startFujiNetViaTCP();
-#endif
 
 private:
     void createMenus();
@@ -166,7 +166,6 @@ private:
 
     // Status bar update methods
     void updateSpeedStatus();
-#ifndef Q_OS_WIN
     void updateFujiNetStatus();
 
     // FujiNet helper methods
@@ -176,7 +175,6 @@ private:
     void switchDrivesToLocalMode();
     void updateStatusBarForDriveMode();
     QString getFujiNetSDPath() const;  // Get SD path with default computation
-#endif
 
     AtariEmulator* m_emulator;
     EmulatorWidget* m_emulatorWidget;
@@ -185,7 +183,6 @@ private:
     // TCP Server for remote control
     TCPServer* m_tcpServer;
 
-#ifndef Q_OS_WIN
     // FujiNet-PC process management
     FujiNetProcessManager* m_fujinetProcessManager;
     FujiNetBinaryManager* m_fujinetBinaryManager;
@@ -197,7 +194,9 @@ private:
     qint64 m_fujinetFirstRestartTime;
     static const int MAX_RESTARTS = 3;
     static const int RESTART_WINDOW_MS = 10000; // 10 seconds
-#endif
+
+    // Fastbasic build panel (above status bar when enabled)
+    FastbasicBuildPanel* m_fastbasicBuildPanel;
 
     // Debugger
     DebuggerWidget* m_debuggerWidget;
@@ -244,9 +243,7 @@ private:
 
     // Status bar widgets
     QLabel* m_speedStatusLabel;
-#ifndef Q_OS_WIN
     QLabel* m_fujinetStatusLabel;
-#endif
 
     // Menu actions
     QAction* m_loadRomAction;

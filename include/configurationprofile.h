@@ -158,6 +158,9 @@ struct ConfigurationProfile {
     bool voiceboxEnabled = false;
     bool sioAcceleration = true;
     
+    // UI / Emulator tab
+    bool fastbasicBuildPanelEnabled = false;
+    
     // Serialization methods
     QJsonObject toJson() const;
     void fromJson(const QJsonObject& json);

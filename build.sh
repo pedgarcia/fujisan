@@ -21,6 +21,7 @@
 #   --sign               - Sign macOS builds (requires certificates)
 #   --notarize           - Notarize macOS builds after signing
 #   --build-fujinet-pc   - Build FujiNet-PC from source (requires fujinet-firmware repo)
+#   --build-fastbasic-compiler - Download and bundle Fastbasic from GitHub releases
 #   --developer-id       - Specify Developer ID for signing
 #   --version X          - Set version (default: from git)
 #   --help               - Show this help
@@ -100,6 +101,7 @@ Options:
   --sign               Sign macOS builds with Developer ID
   --notarize           Notarize macOS builds (implies --sign)
   --build-fujinet-pc   Build FujiNet-PC from source before Fujisan
+  --build-fastbasic-compiler   Download and bundle Fastbasic from GitHub releases
   --developer-id ID    Specify Developer ID certificate
   --version X          Set version
   --help               Show this help
@@ -207,6 +209,17 @@ EOF
     if [[ -f "$app_path/Contents/Resources/fujinet-pc/fujinet" ]]; then
         echo_info "Signing bundled FujiNet-PC binary..."
         codesign --force --timestamp --options runtime --sign "$dev_id" "$app_path/Contents/Resources/fujinet-pc/fujinet"
+    fi
+
+    # Sign all Fastbasic executables if bundled (required for notarization)
+    local fastbasic_dir="$app_path/Contents/Resources/fastbasic"
+    if [[ -d "$fastbasic_dir" ]]; then
+        for exe in "$fastbasic_dir"/fastbasic "$fastbasic_dir"/fb "$fastbasic_dir"/ca65 "$fastbasic_dir"/ld65 "$fastbasic_dir"/ar65 "$fastbasic_dir"/mkatr "$fastbasic_dir"/lsatr; do
+            if [[ -f "$exe" ]]; then
+                echo_info "Signing Fastbasic: $(basename "$exe")..."
+                codesign --force --timestamp --options runtime --sign "$dev_id" "$exe"
+            fi
+        done
     fi
 
     # Sign the main executable
@@ -454,6 +467,51 @@ EOF
     echo_success "FujiNet-PC $version bundled successfully"
 }
 
+# Ensure Fastbasic release is downloaded (Mac: fastbasic/macosx/)
+# Call scripts/download-fastbasic.sh if needed.
+ensure_fastbasic_downloaded() {
+    local platform="$1"  # macosx, linux64, win32
+    local cache_dir="${PROJECT_ROOT}/fastbasic/${platform}"
+    if [[ -d "$cache_dir" ]] && ( [[ "$platform" == "macosx" ]] && [[ -f "$cache_dir/fastbasic" ]] || [[ "$platform" == "linux64" ]] && [[ -f "$cache_dir/fastbasic" ]] || [[ "$platform" == "win32" ]] && [[ -f "$cache_dir/fastbasic.exe" ]] ); then
+        return 0
+    fi
+    echo_info "Downloading Fastbasic ${FASTBASIC_VERSION} for ${platform}..."
+    "$SCRIPT_DIR/scripts/download-fastbasic.sh" "$FASTBASIC_VERSION" || return 1
+}
+
+# Bundle Fastbasic into macOS app (full extracted zip: binary + asminc, syntax, libs, etc.)
+bundle_fastbasic() {
+    local app_path="$1"
+    local dev_id="$2"
+
+    local src_dir="${PROJECT_ROOT}/fastbasic/macosx"
+    if [[ ! -f "$src_dir/fastbasic" ]]; then
+        echo_error "Fastbasic not found at $src_dir/fastbasic. Run: ./scripts/download-fastbasic.sh $FASTBASIC_VERSION"
+        return 1
+    fi
+
+    echo_info "Bundling Fastbasic into app..."
+    local fastbasic_dir="$app_path/Contents/Resources/fastbasic"
+    rm -rf "$fastbasic_dir"
+    mkdir -p "$fastbasic_dir"
+    cp -R "$src_dir"/* "$fastbasic_dir/"
+    chmod +x "$fastbasic_dir/fastbasic" "$fastbasic_dir/fb" 2>/dev/null || true
+
+    # Sign all executables (required for notarization)
+    local exes=(fastbasic fb ca65 ld65 ar65 mkatr lsatr)
+    for exe in "${exes[@]}"; do
+        if [[ -f "$fastbasic_dir/$exe" ]]; then
+            if [[ -n "$dev_id" ]]; then
+                echo_info "Signing $exe..."
+                codesign --force --timestamp --options runtime --sign "$dev_id" "$fastbasic_dir/$exe"
+            else
+                codesign --force --sign - "$fastbasic_dir/$exe" 2>/dev/null || true
+            fi
+        fi
+    done
+    echo_success "Fastbasic bundled"
+}
+
 # Bundle and fix OpenSSL dylibs for FujiNet-PC on macOS
 # When built with --build-fujinet-pc, FujiNet may link to Homebrew OpenSSL.
 # This causes Team ID mismatch on user Macs. Solution: bundle OpenSSL inside app.
@@ -658,6 +716,15 @@ build_macos_arm64() {
         bundle_openssl_for_fujinet "$ARM64_BUILD_DIR/Fujisan.app" "$dev_id"
     fi
 
+    # Bundle Fastbasic if requested (MUST be done BEFORE signing)
+    if [[ "$BUILD_FASTBASIC_COMPILER" == "true" ]]; then
+        if [[ -z "$dev_id" ]] && ( [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]] ); then
+            dev_id=$(find_developer_id)
+        fi
+        ensure_fastbasic_downloaded "macosx" || true
+        bundle_fastbasic "$ARM64_BUILD_DIR/Fujisan.app" "$dev_id" || true
+    fi
+
     # Sign with Developer ID or ad-hoc (AFTER bundling FujiNet and OpenSSL)
     if [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]]; then
         if [[ -z "$dev_id" ]]; then
@@ -750,6 +817,15 @@ build_macos_x86_64() {
         
         # Bundle OpenSSL if FujiNet was built from source (fixes Homebrew Team ID issue)
         bundle_openssl_for_fujinet "$X86_64_BUILD_DIR/Fujisan.app" "$dev_id"
+    fi
+
+    # Bundle Fastbasic if requested (MUST be done BEFORE signing)
+    if [[ "$BUILD_FASTBASIC_COMPILER" == "true" ]]; then
+        if [[ -z "$dev_id" ]] && ( [[ "$SIGN" == "true" ]] || [[ "$NOTARIZE" == "true" ]] ); then
+            dev_id=$(find_developer_id)
+        fi
+        ensure_fastbasic_downloaded "macosx" || true
+        bundle_fastbasic "$X86_64_BUILD_DIR/Fujisan.app" "$dev_id" || true
     fi
 
     # Sign with Developer ID or ad-hoc (AFTER bundling FujiNet and OpenSSL)
@@ -981,7 +1057,7 @@ build_windows() {
     # Use the simplified Windows build script
     if [[ -f "$SCRIPT_DIR/scripts/build-windows-simple.sh" ]]; then
         echo_info "Passing VERSION=$VERSION to Windows build script"
-        VERSION="$VERSION" "$SCRIPT_DIR/scripts/build-windows-simple.sh"
+        BUILD_FASTBASIC_COMPILER="$BUILD_FASTBASIC_COMPILER" VERSION="$VERSION" "$SCRIPT_DIR/scripts/build-windows-simple.sh"
         
         # Package into zip for distribution
         if [[ -d "build-windows" ]]; then
@@ -1043,6 +1119,13 @@ build_linux() {
             local FUJINET_SRC="${FUJINET_SOURCE_DIR:-./../fujinet-firmware}"
             docker_args+=(--fujinet-src "$(cd "$FUJINET_SRC" 2>/dev/null && pwd || echo "$FUJINET_SRC")")
         fi
+        if [[ "$BUILD_FASTBASIC_COMPILER" == "true" ]]; then
+            docker_args+=(--build-fastbasic-compiler)
+            if [[ "$arch" == "arm64" ]]; then
+                local FASTBASIC_SRC="${FASTBASIC_SOURCE_DIR:-./../fastbasic}"
+                docker_args+=(--fastbasic-src "$(cd "$FASTBASIC_SRC" 2>/dev/null && pwd || echo "$FASTBASIC_SRC")")
+            fi
+        fi
         "$SCRIPT_DIR/scripts/build-linux-docker.sh" "${docker_args[@]}"
     else
         echo_error "Linux build script not found"
@@ -1085,7 +1168,9 @@ CLEAN=false
 SIGN=false
 NOTARIZE=false
 BUILD_FUJINET_PC=false
+BUILD_FASTBASIC_COMPILER=false
 BUNDLE_FUJINET=true  # Default to bundling FujiNet-PC (core feature)
+FASTBASIC_VERSION="${FASTBASIC_VERSION:-v4.7}"
 DEVELOPER_ID=""
 
 while [[ $# -gt 0 ]]; do
@@ -1105,6 +1190,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --build-fujinet-pc)
             BUILD_FUJINET_PC=true
+            shift
+            ;;
+        --build-fastbasic-compiler)
+            BUILD_FASTBASIC_COMPILER=true
             shift
             ;;
         --bundle-fujinet)
@@ -1176,6 +1265,9 @@ if [[ "$NOTARIZE" == "true" ]]; then
 fi
 if [[ "$BUILD_FUJINET_PC" == "true" ]]; then
     echo_info "FujiNet-PC Build: Enabled"
+fi
+if [[ "$BUILD_FASTBASIC_COMPILER" == "true" ]]; then
+    echo_info "Fastbasic bundle: Enabled"
 fi
 echo ""
 

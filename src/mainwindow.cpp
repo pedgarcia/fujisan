@@ -27,10 +27,8 @@
 #include <QFileInfo>
 #include <QDateTime>
 
-#ifndef Q_OS_WIN
 #include "fujinetprocessmanager.h"
 #include "fujinetbinarymanager.h"
-#endif
 
 // Debug control - uncomment to enable verbose disk I/O logging
 // #define DEBUG_DISK_IO
@@ -40,14 +38,12 @@ MainWindow::MainWindow(QWidget *parent)
     , m_emulator(new AtariEmulator(this))
     , m_emulatorWidget(nullptr)
     , m_tcpServer(new TCPServer(m_emulator, this, this))
-#ifndef Q_OS_WIN
     , m_fujinetProcessManager(new FujiNetProcessManager(this))
     , m_fujinetBinaryManager(new FujiNetBinaryManager(this))
     , m_fujinetService(new FujiNetService(this))
     , m_fujinetIntentionalRestart(false)
     , m_fujinetRestartCount(0)
     , m_fujinetFirstRestartTime(0)
-#endif
     , m_keepAspectRatio(true)
     , m_startInFullscreen(false)
     , m_isInCustomFullscreen(false)
@@ -62,6 +58,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_mediaPeripheralsDockWidget(nullptr)
     , m_mediaToggleButton(nullptr)
     , m_logoLabel(nullptr)
+    , m_fastbasicBuildPanel(nullptr)
 {
     setWindowTitle(QString("Fujisan %1").arg(FUJISAN_VERSION));
     setMinimumSize(800, 600);
@@ -115,7 +112,6 @@ MainWindow::MainWindow(QWidget *parent)
         }
     }
 
-#ifndef Q_OS_WIN
     // Connect FujiNet process manager signals
     connect(m_fujinetProcessManager, &FujiNetProcessManager::stateChanged,
             this, &MainWindow::onFujiNetProcessStateChanged);
@@ -248,6 +244,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     int launchBehavior = settings.value("fujinet/launchBehavior", 0).toInt(); // 0=Auto, 1=Detect, 2=Manual
 
+#ifdef Q_OS_WIN
+    // FujiNet/NetSIO not available in this release on Windows
+    (void)netSIOEnabled;
+    (void)launchBehavior;
+#else
     if (netSIOEnabled && launchBehavior == 0) { // Auto-launch mode
         qDebug() << "NetSIO enabled - auto-starting FujiNet-PC with saved settings...";
         startFujiNetWithSavedSettings();
@@ -270,20 +271,18 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-#ifndef Q_OS_WIN
     // Stop FujiNet-PC process if we started it
     if (m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
         qDebug() << "Stopping FujiNet-PC process...";
         m_fujinetProcessManager->stop();
     }
 
-    // Aggressive cleanup: kill ALL FujiNet-PC processes to prevent orphans
-    // This handles cases where processes weren't tracked properly
+#ifndef Q_OS_WIN
+    // Aggressive cleanup: kill ALL FujiNet-PC processes to prevent orphans (Unix only)
     qDebug() << "Performing aggressive FujiNet-PC cleanup...";
     QProcess cleanup;
     cleanup.start("pkill", QStringList() << "-9" << "fujinet");
-    cleanup.waitForFinished(2000); // Wait up to 2 seconds
-
+    cleanup.waitForFinished(2000);
     if (cleanup.exitCode() == 0) {
         qDebug() << "Killed orphaned FujiNet-PC processes";
     }
@@ -904,18 +903,16 @@ void MainWindow::createStatusBarWidgets()
     m_speedStatusLabel->setStyleSheet("QLabel { padding: 0 10px; }");
     statusBar()->addPermanentWidget(m_speedStatusLabel);
 
-#ifndef Q_OS_WIN
-    // Create FujiNet status label
+    // Create FujiNet status label (hidden on Windows - FujiNet not available in this release)
     m_fujinetStatusLabel = new QLabel();
     m_fujinetStatusLabel->setStyleSheet("QLabel { padding: 0 10px; }");
+#ifndef Q_OS_WIN
     statusBar()->addPermanentWidget(m_fujinetStatusLabel);
 #endif
 
     // Initial update
     updateSpeedStatus();
-#ifndef Q_OS_WIN
     updateFujiNetStatus();
-#endif
 }
 
 void MainWindow::createEmulatorWidget()
@@ -931,6 +928,12 @@ void MainWindow::createEmulatorWidget()
 
     // Make the emulator widget expand to fill all available space
     layout->addWidget(m_emulatorWidget);
+
+    // Fastbasic build panel (one row above status bar; visibility from Settings → Emulator → Fastbasic)
+    m_fastbasicBuildPanel = new FastbasicBuildPanel(this, centralWidget);
+    layout->addWidget(m_fastbasicBuildPanel);
+    QSettings settings("8bitrelics", "Fujisan");
+    m_fastbasicBuildPanel->setVisible(settings.value("fastbasic/buildPanelEnabled", false).toBool());
 
     setCentralWidget(centralWidget);
 
@@ -976,6 +979,12 @@ void MainWindow::updateFujiNetStatus()
     }
 
     m_fujinetStatusLabel->setText(statusText);
+}
+#else
+void MainWindow::updateFujiNetStatus()
+{
+    if (m_fujinetStatusLabel)
+        m_fujinetStatusLabel->setText("FujiNet: N/A");
 }
 #endif
 
@@ -1027,7 +1036,6 @@ void MainWindow::loadRom()
 
 void MainWindow::coldBoot()
 {
-#ifndef Q_OS_WIN
     // Check if NetSIO is enabled and FujiNet-PC is running (managed or external)
     // Cold boot triggers FujiNet-PC exit code 75 (restart request)
     // We need to delay the boot to allow FujiNet-PC to restart and be ready
@@ -1061,7 +1069,6 @@ void MainWindow::coldBoot()
         }
         return;
     }
-#endif
 
     // Normal cold boot (no NetSIO or not running FujiNet-PC)
     m_emulator->coldBoot();
@@ -1195,9 +1202,7 @@ void MainWindow::onMachineTypeChanged(int index)
 void MainWindow::restartEmulator()
 {
     qDebug() << "=== RESTART EMULATOR START ===";
-#ifndef Q_OS_WIN
     qDebug() << "FujiNet-PC process running:" << (m_fujinetProcessManager && m_fujinetProcessManager->isRunning());
-#endif
 
     m_emulator->shutdown();
 
@@ -1283,6 +1288,19 @@ void MainWindow::restartEmulator()
         m_emulator->setJoystick1Preset(settings.value("input/joystick2Preset", "wasd").toString());
         qDebug() << "Applied keyboard joystick state after restart - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
 
+        // Re-apply emulation speed from QSettings (atari800 core resets it on init, so status bar would show MAX otherwise)
+        bool turboMode = settings.value("machine/turboMode", false).toBool();
+        int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt();
+        int speedPercentage;
+        if (turboMode) {
+            speedPercentage = 0;
+        } else if (speedIndex == 0) {
+            speedPercentage = 50;
+        } else {
+            speedPercentage = speedIndex * 100;
+        }
+        m_emulator->setEmulationSpeed(speedPercentage);
+
         // Update toolbar to reflect actual BASIC state (may have been auto-disabled for FujiNet)
         updateToolbarFromSettings();
     } else {
@@ -1349,13 +1367,10 @@ void MainWindow::onSpeedToggled(bool isFullSpeed)
 void MainWindow::showSettings()
 {
     SettingsDialog dialog(m_emulator, m_profileManager,
-#ifndef Q_OS_WIN
                          m_fujinetService,
-#endif
                          this);
     connect(&dialog, &SettingsDialog::settingsChanged, this, &MainWindow::onSettingsChanged);
 
-#ifndef Q_OS_WIN
     // Connect NetSIO enabled change signal for FujiNet-PC process management
     connect(&dialog, &SettingsDialog::netSIOEnabledChanged,
             this, &MainWindow::onNetSIOEnabledChanged);
@@ -1363,7 +1378,6 @@ void MainWindow::showSettings()
     // Share FujiNet managers with the dialog to prevent orphaned processes
     // and ensure coordinated lifecycle management
     dialog.setFujiNetManagers(m_fujinetProcessManager, m_fujinetBinaryManager);
-#endif
 
     // Connect signal to sync printer state when profile is being saved
     connect(&dialog, &SettingsDialog::syncPrinterStateRequested, this, [this, &dialog]() {
@@ -1433,6 +1447,12 @@ void MainWindow::onSettingsChanged()
         printerWidget->setPrinterEnabled(printerEnabled);
         printerWidget->setOutputFormat(outputFormat);
         printerWidget->setPrinterType(printerType);
+    }
+
+    // Update Fastbasic build panel visibility
+    if (m_fastbasicBuildPanel) {
+        QSettings settings("8bitrelics", "Fujisan");
+        m_fastbasicBuildPanel->setVisible(settings.value("fastbasic/buildPanelEnabled", false).toBool());
     }
 
     statusBar()->showMessage("Settings applied and emulator restarted", 3000);
@@ -2070,7 +2090,6 @@ void MainWindow::createMediaPeripheralsDock()
         }
     });
 
-#ifndef Q_OS_WIN
     // Connect FujiNet disk I/O signals (reuse same handlers as local drives)
     connect(m_fujinetProcessManager, &FujiNetProcessManager::diskIOStart,
             this, [this](int driveNumber, bool isWriting) {
@@ -2148,7 +2167,6 @@ void MainWindow::createMediaPeripheralsDock()
                     m_fujinetService, &FujiNetService::clearPrinterBuffer);
         }
     }
-#endif
 
     connect(m_mediaToggleButton, &QPushButton::clicked, this, &MainWindow::toggleMediaDock);
 
@@ -2564,7 +2582,6 @@ void MainWindow::onDiskInserted(int driveNumber, const QString& diskPath)
 {
     QFileInfo fileInfo(diskPath);
 
-#ifndef Q_OS_WIN
     // Check if we're in FujiNet mode
     qDebug() << "NetSIO enabled:" << m_netSIOEnabled << ", FujiNet connected:" << m_fujinetService->isConnected();
     if (m_netSIOEnabled && m_fujinetService->isConnected()) {
@@ -2620,7 +2637,6 @@ void MainWindow::onDiskInserted(int driveNumber, const QString& diskPath)
         // Progress indicator will be hidden by mountSuccess/mountFailed signal handlers
         return;
     }
-#endif
 
     // Local mode - normal handling
     statusBar()->showMessage(QString("Disk mounted to D%1: %2 - Try typing DIR from BASIC")
@@ -2633,7 +2649,6 @@ void MainWindow::onDiskInserted(int driveNumber, const QString& diskPath)
 
 void MainWindow::onDiskEjected(int driveNumber)
 {
-#ifndef Q_OS_WIN
     // Check if we're in FujiNet mode
     if (m_netSIOEnabled && m_fujinetService->isConnected()) {
         // FujiNet mode - unmount via API
@@ -2645,7 +2660,6 @@ void MainWindow::onDiskEjected(int driveNumber)
         statusBar()->showMessage(QString("Ejecting disk from FujiNet D%1...").arg(driveNumber), 3000);
         return;
     }
-#endif
 
     // Local mode - normal handling
     statusBar()->showMessage(QString("Disk ejected from D%1:").arg(driveNumber), 3000);
@@ -2671,7 +2685,6 @@ void MainWindow::onDriveStateChanged(int driveNumber, bool enabled)
     // Save drive state to settings
     saveDriveStateToSettings(driveNumber, enabled);
 
-#ifndef Q_OS_WIN
     // If NetSIO is enabled, sync the enable/disable state to FujiNet config
     if (m_netSIOEnabled && m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
         QString sdPath = getFujiNetSDPath();
@@ -2732,7 +2745,6 @@ void MainWindow::onDriveStateChanged(int driveNumber, bool enabled)
             }
         }
     }
-#endif
 }
 
 void MainWindow::onCassetteInserted(const QString& cassettePath)
@@ -2772,6 +2784,11 @@ void MainWindow::onCartridgeEjected()
 void MainWindow::loadInitialSettings()
 {
     QSettings settings("8bitrelics", "Fujisan");
+
+    // Fastbasic build panel visibility (panel is created in createEmulatorWidget)
+    if (m_fastbasicBuildPanel) {
+        m_fastbasicBuildPanel->setVisible(settings.value("fastbasic/buildPanelEnabled", false).toBool());
+    }
 
     // Debug checkbox state vs settings
     if (m_joystickEnabledCheck) {
@@ -2835,6 +2852,9 @@ void MainWindow::loadInitialSettings()
 
     qDebug() << "Input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
     qDebug() << "Special devices - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
+#ifdef Q_OS_WIN
+    netSIOEnabled = false; // FujiNet/NetSIO not available on Windows in this release
+#endif
 
     // Load ROM paths BEFORE initialization
     QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
@@ -2862,6 +2882,8 @@ void MainWindow::loadInitialSettings()
         QApplication::quit();
         return;
     }
+
+    // FujiNet/NetSIO not available on Windows in this release
 
     // Ensure keyboard joystick state is properly applied after initialization
     // This is needed because the initial state from command line args might not match
@@ -2915,6 +2937,27 @@ void MainWindow::loadInitialSettings()
 
     // Update toolbar to reflect loaded settings
     updateToolbarFromSettings();
+
+    // Apply the current profile so emulator and QSettings match the selected profile.
+    // This ensures that after reboot the correct profile (e.g. "offline" with NetSIO disabled) is applied.
+    QString currentProfileName = m_profileManager->getCurrentProfileName();
+    if (!currentProfileName.isEmpty()) {
+        ConfigurationProfile profile = m_profileManager->loadProfile(currentProfileName);
+        if (profile.isValid()) {
+            qDebug() << "Applying current profile at startup:" << currentProfileName;
+            applyProfileToEmulator(profile);
+            m_emulator->setCurrentProfileName(currentProfileName);
+        } else {
+            // Profile file missing (e.g. deleted); switch to Default and apply it
+            qWarning() << "Current profile not found or invalid:" << currentProfileName << "- switching to Default";
+            m_profileManager->setCurrentProfileName("Default");
+            ConfigurationProfile defaultProfile = m_profileManager->loadProfile("Default");
+            if (defaultProfile.isValid()) {
+                applyProfileToEmulator(defaultProfile);
+                m_emulator->setCurrentProfileName("Default");
+            }
+        }
+    }
 }
 
 void MainWindow::loadAndApplyMediaSettings()
@@ -3202,6 +3245,11 @@ void MainWindow::quickLoadState()
         // Get the profile name from the loaded state
         QString profileName = m_emulator->getCurrentProfileName();
 
+        // Sync ProfileManager so the persisted current profile matches the loaded state
+        if (!profileName.isEmpty() && m_profileManager->profileExists(profileName)) {
+            m_profileManager->setCurrentProfileName(profileName);
+        }
+
         // Try to select the profile in the combo box
         int index = m_profileCombo->findText(profileName);
         if (index >= 0) {
@@ -3262,6 +3310,11 @@ void MainWindow::loadState()
         if (m_emulator->loadState(filename)) {
             // Get the profile name from the loaded state
             QString profileName = m_emulator->getCurrentProfileName();
+
+            // Sync ProfileManager so the persisted current profile matches the loaded state
+            if (!profileName.isEmpty() && m_profileManager->profileExists(profileName)) {
+                m_profileManager->setCurrentProfileName(profileName);
+            }
 
             // Try to select the profile in the combo box
             int index = m_profileCombo->findText(profileName);
@@ -3517,12 +3570,10 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
     // Save profile values to QSettings so Settings Dialog will show correct values
     QSettings settings("8bitrelics", "Fujisan");
 
-#ifndef Q_OS_WIN
     // Check if NetSIO state is changing (read old state BEFORE saving new value)
     bool oldNetSIOState = settings.value("media/netSIOEnabled", false).toBool();
     bool newNetSIOState = profile.netSIOEnabled;
     qDebug() << "=== [TOOLBAR PROFILE] NetSIO state check - Old:" << oldNetSIOState << "New:" << newNetSIOState;
-#endif
 
     settings.setValue("machine/type", profile.machineType);
     settings.setValue("machine/videoSystem", profile.videoSystem);
@@ -3532,8 +3583,12 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
     settings.setValue("audio/enabled", profile.audioEnabled);
     settings.setValue("audio/volume", profile.audioVolume);
     settings.setValue("media/netSIOEnabled", profile.netSIOEnabled);
+    settings.setValue("fastbasic/buildPanelEnabled", profile.fastbasicBuildPanelEnabled);
 
-#ifndef Q_OS_WIN
+    if (m_fastbasicBuildPanel) {
+        m_fastbasicBuildPanel->setVisible(profile.fastbasicBuildPanelEnabled);
+    }
+
     // CRITICAL: Start/stop FujiNet-PC BEFORE emulator restart if NetSIO state changed
     // FujiNet must be running before emulator initializes with NetSIO enabled
     if (oldNetSIOState != newNetSIOState) {
@@ -3549,7 +3604,6 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
     } else {
         qDebug() << "=== [TOOLBAR PROFILE] NetSIO unchanged, no FujiNet action needed";
     }
-#endif
 
     // Restart emulator to apply all configuration changes (including NetSIO)
     // Must use restartEmulator() not coldBoot() because NetSIO requires full reinitialization
@@ -3570,7 +3624,6 @@ void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
     QFileInfo fileInfo(filename);
     qDebug() << "Mounting disk image dropped on emulator to D1:" << filename;
 
-#ifndef Q_OS_WIN
     // Check if we should use FujiNet mode
     if (m_netSIOEnabled && m_diskDrive1->getDriveMode() == DiskDriveWidget::FUJINET) {
         // FujiNet mode - copy to SD and mount via FujiNet API
@@ -3611,7 +3664,6 @@ void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
         statusBar()->showMessage(QString("Mounting via FujiNet: %1").arg(fileInfo.fileName()), 3000);
         return;
     }
-#endif
 
     // Local mode - enable D1 drive if it's currently disabled
     if (!m_diskDrive1->isDriveEnabled()) {
@@ -3648,7 +3700,6 @@ void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
 
 void MainWindow::onPrinterEnabledChanged(bool enabled)
 {
-#ifndef Q_OS_WIN
     // FujiNet-PC printer (network printing)
     if (m_fujinetService) {
         QString printerType = m_mediaPeripheralsDock
@@ -3665,7 +3716,6 @@ void MainWindow::onPrinterEnabledChanged(bool enabled)
             qDebug() << "FujiNet printer disabled via MainWindow";
         }
     }
-#endif
 
     // Note: Local P: device printer is disabled (not working in atari800 core)
 }
@@ -3680,7 +3730,6 @@ void MainWindow::onPrinterTypeChanged(const QString& type)
 {
     qDebug() << "Printer type changed to:" << type;
 
-#ifndef Q_OS_WIN
     // Update FujiNet-PC printer configuration
     if (m_fujinetService) {
         bool enabled = m_mediaPeripheralsDock
@@ -3689,7 +3738,6 @@ void MainWindow::onPrinterTypeChanged(const QString& type)
 
         m_fujinetService->configurePrinter(type, enabled);
     }
-#endif
 }
 
 void MainWindow::toggleTCPServer()
@@ -3909,7 +3957,6 @@ void MainWindow::togglePause()
     }
 }
 
-#ifndef Q_OS_WIN
 void MainWindow::updateFujiNetConfigFile(const QString& configPath, int netsioPort)
 {
     // Read existing config file
@@ -4038,7 +4085,6 @@ void MainWindow::startFujiNetWithSavedSettings()
 
 void MainWindow::stopFujiNetViaTCP()
 {
-#ifndef Q_OS_WIN
     if (!m_fujinetProcessManager) {
         qWarning() << "[TCP] FujiNet process manager not initialized - cannot stop";
         return;
@@ -4051,20 +4097,14 @@ void MainWindow::stopFujiNetViaTCP()
         m_fujinetService->stopDrivePolling();
     }
     // Reset netsio client state so the emulator stops routing SIO to the dead process.
-    // When FujiNet-PC restarts it will perform a clean handshake from scratch, avoiding
-    // the SIGABRT crash caused by receiving mid-stream SIO data on reconnect.
     if (m_emulator) {
         m_emulator->resetNetSIOClientState();
     }
     m_fujinetProcessManager->stop();
-#else
-    qWarning() << "[TCP] FujiNet stop requested on unsupported platform";
-#endif
 }
 
 void MainWindow::startFujiNetViaTCP()
 {
-#ifndef Q_OS_WIN
     if (!m_fujinetProcessManager || !m_fujinetBinaryManager) {
         qWarning() << "[TCP] FujiNet managers not initialized - cannot start";
         return;
@@ -4073,9 +4113,6 @@ void MainWindow::startFujiNetViaTCP()
     qDebug() << "[TCP] Starting FujiNet-PC via TCP command...";
     m_fujinetIntentionalRestart = true;
     startFujiNetWithSavedSettings();
-#else
-    qWarning() << "[TCP] FujiNet start requested on unsupported platform";
-#endif
 }
 
 void MainWindow::onFujiNetProcessStateChanged(int state)
@@ -4188,7 +4225,6 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
             m_fujinetService->startDrivePolling();
         }
 
-#ifndef Q_OS_WIN
         // Show printer UI and start polling if printer is enabled AND FujiNet is connected
         if (m_fujinetService && m_mediaPeripheralsDock) {
             m_mediaPeripheralsDock->setNetSIOEnabled(true);
@@ -4201,7 +4237,6 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
                 }
             }
         }
-#endif
 
         // Start FujiNet-PC if not already running (auto-launch mode only)
         if (launchBehavior == 0 && !m_fujinetProcessManager->isRunning()) {
@@ -4220,14 +4255,12 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
         m_fujinetService->stopDrivePolling();
         m_fujinetService->stopHealthCheck();
 
-#ifndef Q_OS_WIN
         // Hide printer UI and stop polling
         if (m_fujinetService && m_mediaPeripheralsDock) {
             m_mediaPeripheralsDock->setNetSIOEnabled(false);
             m_fujinetService->stopPrinterPolling();
             qDebug() << "Stopped FujiNet printer polling and hid printer UI";
         }
-#endif
 
         // Stop FujiNet-PC if we started it (auto-launch mode only)
         if (launchBehavior == 0 && m_fujinetProcessManager->isRunning()) {
@@ -4268,7 +4301,6 @@ void MainWindow::onFujiNetConnected()
         updateStatusBarForDriveMode();
         m_fujinetService->startDrivePolling();
 
-#ifndef Q_OS_WIN
         // Configure and start printer polling if printer is enabled
         if (m_mediaPeripheralsDock) {
             PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
@@ -4280,7 +4312,6 @@ void MainWindow::onFujiNetConnected()
                 qDebug() << "Printer connection established (SSE with polling fallback)";
             }
         }
-#endif
     }
 
     // Update status bar to reflect FujiNet connection state
@@ -4424,4 +4455,3 @@ QString MainWindow::getFujiNetSDPath() const
 
     return QString();
 }
-#endif
