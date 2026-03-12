@@ -381,16 +381,11 @@ void SettingsDialog::createHardwareTab()
     specialLayout->addLayout(rDeviceLayout);
 
     m_netSIOEnabled = new QCheckBox("Enable NetSIO (FujiNet-PC Support)");
-#ifdef Q_OS_WIN
-    m_netSIOEnabled->setToolTip("FujiNet/NetSIO support is coming in a future Windows release.");
-    m_netSIOEnabled->setEnabled(false);
-#else
     m_netSIOEnabled->setToolTip("Enable NetSIO for FujiNet-PC network functionality\n\n"
                                "IMPORTANT: FujiNet requires BASIC to be disabled to boot properly.\n"
                                "BASIC will be automatically disabled when NetSIO is enabled.");
     // Connect NetSIO checkbox to update BASIC checkbox state
     connect(m_netSIOEnabled, &QCheckBox::toggled, this, &SettingsDialog::onNetSIOToggled);
-#endif
     specialLayout->addWidget(m_netSIOEnabled);
 
     m_rtimeEnabled = new QCheckBox("Enable R-Time 8 Real-Time Clock");
@@ -1859,9 +1854,7 @@ void SettingsDialog::createEmulatorTab()
 void SettingsDialog::createFujiNetTab()
 {
     m_fujinetTab = new QWidget();
-#ifndef Q_OS_WIN
     m_tabWidget->addTab(m_fujinetTab, "FujiNet");
-#endif
 
     QVBoxLayout* mainLayout = new QVBoxLayout(m_fujinetTab);
     mainLayout->setSpacing(10);
@@ -2029,7 +2022,7 @@ void SettingsDialog::createFujiNetTab()
 
     // Description (compact single line)
     QLabel* description = new QLabel(
-        "FujiNet-PC provides network-based disk emulation. When NetSIO is enabled, D1-D8 are served by FujiNet-PC. Not available on Windows."
+        "FujiNet-PC provides network-based disk emulation. When NetSIO is enabled, D1-D8 are served by FujiNet-PC."
     );
     description->setStyleSheet("color: #666; font-size: 11px;");
     mainLayout->addWidget(description);

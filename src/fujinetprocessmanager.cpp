@@ -130,13 +130,26 @@ void FujiNetProcessManager::stop()
 
     // Check if we're managing the process or just tracking an external one
     if (m_process->state() == QProcess::NotRunning) {
-        // External process - use pkill to stop it
+        // External process - use platform-specific kill command
+#ifdef Q_OS_WIN
+        qDebug() << "Stopping external FujiNet-PC process with taskkill";
+        QProcess taskkill;
+        taskkill.start("taskkill", QStringList() << "/IM" << "fujinet.exe");
+        taskkill.waitForFinished(2000);
+
+        QThread::msleep(1000);
+        if (isProcessRunningExternally("fujinet")) {
+            qDebug() << "External FujiNet-PC did not terminate, force killing";
+            QProcess taskkillForce;
+            taskkillForce.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
+            taskkillForce.waitForFinished(2000);
+        }
+#else
         qDebug() << "Stopping external FujiNet-PC process with pkill";
         QProcess pkill;
         pkill.start("pkill", QStringList() << "-TERM" << "fujinet");
         pkill.waitForFinished(2000);
 
-        // Give it a moment, then force kill if needed
         QThread::msleep(1000);
         if (isProcessRunningExternally("fujinet")) {
             qDebug() << "External FujiNet-PC did not terminate, force killing";
@@ -144,6 +157,7 @@ void FujiNetProcessManager::stop()
             pkillForce.start("pkill", QStringList() << "-9" << "fujinet");
             pkillForce.waitForFinished(2000);
         }
+#endif
     } else {
         // Process we started - use QProcess methods
         m_process->terminate();
@@ -174,6 +188,26 @@ void FujiNetProcessManager::clearOutputBuffers()
 
 bool FujiNetProcessManager::isProcessRunningExternally(const QString& processName)
 {
+#ifdef Q_OS_WIN
+    // Use tasklist to check if process is running (Windows)
+    QString imageName = processName;
+    if (!imageName.endsWith(".exe", Qt::CaseInsensitive)) {
+        imageName += ".exe";
+    }
+    QProcess tasklist;
+    tasklist.start("tasklist", QStringList() << "/FI" << QString("IMAGENAME eq %1").arg(imageName) << "/NH");
+    tasklist.waitForFinished(1000);
+
+    // tasklist outputs lines; if process exists, we get a line containing the image name
+    QByteArray output = tasklist.readAllStandardOutput();
+    bool isRunning = output.toLower().contains(imageName.toUtf8().toLower());
+
+    if (isRunning) {
+        qDebug() << "Detected existing" << imageName << "process";
+    }
+
+    return isRunning;
+#else
     // Use pgrep to check if process is running (Unix/Linux/macOS)
     QProcess pgrep;
     pgrep.start("pgrep", QStringList() << "-x" << processName);
@@ -187,6 +221,7 @@ bool FujiNetProcessManager::isProcessRunningExternally(const QString& processNam
     }
 
     return isRunning;
+#endif
 }
 
 // Private slots

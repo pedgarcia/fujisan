@@ -708,7 +708,6 @@ void TCPServer::handleSystemCommand(QTcpSocket* client, const QJsonObject& reque
         sendEventToAllClients("system_restarted", eventData);
         
     } else if (subCommand == "stop_fujinet") {
-#ifndef Q_OS_WIN
         if (m_mainWindow) {
             qDebug() << "TCP Server: Stopping FujiNet-PC via system.stop_fujinet";
             m_mainWindow->stopFujiNetViaTCP();
@@ -719,13 +718,8 @@ void TCPServer::handleSystemCommand(QTcpSocket* client, const QJsonObject& reque
             sendResponse(client, requestId, false, QJsonValue(),
                         "Main window not available to stop FujiNet");
         }
-#else
-        sendResponse(client, requestId, false, QJsonValue(),
-                    "FujiNet not available on Windows in this release");
-#endif
 
     } else if (subCommand == "start_fujinet") {
-#ifndef Q_OS_WIN
         if (m_mainWindow) {
             qDebug() << "TCP Server: Starting FujiNet-PC via system.start_fujinet";
             m_mainWindow->startFujiNetViaTCP();
@@ -736,11 +730,7 @@ void TCPServer::handleSystemCommand(QTcpSocket* client, const QJsonObject& reque
             sendResponse(client, requestId, false, QJsonValue(),
                         "Main window not available to start FujiNet");
         }
-#else
-        sendResponse(client, requestId, false, QJsonValue(),
-                    "FujiNet not available on Windows in this release");
-#endif
-        
+
     } else if (subCommand == "restart") {
         // Generic restart - use cold restart for reliability
         m_emulator->coldRestart();

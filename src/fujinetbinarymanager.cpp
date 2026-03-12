@@ -40,8 +40,7 @@ FujiNetBinaryManager::~FujiNetBinaryManager()
 QString FujiNetBinaryManager::getCurrentPlatform()
 {
 #ifdef Q_OS_WIN
-    // Windows is not supported
-    return QString();
+    return "windows-x86_64";
 #elif defined(Q_OS_MAC)
     // Detect macOS architecture
     #ifdef Q_PROCESSOR_ARM_64
@@ -67,14 +66,17 @@ QString FujiNetBinaryManager::getStoragePath()
 #ifdef Q_OS_MAC
     // macOS: Store in app bundle Resources
     return QCoreApplication::applicationDirPath() + "/../Resources/fujinet-pc";
-#else
-    // Linux: Check bundled location first (for distributed packages)
+#elif defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+    // Windows/Linux: Check bundled location first (for distributed packages)
     QString bundledPath = QCoreApplication::applicationDirPath() + "/fujinet-pc";
     if (QDir(bundledPath).exists()) {
         return bundledPath;
     }
 
     // Fall back to user data directory (for user-installed binaries)
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return dataPath + "/fujinet-pc";
+#else
     QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     return dataPath + "/fujinet-pc";
 #endif

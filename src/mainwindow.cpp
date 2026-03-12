@@ -244,11 +244,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     int launchBehavior = settings.value("fujinet/launchBehavior", 0).toInt(); // 0=Auto, 1=Detect, 2=Manual
 
-#ifdef Q_OS_WIN
-    // FujiNet/NetSIO not available in this release on Windows
-    (void)netSIOEnabled;
-    (void)launchBehavior;
-#else
     if (netSIOEnabled && launchBehavior == 0) { // Auto-launch mode
         qDebug() << "NetSIO enabled - auto-starting FujiNet-PC with saved settings...";
         startFujiNetWithSavedSettings();
@@ -264,7 +259,6 @@ MainWindow::MainWindow(QWidget *parent)
             qDebug() << "No existing FujiNet-PC process found - waiting for external start";
         }
     }
-#endif
 
     qDebug() << "Fujisan initialized successfully";
 }
@@ -277,16 +271,18 @@ MainWindow::~MainWindow()
         m_fujinetProcessManager->stop();
     }
 
-#ifndef Q_OS_WIN
-    // Aggressive cleanup: kill ALL FujiNet-PC processes to prevent orphans (Unix only)
+    // Aggressive cleanup: kill ALL FujiNet-PC processes to prevent orphans
     qDebug() << "Performing aggressive FujiNet-PC cleanup...";
     QProcess cleanup;
+#ifdef Q_OS_WIN
+    cleanup.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
+#else
     cleanup.start("pkill", QStringList() << "-9" << "fujinet");
+#endif
     cleanup.waitForFinished(2000);
     if (cleanup.exitCode() == 0) {
         qDebug() << "Killed orphaned FujiNet-PC processes";
     }
-#endif
 
     if (m_emulator) {
         m_emulator->shutdown();
@@ -903,12 +899,10 @@ void MainWindow::createStatusBarWidgets()
     m_speedStatusLabel->setStyleSheet("QLabel { padding: 0 10px; }");
     statusBar()->addPermanentWidget(m_speedStatusLabel);
 
-    // Create FujiNet status label (hidden on Windows - FujiNet not available in this release)
+    // Create FujiNet status label
     m_fujinetStatusLabel = new QLabel();
     m_fujinetStatusLabel->setStyleSheet("QLabel { padding: 0 10px; }");
-#ifndef Q_OS_WIN
     statusBar()->addPermanentWidget(m_fujinetStatusLabel);
-#endif
 
     // Initial update
     updateSpeedStatus();
@@ -962,7 +956,6 @@ void MainWindow::updateSpeedStatus()
     m_speedStatusLabel->setText(speedText);
 }
 
-#ifndef Q_OS_WIN
 void MainWindow::updateFujiNetStatus()
 {
     if (!m_fujinetStatusLabel) {
@@ -980,13 +973,6 @@ void MainWindow::updateFujiNetStatus()
 
     m_fujinetStatusLabel->setText(statusText);
 }
-#else
-void MainWindow::updateFujiNetStatus()
-{
-    if (m_fujinetStatusLabel)
-        m_fujinetStatusLabel->setText("FujiNet: N/A");
-}
-#endif
 
 void MainWindow::createDebugger()
 {
@@ -2852,9 +2838,6 @@ void MainWindow::loadInitialSettings()
 
     qDebug() << "Input settings - KbdJoy0:" << kbdJoy0Enabled << "KbdJoy1:" << kbdJoy1Enabled << "Swap:" << swapJoysticks;
     qDebug() << "Special devices - NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
-#ifdef Q_OS_WIN
-    netSIOEnabled = false; // FujiNet/NetSIO not available on Windows in this release
-#endif
 
     // Load ROM paths BEFORE initialization
     QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1)); // Remove the '-' prefix
@@ -2882,8 +2865,6 @@ void MainWindow::loadInitialSettings()
         QApplication::quit();
         return;
     }
-
-    // FujiNet/NetSIO not available on Windows in this release
 
     // Ensure keyboard joystick state is properly applied after initialization
     // This is needed because the initial state from command line args might not match
