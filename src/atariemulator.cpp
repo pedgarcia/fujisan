@@ -14,7 +14,6 @@
 #include <QApplication>
 #include <QMetaObject>
 #include <QTimer>
-#include <QThread>
 #include <QFileInfo>
 #include <QSettings>
 #include <QStandardPaths>
@@ -1667,53 +1666,18 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 
 void AtariEmulator::coldBoot()
 {
-    qDebug() << "[NETSIO] COLD BOOT START";
-    qDebug() << "[NETSIO] m_netSIOEnabled:" << m_netSIOEnabled;
-
+    qDebug() << "[NETSIO] COLD BOOT START — m_netSIOEnabled:" << m_netSIOEnabled;
 #ifdef NETSIO
-    extern int fujinet_known;  // Declared in netsio.c, set when first packet received from FujiNet-PC
-    qDebug() << "[NETSIO] Compiled: YES [v0.9.5 WITH SO_REUSEPORT FIX]";
-    qDebug() << "[NETSIO] netsio_enabled (core variable):" << netsio_enabled;
-    qDebug() << "[NETSIO] fujinet_known (received packets):" << fujinet_known;
-#else
-    qDebug() << "[NETSIO] Compiled: NO";
+    qDebug() << "[NETSIO] netsio_enabled:" << netsio_enabled;
 #endif
 
-    // Wait for the new FujiNet-PC instance to announce itself, then reset the Atari.
-    // MainWindow::coldBoot() has already force-killed the old instance and started a
-    // new one; resetNetSIOClientState() cleared netsio_enabled + fujinet_known to 0.
+    // Reset the Atari.  When NetSIO is active we suppress the 0xFF cold-reset packet
+    // that Atari800_Coldstart() would normally send: that packet causes FujiNet-PC to
+    // call exit(75) and restart, which would happen right as the Atari tries to boot
+    // from it.  FujiNet-PC restart is now handled explicitly by the FujiNet Reset
+    // button in the sidebar — the emulator's cold boot no longer owns FujiNet's lifecycle.
 #ifdef NETSIO
-    if (m_netSIOEnabled) {
-        extern int fujinet_known;
-
-        // Wait for NETSIO_DEVICE_CONNECTED (sets netsio_enabled=1) and the first UDP
-        // packet (sets fujinet_known=1).  Allow up to 10 seconds for FujiNet-PC to
-        // start and connect on slow Windows machines.
-        if (!netsio_enabled || !fujinet_known) {
-            qDebug() << "[NETSIO] Waiting for new FujiNet-PC instance to connect (up to 10 s)...";
-            QElapsedTimer timer;
-            timer.start();
-            while (!(netsio_enabled && fujinet_known) && timer.elapsed() < 10000) {
-                QCoreApplication::processEvents();
-                QThread::msleep(50);
-            }
-            if (netsio_enabled && fujinet_known) {
-                qDebug() << "[NETSIO] FujiNet-PC connected after" << timer.elapsed() << "ms";
-            } else {
-                qWarning() << "[NETSIO] TIMEOUT: FujiNet-PC did not connect after 10 s";
-                qWarning() << "[NETSIO]   netsio_enabled:" << netsio_enabled
-                           << "  fujinet_known:" << fujinet_known;
-            }
-        } else {
-            qDebug() << "[NETSIO] FujiNet-PC already connected";
-        }
-
-        // Suppress the netsio_cold_reset() call (0xFF) that Atari800_Coldstart() would
-        // normally send.  The old FujiNet-PC is already dead; sending 0xFF to the new
-        // instance would make it restart immediately — right as the Atari tries to boot
-        // from it, causing a second, unhandled restart loop.
-        // We suppress it by temporarily clearing netsio_enabled for the duration of
-        // Atari800_Coldstart(); the receive thread restores it via NETSIO_DEVICE_CONNECTED.
+    if (m_netSIOEnabled && netsio_enabled) {
         int savedNetsioEnabled = netsio_enabled;
         netsio_enabled = 0;
         qDebug() << "Calling Atari800_Coldstart() (internal 0xFF suppressed)...";
@@ -1721,12 +1685,14 @@ void AtariEmulator::coldBoot()
         netsio_enabled = savedNetsioEnabled;
         qDebug() << "Atari800_Coldstart() completed";
     } else {
-        qDebug() << "[NETSIO] NetSIO disabled - calling Atari800_Coldstart() normally";
+        qDebug() << "Calling Atari800_Coldstart()...";
         Atari800_Coldstart();
+        qDebug() << "Atari800_Coldstart() completed";
     }
 #else
-    qDebug() << "[NETSIO] Not compiled - calling Atari800_Coldstart() normally";
+    qDebug() << "Calling Atari800_Coldstart()...";
     Atari800_Coldstart();
+    qDebug() << "Atari800_Coldstart() completed";
 #endif
 
     // Dismount local disks to give FujiNet boot priority

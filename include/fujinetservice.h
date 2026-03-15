@@ -100,6 +100,9 @@ public:
     void queryMountStatus();  // Query all disk slots D1-D8
     void queryDriveStatus();  // Query drive status from root / endpoint (new format)
 
+    // FujiNet device actions
+    void swapDisks();  // Rotate disk images (Button A equivalent, HTTP GET /swap)
+
     // Browse files on host
     void browseHost(int hostSlot);
 

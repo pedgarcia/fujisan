@@ -326,6 +326,21 @@ void FujiNetService::queryDriveStatus()
             this, &FujiNetService::onNetworkError);
 }
 
+void FujiNetService::swapDisks()
+{
+    if (!m_isConnected) {
+        qDebug() << "FujiNetService::swapDisks() - not connected, skipping";
+        return;
+    }
+
+    QUrl url(m_serverUrl + "/swap");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
+
+    QNetworkReply* reply = m_networkManager->get(request);
+    connect(reply, &QNetworkReply::finished, reply, &QNetworkReply::deleteLater);
+}
+
 void FujiNetService::browseHost(int hostSlot)
 {
     QString endpoint = QString("/browse/%1").arg(hostSlot);

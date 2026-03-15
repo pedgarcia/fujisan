@@ -304,6 +304,7 @@ set(SOURCES
     src/fujinetservice.cpp
     src/fujinetprocessmanager.cpp
     src/fujinetbinarymanager.cpp
+    src/fujinetwidget.cpp
 )
 
 set(HEADERS
@@ -332,6 +333,7 @@ set(HEADERS
     include/fujinetservice.h
     include/fujinetprocessmanager.h
     include/fujinetbinarymanager.h
+    include/fujinetwidget.h
 )
 
 # ============================================================================

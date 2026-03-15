@@ -18,6 +18,7 @@ MediaPeripheralsDock::MediaPeripheralsDock(AtariEmulator* emulator, QWidget* par
     , m_cassetteGroup(nullptr)
     , m_diskDrivesGroup(nullptr)
     , m_printerGroup(nullptr)
+    , m_fujinetGroup(nullptr)
     , m_driveContainer(nullptr)
     , m_driveButtonsLayout(nullptr)
     , m_addDriveButton(nullptr)
@@ -25,6 +26,7 @@ MediaPeripheralsDock::MediaPeripheralsDock(AtariEmulator* emulator, QWidget* par
     , m_cartridgeWidget(nullptr)
     , m_cassetteWidget(nullptr)
     , m_printerWidget(nullptr)
+    , m_fujinetWidget(nullptr)
 {
     // Initialize drive widgets array
     for (int i = 0; i < 7; i++) {
@@ -45,13 +47,14 @@ void MediaPeripheralsDock::setupUI()
     m_mainLayout->setContentsMargins(4, 4, 4, 4);
     m_mainLayout->setSpacing(SECTION_SPACING);
     
-    // New order: Drives first, then Cassette, then Printer (Cartridge moved to toolbar)
+    // Order: Drives, Cassette, Printer, FujiNet at very bottom
     createDiskDrivesSection();
     // createCartridgeSection(); // Cartridge moved to main toolbar
     createCassetteSection();
     createPrinterSection();
-    
-    // Add stretch to push everything to the top
+    createFujiNetSection();
+
+    // Stretch pushes everything to the top; FujiNet group is pinned last
     m_mainLayout->addStretch();
 }
 
@@ -322,8 +325,27 @@ void MediaPeripheralsDock::updateDriveButtonStates()
 
 void MediaPeripheralsDock::setNetSIOEnabled(bool enabled)
 {
-    // Show/hide printer UI based on NetSIO state (FujiNet-PC only)
+    // Show/hide printer and FujiNet widgets based on NetSIO state
     if (m_printerGroup) {
         m_printerGroup->setVisible(enabled);
     }
+    if (m_fujinetGroup) {
+        m_fujinetGroup->setVisible(enabled);
+    }
+}
+
+void MediaPeripheralsDock::createFujiNetSection()
+{
+    m_fujinetGroup = new QGroupBox("FujiNet", this);
+    QVBoxLayout* groupLayout = new QVBoxLayout(m_fujinetGroup);
+    groupLayout->setContentsMargins(4, 6, 4, 6);
+    groupLayout->setSpacing(2);
+
+    m_fujinetWidget = new FujiNetWidget(m_fujinetGroup);
+    groupLayout->addWidget(m_fujinetWidget);
+
+    m_mainLayout->addWidget(m_fujinetGroup);
+
+    // Hidden until NetSIO is enabled (same pattern as printer)
+    m_fujinetGroup->setVisible(false);
 }

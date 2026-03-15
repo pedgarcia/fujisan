@@ -29,6 +29,7 @@
 
 #include "fujinetprocessmanager.h"
 #include "fujinetbinarymanager.h"
+#include "fujinetwidget.h"
 
 // Debug control - uncomment to enable verbose disk I/O logging
 // #define DEBUG_DISK_IO
@@ -1022,79 +1023,15 @@ void MainWindow::loadRom()
 
 void MainWindow::coldBoot()
 {
-    // Check if NetSIO is enabled and FujiNet-PC is running (managed or external)
-    // Cold boot triggers FujiNet-PC exit code 75 (restart request)
-    // We need to delay the boot to allow FujiNet-PC to restart and be ready
-    QSettings settings;
-    bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
-
-    // Check if FujiNet-PC is running (either managed by us or externally)
-    bool fujinetRunning = false;
-    if (m_fujinetProcessManager) {
-        fujinetRunning = m_fujinetProcessManager->isRunning() ||
-                        FujiNetProcessManager::isProcessRunningExternally("fujinet");
-    }
-
-    if (netSIOEnabled && fujinetRunning) {
-        // Show message immediately for user feedback
-        statusBar()->showMessage("Cold boot - restarting FujiNet-PC...", 10000);
-        qDebug() << "Cold boot with NetSIO - force-killing and restarting FujiNet-PC";
-
-        // Mark as intentional so onFujiNetDisconnected() suppresses the error dialog
-        // and drive-mode switch when the process manager reports the kill.
-        m_fujinetIntentionalRestart = true;
-
-        // Stop the HTTP health-check and drive-polling timers so they don't fire
-        // (and clear m_fujinetIntentionalRestart prematurely) during the spin-loop.
-        if (m_fujinetService) {
-            m_fujinetService->stopHealthCheck();
-            m_fujinetService->stopDrivePolling();
-        }
-
-        // Force-kill the old FujiNet-PC instance.  This is nearly instant on all
-        // platforms (SIGKILL / TerminateProcess) vs the 8-9 s graceful exit(75) path
-        // that FujiNet-PC takes when it receives the 0xFF cold-reset packet.
-        m_fujinetProcessManager->forceKill();
-
-        // Clear the NETSIO client-side state so AtariEmulator::coldBoot() can
-        // detect when the NEW instance has announced itself.
-        m_emulator->resetNetSIOClientState();
-
-        // Start the new FujiNet-PC instance immediately — the old one is already dead.
-        startFujiNetWithSavedSettings();
-
-        // Perform cold boot: waits for the new FujiNet-PC to connect, then resets
-        // the Atari (suppressing the internal 0xFF inside Atari800_Coldstart()).
-        m_emulator->coldBoot();
-
-        // Cold boot complete.  FujiNet-PC should be running again (fujinet_known==1).
-        // Reset the intentional-restart flag and force the connection state back to
-        // "unknown" so the first successful health-check re-emits connected(), which
-        // restarts drive polling and updates the UI.
-        m_fujinetIntentionalRestart = false;
-        if (m_fujinetService) {
-            m_fujinetService->resetConnectionState();
-            int httpPort = settings.value("fujinet/apiPort", 8000).toInt();
-            m_fujinetService->setServerUrl(QString("http://localhost:%1").arg(httpPort));
-            m_fujinetService->startHealthCheck(3000);
-        }
-
-        // Show completion message after a short delay
-        QTimer::singleShot(2000, this, [this]() {
-            statusBar()->showMessage("Cold boot completed - FujiNet-PC ready", 2000);
-            qDebug() << "Cold boot with FujiNet-PC restart completed";
-        });
-        // Restore focus to emulator widget (fixes Linux focus loss)
-        if (m_emulatorWidget) {
-            m_emulatorWidget->setFocus();
-        }
-        return;
-    }
-
-    // Normal cold boot (no NetSIO or not running FujiNet-PC)
+    // Cold boot resets only the Atari.  FujiNet-PC manages its own lifecycle via
+    // the FujiNet Reset button in the sidebar — pressing Reset restarts FujiNet-PC
+    // and sets boot_config=true, so the next cold boot reaches the CONFIG app.
+    //
+    // The 0xFF suppression inside AtariEmulator::coldBoot() prevents the Atari800
+    // core from accidentally restarting FujiNet-PC via the NetSIO cold-reset packet.
+    qDebug() << "Cold boot";
     m_emulator->coldBoot();
     statusBar()->showMessage("Cold boot performed", 2000);
-    // Restore focus to emulator widget (fixes Linux focus loss)
     if (m_emulatorWidget) {
         m_emulatorWidget->setFocus();
     }
@@ -2175,6 +2112,30 @@ void MainWindow::createMediaPeripheralsDock()
             printer->resetDeduplicationHash();
         }
     });
+
+    // Connect FujiNet widget signals (Reset, Swap, LED updates)
+    if (m_mediaPeripheralsDock) {
+        FujiNetWidget* fujinetWidget = m_mediaPeripheralsDock->getFujiNetWidget();
+        if (fujinetWidget) {
+            // Button actions → MainWindow slots
+            connect(fujinetWidget, &FujiNetWidget::resetRequested,
+                    this, &MainWindow::resetFujiNet);
+            connect(fujinetWidget, &FujiNetWidget::swapRequested,
+                    this, &MainWindow::swapFujiNetDisks);
+
+            // FujiNetService health-check → WiFi LED
+            connect(m_fujinetService, &FujiNetService::connected,
+                    fujinetWidget, &FujiNetWidget::onConnected);
+            connect(m_fujinetService, &FujiNetService::disconnected,
+                    fujinetWidget, &FujiNetWidget::onDisconnected);
+
+            // FujiNetProcessManager disk I/O → Bus LED
+            connect(m_fujinetProcessManager, &FujiNetProcessManager::diskIOStart,
+                    fujinetWidget, &FujiNetWidget::onBusActivity);
+            connect(m_fujinetProcessManager, &FujiNetProcessManager::diskIOEnd,
+                    fujinetWidget, &FujiNetWidget::onBusIdle);
+        }
+    }
 
     // Connect printer polling pause/resume signals
     if (m_mediaPeripheralsDock) {
@@ -4181,13 +4142,34 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
                 }
             }
 
+            if (m_fujinetIntentionalRestart) {
+                // Process was force-killed intentionally (Reset button) — don't
+                // overwrite the "Restarting..." status message or flash "stopped".
+                qDebug() << "FujiNet-PC process exited after intentional force-kill";
+                if (m_mediaPeripheralsDock) {
+                    FujiNetWidget* fw = m_mediaPeripheralsDock->getFujiNetWidget();
+                    if (fw) fw->setFujiNetRunning(false);
+                }
+                break;
+            }
             qDebug() << "FujiNet-PC process stopped";
             statusBar()->showMessage("FujiNet-PC stopped", 3000);
+            if (m_mediaPeripheralsDock) {
+                FujiNetWidget* fw = m_mediaPeripheralsDock->getFujiNetWidget();
+                if (fw) fw->setFujiNetRunning(false);
+            }
             break;
         }
         case FujiNetProcessManager::Starting:
             qDebug() << "FujiNet-PC process starting...";
             statusBar()->showMessage("Starting FujiNet-PC...", 3000);
+            if (m_mediaPeripheralsDock) {
+                FujiNetWidget* fw = m_mediaPeripheralsDock->getFujiNetWidget();
+                if (fw) {
+                    fw->setFujiNetRunning(true);
+                    // WiFi LED will go green once FujiNetService::connected() fires
+                }
+            }
             break;
         case FujiNetProcessManager::Running:
             qDebug() << "FujiNet-PC process running";
@@ -4198,6 +4180,13 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
             statusBar()->showMessage("Stopping FujiNet-PC...", 3000);
             break;
         case FujiNetProcessManager::Error:
+            // During intentional force-kill (Reset button), Qt reports a crash exit.
+            // Suppress the error message and health-check stop — resetFujiNet() already
+            // stopped them, and startFujiNetWithSavedSettings() will restart them.
+            if (m_fujinetIntentionalRestart) {
+                qDebug() << "FujiNet-PC process exited (intentional force-kill)";
+                break;
+            }
             qWarning() << "FujiNet-PC process error";
             statusBar()->showMessage("FujiNet-PC error - check console", 5000);
             // Stop health check so it doesn't flood logs with "Connection refused"
@@ -4284,6 +4273,62 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
 
     // Update status bar to reflect FujiNet state change
     updateFujiNetStatus();
+}
+
+void MainWindow::resetFujiNet()
+{
+    qDebug() << "FujiNet Reset button pressed — force-killing and restarting FujiNet-PC";
+
+    if (!m_fujinetProcessManager) {
+        qWarning() << "resetFujiNet: no process manager";
+        return;
+    }
+
+    statusBar()->showMessage("Restarting FujiNet-PC...", 10000);
+
+    // Mark as intentional so onFujiNetDisconnected() suppresses the error dialog
+    m_fujinetIntentionalRestart = true;
+
+    // Stop health checks to avoid spurious disconnect events during restart
+    if (m_fujinetService) {
+        m_fujinetService->stopHealthCheck();
+        m_fujinetService->stopDrivePolling();
+    }
+
+    // Update FujiNet widget state
+    if (m_mediaPeripheralsDock) {
+        FujiNetWidget* fw = m_mediaPeripheralsDock->getFujiNetWidget();
+        if (fw) fw->onDisconnected();
+    }
+
+    // Force-kill old instance (nearly instant on all platforms)
+    m_fujinetProcessManager->forceKill();
+
+    // Clear NETSIO client state so the new instance's handshake is detected fresh
+    m_emulator->resetNetSIOClientState();
+
+    // Reset HTTP connection state so that the next successful health check
+    // will re-emit connected() even if m_isConnected was already true.
+    // Without this, if no in-flight request existed when stopHealthCheck()
+    // was called, m_isConnected stays true and connected() is never re-emitted,
+    // leaving the widget permanently showing "Stopped / Disconnected".
+    if (m_fujinetService) {
+        m_fujinetService->resetConnectionState();
+    }
+
+    // Immediately start new FujiNet-PC instance
+    // onFujiNetConnected() will restart health check + drive polling when it connects
+    startFujiNetWithSavedSettings();
+}
+
+void MainWindow::swapFujiNetDisks()
+{
+    qDebug() << "FujiNet Swap button pressed — rotating disk images";
+    if (m_fujinetService && m_fujinetService->isConnected()) {
+        m_fujinetService->swapDisks();
+    } else {
+        qWarning() << "swapFujiNetDisks: FujiNet not connected";
+    }
 }
 
 void MainWindow::onFujiNetConnected()

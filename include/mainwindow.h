@@ -86,6 +86,8 @@ private slots:
     void onFujiNetConnected();
     void onFujiNetDisconnected();
     void onFujiNetDriveStatusUpdated(const QVector<FujiNetDrive>& drives);
+    void resetFujiNet();   // FujiNet Reset button — force-kill + restart FujiNet-PC
+    void swapFujiNetDisks(); // FujiNet Swap button — rotate disk images via HTTP GET /swap
 
     // State save/load slots
     void quickSaveState();

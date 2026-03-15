@@ -20,6 +20,7 @@
 #include "cassettewidget.h"
 #include "cartridgewidget.h"
 #include "printerwidget.h"
+#include "fujinetwidget.h"
 
 class AtariEmulator;
 
@@ -35,6 +36,7 @@ public:
     CassetteWidget* getCassetteWidget() { return m_cassetteWidget; }
     CartridgeWidget* getCartridgeWidget() { return m_cartridgeWidget; }
     PrinterWidget* getPrinterWidget() { return m_printerWidget; }
+    FujiNetWidget* getFujiNetWidget() { return m_fujinetWidget; }
 
     // Update all devices from emulator state
     void updateAllDevices();
@@ -76,6 +78,7 @@ private:
     void createCassetteSection();
     void createDiskDrivesSection();
     void createPrinterSection();
+    void createFujiNetSection();
     void connectSignals();
     void updateDriveButtonStates();
 
@@ -89,6 +92,7 @@ private:
     QGroupBox* m_cassetteGroup;
     QGroupBox* m_diskDrivesGroup;
     QGroupBox* m_printerGroup;
+    QGroupBox* m_fujinetGroup;
 
     // Dynamic drive section components
     QWidget* m_driveContainer;
@@ -101,7 +105,8 @@ private:
     CassetteWidget* m_cassetteWidget;
     DiskDriveWidget* m_driveWidgets[7]; // D2-D8 (index 0 = D2, index 6 = D8)
     PrinterWidget* m_printerWidget;
-    
+    FujiNetWidget* m_fujinetWidget;
+
     // Drive visibility tracking
     int m_visibleDrives; // Number of drives currently visible (3 = D2-D4, 7 = D2-D8)
 
