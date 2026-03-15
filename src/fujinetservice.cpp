@@ -86,6 +86,11 @@ void FujiNetService::stopDrivePolling()
     m_drivePollingTimer->stop();
 }
 
+void FujiNetService::resetConnectionState()
+{
+    m_isConnected = false;
+}
+
 void FujiNetService::abortAllRequests()
 {
     // Abort all pending mount requests

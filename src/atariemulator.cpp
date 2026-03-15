@@ -1679,88 +1679,55 @@ void AtariEmulator::coldBoot()
     qDebug() << "[NETSIO] Compiled: NO";
 #endif
 
-    // CRITICAL: Send cold reset notification to FujiNet-PC BEFORE resetting emulator
-    // This tells FujiNet-PC to reset its state (boot_config=true, status_wait_count=5)
+    // Wait for the new FujiNet-PC instance to announce itself, then reset the Atari.
+    // MainWindow::coldBoot() has already force-killed the old instance and started a
+    // new one; resetNetSIOClientState() cleared netsio_enabled + fujinet_known to 0.
 #ifdef NETSIO
     if (m_netSIOEnabled) {
         extern int fujinet_known;
 
-        // PHASE 1: Wait for NetSIO socket initialization (netsio_enabled)
-        if (!netsio_enabled) {
-            qDebug() << "[NETSIO] Waiting for NetSIO socket initialization (port 9997)...";
+        // Wait for NETSIO_DEVICE_CONNECTED (sets netsio_enabled=1) and the first UDP
+        // packet (sets fujinet_known=1).  Allow up to 10 seconds for FujiNet-PC to
+        // start and connect on slow Windows machines.
+        if (!netsio_enabled || !fujinet_known) {
+            qDebug() << "[NETSIO] Waiting for new FujiNet-PC instance to connect (up to 10 s)...";
             QElapsedTimer timer;
             timer.start();
-            while (!netsio_enabled && timer.elapsed() < 2000) {
+            while (!(netsio_enabled && fujinet_known) && timer.elapsed() < 10000) {
                 QCoreApplication::processEvents();
                 QThread::msleep(50);
             }
-
-            if (!netsio_enabled) {
-                qWarning() << "[NETSIO] TIMEOUT: NetSIO socket not initialized after 2 seconds";
-                qWarning() << "[NETSIO] FujiNet boot will FAIL - netsio_enabled is still 0";
+            if (netsio_enabled && fujinet_known) {
+                qDebug() << "[NETSIO] FujiNet-PC connected after" << timer.elapsed() << "ms";
             } else {
-                qDebug() << "[NETSIO] NetSIO socket initialized after" << timer.elapsed() << "ms";
-            }
-        }
-
-        // PHASE 2: Wait for FujiNet-PC first packet (fujinet_known)
-        if (netsio_enabled && !fujinet_known) {
-            qDebug() << "[NETSIO] Waiting for FujiNet-PC first packet (fujinet_known)...";
-            QElapsedTimer timer;
-            timer.start();
-            while (!fujinet_known && timer.elapsed() < 2000) {
-                QCoreApplication::processEvents();
-                QThread::msleep(50);
-            }
-
-            if (!fujinet_known) {
-                qWarning() << "[NETSIO] TIMEOUT: No packets from FujiNet-PC after 2 seconds";
-                qWarning() << "[NETSIO] Reset packet will NOT be sent - FujiNet boot will FAIL";
-            } else {
-                qDebug() << "[NETSIO] FujiNet-PC responded after" << timer.elapsed() << "ms";
-            }
-        }
-
-        // SEND RESET: Only if both conditions are met
-        if (netsio_enabled && fujinet_known) {
-            qDebug() << "[NETSIO] Sending cold reset to FujiNet-PC (0xFF packet)";
-            int resetResult = netsio_cold_reset();
-            qDebug() << "[NETSIO] netsio_cold_reset() returned:" << resetResult;
-            
-            // Reset fujinet_known to wait for FujiNet-PC to restart and reconnect
-            // This fixes the race condition where cold boot proceeds before FujiNet-PC is ready
-            fujinet_known = 0;
-            
-            // Wait for FujiNet-PC to restart and reconnect (up to 3 seconds)
-            qDebug() << "[NETSIO] Waiting for FujiNet-PC to restart...";
-            QElapsedTimer restartTimer;
-            restartTimer.start();
-            while (!fujinet_known && restartTimer.elapsed() < 3000) {
-                QCoreApplication::processEvents();
-                QThread::msleep(50);
-            }
-            
-            if (fujinet_known) {
-                qDebug() << "[NETSIO] FujiNet-PC reconnected after" << restartTimer.elapsed() << "ms";
-            } else {
-                qWarning() << "[NETSIO] TIMEOUT: FujiNet-PC did not reconnect after 3 seconds";
+                qWarning() << "[NETSIO] TIMEOUT: FujiNet-PC did not connect after 10 s";
+                qWarning() << "[NETSIO]   netsio_enabled:" << netsio_enabled
+                           << "  fujinet_known:" << fujinet_known;
             }
         } else {
-            qWarning() << "[NETSIO] CANNOT SEND RESET - Conditions not met:";
-            qWarning() << "[NETSIO]   netsio_enabled:" << netsio_enabled << "(need: 1)";
-            qWarning() << "[NETSIO]   fujinet_known:" << fujinet_known << "(need: 1)";
+            qDebug() << "[NETSIO] FujiNet-PC already connected";
         }
+
+        // Suppress the netsio_cold_reset() call (0xFF) that Atari800_Coldstart() would
+        // normally send.  The old FujiNet-PC is already dead; sending 0xFF to the new
+        // instance would make it restart immediately — right as the Atari tries to boot
+        // from it, causing a second, unhandled restart loop.
+        // We suppress it by temporarily clearing netsio_enabled for the duration of
+        // Atari800_Coldstart(); the receive thread restores it via NETSIO_DEVICE_CONNECTED.
+        int savedNetsioEnabled = netsio_enabled;
+        netsio_enabled = 0;
+        qDebug() << "Calling Atari800_Coldstart() (internal 0xFF suppressed)...";
+        Atari800_Coldstart();
+        netsio_enabled = savedNetsioEnabled;
+        qDebug() << "Atari800_Coldstart() completed";
     } else {
-        qDebug() << "[NETSIO] NetSIO disabled - skipping FujiNet reset";
+        qDebug() << "[NETSIO] NetSIO disabled - calling Atari800_Coldstart() normally";
+        Atari800_Coldstart();
     }
 #else
-    qDebug() << "[NETSIO] WARNING: Not compiled - NetSIO not available";
-#endif
-
-    // Reset the Atari
-    qDebug() << "Calling Atari800_Coldstart()...";
+    qDebug() << "[NETSIO] Not compiled - calling Atari800_Coldstart() normally";
     Atari800_Coldstart();
-    qDebug() << "Atari800_Coldstart() completed";
+#endif
 
     // Dismount local disks to give FujiNet boot priority
     if (m_netSIOEnabled) {

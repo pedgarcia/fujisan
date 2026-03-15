@@ -68,6 +68,7 @@ public:
     void startHealthCheck(int intervalMs = 5000);
     void stopHealthCheck();
     void abortAllRequests();  // Abort all pending network requests
+    void resetConnectionState();  // Force m_isConnected=false so next successful check re-emits connected()
 
     // Drive polling
     void startDrivePolling(int intervalMs = 2500);  // Poll drive status every 2.5 seconds

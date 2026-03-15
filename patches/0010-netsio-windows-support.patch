@@ -81,7 +81,13 @@ new file mode 100644
 index 00000000..afbc7f68
 --- /dev/null
 +++ b/src/netsiowin.c
-@@ -0,0 +1,420 @@
+
+diff --git a/src/netsiowin.c b/src/netsiowin.c
+new file mode 100644
+index 00000000..00000000
+--- /dev/null
++++ b/src/netsiowin.c
+@@ -0,0 +1,419 @@
 +/*
 + * netsiowin.c - NetSIO Windows implementation for FujiNet-PC <-> Atari800 Emulator
 + *
@@ -501,3 +507,4 @@ index 00000000..afbc7f68
 +    send_block_to_fujinet(p, sizeof(p));
 +    netsio_cmd_off_sync();
 +}
+

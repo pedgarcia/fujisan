@@ -1,0 +1,4 @@
+# Patch files must always use Unix LF line endings.
+# CRLF in .patch files causes git apply to report "corrupt patch" and silently skip them.
+*.patch text eol=lf
+*.sh    text eol=lf

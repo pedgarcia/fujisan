@@ -397,6 +397,10 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     SCREENSHOTS
     # Remove dependency on runtime ATARI800_SRC_PATH
     EMBEDDED_LIBATARI800
+    # Enable NetSIO support in Fujisan wrapper code (mirrors libatari800 --enable-netsio).
+    # On Linux/macOS netsio.c is used; on Windows netsiowin.c (Winsock2) is used.
+    # windows_compat.h sets HAVE_WINDOWS_H so netsio.h takes the correct header branch.
+    NETSIO
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:HAVE_SDL2_AUDIO>
     $<$<BOOL:${HAVE_SDL2_JOYSTICK}>:HAVE_SDL2_JOYSTICK>
 )

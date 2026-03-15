@@ -41,6 +41,7 @@ public:
     bool start(const QString& binaryPath, const QStringList& arguments = QStringList());
     void stop();
     void restart();
+    void forceKill();  // Immediately terminate without waiting for graceful shutdown
 
     // State queries
     ProcessState getState() const { return m_state; }

@@ -3,12 +3,6 @@
 
 #ifdef _WIN32
 
-// Disable NETSIO on Windows - officially not supported on Windows platform
-// NetSIO only works with Linux/macOS. Windows users should use Altirra + FujiNet-PC instead
-#ifdef NETSIO
-#undef NETSIO
-#endif
-
 // Prevent common macro conflicts
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -40,6 +34,12 @@
 
 // Include Windows headers first to prevent conflicts
 #include <windows.h>
+
+// Tell atari800 headers (netsio.h etc.) that Windows headers are available,
+// so they use the Winsock2 path instead of trying to include POSIX <pthread.h>.
+#ifndef HAVE_WINDOWS_H
+#define HAVE_WINDOWS_H 1
+#endif
 
 // Undefine any problematic macros that might conflict with C++ keywords
 #ifdef string

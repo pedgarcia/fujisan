@@ -1037,14 +1037,49 @@ void MainWindow::coldBoot()
 
     if (netSIOEnabled && fujinetRunning) {
         // Show message immediately for user feedback
-        statusBar()->showMessage("Cold boot - waiting for FujiNet-PC to restart...", 4000);
-        qDebug() << "Cold boot with NetSIO - FujiNet-PC will restart";
+        statusBar()->showMessage("Cold boot - restarting FujiNet-PC...", 10000);
+        qDebug() << "Cold boot with NetSIO - force-killing and restarting FujiNet-PC";
 
-        // Perform cold boot immediately (screen goes black, provides instant feedback)
+        // Mark as intentional so onFujiNetDisconnected() suppresses the error dialog
+        // and drive-mode switch when the process manager reports the kill.
+        m_fujinetIntentionalRestart = true;
+
+        // Stop the HTTP health-check and drive-polling timers so they don't fire
+        // (and clear m_fujinetIntentionalRestart prematurely) during the spin-loop.
+        if (m_fujinetService) {
+            m_fujinetService->stopHealthCheck();
+            m_fujinetService->stopDrivePolling();
+        }
+
+        // Force-kill the old FujiNet-PC instance.  This is nearly instant on all
+        // platforms (SIGKILL / TerminateProcess) vs the 8-9 s graceful exit(75) path
+        // that FujiNet-PC takes when it receives the 0xFF cold-reset packet.
+        m_fujinetProcessManager->forceKill();
+
+        // Clear the NETSIO client-side state so AtariEmulator::coldBoot() can
+        // detect when the NEW instance has announced itself.
+        m_emulator->resetNetSIOClientState();
+
+        // Start the new FujiNet-PC instance immediately — the old one is already dead.
+        startFujiNetWithSavedSettings();
+
+        // Perform cold boot: waits for the new FujiNet-PC to connect, then resets
+        // the Atari (suppressing the internal 0xFF inside Atari800_Coldstart()).
         m_emulator->coldBoot();
 
-        // Show completion message after a short delay (gives FujiNet-PC time to restart)
-        // 2 seconds should be sufficient for FujiNet-PC to exit and begin restarting
+        // Cold boot complete.  FujiNet-PC should be running again (fujinet_known==1).
+        // Reset the intentional-restart flag and force the connection state back to
+        // "unknown" so the first successful health-check re-emits connected(), which
+        // restarts drive polling and updates the UI.
+        m_fujinetIntentionalRestart = false;
+        if (m_fujinetService) {
+            m_fujinetService->resetConnectionState();
+            int httpPort = settings.value("fujinet/apiPort", 8000).toInt();
+            m_fujinetService->setServerUrl(QString("http://localhost:%1").arg(httpPort));
+            m_fujinetService->startHealthCheck(3000);
+        }
+
+        // Show completion message after a short delay
         QTimer::singleShot(2000, this, [this]() {
             statusBar()->showMessage("Cold boot completed - FujiNet-PC ready", 2000);
             qDebug() << "Cold boot with FujiNet-PC restart completed";
@@ -4107,10 +4142,11 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
             // Exit code 75 = EX_TEMPFAIL = "please restart me" (cold reset)
             // This is the expected behavior when emulator sends cold reset (0xFF)
             if (exitCode == 75) {
-                QSettings settings;
-                bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
-
-                if (netSIOEnabled) {
+                // Use the in-memory m_netSIOEnabled flag rather than re-reading QSettings.
+                // Reading QSettings (INI file) inside a nested processEvents() call stack
+                // (e.g. during coldBoot()'s spin-loop) can return stale/default values on
+                // Windows because the INI file may not yet be flushed from a prior write.
+                if (m_netSIOEnabled) {
                     // Restart loop protection: prevent infinite restarts on crashes
                     qint64 now = QDateTime::currentMSecsSinceEpoch();
 
@@ -4135,26 +4171,13 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
                     qDebug() << "FujiNet-PC exited with code 75 (cold reset request) - auto-restarting..."
                              << "(" << m_fujinetRestartCount << "of" << MAX_RESTARTS << "allowed restarts)";
 
-                    QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
-                    if (!binaryPath.isEmpty()) {
-                        // Load saved settings instead of using hardcoded defaults
-                        QSettings settings;
-                        QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
-                        if (sdPath.isEmpty()) {
-                            sdPath = "SD";  // Default only if no saved path
-                        }
-
-                        QStringList arguments;
-                        arguments << "-c" << "fnconfig.ini";
-                        arguments << "-s" << sdPath;
-
-                        qDebug() << "Restarting FujiNet-PC with SD path:" << sdPath;
-                        m_fujinetProcessManager->start(binaryPath, arguments);
-                        statusBar()->showMessage("Restarting FujiNet-PC after cold reset...", 2000);
-                        return; // Don't show "stopped" message
-                    } else {
-                        qWarning() << "Cannot restart FujiNet-PC - binary path not found";
-                    }
+                    // Use startFujiNetWithSavedSettings() so all configured ports and paths
+                    // are applied correctly, and the HTTP health check is (re)started so the
+                    // status bar and drive polling reconnect once FujiNet-PC is ready.
+                    m_fujinetIntentionalRestart = true;  // suppress disconnect dialog / local-mode switch
+                    startFujiNetWithSavedSettings();
+                    statusBar()->showMessage("Restarting FujiNet-PC after cold reset...", 2000);
+                    return; // Don't show "stopped" message
                 }
             }
 
@@ -4226,6 +4249,15 @@ void MainWindow::onNetSIOEnabledChanged(bool enabled)
             startFujiNetWithSavedSettings();
         } else {
             qDebug() << "NetSIO enabled but FujiNet-PC already running or not in auto-launch mode";
+            // FujiNet-PC is already running - ensure the health check is active so the
+            // status bar and drive polling can connect to the HTTP API.
+            if (m_fujinetService) {
+                QSettings settings;
+                int httpPort = settings.value("fujinet/apiPort", 8000).toInt();
+                m_fujinetService->setServerUrl(QString("http://localhost:%1").arg(httpPort));
+                m_fujinetService->startHealthCheck(3000);
+                qDebug() << "Started FujiNet health check for existing process on port" << httpPort;
+            }
         }
     } else {
         // Switch drives back to local mode

@@ -180,6 +180,34 @@ void FujiNetProcessManager::restart()
     start(m_binaryPath, m_arguments);
 }
 
+void FujiNetProcessManager::forceKill()
+{
+    if (m_state == NotRunning) {
+        qDebug() << "FujiNet-PC is not running, nothing to kill";
+        return;
+    }
+
+    qDebug() << "Force-killing FujiNet-PC (no graceful shutdown)";
+    setState(Stopping);
+
+    if (m_process->state() != QProcess::NotRunning) {
+        // Process we started — SIGKILL / TerminateProcess (synchronous on Windows)
+        m_process->kill();
+        m_process->waitForFinished(1000);
+    } else {
+        // Externally running process
+#ifdef Q_OS_WIN
+        QProcess taskkill;
+        taskkill.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
+        taskkill.waitForFinished(1000);
+#else
+        QProcess pkill;
+        pkill.start("pkill", QStringList() << "-9" << "fujinet");
+        pkill.waitForFinished(1000);
+#endif
+    }
+}
+
 void FujiNetProcessManager::clearOutputBuffers()
 {
     m_stdoutBuffer.clear();

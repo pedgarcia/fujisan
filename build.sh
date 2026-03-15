@@ -1087,7 +1087,7 @@ build_windows() {
                 cd - > /dev/null
                 
                 # Clean up build directory after successful packaging
-                rm -rf build-windows/
+                #rm -rf build-windows/
             else
                 echo_error "Failed to create Windows zip package"
             fi
