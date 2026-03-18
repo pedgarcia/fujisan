@@ -193,6 +193,7 @@ private:
     QLabel* m_volumeLabel;
     QSpinBox* m_bufferLengthSpinBox;
     QSpinBox* m_audioLatencySpinBox;
+    QCheckBox* m_audioDiagnosticsCheck;
     QCheckBox* m_consoleSound;
     QCheckBox* m_serialSound;
     

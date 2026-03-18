@@ -25,6 +25,7 @@
 #include <QByteArray>
 #include <cstring>  // for memset
 #include <vector>   // for std::vector
+#include <chrono>   // for high-resolution logging timestamps
 
 #ifdef HAVE_SDL2_AUDIO
 #include "sdl2audiobackend.h"
@@ -125,9 +126,11 @@ AtariEmulator::AtariEmulator(QObject *parent)
     // Set up the global instance pointer for the callback
     s_emulatorInstance = this;
     
-    // Use PreciseTimer for more accurate frame timing
-    // This might help with audio synchronization issues
+    // Use single-shot PreciseTimer for drift-compensated frame scheduling.
+    // Single-shot mode means it fires exactly once per requestNextFrame() call,
+    // preventing duplicate firings when the emulator is restarted mid-flight.
     m_frameTimer->setTimerType(Qt::PreciseTimer);
+    m_frameTimer->setSingleShot(true);
     connect(m_frameTimer, &QTimer::timeout, this, &AtariEmulator::processFrame);
 
 #ifdef HAVE_SDL2_JOYSTICK
@@ -418,9 +421,16 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
         if (m_audioEnabled) {
             setupAudio();
         }
-        
-        // Start the frame timer
-        m_frameTimer->start(static_cast<int>(m_frameTimeMs));
+
+        // Initialize absolute-time frame scheduler and reset PI state
+        m_firstFrameTime = std::chrono::steady_clock::now();
+        m_frameCount     = 0;
+        m_piIntegral     = 0.0;
+        m_piSpeedTrim    = 0.0;
+        m_avgGap         = 0.0;
+
+        // Schedule first frame
+        requestNextFrame();
         return true;
     }
     
@@ -797,9 +807,16 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
         if (m_audioEnabled) {
             setupAudio();
         }
-        
-        // Start the frame timer
-        m_frameTimer->start(static_cast<int>(m_frameTimeMs));
+
+        // Initialize absolute-time frame scheduler and reset PI state
+        m_firstFrameTime = std::chrono::steady_clock::now();
+        m_frameCount     = 0;
+        m_piIntegral     = 0.0;
+        m_piSpeedTrim    = 0.0;
+        m_avgGap         = 0.0;
+
+        // Schedule first frame
+        requestNextFrame();
         qDebug() << "=== INITIALIZATION COMPLETE - Emulator started successfully ===";
         return true;
     }
@@ -894,6 +911,8 @@ void AtariEmulator::shutdown()
 
 void AtariEmulator::processFrame()
 {
+    // Advance frame counter; next interval will be computed in requestNextFrame()
+    // at the end of this function (absolute-time scheduling, no per-frame work needed here).
     // Delayed restart mechanism removed - no longer needed!
     // NetSIO reset notifications (0xFF/0xFE packets) provide instant state sync
     // with FujiNet-PC, eliminating the need for polling and delays.
@@ -1052,6 +1071,37 @@ void AtariEmulator::processFrame()
 #endif
     // Handle Qt audio output with double buffering (inspired by Atari800MacX)
     if (m_audioEnabled && m_audioOutput && m_audioDevice) {
+        // Audio diagnostics (enabled only when m_enableAudioDiagnostics is true)
+        static bool s_audioDiagnosticsInitialized = false;
+        static std::chrono::steady_clock::time_point s_lastFrameTime;
+        static QFile s_audioDiagFile;
+
+        if (m_enableAudioDiagnostics && !s_audioDiagnosticsInitialized) {
+            s_audioDiagnosticsInitialized = true;
+
+            // Open CSV log file in the user's writable location
+            QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+            QDir().mkpath(logDir);
+            QString logPath = logDir + QDir::separator() + "audio_diagnostics.csv";
+
+            s_audioDiagFile.setFileName(logPath);
+            if (s_audioDiagFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+                QTextStream ts(&s_audioDiagFile);
+                ts << "ms_since_start,frame_interval_ms,sound_buffer_len,dsp_gap_bytes,bytes_free,audio_state\n";
+                ts.flush();
+            } else {
+                qWarning() << "Failed to open audio diagnostics log file at" << logPath;
+            }
+
+            s_lastFrameTime = std::chrono::steady_clock::now();
+        } else if (!m_enableAudioDiagnostics && s_audioDiagnosticsInitialized) {
+            // Diagnostics disabled at runtime
+            s_audioDiagnosticsInitialized = false;
+            if (s_audioDiagFile.isOpen()) {
+                s_audioDiagFile.close();
+            }
+        }
+
         unsigned char* soundBuffer = libatari800_get_sound_buffer();
         int soundBufferLen = libatari800_get_sound_buffer_len();
         
@@ -1069,11 +1119,12 @@ void AtariEmulator::processFrame()
                 gap += m_dspBufferBytes;
             }
             
-            // Conditional speed adjustment - disabled for Windows/Linux due to Qt audio issues
-            // Speed micro-adjustments can cause timing variations during typing/UI operations
-#if 0  // Disabled for all platforms - provides more stable audio
-            updateEmulationSpeed();
-#endif
+            // PI audio-clock feedback: gently adjusts m_frameTimeMs to keep the
+            // DSP ring buffer at its target fill level.  Corrections are ±0.5% max,
+            // so there are no audible pitch changes.
+            if (m_userRequestedSpeedMultiplier != 0.0) {
+                updateEmulationSpeed();
+            }
 
             // Platform-specific buffer management
             int targetGap = m_targetDelay * m_bytesPerSample;  // Target buffer level
@@ -1127,19 +1178,23 @@ void AtariEmulator::processFrame()
             // Always write audio data - use ring buffer overwrite if needed
 #endif
             {
-                // Write to DSP buffer
+                // Write sound data into the ring buffer.
+                // On wrap we assemble through the staging buffer first so the
+                // ring buffer is updated in a single contiguous operation.
+                int writeOffset = m_dspWritePos % m_dspBufferBytes;
                 int newPos = m_dspWritePos + soundBufferLen;
-                if (newPos / m_dspBufferBytes == m_dspWritePos / m_dspBufferBytes) {
-                    // No wrap
-                    memcpy(m_dspBuffer.data() + (m_dspWritePos % m_dspBufferBytes), 
-                           soundBuffer, soundBufferLen);
+                if (writeOffset + soundBufferLen <= m_dspBufferBytes) {
+                    // No wrap — direct copy
+                    memcpy(m_dspBuffer.data() + writeOffset, soundBuffer, soundBufferLen);
                 } else {
-                    // Wraps around
-                    int firstPartSize = m_dspBufferBytes - (m_dspWritePos % m_dspBufferBytes);
-                    memcpy(m_dspBuffer.data() + (m_dspWritePos % m_dspBufferBytes), 
-                           soundBuffer, firstPartSize);
-                    memcpy(m_dspBuffer.data(), 
-                           soundBuffer + firstPartSize, soundBufferLen - firstPartSize);
+                    // Wrap: assemble contiguous copy through staging buffer then split into ring
+                    int firstPartSize = m_dspBufferBytes - writeOffset;
+                    memcpy(m_dspStagingBuffer.data(), soundBuffer, soundBufferLen);
+                    memcpy(m_dspBuffer.data() + writeOffset,
+                           m_dspStagingBuffer.data(), firstPartSize);
+                    memcpy(m_dspBuffer.data(),
+                           m_dspStagingBuffer.data() + firstPartSize,
+                           soundBufferLen - firstPartSize);
                 }
                 m_dspWritePos = newPos % (m_dspBufferBytes * 2);
             }
@@ -1158,6 +1213,30 @@ void AtariEmulator::processFrame()
             
             int bytesFree = m_audioOutput->bytesFree();
 
+            // Audio diagnostics logging
+            if (m_enableAudioDiagnostics && s_audioDiagFile.isOpen()) {
+                using namespace std::chrono;
+                static steady_clock::time_point s_startTime = steady_clock::now();
+                steady_clock::time_point now = steady_clock::now();
+
+                double msSinceStart =
+                    duration_cast<duration<double, std::milli>>(now - s_startTime).count();
+                double frameIntervalMs =
+                    duration_cast<duration<double, std::milli>>(now - s_lastFrameTime).count();
+                s_lastFrameTime = now;
+
+                int audioState = m_audioOutput->state();
+
+                QTextStream ts(&s_audioDiagFile);
+                ts << QString::number(msSinceStart, 'f', 3) << ","
+                   << QString::number(frameIntervalMs, 'f', 3) << ","
+                   << soundBufferLen << ","
+                   << gap << ","
+                   << bytesFree << ","
+                   << audioState << "\n";
+                ts.flush();
+            }
+
             // Platform-specific writing strategy
 #ifdef _WIN32
             // Windows: Write in period-size chunks to match Qt's preferred rhythm
@@ -1175,26 +1254,26 @@ void AtariEmulator::processFrame()
             // Always try to write if there's any space available
             if (toWrite > 0 && available > 0) {
 #endif
-                // Read from DSP buffer and write to audio device
-                int newReadPos = m_dspReadPos + toWrite;
-                if (newReadPos / m_dspBufferBytes == m_dspReadPos / m_dspBufferBytes) {
-                    // No wrap
-                    m_audioDevice->write(
-                        m_dspBuffer.data() + (m_dspReadPos % m_dspBufferBytes), 
-                        toWrite
-                    );
+                // Read from DSP buffer and write to audio device.
+                // Always issue a single write() call so there is no window in which
+                // the Qt audio pull thread could observe a partial update.
+                // On wrap, assemble through the staging buffer first.
+                int readOffset  = m_dspReadPos % m_dspBufferBytes;
+                int newReadPos  = m_dspReadPos + toWrite;
+                const char* writePtr;
+                if (readOffset + toWrite <= m_dspBufferBytes) {
+                    // No wrap — write directly from ring buffer
+                    writePtr = m_dspBuffer.data() + readOffset;
                 } else {
-                    // Wraps around
-                    int firstPartSize = m_dspBufferBytes - (m_dspReadPos % m_dspBufferBytes);
-                    m_audioDevice->write(
-                        m_dspBuffer.data() + (m_dspReadPos % m_dspBufferBytes), 
-                        firstPartSize
-                    );
-                    m_audioDevice->write(
-                        m_dspBuffer.data(), 
-                        toWrite - firstPartSize
-                    );
+                    // Wrap — assemble contiguous chunk in staging buffer
+                    int firstPartSize = m_dspBufferBytes - readOffset;
+                    memcpy(m_dspStagingBuffer.data(),
+                           m_dspBuffer.data() + readOffset, firstPartSize);
+                    memcpy(m_dspStagingBuffer.data() + firstPartSize,
+                           m_dspBuffer.data(), toWrite - firstPartSize);
+                    writePtr = m_dspStagingBuffer.data();
                 }
+                m_audioDevice->write(writePtr, toWrite);
                 m_dspReadPos = newReadPos % (m_dspBufferBytes * 2);
             }
             
@@ -1222,6 +1301,38 @@ void AtariEmulator::processFrame()
     checkBreakpoints();
 
     emit frameReady();
+
+    // Schedule the next frame if emulation is running
+    if (!m_emulationPaused) {
+        requestNextFrame();
+    }
+}
+
+void AtariEmulator::requestNextFrame()
+{
+    // Absolute-time scheduling: each frame fires at firstFrameTime + frameCount * frameTimeMs.
+    // Any Qt timer overshoot or undershoot is automatically corrected on the next frame
+    // because we always measure the delay relative to the fixed absolute origin.
+    using namespace std::chrono;
+
+    m_frameCount++;
+
+    auto nextFrameTime = m_firstFrameTime +
+        duration<double, std::milli>(m_frameCount * static_cast<double>(m_frameTimeMs));
+
+    auto now = steady_clock::now();
+    auto delayUs = duration_cast<microseconds>(nextFrameTime - now).count();
+
+    // Convert microseconds to milliseconds, clamping to [0, frameTimeMs] range
+    int intervalMs = 0;
+    if (delayUs > 0) {
+        // Round to nearest ms; clamp so we never schedule more than one full frame ahead
+        intervalMs = static_cast<int>((delayUs + 500) / 1000);
+        int maxInterval = static_cast<int>(m_frameTimeMs) + 1;
+        if (intervalMs > maxInterval) intervalMs = maxInterval;
+    }
+
+    m_frameTimer->start(intervalMs);
 }
 
 const unsigned char* AtariEmulator::getScreen()
@@ -2024,9 +2135,11 @@ void AtariEmulator::setupAudio()
 #endif
     m_dspBufferBytes = dspBufferSamples * m_bytesPerSample;
     
-    // Initialize the DSP buffer
+    // Initialize the DSP buffer and staging buffer
     m_dspBuffer.resize(m_dspBufferBytes);
     m_dspBuffer.fill(0);
+    m_dspStagingBuffer.resize(DSP_STAGING_BYTES);
+    m_dspStagingBuffer.fill(0);
     
     // Initialize positions
     m_dspReadPos = 0;
@@ -2078,13 +2191,73 @@ void AtariEmulator::setupAudio()
         // Update callback tick for gap estimation
         m_callbackTick = QDateTime::currentMSecsSinceEpoch();
     });
-    
+
+    // Underrun detection: in push mode, QAudioOutput enters IdleState when its
+    // internal buffer drains.  We log the event and schedule a deferred recovery
+    // via QMetaObject::invokeMethod so we never call write()/reset state from
+    // directly inside the audio backend's signal emission path.
+    connect(m_audioOutput, &QAudioOutput::stateChanged, this, [this](QAudio::State state) {
+        if (state != QAudio::IdleState)
+            return;
+        if (!m_audioOutput || m_audioOutput->error() != QAudio::NoError)
+            return;
+
+        static int underrunCount = 0;
+        underrunCount++;
+        if (underrunCount <= 5 || underrunCount % 50 == 0) {
+            qDebug() << "[Audio] Underrun #" << underrunCount
+                     << "- scheduling deferred recovery";
+        }
+
+        // Defer all recovery work to the next event-loop iteration so we are
+        // not executing inside the audio backend's signal emission stack.
+        QMetaObject::invokeMethod(this, [this]() {
+            if (!m_audioOutput || !m_audioDevice || !m_audioEnabled)
+                return;
+            // Only act if still in IdleState; ActiveState means recovery happened already
+            if (m_audioOutput->state() != QAudio::IdleState)
+                return;
+
+            // Reset DSP ring buffer so the next processFrame() write starts clean
+            m_dspWritePos = 0;
+            m_dspReadPos  = 0;
+            m_dspBuffer.fill(0);
+
+            // Reset PI controller — stale integral is misleading after an underrun
+            m_piIntegral  = 0.0;
+            m_piSpeedTrim = 0.0;
+            m_avgGap      = 0.0;
+
+#ifdef __linux__
+            // On Linux/PulseAudio, repeated underruns suggest bytesFree() is
+            // under-reporting.  Grow the target delay by one fragment size.
+            static int linuxUnderrunCount = 0;
+            if (++linuxUnderrunCount % 5 == 0) {
+                m_targetDelay = qMin(m_targetDelay + m_fragmentSize,
+                                     m_dspBufferBytes / m_bytesPerSample / 2);
+                qDebug() << "[Audio] Linux: increased target delay to"
+                         << m_targetDelay << "samples after repeated underruns";
+            }
+#endif
+
+            // Write a silence cushion so the device returns to ActiveState.
+            // In push mode, writing data is sufficient — do NOT call resume()
+            // which is only valid after suspend() and will crash on IdleState.
+            int silenceBytes = qMin(m_targetDelay * m_bytesPerSample,
+                                    m_audioOutput->bytesFree());
+            if (silenceBytes > 0) {
+                QByteArray silence(silenceBytes, 0);
+                m_audioDevice->write(silence);
+            }
+        }, Qt::QueuedConnection);
+    });
+
     m_audioDevice = m_audioOutput->start();
-    
+
     if (m_audioDevice) {
-        
         // Test what we actually get from libatari800
         int testBufferLen = libatari800_get_sound_buffer_len();
+        Q_UNUSED(testBufferLen);
     } else {
         m_audioEnabled = false;
     }
@@ -2749,7 +2922,13 @@ void AtariEmulator::pauseEmulation()
 void AtariEmulator::resumeEmulation()
 {
     if (m_emulationPaused) {
-        m_frameTimer->start();
+        // Reset absolute-time scheduler and PI state when resuming
+        m_firstFrameTime = std::chrono::steady_clock::now();
+        m_frameCount     = 0;
+        m_piIntegral     = 0.0;
+        m_piSpeedTrim    = 0.0;
+        m_avgGap         = 0.0;
+        requestNextFrame();
         m_emulationPaused = false;
         // Reset last PC when resuming to avoid missing breakpoints
         m_lastPC = 0xFFFF;
@@ -2798,104 +2977,69 @@ void AtariEmulator::stepOneInstruction()
 
 double AtariEmulator::calculateSpeedAdjustment()
 {
-    // Calculate buffer gap similar to Atari800MacX
-    int gap = 0;
-    
-    if (m_audioBackend == QtAudio && m_audioEnabled && m_audioOutput) {
-        // Calculate how much data is buffered
-        int bufferedBytes = (m_dspWritePos - m_dspReadPos + m_dspBufferBytes) % m_dspBufferBytes;
-        int bufferedSamples = bufferedBytes / m_bytesPerSample;
-        
-        // Calculate gap from target delay
-        gap = m_targetDelay - bufferedSamples;
-        
-        // Update smoothed average gap
-        m_avgGap = m_avgGap * (1.0 - SPEED_ADJUSTMENT_ALPHA) + gap * SPEED_ADJUSTMENT_ALPHA;
-        
-        // Calculate speed adjustment based on gap
-        // Positive gap = buffer running low, speed up
-        // Negative gap = buffer too full, slow down
-        double speedAdjustment = 0.0;
-        
-#ifdef _WIN32
-        // Windows: Use gentler speed adjustments with larger buffer thresholds
-        if (m_avgGap > 150) {
-            // Buffer very low, speed up moderately
-            speedAdjustment = 0.03;
-        } else if (m_avgGap > 60) {
-            // Buffer low, speed up slightly
-            speedAdjustment = 0.015;
-        } else if (m_avgGap < -150) {
-            // Buffer very full, slow down moderately
-            speedAdjustment = -0.03;
-        } else if (m_avgGap < -60) {
-            // Buffer full, slow down slightly
-            speedAdjustment = -0.015;
-        }
+    // PI controller: measures DSP ring-buffer fill vs. target and returns a
+    // fractional speed correction in the range [-PI_MAX_TRIM, +PI_MAX_TRIM].
+    //
+    // error > 0  → buffer is below target → emulator is too slow → speed up
+    // error < 0  → buffer is above target → emulator is too fast → slow down
+    //
+    // After Phase 2 the systematic 4.3% drift is gone, so this controller only
+    // needs to handle residual crystal-oscillator mismatch (~100ppm) and random
+    // jitter.  The very small gains (KP=1e-5, KI=5e-7) reflect this.
+
+    if (m_audioBackend != QtAudio || !m_audioEnabled || !m_audioOutput)
+        return 0.0;
+
+    int bufferedBytes   = (m_dspWritePos - m_dspReadPos + m_dspBufferBytes) % m_dspBufferBytes;
+    int bufferedSamples = bufferedBytes / m_bytesPerSample;
+    double error        = static_cast<double>(m_targetDelay - bufferedSamples);
+
+    // On Linux/PipeWire, bytesFree() can be stale; use a longer averaging window
+#ifdef __linux__
+    constexpr double alpha = 0.02;  // ~50-frame window
 #else
-        // macOS/Linux: Original more aggressive adjustments
-        if (m_avgGap > 50) {
-            // Buffer very low, speed up significantly
-            speedAdjustment = 0.05;
-        } else if (m_avgGap > 20) {
-            // Buffer low, speed up slightly
-            speedAdjustment = 0.02;
-        } else if (m_avgGap < -50) {
-            // Buffer very full, slow down significantly
-            speedAdjustment = -0.05;
-        } else if (m_avgGap < -20) {
-            // Buffer full, slow down slightly
-            speedAdjustment = -0.02;
-        }
+    constexpr double alpha = 0.05;  // ~20-frame window
 #endif
-        
-        return speedAdjustment;
-    }
-    
-    return 0.0;
+    m_avgGap = m_avgGap * (1.0 - alpha) + error * alpha;
+
+    // Proportional term: immediate response to current smoothed error
+    double pTerm = PI_KP * m_avgGap;
+
+    // Integral term: slow drift correction (wind-up limited by PI_MAX_TRIM)
+    m_piIntegral += PI_KI * m_avgGap;
+    m_piIntegral = qBound(-PI_MAX_TRIM, m_piIntegral, PI_MAX_TRIM);
+
+    double correction = qBound(-PI_MAX_TRIM, pTerm + m_piIntegral, PI_MAX_TRIM);
+    return correction;
 }
 
 void AtariEmulator::updateEmulationSpeed()
 {
-    // Don't apply audio sync adjustments if user requested unlimited speed
-    if (m_userRequestedSpeedMultiplier == 0.0) {
-        return;  // Keep unlimited speed, don't adjust
-    }
+    // Don't touch timing when unlimited speed is requested
+    if (m_userRequestedSpeedMultiplier == 0.0)
+        return;
 
     if (!m_audioEnabled || m_audioBackend != QtAudio) {
-        m_currentSpeed = 1.0;
+        // No audio sync — reset PI state and use base frame time
+        m_piIntegral   = 0.0;
+        m_piSpeedTrim  = 0.0;
+        m_currentSpeed = m_userRequestedSpeedMultiplier;
+        m_targetSpeed  = m_currentSpeed;
         return;
     }
 
-    // Calculate speed adjustment for audio synchronization
-    double adjustment = calculateSpeedAdjustment();
+    // Get PI correction (fractional, e.g. +0.002 = 0.2% faster)
+    double trim = calculateSpeedAdjustment();
+    m_piSpeedTrim  = trim;
+    m_currentSpeed = m_userRequestedSpeedMultiplier * (1.0 + trim);
+    m_targetSpeed  = m_currentSpeed;
 
-    // Update target speed (audio sync adjustment only)
-    m_targetSpeed = 1.0 + adjustment;
-
-    // Clamp to reasonable range (95% to 105%)
-    m_targetSpeed = qBound(0.95, m_targetSpeed, 1.05);
-
-    // Smooth transition to target speed
-#ifdef _WIN32
-    // Windows: Smoother transition to avoid audio artifacts
-    m_currentSpeed = m_currentSpeed * 0.95 + m_targetSpeed * 0.05;
-#else
-    // macOS/Linux: Faster transition for more responsive adjustment
-    m_currentSpeed = m_currentSpeed * 0.9 + m_targetSpeed * 0.1;
-#endif
-
-    // Apply combined speed to frame timer:
-    // Base speed from user request, fine-tuned by audio sync adjustment
-    if (m_frameTimer) {
-        // Combine user-requested speed with audio sync adjustment
-        double combinedSpeed = m_userRequestedSpeedMultiplier * m_currentSpeed;
-
-        // Adjust frame interval based on combined speed
-        // Faster speed = shorter interval
-        float adjustedFrameTime = m_frameTimeMs / combinedSpeed;
-        m_frameTimer->setInterval(static_cast<int>(adjustedFrameTime));
-    }
+    // Feed correction into the absolute-time scheduler by adjusting the effective
+    // frame time.  The scheduler in requestNextFrame() reads m_frameTimeMs, so
+    // changing it here naturally shifts every future frame's target time.
+    // Base frame time = 1000ms / targetFPS; divide by combined speed multiplier.
+    double baseFps = static_cast<double>(m_targetFps);
+    m_frameTimeMs  = static_cast<float>((1000.0 / baseFps) / m_currentSpeed);
 }
 
 void AtariEmulator::setDiskActivityCallback(std::function<void(int, bool)> callback)

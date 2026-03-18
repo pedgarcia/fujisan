@@ -673,6 +673,18 @@ void SettingsDialog::createAudioConfigTab()
     m_audioLatencySpinBox->setSuffix(" ms");
     m_audioLatencySpinBox->setToolTip("Additional audio latency for synchronization - adjust if experiencing audio/video sync issues");
     audioLayout->addRow("Audio Delay:", m_audioLatencySpinBox);
+
+    // Audio Diagnostics (for troubleshooting)
+    m_audioDiagnosticsCheck = new QCheckBox("Enable audio diagnostics logging (for troubleshooting)");
+    m_audioDiagnosticsCheck->setToolTip("Write detailed audio timing and buffer statistics to a CSV file. Enable this only when asked for diagnostics, as it may impact performance slightly.");
+    audioLayout->addRow("", m_audioDiagnosticsCheck);
+
+    // Apply diagnostics toggle to emulator in real time
+    connect(m_audioDiagnosticsCheck, &QCheckBox::toggled, [this](bool enabled) {
+        if (m_emulator) {
+            m_emulator->setAudioDiagnosticsEnabled(enabled);
+        }
+    });
     
     tabLayout->addWidget(audioGroup);
     
@@ -2515,6 +2527,7 @@ void SettingsDialog::loadSettings()
     
     // Load Audio Configuration
     m_soundEnabled->setChecked(settings.value("audio/enabled", true).toBool());
+    m_audioDiagnosticsCheck->setChecked(settings.value("audio/diagnosticsEnabled", false).toBool());
     
     int audioFreq = settings.value("audio/frequency", 44100).toInt();
     for (int i = 0; i < m_audioFrequency->count(); ++i) {
@@ -2879,6 +2892,7 @@ void SettingsDialog::saveSettings()
     
     // Save Audio Configuration
     settings.setValue("audio/enabled", m_soundEnabled->isChecked());
+    settings.setValue("audio/diagnosticsEnabled", m_audioDiagnosticsCheck->isChecked());
     settings.setValue("audio/frequency", m_audioFrequency->currentData().toInt());
     settings.setValue("audio/bits", m_audioBits->currentData().toInt());
     settings.setValue("audio/volume", m_volumeSlider->value());
@@ -3544,6 +3558,7 @@ void SettingsDialog::restoreDefaults()
     
     // Audio Configuration defaults
     m_soundEnabled->setChecked(true);
+    m_audioDiagnosticsCheck->setChecked(false);
     m_audioFrequency->setCurrentIndex(1); // 44100 Hz
     m_audioBits->setCurrentIndex(1);       // 16-bit
     m_volumeSlider->setValue(80);          // 80% volume

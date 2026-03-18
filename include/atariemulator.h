@@ -301,6 +301,8 @@ public:
     
     // Speed control
     void setEmulationSpeed(int percentage);
+    void setAudioDiagnosticsEnabled(bool enabled) { m_enableAudioDiagnostics = enabled; }
+    void requestNextFrame();  // Public so timer callback can schedule the next frame
     
     // Direct input injection for paste functionality
     void injectCharacter(char ch);
@@ -363,6 +365,13 @@ private:
     void setupAudio();
     void triggerDiskActivity();
     QString quotePath(const QString& path);  // Helper to quote paths with spaces
+    bool m_enableAudioDiagnostics = false;   // Enable CSV logging for audio diagnostics
+
+    // High-resolution frame timing using absolute time scheduling.
+    // Each frame is scheduled at firstFrameTime + frameCount * frameTimeMs,
+    // so Qt timer overshoot/undershoot is automatically compensated next frame.
+    std::chrono::steady_clock::time_point m_firstFrameTime;
+    int64_t m_frameCount = 0;
     
     bool m_basicEnabled = true;
     bool m_altirraOSEnabled = false;
@@ -413,20 +422,30 @@ private:
     int m_dspBufferBytes;
     int m_dspWritePos;
     int m_dspReadPos;
+    // Staging buffer: holds one frame's worth of audio assembled before a single
+    // contiguous write() to the Qt audio device (eliminates split-write micro-gaps).
+    static constexpr int DSP_STAGING_BYTES = 2048; // > max frame size (1472 bytes)
+    QByteArray m_dspStagingBuffer;
     qint64 m_callbackTick;  // Time when callback occurred
     double m_avgGap;     // Average gap for speed adjustment
     int m_targetDelay;   // Target delay in samples
     int m_sampleRate;
     int m_bytesPerSample;
     int m_fragmentSize;  // Size of each audio fragment
-    
-    // Dynamic speed adjustment (like Atari800MacX)
-    double m_currentSpeed;  // Current emulation speed (0.95 to 1.05)
-    double m_targetSpeed;   // Target speed based on buffer level
-    static constexpr double SPEED_ADJUSTMENT_ALPHA = 0.1;  // Smoothing factor
+
+    // PI controller for audio clock feedback (Phase 3)
+    // Corrections are tiny (±0.5%) so there are no audible pitch changes.
+    double m_piIntegral = 0.0;      // Integral term accumulator
+    double m_piSpeedTrim = 0.0;     // Current speed trim applied to m_frameTimeMs
+
+    static constexpr double PI_KP      = 0.000010;  // Proportional gain
+    static constexpr double PI_KI      = 0.0000005; // Integral gain
+    static constexpr double PI_MAX_TRIM = 0.005;    // ±0.5% max correction
 
     // User-requested speed multiplier (separate from audio sync adjustment)
     double m_userRequestedSpeedMultiplier;  // 1.0 = normal, 2.0 = 2x, 0.5 = 0.5x, 0.0 = unlimited
+    double m_currentSpeed;  // Effective combined speed (user × PI trim) — kept for legacy API
+    double m_targetSpeed;   // Target speed (kept for legacy API)
     
     // Unified Audio Backend (new implementation)
     UnifiedAudioBackend* m_unifiedAudio;
