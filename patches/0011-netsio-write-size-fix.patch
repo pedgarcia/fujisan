@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Developer <fujisan@atari>
+Date: Tue, 17 Mar 2026 00:00:00 -0800
+Subject: [PATCH] Fix uint8_t truncation of write_size in NETSIO_SYNC_RESPONSE
+
+The OPEN DIRECTORY command passes a 256-byte payload to FujiNet, causing
+NetSIO::setWriteSize(256) to encode sync_write_size = 257 (data + checksum)
+as a little-endian uint16_t in the SYNC_RESPONSE packet bytes [4:5].
+
+On the emulator side, write_size was declared as uint8_t, so 257 (0x0101)
+was truncated to 1. The SIO write frame handler then collected only 1 byte
+(the first byte of the directory path, e.g. '/' = 0x2F) and sent it as
+the checksum byte, leaving FujiNet waiting for 255 more data bytes that
+never arrived. FujiNet computed checksum 0x2F from the one received byte
+and compared it against the 0x00 it eventually got, producing the repeated
+"Data Frame Chksum error, calc 2f, rcv 00" log lines.
+
+Any command whose payload >= 255 bytes hits this bug. OPEN DIRECTORY is
+the canonical case at exactly 256 bytes.
+
+Fix: declare write_size as uint16_t, matching the protocol encoding.
+---
+ src/netsio.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/netsio.c b/src/netsio.c
+index 3fafc31d..1e4340d3 100644
+--- a/src/netsio.c
++++ b/src/netsio.c
+@@ -648,7 +648,8 @@ static void *fujinet_rx_thread(void *arg) {
+             case NETSIO_SYNC_RESPONSE:
+             {
+                 /* packet: [cmd][sync#][ack_type][ack_byte][write_lo][write_hi] */
+-                uint8_t resp_sync, ack_type, ack_byte, write_size;
++                uint8_t resp_sync, ack_type, ack_byte;
++                uint16_t write_size;
+ 
+                 if (n < 6)
+                 {
