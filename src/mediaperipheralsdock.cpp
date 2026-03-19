@@ -47,15 +47,12 @@ void MediaPeripheralsDock::setupUI()
     m_mainLayout->setContentsMargins(4, 4, 4, 4);
     m_mainLayout->setSpacing(SECTION_SPACING);
     
-    // Order: Drives, Cassette, Printer, FujiNet at very bottom
+    // Order: Drives, Cassette, FujiNet, Printer
     createDiskDrivesSection();
     // createCartridgeSection(); // Cartridge moved to main toolbar
     createCassetteSection();
-    createPrinterSection();
     createFujiNetSection();
-
-    // Stretch pushes everything to the top; FujiNet group is pinned last
-    m_mainLayout->addStretch();
+    createPrinterSection();
 }
 
 void MediaPeripheralsDock::createCartridgeSection()
@@ -148,7 +145,7 @@ void MediaPeripheralsDock::createPrinterSection()
     // Printer widget - FujiNet-PC only (hidden until NetSIO enabled)
     m_printerGroup = new QGroupBox("Printer (P:)", this);
     QVBoxLayout* printerLayout = new QVBoxLayout(m_printerGroup);
-    printerLayout->setContentsMargins(4, 8, 4, 4);
+    printerLayout->setContentsMargins(4, 4, 4, 4);
     printerLayout->setSpacing(4);
 
     // Create printer widget

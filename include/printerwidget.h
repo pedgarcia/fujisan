@@ -146,8 +146,8 @@ private:
     int m_maxDisplayHeight;                 // Current display height (grows during printing)
 
     // Constants
-    static const int FORM_TIP_HEIGHT = 50;   // Initial tip size
-    static const int FORM_MAX_HEIGHT = 200;  // Max expansion when printing
+    static const int FORM_TIP_HEIGHT = 35;   // Initial tip size
+    static const int FORM_MAX_HEIGHT = 130;  // Max expansion when printing
     static const int MAX_DUPLICATES_BEFORE_PAUSE = 3;
     static const QStringList OUTPUT_FORMATS;
     static const QString DEFAULT_FORMAT;

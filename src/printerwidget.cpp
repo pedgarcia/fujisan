@@ -183,18 +183,18 @@ void PrinterWidget::setupUI()
 
     // Control buttons in a horizontal layout (ABOVE the form)
     QHBoxLayout* buttonRow = new QHBoxLayout();
-    buttonRow->setSpacing(8);
-    buttonRow->setContentsMargins(0, 10, 0, 10);
+    buttonRow->setSpacing(5);
+    buttonRow->setContentsMargins(0, 2, 0, 2);
     buttonRow->addStretch();
 
     m_saveButton = new QPushButton("Save", this);
-    m_saveButton->setMinimumHeight(24);
+    m_saveButton->setFixedSize(46, 24);
     m_saveButton->setToolTip("Save printer output to file");
     connect(m_saveButton, &QPushButton::clicked, this, &PrinterWidget::onSaveOutputClicked);
     buttonRow->addWidget(m_saveButton);
 
     m_tearButton = new QPushButton("Tear", this);
-    m_tearButton->setMinimumHeight(24);
+    m_tearButton->setFixedSize(46, 24);
     m_tearButton->setToolTip("Tear off printed output (clears buffer)");
     connect(m_tearButton, &QPushButton::clicked, this, &PrinterWidget::onClearOutputClicked);
     buttonRow->addWidget(m_tearButton);
@@ -204,7 +204,7 @@ void PrinterWidget::setupUI()
     m_mainLayout->addLayout(buttonRow);
 
     // Add spacing between buttons and printer surface
-    m_mainLayout->addSpacing(15);
+    m_mainLayout->addSpacing(8);
 
     // Printer surface line (always visible, represents printer output slot)
     QLabel* printerSurface = new QLabel(this);

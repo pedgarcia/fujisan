@@ -6,6 +6,7 @@
  */
 
 #include "settingsdialog.h"
+#include <QDateTime>
 #include <QDebug>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -3417,6 +3418,18 @@ void SettingsDialog::accept()
     // Stop FujiNet health check to prevent signals firing during destruction
     if (m_fujinetService) {
         m_fujinetService->stopHealthCheck();
+    }
+
+    // Persist current settings to the current profile when OK is clicked.
+    // This ensures changes are saved without requiring users to click the profile "Save" button.
+    QString currentProfile = m_profileManager->getCurrentProfileName();
+    if (!currentProfile.isEmpty() && m_profileManager->profileExists(currentProfile)) {
+        emit syncPrinterStateRequested();
+        ConfigurationProfile profile = getCurrentUIState();
+        profile.name = currentProfile;
+        profile.description = QString("Saved on %1").arg(QDateTime::currentDateTime().toString("MMM dd, yyyy"));
+        m_profileManager->saveProfile(currentProfile, profile);
+        qDebug() << "Settings persisted to current profile:" << currentProfile;
     }
 
     QDialog::accept();

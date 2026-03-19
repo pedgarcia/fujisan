@@ -7,7 +7,10 @@
 
 #include "fujinetwidget.h"
 
+#include <QApplication>
+#include <QFileInfo>
 #include <QHBoxLayout>
+#include <QPixmap>
 #include <QVBoxLayout>
 #include <QGroupBox>
 #include <QDebug>
@@ -69,11 +72,49 @@ void FujiNetWidget::applyLedStyle(QFrame* led, const QString& color, bool lit)
 // setupUI
 // ---------------------------------------------------------------------------
 
+static QString findFujiNetImagePath()
+{
+    QStringList paths = {
+        "./images/fujinet.png",
+        "../images/fujinet.png",
+        QApplication::applicationDirPath() + "/images/fujinet.png",
+        QApplication::applicationDirPath() + "/../images/fujinet.png",
+#ifdef Q_OS_MAC
+        QApplication::applicationDirPath() + "/../Resources/images/fujinet.png",
+#endif
+#ifdef Q_OS_LINUX
+        "/usr/share/fujisan/images/fujinet.png",
+        QApplication::applicationDirPath() + "/../share/images/fujinet.png",
+#endif
+        ":/images/fujinet.png"
+    };
+    for (const QString& p : paths) {
+        if (QFileInfo::exists(p))
+            return p;
+    }
+    return QString();
+}
+
 void FujiNetWidget::setupUI()
 {
     auto* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(4, 4, 4, 4);
-    mainLayout->setSpacing(4);
+    mainLayout->setContentsMargins(4, 2, 4, 2);
+    mainLayout->setSpacing(0);
+
+    // ---- FujiNet image ----
+    QString imgPath = findFujiNetImagePath();
+    if (!imgPath.isEmpty()) {
+        QPixmap pixmap;
+        if (pixmap.load(imgPath)) {
+            QLabel* imgLabel = new QLabel(this);
+            QPixmap scaled = pixmap.scaled(96, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            imgLabel->setPixmap(scaled);
+            imgLabel->setAlignment(Qt::AlignCenter);
+            imgLabel->setFixedHeight(scaled.height());
+            imgLabel->setContentsMargins(0, 0, 0, 0);
+            mainLayout->addWidget(imgLabel, 0, Qt::AlignHCenter);
+        }
+    }
 
     // ---- Status row: label + LEDs ----
     auto* statusRow = new QHBoxLayout();
@@ -98,27 +139,38 @@ void FujiNetWidget::setupUI()
     m_busLed->setToolTip("SIO Bus activity");
     statusRow->addWidget(m_busLed);
 
+    mainLayout->addSpacing(2);
     mainLayout->addLayout(statusRow);
+    mainLayout->addSpacing(1);
 
-    // ---- Button row: Reset + Swap ----
+    // ---- Button row: R (Reset) + S (Swap) ----
     auto* buttonRow = new QHBoxLayout();
     buttonRow->setSpacing(4);
 
-    m_resetButton = new QPushButton("Reset", this);
-    m_resetButton->setToolTip("Restart FujiNet-PC (returns to CONFIG app)");
-    m_resetButton->setFixedHeight(22);
+    m_resetButton = new QPushButton("R", this);
+    m_resetButton->setToolTip("Reset — Restart FujiNet-PC (returns to CONFIG app)");
+    m_resetButton->setStyleSheet("QPushButton { font-size: 8px; }");
+    m_resetButton->setFixedHeight(24);
+    m_resetButton->setFixedWidth(28);
     m_resetButton->setEnabled(false);
     connect(m_resetButton, &QPushButton::clicked, this, &FujiNetWidget::resetRequested);
     buttonRow->addWidget(m_resetButton);
 
-    m_swapButton = new QPushButton("Swap", this);
-    m_swapButton->setToolTip("Rotate disk images (equivalent to FujiNet Button A)");
-    m_swapButton->setFixedHeight(22);
+    m_swapButton = new QPushButton("S", this);
+    m_swapButton->setStyleSheet("QPushButton { font-size: 8px; }");
+    m_swapButton->setToolTip("Swap — Rotate disk images (equivalent to FujiNet Button A)");
+    m_swapButton->setFixedHeight(24);
+    m_swapButton->setFixedWidth(28);
     m_swapButton->setEnabled(false);
     connect(m_swapButton, &QPushButton::clicked, this, &FujiNetWidget::swapRequested);
     buttonRow->addWidget(m_swapButton);
 
     mainLayout->addLayout(buttonRow);
+    mainLayout->addSpacing(4);
+
+    // Ensure widget never shrinks below content height (prevents button cropping)
+    // Image(72) + gap(2) + status(~16) + gap(1) + buttons(24) + spacing(4) + margins(4) ≈ 123
+    setMinimumHeight(124);
 }
 
 // ---------------------------------------------------------------------------
