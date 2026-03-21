@@ -1,0 +1,88 @@
+diff --git a/src/netsio.c b/src/netsio.c
+index 1e4340d3..92dfa23a 100644
+--- a/src/netsio.c
++++ b/src/netsio.c
+@@ -17,6 +17,7 @@
+ #include <sys/ioctl.h>
+ #include <netinet/in.h>
+ #include <fcntl.h>
++#include <sys/select.h>
+ #include <time.h>
+ #include "netsio.h"
+ #include "log.h"
+@@ -43,6 +44,12 @@ int netsio_cmd_state = 0;
+ /* data frame size for SIO write commands */
+ volatile int netsio_next_write_size = 0;
+ 
++/* Max time to wait for a byte from the RX thread (FujiNet -> emulator pipe).
++ * Prevents indefinite GUI freezes when FujiNet-PC is slow or wedged. */
++#ifndef NETSIO_RECV_BYTE_TIMEOUT_SEC
++#define NETSIO_RECV_BYTE_TIMEOUT_SEC 10
++#endif
++
+ /* FIFO pipe: fds0: FujiNet->emulator */
+ int fds0[2];
+ 
+@@ -460,21 +467,51 @@ int netsio_send_byte_sync(uint8_t b)
+ 
+ /* The emulator calls this to receive a data byte from FujiNet */
+ int netsio_recv_byte(uint8_t *b) {
+-    ssize_t n = read(fds0[0], b, 1);
+-    if (n < 0)
+-    {
+-        if (errno == EINTR) return netsio_recv_byte(b);
++    if (fds0[0] < 0)
++        return -1;
++
++    for (;;) {
++        fd_set rfds;
++        struct timeval tv;
++        int sel;
++
++        FD_ZERO(&rfds);
++        FD_SET(fds0[0], &rfds);
++        tv.tv_sec = NETSIO_RECV_BYTE_TIMEOUT_SEC;
++        tv.tv_usec = 0;
++
++        sel = select(fds0[0] + 1, &rfds, NULL, NULL, &tv);
++        if (sel < 0) {
++            if (errno == EINTR)
++                continue;
+ #ifdef DEBUG
+-        Log_print("netsio: read from rx FIFO");
++            Log_print("netsio: recv_byte select error");
+ #endif
+-        return -1;
+-    }
+-    if (n == 0)
+-        return -1; /* FIFO closed? */
++            return -1;
++        }
++        if (sel == 0) {
++#ifdef DEBUG
++            Log_print("netsio: recv_byte: select timeout waiting for pipe data");
++#endif
++            return -1;
++        }
++
++        ssize_t n = read(fds0[0], b, 1);
++        if (n < 0) {
++            if (errno == EINTR)
++                continue;
++#ifdef DEBUG
++            Log_print("netsio: read from rx FIFO");
++#endif
++            return -1;
++        }
++        if (n == 0)
++            return -1; /* FIFO closed? */
+ #ifdef DEBUG2
+-    Log_print("netsio: read to emu: %02X", (unsigned)*b);
++        Log_print("netsio: read to emu: %02X", (unsigned)*b);
+ #endif
+-    return 0;
++        return 0;
++    }
+ }
+ 
+ /* Send netsio COLD reset 0xFF */

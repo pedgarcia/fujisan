@@ -1323,6 +1323,20 @@ void AtariEmulator::requestNextFrame()
     auto now = steady_clock::now();
     auto delayUs = duration_cast<microseconds>(nextFrameTime - now).count();
 
+    // Debt cap (mirrors standalone atari800's Atari800_Sync self-healing):
+    // If we've fallen more than one full frame behind wall-clock time, discard
+    // the accumulated debt by resetting the time baseline.  Without this,
+    // netsio_wait_for_sync() blocking inside ANTIC_Frame() causes an ever-growing
+    // catch-up backlog where each intervalMs=0 frame that hits another SIO command
+    // adds more blocking, creating a feedback loop of progressive slowdown.
+    const auto frameTimeUs = static_cast<int64_t>(m_frameTimeMs * 1000.0);
+    if (delayUs < -frameTimeUs) {
+        qDebug() << "Debt cap fired: delayUs=" << delayUs << "frameTimeUs=" << frameTimeUs;
+        m_firstFrameTime = now;
+        m_frameCount = 1;
+        delayUs = frameTimeUs;
+    }
+
     // Convert microseconds to milliseconds, clamping to [0, frameTimeMs] range
     int intervalMs = 0;
     if (delayUs > 0) {

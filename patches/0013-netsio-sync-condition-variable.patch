@@ -1,0 +1,395 @@
+diff --git a/src/netsio.c b/src/netsio.c
+index 72e912e2..69fcc849 100644
+--- a/src/netsio.c
++++ b/src/netsio.c
+@@ -17,6 +17,7 @@
+ #include <sys/ioctl.h>
+ #include <netinet/in.h>
+ #include <fcntl.h>
++#include <sys/select.h>
+ #include <time.h>
+ #include "netsio.h"
+ #include "log.h"
+@@ -40,6 +41,20 @@ int fujinet_known = 0;
+ volatile int netsio_sync_wait = 0;
+ /* true if cmd line pulled */
+ int netsio_cmd_state = 0;
++/* COMMAND_ON deferred: send with the data block to avoid a timing race
++ * where FujiNet-PC sees COMMAND_ON before the command bytes arrive */
++static int netsio_cmd_pending = 0;
++
++/* Diagnostic: timestamp (us) when the command data block was sent, so we
++ * can measure the gap until COMMAND_OFF_SYNC arrives. */
++static uint64_t netsio_cmd_data_sent_us = 0;
++static int netsio_last_sync_timedout = 0;
++
++static uint64_t netsio_now_us(void) {
++    struct timespec ts;
++    clock_gettime(CLOCK_MONOTONIC, &ts);
++    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
++}
+ /* data frame size for SIO write commands */
+ volatile int netsio_next_write_size = 0;
+ 
+@@ -47,6 +62,17 @@ volatile int netsio_next_write_size = 0;
+ volatile int netsio_ca1_state = 1;
+ volatile int netsio_cb1_state = 1;
+ 
++/* Condition variable so the emulator wakes immediately when FujiNet responds,
++ * instead of sleeping 5 ms per tick in the old busy-loop. */
++static pthread_mutex_t netsio_sync_mutex = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t  netsio_sync_cond  = PTHREAD_COND_INITIALIZER;
++
++/* Max time to wait for a byte from the RX thread (FujiNet -> emulator pipe).
++ * Prevents indefinite GUI freezes when FujiNet-PC is slow or wedged. */
++#ifndef NETSIO_RECV_BYTE_TIMEOUT_SEC
++#define NETSIO_RECV_BYTE_TIMEOUT_SEC 10
++#endif
++
+ /* FIFO pipe: fds0: FujiNet->emulator */
+ int fds0[2];
+ 
+@@ -320,19 +346,58 @@ int netsio_init(uint16_t port) {
+ /* Called when a command frame with sync response is sent to FujiNet */
+ void netsio_wait_for_sync(void)
+ {
+-    int ticker = 0;
+-    while (netsio_sync_wait)
+-    {
+-#ifdef DEBUG
+-        Log_print("netsio: waiting for sync response - %d", ticker);
+-#endif
+-        millisleep(5);
+-        if (ticker > 7)
+-        {
++    uint64_t sync_start = netsio_now_us();
++    struct timespec deadline;
++    clock_gettime(CLOCK_REALTIME, &deadline);
++    /* 25 ms absolute deadline.
++     * 25 ms timeout + ~17 ms worst-case frame boundary = 42 ms total, which
++     * stays under FujiNet-PC's 50 ms CMD de-assert timeout.  The old 40 ms
++     * value caused a cascade: timeout (40 ms) + frame boundary (17 ms) = 57 ms
++     * which exceeded the 50 ms threshold and made FujiNet-PC return without
++     * sending a sync response, triggering another timeout and so on. */
++    deadline.tv_nsec += 25 * 1000000L;
++    if (deadline.tv_nsec >= 1000000000L) {
++        deadline.tv_sec++;
++        deadline.tv_nsec -= 1000000000L;
++    }
++
++    pthread_mutex_lock(&netsio_sync_mutex);
++    while (netsio_sync_wait) {
++        int rc = pthread_cond_timedwait(&netsio_sync_cond,
++                                        &netsio_sync_mutex,
++                                        &deadline);
++        if (rc == ETIMEDOUT) {
+             netsio_sync_wait = 0;
+             break;
+         }
+-        ticker++;
++    }
++    pthread_mutex_unlock(&netsio_sync_mutex);
++    {
++        uint64_t sync_elapsed = netsio_now_us() - sync_start;
++        netsio_last_sync_timedout = (sync_elapsed > 22000) ? 1 : 0;
++        if (sync_elapsed > 5000)
++            Log_print("netsio: sync wait took %llu us (>5ms)%s",
++                       (unsigned long long)sync_elapsed,
++                       netsio_last_sync_timedout ? " TIMEOUT" : "");
+     }
++    /* After a successful ACK on a READ/STATUS command, wait briefly for the
++     * DATA_BLOCK that FujiNet sends right after SYNC_RESPONSE to land in the
++     * pipe.  Without this, the emulator running fast during a debt-cap catch-up
++     * can exhaust the Atari OS SERIN timeout before the rx thread has time to
++     * write the data bytes into the pipe.  Over localhost UDP, DATA_BLOCK
++     * typically arrives < 200 µs after SYNC_RESPONSE; the 2 ms cap handles a
++     * loaded system gracefully.
++     * Skip for WRITE commands (netsio_next_write_size > 0): the emulator sends
++     * data to FujiNet next, so no DATA_BLOCK is incoming. */
++    if (!netsio_last_sync_timedout &&
++        netsio_next_write_size == 0 &&
++        netsio_available() >= 1) {
++        int waited = 0;
++        while (netsio_available() <= 1 && waited < 20) {
++            struct timespec ts = { 0, 100000L }; /* 100 µs */
++            nanosleep(&ts, NULL);
++            waited++;
++        }
++    }
+ }
+ 
+@@ -352,16 +417,25 @@ int netsio_available(void) {
+     return avail;
+ }
+ 
+-/* COMMAND ON */
++/* Flush any deferred COMMAND_ON to FujiNet-PC right now. */
++static void netsio_flush_cmd_on(void)
++{
++    if (netsio_cmd_pending) {
++        uint8_t p = NETSIO_COMMAND_ON;
++        send_to_fujinet(&p, 1);
++        netsio_cmd_pending = 0;
++    }
++}
++
++/* COMMAND ON -- deferred until the command bytes are ready so that
++ * FujiNet-PC never sees COMMAND_ON without data following immediately. */
+ int netsio_cmd_on(void)
+ {
+-    uint8_t p;
+-    p = NETSIO_COMMAND_ON;
+ #ifdef DEBUG
+-    Log_print("netsio: CMD ON");
++    Log_print("netsio: CMD ON (deferred)");
+ #endif
+     netsio_cmd_state = 1;
+-    send_to_fujinet(&p, 1);
++    netsio_cmd_pending = 1;
+     return 0;
+ }
+ 
+@@ -369,6 +443,7 @@ int netsio_cmd_on(void)
+ int netsio_cmd_off(void)
+ {
+     uint8_t p;
++    netsio_flush_cmd_on();
+     p = NETSIO_COMMAND_OFF;
+ #ifdef DEBUG
+     Log_print("netsio: CMD OFF");
+@@ -381,6 +456,14 @@ int netsio_cmd_off(void)
+ int netsio_cmd_off_sync(void)
+ {
+     uint8_t p[2];
++    netsio_flush_cmd_on();
++    if (netsio_cmd_data_sent_us) {
++        uint64_t gap = netsio_now_us() - netsio_cmd_data_sent_us;
++        if (gap > 10000)
++            Log_print("netsio: CMD_OFF_SYNC gap %llu us after data (>10ms!) prev_sync_timeout=%d",
++                       (unsigned long long)gap, netsio_last_sync_timedout);
++        netsio_cmd_data_sent_us = 0;
++    }
+     p[0] = NETSIO_COMMAND_OFF_SYNC;
+     netsio_sync_num++;
+     p[1] = netsio_sync_num;
+@@ -392,6 +475,17 @@ int netsio_cmd_off_sync(void)
+     return 0;
+ }
+ 
++/* Cancel a deferred COMMAND_ON without sending anything (short/aborted frame) */
++void netsio_cmd_cancel(void)
++{
++#ifdef DEBUG
++    if (netsio_cmd_pending)
++        Log_print("netsio: CMD ON cancelled (short frame)");
++#endif
++    netsio_cmd_pending = 0;
++    netsio_cmd_state = 0;
++}
++
+ /* Toggle Command Line */
+ void netsio_toggle_cmd(int v)
+ {
+@@ -437,6 +531,7 @@ int netsio_motor_off(void)
+ /* The emulator calls this to send a data byte out to FujiNet */
+ int netsio_send_byte(uint8_t b) {
+     uint8_t pkt[2];
++    netsio_flush_cmd_on();
+     pkt[0] = NETSIO_DATA_BYTE;
+     pkt[1] = b;
+ #ifdef DEBUG
+@@ -448,7 +543,10 @@ int netsio_send_byte(uint8_t b) {
+ 
+ /* The emulator calls this to send a data block out to FujiNet */
+ int netsio_send_block(const uint8_t *block, ssize_t len) {
++    netsio_flush_cmd_on();
+     send_block_to_fujinet(block, len);
++    if (netsio_cmd_state)
++        netsio_cmd_data_sent_us = netsio_now_us();
+ #ifdef DEBUG
+     Log_print("netsio: send block, %i bytes:\n  %s", len, buf_to_hex(block, 0, len));
+ #endif
+@@ -459,6 +557,7 @@ int netsio_send_block(const uint8_t *block, ssize_t len) {
+ int netsio_send_byte_sync(uint8_t b)
+ {
+     uint8_t p[3];
++    netsio_flush_cmd_on();
+     p[0] = NETSIO_DATA_BYTE_SYNC;
+     p[1] = b;
+     netsio_sync_num++;
+@@ -473,21 +572,51 @@ int netsio_send_byte_sync(uint8_t b)
+ 
+ /* The emulator calls this to receive a data byte from FujiNet */
+ int netsio_recv_byte(uint8_t *b) {
+-    ssize_t n = read(fds0[0], b, 1);
+-    if (n < 0)
+-    {
+-        if (errno == EINTR) return netsio_recv_byte(b);
++    if (fds0[0] < 0)
++        return -1;
++
++    for (;;) {
++        fd_set rfds;
++        struct timeval tv;
++        int sel;
++
++        FD_ZERO(&rfds);
++        FD_SET(fds0[0], &rfds);
++        tv.tv_sec = NETSIO_RECV_BYTE_TIMEOUT_SEC;
++        tv.tv_usec = 0;
++
++        sel = select(fds0[0] + 1, &rfds, NULL, NULL, &tv);
++        if (sel < 0) {
++            if (errno == EINTR)
++                continue;
+ #ifdef DEBUG
+-        Log_print("netsio: read from rx FIFO");
++            Log_print("netsio: recv_byte select error");
+ #endif
+-        return -1;
+-    }
+-    if (n == 0)
+-        return -1; /* FIFO closed? */
++            return -1;
++        }
++        if (sel == 0) {
++#ifdef DEBUG
++            Log_print("netsio: recv_byte: select timeout waiting for pipe data");
++#endif
++            return -1;
++        }
++
++        ssize_t n = read(fds0[0], b, 1);
++        if (n < 0) {
++            if (errno == EINTR)
++                continue;
++#ifdef DEBUG
++            Log_print("netsio: read from rx FIFO");
++#endif
++            return -1;
++        }
++        if (n == 0)
++            return -1; /* FIFO closed? */
+ #ifdef DEBUG2
+-    Log_print("netsio: read to emu: %02X", (unsigned)*b);
++        Log_print("netsio: read to emu: %02X", (unsigned)*b);
+ #endif
+-    return 0;
++        return 0;
++    }
+ }
+ 
+ /* Send netsio COLD reset 0xFF */
+@@ -513,9 +642,9 @@ int netsio_warm_reset(void) {
+ /* Send a test command frame to fujinet-pc */
+ void netsio_test_cmd(void)
+ {
+-    uint8_t p[6] = { 0x70, 0xE8, 0x00, 0x00, 0x59 }; /* Send fujidev get adapter config request */
+-    netsio_cmd_on(); /* Turn on CMD */
+-    send_block_to_fujinet(p, sizeof(p));
++    uint8_t p[5] = { 0x70, 0xE8, 0x00, 0x00, 0x59 }; /* Send fujidev get adapter config request */
++    netsio_cmd_on(); /* Turn on CMD (deferred) */
++    netsio_send_block(p, sizeof(p)); /* flushes COMMAND_ON then sends data */
+     netsio_cmd_off_sync(); /* Turn off CMD */
+ }
+ 
+@@ -661,7 +790,8 @@ static void *fujinet_rx_thread(void *arg) {
+             case NETSIO_SYNC_RESPONSE:
+             {
+                 /* packet: [cmd][sync#][ack_type][ack_byte][write_lo][write_hi] */
+-                uint8_t resp_sync, ack_type, ack_byte, write_size;
++                uint8_t resp_sync, ack_type, ack_byte;
++                uint16_t write_size;
+ 
+                 if (n < 6)
+                 {
+@@ -705,6 +835,11 @@ static void *fujinet_rx_thread(void *arg) {
+                     }
+                 }
+                 netsio_sync_wait = 0; /* continue emulation */
++                /* Wake the emulator thread immediately rather than waiting
++                 * for the next 5 ms busy-loop tick. */
++                pthread_mutex_lock(&netsio_sync_mutex);
++                pthread_cond_signal(&netsio_sync_cond);
++                pthread_mutex_unlock(&netsio_sync_mutex);
+                 break;
+             }
+ 
+@@ -824,7 +959,9 @@ void netsio_shutdown(void) {
+     netsio_sync_num = 0;
+     fujinet_known = 0;
+     netsio_sync_wait = 0;
++    pthread_cond_broadcast(&netsio_sync_cond); /* unblock any waiting caller */
+     netsio_cmd_state = 0;
++    netsio_cmd_pending = 0;
+     netsio_next_write_size = 0;
+ 
+     /* Clear address info */
+diff --git a/src/netsio.h b/src/netsio.h
+index 58e8b1b2..2c79eeb4 100644
+--- a/src/netsio.h
++++ b/src/netsio.h
+@@ -80,6 +80,7 @@ int netsio_recv_byte(uint8_t *b);
+ int netsio_cmd_on(void);
+ int netsio_cmd_off(void);
+ int netsio_cmd_off_sync(void);
++void netsio_cmd_cancel(void);
+ void netsio_toggle_cmd(int v);
+ int netsio_motor_on(void);
+ int netsio_motor_off(void);
+diff --git a/src/sio.c b/src/sio.c
+index 1c0d7783..3ab8bf6a 100644
+--- a/src/sio.c
++++ b/src/sio.c
+@@ -1531,7 +1531,7 @@ void SIO_SwitchCommandFrame(int onoff)
+ 	if (onoff)
+ 	{				/* Enabled */
+ #ifdef NETSIO
+-		if (netsio_enabled)
++		if (netsio_enabled && !BINLOAD_start_binloading)
+ 			netsio_cmd_on();
+ #endif /* NETSIO */
+ 		if (TransferStatus != SIO_NoFrame) 
+@@ -1548,7 +1548,7 @@ void SIO_SwitchCommandFrame(int onoff)
+ 	else
+ 	{
+ #ifdef NETSIO
+-		if (netsio_enabled)
++		if (netsio_enabled && !BINLOAD_start_binloading)
+ 		{
+ 			if (CommandIndex < ExpectedBytes)
+ 			{
+@@ -1560,11 +1560,12 @@ void SIO_SwitchCommandFrame(int onoff)
+ 					netsio_send_block(CommandFrame, CommandIndex);
+ 				*/
+ 				/* b) Skip sending short/invalid CF */
++				netsio_cmd_cancel();
+ 				TransferStatus = SIO_NoFrame;
+ 			}
+-			else
+-			{
+-				netsio_cmd_off_sync();
++		else
++		{
++			netsio_cmd_off_sync();
+ 				netsio_wait_for_sync(); /* Wait for sync response (ACK/NAK/NONE) */
+ 				/* POKEY_DELAYED_SERIN_IRQ = SIO_SERIN_INTERVAL * 8;*/
+ 				TransferStatus = SIO_StatusRead; /* Receive ACK/NAK in SIO_GetByte */
+@@ -1672,7 +1673,7 @@ void NetSIO_PutByte(int byte)
+ void SIO_PutByte(int byte)
+ {
+ #ifdef NETSIO
+-	if (netsio_enabled)
++	if (netsio_enabled && !BINLOAD_start_binloading)
+ 	{
+ 		NetSIO_PutByte(byte);
+ 		return;
+@@ -1832,7 +1833,7 @@ int SIO_GetByte(void)
+ 	int byte = 0;
+ 
+ #ifdef NETSIO
+-	if (netsio_enabled)
++	if (netsio_enabled && !BINLOAD_start_binloading)
+ 		return NetSIO_GetByte();
+ #endif /* NETSIO */
+ 
