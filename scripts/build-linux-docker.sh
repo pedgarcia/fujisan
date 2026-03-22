@@ -355,7 +355,32 @@ if [ "$BUILD_FUJINET_PC" = "true" ]; then
         -DFUJINET_TARGET=ATARI \
         -DCMAKE_BUILD_TYPE=Release
     make -j$(nproc)
+    # dist/ mirrors build.sh: WebUI + distfiles. The dist CMake target runs build_webui.py
+    # (needs python3-jinja2, python3-yaml) and copies distfiles/. If it fails, assemble the same layout.
+    echo "Running FujiNet dist target (WebUI + distfiles → dist/)..."
+    if cmake --build . --target dist; then
+        echo "✓ cmake dist target completed"
+    else
+        echo "⚠ cmake dist failed; running build_webui and assembling dist/ manually..."
+        if cmake --build . --target build_webui; then
+            mkdir -p /tmp/fujinet-build/dist
+            cp -r /build/fujinet-firmware/distfiles/. /tmp/fujinet-build/dist/
+            cp -f /tmp/fujinet-build/fujinet /tmp/fujinet-build/dist/fujinet
+            if [ -d /tmp/fujinet-build/data ]; then
+                rm -rf /tmp/fujinet-build/dist/data
+                cp -r /tmp/fujinet-build/data /tmp/fujinet-build/dist/data
+                echo "✓ Manual dist/ layout created (data + distfiles + fujinet)"
+            else
+                echo "⚠ build_webui did not produce /tmp/fujinet-build/data — check Python deps (jinja2, yaml)"
+            fi
+        else
+            echo "⚠ build_webui failed — bundle may lack data/; ensure python3-jinja2 and python3-yaml are installed"
+        fi
+    fi
     FUJINET_BINARY="/tmp/fujinet-build/fujinet"
+    if [ -f "/tmp/fujinet-build/dist/fujinet" ]; then
+        FUJINET_BINARY="/tmp/fujinet-build/dist/fujinet"
+    fi
     echo "✓ FujiNet-PC built: $(file $FUJINET_BINARY)"
     cd /tmp/fujisan-build/build-release
 fi
@@ -397,21 +422,42 @@ elif [ -n "$FUJINET_BINARY" ]; then
     chmod 755 fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet
     mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/SD
 
-    # When building from source, copy data folder from fujinet-firmware
-    if [ -d "/build/fujinet-firmware/data" ]; then
-        echo "Copying data folder from fujinet-firmware source..."
+    FUJINET_DIST="/tmp/fujinet-build/dist"
+    # Prefer CMake dist/ output (matches build.sh); fall back to legacy repo layout
+    if [ -d "$FUJINET_DIST/data" ]; then
+        echo "Copying data from $FUJINET_DIST/data..."
+        cp -r "$FUJINET_DIST/data" fujisan-linux/usr/lib/fujisan/fujinet-pc/
+        echo "✓ Data folder copied"
+    elif [ -d "/tmp/fujinet-build/data" ]; then
+        echo "Copying data from CMake build tree (BUILD_DATA_DIR)..."
+        cp -r /tmp/fujinet-build/data fujisan-linux/usr/lib/fujisan/fujinet-pc/
+        echo "✓ Data folder copied"
+    elif [ -d "/build/fujinet-firmware/data" ]; then
+        echo "Copying data from fujinet-firmware repo root (legacy layout)..."
         cp -r /build/fujinet-firmware/data fujisan-linux/usr/lib/fujisan/fujinet-pc/
         echo "✓ Data folder copied"
     else
-        echo "⚠ Warning: /build/fujinet-firmware/data not found"
+        echo "⚠ Warning: No data folder found under dist/, build tree, or repo root"
     fi
 
-    # Copy fnconfig.ini from ATARI device-specific folder
-    if [ -f "/build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" ]; then
+    if [ -f "$FUJINET_DIST/fnconfig.ini" ]; then
+        cp "$FUJINET_DIST/fnconfig.ini" fujisan-linux/usr/lib/fujisan/fujinet-pc/
+        echo "✓ fnconfig.ini copied from dist"
+    elif [ -f "/build/fujinet-firmware/distfiles/fnconfig.ini" ]; then
+        cp /build/fujinet-firmware/distfiles/fnconfig.ini fujisan-linux/usr/lib/fujisan/fujinet-pc/
+        echo "✓ fnconfig.ini copied from distfiles"
+    elif [ -f "/build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" ]; then
         cp /build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini \
            fujisan-linux/usr/lib/fujisan/fujinet-pc/
         echo "✓ fnconfig.ini copied from BUILD_ATARI"
     fi
+
+    if [ -d "$FUJINET_DIST/SD" ]; then
+        cp -r "$FUJINET_DIST/SD/." fujisan-linux/usr/lib/fujisan/fujinet-pc/SD/
+    fi
+    [ -f "$FUJINET_DIST/run-fujinet.sh" ] && cp "$FUJINET_DIST/run-fujinet.sh" fujisan-linux/usr/lib/fujisan/fujinet-pc/
+    [ -f "$FUJINET_DIST/run-fujinet" ]    && cp "$FUJINET_DIST/run-fujinet"    fujisan-linux/usr/lib/fujisan/fujinet-pc/
+    [ -f "$FUJINET_DIST/VERSION" ]        && cp "$FUJINET_DIST/VERSION"        fujisan-linux/usr/lib/fujisan/fujinet-pc/
 
     echo "✓ FujiNet-PC bundled for .deb (from source)"
 else
@@ -662,21 +708,41 @@ QTCONF_EOF
         chmod +x fujisan-portable/bin/fujinet-pc/fujinet
         mkdir -p fujisan-portable/bin/fujinet-pc/SD
 
-        # When building from source, copy data folder from fujinet-firmware
-        if [ -d "/build/fujinet-firmware/data" ]; then
-            echo "Copying data folder from fujinet-firmware source..."
+        FUJINET_DIST="/tmp/fujinet-build/dist"
+        if [ -d "$FUJINET_DIST/data" ]; then
+            echo "Copying data from $FUJINET_DIST/data..."
+            cp -r "$FUJINET_DIST/data" fujisan-portable/bin/fujinet-pc/
+            echo "✓ Data folder copied"
+        elif [ -d "/tmp/fujinet-build/data" ]; then
+            echo "Copying data from CMake build tree (BUILD_DATA_DIR)..."
+            cp -r /tmp/fujinet-build/data fujisan-portable/bin/fujinet-pc/
+            echo "✓ Data folder copied"
+        elif [ -d "/build/fujinet-firmware/data" ]; then
+            echo "Copying data from fujinet-firmware repo root (legacy layout)..."
             cp -r /build/fujinet-firmware/data fujisan-portable/bin/fujinet-pc/
             echo "✓ Data folder copied"
         else
-            echo "⚠ Warning: /build/fujinet-firmware/data not found"
+            echo "⚠ Warning: No data folder found under dist/, build tree, or repo root"
         fi
 
-        # Copy fnconfig.ini from ATARI device-specific folder
-        if [ -f "/build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" ]; then
+        if [ -f "$FUJINET_DIST/fnconfig.ini" ]; then
+            cp "$FUJINET_DIST/fnconfig.ini" fujisan-portable/bin/fujinet-pc/
+            echo "✓ fnconfig.ini copied from dist"
+        elif [ -f "/build/fujinet-firmware/distfiles/fnconfig.ini" ]; then
+            cp /build/fujinet-firmware/distfiles/fnconfig.ini fujisan-portable/bin/fujinet-pc/
+            echo "✓ fnconfig.ini copied from distfiles"
+        elif [ -f "/build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini" ]; then
             cp /build/fujinet-firmware/data/webui/device_specific/BUILD_ATARI/fnconfig.ini \
                fujisan-portable/bin/fujinet-pc/
             echo "✓ fnconfig.ini copied from BUILD_ATARI"
         fi
+
+        if [ -d "$FUJINET_DIST/SD" ]; then
+            cp -r "$FUJINET_DIST/SD/." fujisan-portable/bin/fujinet-pc/SD/
+        fi
+        [ -f "$FUJINET_DIST/run-fujinet.sh" ] && cp "$FUJINET_DIST/run-fujinet.sh" fujisan-portable/bin/fujinet-pc/
+        [ -f "$FUJINET_DIST/run-fujinet" ]    && cp "$FUJINET_DIST/run-fujinet"    fujisan-portable/bin/fujinet-pc/
+        [ -f "$FUJINET_DIST/VERSION" ]        && cp "$FUJINET_DIST/VERSION"        fujisan-portable/bin/fujinet-pc/
 
         echo "✓ FujiNet-PC bundled in portable package (from source)"
     fi

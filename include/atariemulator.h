@@ -422,9 +422,11 @@ private:
     int m_dspBufferBytes;
     int m_dspWritePos;
     int m_dspReadPos;
-    // Staging buffer: holds one frame's worth of audio assembled before a single
-    // contiguous write() to the Qt audio device (eliminates split-write micro-gaps).
-    static constexpr int DSP_STAGING_BYTES = 2048; // > max frame size (1472 bytes)
+    // Staging buffer: assembles a contiguous chunk for one write() to QIODevice.
+    // Must be able to hold the largest single write: min(DSP ring span, Qt bytesFree()),
+    // which on Linux is often up to the QAudioOutput buffer size (8192), not merely
+    // one emulator frame (~1472 bytes). Code resizes at runtime if needed.
+    static constexpr int DSP_STAGING_BYTES = 8192;
     QByteArray m_dspStagingBuffer;
     qint64 m_callbackTick;  // Time when callback occurred
     double m_avgGap;     // Average gap for speed adjustment

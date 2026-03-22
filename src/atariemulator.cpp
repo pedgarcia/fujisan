@@ -1105,12 +1105,8 @@ void AtariEmulator::processFrame()
         unsigned char* soundBuffer = libatari800_get_sound_buffer();
         int soundBufferLen = libatari800_get_sound_buffer_len();
         
-        // Safety check for buffer initialization
-        if (m_dspBufferBytes == 0 || m_dspBuffer.isEmpty()) {
-            return;  // Audio not properly initialized yet
-        }
-        
-        if (soundBuffer && soundBufferLen > 0) {
+        // DSP buffer must exist before touching the ring (never abort the whole frame)
+        if (m_dspBufferBytes > 0 && !m_dspBuffer.isEmpty() && soundBuffer && soundBufferLen > 0) {
             // Write to DSP buffer (producer side)
             int gap = m_dspWritePos - m_dspReadPos;
             
@@ -1265,7 +1261,11 @@ void AtariEmulator::processFrame()
                     // No wrap — write directly from ring buffer
                     writePtr = m_dspBuffer.data() + readOffset;
                 } else {
-                    // Wrap — assemble contiguous chunk in staging buffer
+                    // Wrap — assemble contiguous chunk in staging buffer (may exceed one
+                    // emulator frame; size is bounded by Qt bytesFree(), e.g. 8192 bytes).
+                    if (toWrite > m_dspStagingBuffer.size()) {
+                        m_dspStagingBuffer.resize(toWrite);
+                    }
                     int firstPartSize = m_dspBufferBytes - readOffset;
                     memcpy(m_dspStagingBuffer.data(),
                            m_dspBuffer.data() + readOffset, firstPartSize);
@@ -1333,7 +1333,9 @@ void AtariEmulator::requestNextFrame()
     if (delayUs < -frameTimeUs) {
         qDebug() << "Debt cap fired: delayUs=" << delayUs << "frameTimeUs=" << frameTimeUs;
         m_firstFrameTime = now;
-        m_frameCount = 1;
+        // Next line in this function is m_frameCount++, so use 0 here so the first
+        // deadline after reset is firstFrameTime + 1 * frameTime (not +2).
+        m_frameCount = 0;
         delayUs = frameTimeUs;
     }
 
