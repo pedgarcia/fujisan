@@ -87,7 +87,7 @@ new file mode 100644
 index 00000000..00000000
 --- /dev/null
 +++ b/src/netsiowin.c
-@@ -0,0 +1,419 @@
+@@ -0,0 +1,433 @@
 +/*
 + * netsiowin.c - NetSIO Windows implementation for FujiNet-PC <-> Atari800 Emulator
 + *
@@ -506,5 +506,19 @@ index 00000000..00000000
 +    netsio_cmd_on();
 +    send_block_to_fujinet(p, sizeof(p));
 +    netsio_cmd_off_sync();
++}
++
++/* netsio_poll: called from POKEY_Scanline() to apply buffered PROCEED/INTERRUPT
++ * pin states.  The Windows implementation does not yet track these signals, so
++ * this is a no-op stub. */
++void netsio_poll(void)
++{
++}
++
++/* netsio_cmd_cancel: called from sio.c when a command frame is too short or
++ * invalid.  The Windows implementation has no deferred COMMAND_ON state, so
++ * this is a no-op stub. */
++void netsio_cmd_cancel(void)
++{
 +}
 
