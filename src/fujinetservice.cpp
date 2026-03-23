@@ -65,8 +65,9 @@ void FujiNetService::checkConnection()
 void FujiNetService::startHealthCheck(int intervalMs)
 {
     m_healthCheckTimer->start(intervalMs);
-    // First check runs after intervalMs; no immediate check to avoid "Connection refused"
-    // when the process has just been started and hasn't bound to the port yet.
+    // Fire an early probe after 500 ms so the widget shows "Connected" quickly once
+    // FujiNet is up, without risking "connection refused" on an immediate call.
+    QTimer::singleShot(500, this, &FujiNetService::checkConnection);
 }
 
 void FujiNetService::stopHealthCheck()

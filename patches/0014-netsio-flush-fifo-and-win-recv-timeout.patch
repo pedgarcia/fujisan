@@ -1,0 +1,38 @@
+--- a/src/netsio.c
++++ b/src/netsio.c
+@@ -352,6 +352,22 @@
+     return avail;
+ }
+ 
++/* Drain all pending bytes in the FujiNet->emulator pipe.
++ * Temporarily sets O_NONBLOCK, reads until empty, then restores flags. */
++void netsio_flush_fifo(void)
++{
++    if (fds0[0] < 0)
++        return;
++    int flags = fcntl(fds0[0], F_GETFL, 0);
++    fcntl(fds0[0], F_SETFL, flags | O_NONBLOCK);
++    {
++        uint8_t discard[256];
++        while (read(fds0[0], discard, sizeof(discard)) > 0)
++            ;
++    }
++    fcntl(fds0[0], F_SETFL, flags);
++}
++
+ /* COMMAND ON */
+ int netsio_cmd_on(void)
+ {
+--- a/src/netsio.h
++++ b/src/netsio.h
+@@ -89,6 +89,10 @@
+ int netsio_cold_reset(void);
+ int netsio_warm_reset(void);
+ 
++/* Drain all pending bytes in the FujiNet->emulator FIFO/pipe.
++ * Call after killing FujiNet-PC so stale data does not corrupt the next session. */
++void netsio_flush_fifo(void);
++
+ void netsio_test_cmd(void);
+ 
+ #endif /* NETSIO_H */

@@ -4346,8 +4346,7 @@ void MainWindow::onFujiNetConnected()
 
     // Get FujiNet settings
     QSettings settings;
-    QString sdPath = settings.value("fujinet/sdPath", "").toString();
-    int httpPort = settings.value("fujinet/httpPort", 8000).toInt();
+    int httpPort = settings.value("fujinet/apiPort", 8000).toInt();
 
     // Configure FujiNet service
     QString serverUrl = QString("http://localhost:%1").arg(httpPort);

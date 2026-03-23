@@ -194,8 +194,11 @@ void FujiNetProcessManager::forceKill()
         // Process we started — SIGKILL / TerminateProcess (synchronous on Windows)
         m_process->kill();
         m_process->waitForFinished(1000);
+        // waitForFinished processes queued events, so the QProcess::finished signal
+        // will have fired by now and setState(NotRunning) called from the handler.
     } else {
-        // Externally running process
+        // Externally running process — no QProcess::finished signal will come,
+        // so we must transition state ourselves after the kill completes.
 #ifdef Q_OS_WIN
         QProcess taskkill;
         taskkill.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
@@ -205,6 +208,7 @@ void FujiNetProcessManager::forceKill()
         pkill.start("pkill", QStringList() << "-9" << "fujinet");
         pkill.waitForFinished(1000);
 #endif
+        setState(NotRunning);
     }
 }
 
