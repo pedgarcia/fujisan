@@ -233,33 +233,17 @@ MainWindow::MainWindow(QWidget *parent)
                 }
             });
 
-    // Initialize NetSIO state and update BASIC toggle accordingly
-    bool netSIOEnabled = settings.value("media/netSIOEnabled", false).toBool();
-    m_netSIOEnabled = netSIOEnabled;
-    updateBasicToggleState();
-
-    // Sync printer UI visibility with NetSIO state (FujiNet-PC only)
-    if (m_mediaPeripheralsDock) {
-        m_mediaPeripheralsDock->setNetSIOEnabled(m_netSIOEnabled);
-    }
-
-    int launchBehavior = settings.value("fujinet/launchBehavior", 0).toInt(); // 0=Auto, 1=Detect, 2=Manual
-
-    if (netSIOEnabled && launchBehavior == 0) { // Auto-launch mode
-        qDebug() << "NetSIO enabled - auto-starting FujiNet-PC with saved settings...";
-        startFujiNetWithSavedSettings();
-    } else if (netSIOEnabled && launchBehavior == 1) { // Detect existing mode
-        qDebug() << "NetSIO enabled - detecting existing FujiNet-PC process...";
-
-        // Check if FujiNet-PC is already running externally
-        if (FujiNetProcessManager::isProcessRunningExternally("fujinet")) {
-            qDebug() << "Found existing FujiNet-PC process - attaching to it";
-            // Start with saved settings for future restart needs
-            startFujiNetWithSavedSettings();
-        } else {
-            qDebug() << "No existing FujiNet-PC process found - waiting for external start";
-        }
-    }
+    // Initialize NetSIO state once the event loop is running.
+    // On Windows, QProcess::start() and QTimer need the event loop active.
+    // QTimer::singleShot(0, ...) defers to the first event loop iteration,
+    // which is right after QApplication::exec() starts — the same context
+    // where the Settings dialog path works.
+    QTimer::singleShot(0, this, [this]() {
+        QSettings s("8bitrelics", "Fujisan");
+        bool netSIOEnabled = s.value("media/netSIOEnabled", false).toBool();
+        onNetSIOEnabledChanged(netSIOEnabled);
+        updateFujiNetStatus();
+    });
 
     qDebug() << "Fujisan initialized successfully";
 }
@@ -4079,10 +4063,6 @@ void MainWindow::stopFujiNetViaTCP()
         m_fujinetService->stopHealthCheck();
         m_fujinetService->stopDrivePolling();
     }
-    // Reset netsio client state so the emulator stops routing SIO to the dead process.
-    if (m_emulator) {
-        m_emulator->resetNetSIOClientState();
-    }
     m_fujinetProcessManager->stop();
 }
 
@@ -4310,21 +4290,18 @@ void MainWindow::resetFujiNet()
     // Force-kill old instance (nearly instant on all platforms)
     m_fujinetProcessManager->forceKill();
 
-    // Clear NETSIO client state so the new instance's handshake is detected fresh
-    m_emulator->resetNetSIOClientState();
-
     // Reset HTTP connection state so that the next successful health check
     // will re-emit connected() even if m_isConnected was already true.
-    // Without this, if no in-flight request existed when stopHealthCheck()
-    // was called, m_isConnected stays true and connected() is never re-emitted,
-    // leaving the widget permanently showing "Stopped / Disconnected".
     if (m_fujinetService) {
         m_fujinetService->resetConnectionState();
     }
 
-    // Immediately start new FujiNet-PC instance
-    // onFujiNetConnected() will restart health check + drive polling when it connects
-    startFujiNetWithSavedSettings();
+    // Delay the restart slightly: on Windows, forceKill() no longer calls waitForFinished()
+    // to avoid the nested event loop crash, so the OS may not have released the port yet
+    // when we try to bind again. A short delay gives TerminateProcess time to complete.
+    QTimer::singleShot(300, this, [this]() {
+        startFujiNetWithSavedSettings();
+    });
 }
 
 void MainWindow::swapFujiNetDisks()
@@ -4359,14 +4336,21 @@ void MainWindow::onFujiNetConnected()
     m_fujinetService->setServerUrl(serverUrl);
 
     // Switch drives to FujiNet mode and start polling if NetSIO is enabled
+    qDebug() << "[onFujiNetConnected] m_netSIOEnabled=" << m_netSIOEnabled;
     if (m_netSIOEnabled) {
+        qDebug() << "[onFujiNetConnected] calling switchDrivesToFujiNetMode";
         switchDrivesToFujiNetMode();
+        qDebug() << "[onFujiNetConnected] switchDrivesToFujiNetMode returned";
         updateStatusBarForDriveMode();
+        qDebug() << "[onFujiNetConnected] calling startDrivePolling";
         m_fujinetService->startDrivePolling();
+        qDebug() << "[onFujiNetConnected] startDrivePolling returned";
 
         // Configure and start printer polling if printer is enabled
         if (m_mediaPeripheralsDock) {
             PrinterWidget* printer = m_mediaPeripheralsDock->getPrinterWidget();
+            qDebug() << "[onFujiNetConnected] printer=" << printer
+                     << "isPrinterEnabled=" << (printer ? printer->isPrinterEnabled() : false);
             if (printer && printer->isPrinterEnabled()) {
                 // Configure the printer on FujiNet-PC (will use SSE or polling fallback automatically)
                 QString printerType = printer->getPrinterType();
@@ -4377,8 +4361,10 @@ void MainWindow::onFujiNetConnected()
         }
     }
 
+    qDebug() << "[onFujiNetConnected] calling updateFujiNetStatus";
     // Update status bar to reflect FujiNet connection state
     updateFujiNetStatus();
+    qDebug() << "[onFujiNetConnected] done";
 }
 
 void MainWindow::onFujiNetDisconnected()
@@ -4450,19 +4436,26 @@ void MainWindow::switchDrivesToFujiNetMode()
     qDebug() << "Switching drives to FujiNet mode";
 
     // Switch D1 (toolbar)
+    qDebug() << "[switchDrives] m_diskDrive1=" << (void*)m_diskDrive1;
     if (m_diskDrive1) {
+        qDebug() << "[switchDrives] setting D1 to FUJINET";
         m_diskDrive1->setDriveMode(DiskDriveWidget::FUJINET);
+        qDebug() << "[switchDrives] D1 done";
     }
 
     // Switch D2-D8 (media peripherals dock)
+    qDebug() << "[switchDrives] m_mediaPeripheralsDock=" << (void*)m_mediaPeripheralsDock;
     if (m_mediaPeripheralsDock) {
         for (int i = 2; i <= 8; i++) {
             DiskDriveWidget* driveWidget = m_mediaPeripheralsDock->getDriveWidget(i);
+            qDebug() << "[switchDrives] D" << i << "=" << (void*)driveWidget;
             if (driveWidget) {
                 driveWidget->setDriveMode(DiskDriveWidget::FUJINET);
+                qDebug() << "[switchDrives] D" << i << "done";
             }
         }
     }
+    qDebug() << "[switchDrives] complete";
 }
 
 void MainWindow::switchDrivesToLocalMode()

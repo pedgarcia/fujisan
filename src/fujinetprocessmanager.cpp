@@ -19,6 +19,7 @@ FujiNetProcessManager::FujiNetProcessManager(QObject *parent)
     , m_process(new QProcess(this))
     , m_state(NotRunning)
     , m_launchBehavior(AutoLaunch)
+    , m_skipExternalCheck(false)
     , m_lastExitCode(0)
     , m_lastExitStatus(QProcess::NormalExit)
     , m_startTimer(new QTimer(this))
@@ -50,14 +51,20 @@ bool FujiNetProcessManager::start(const QString& binaryPath, const QStringList& 
         return false;
     }
 
-    // Kill any stale/external FujiNet-PC process before launching a managed one.
-    // Previous sessions may leave zombie or orphaned processes behind; pgrep can
-    // match those and, if we short-circuited here, the state would be stuck at
-    // Running with no QProcess and no onProcessFinished signal — leaving the
-    // health-check polling a dead server forever.
-    // The "Detect existing" launch mode already handles attaching to a user-started
-    // external process in MainWindow before calling start().
-    if (isProcessRunningExternally("fujinet")) {
+    // Skip isProcessRunningExternally() after forceKill() — we just killed the process and are
+    // restarting it, so there is no external instance; that check runs a nested event loop
+    // (tasklist.waitForFinished) which can crash the emulator timer on Windows.
+    if (m_skipExternalCheck) {
+        qDebug() << "Skipping isProcessRunningExternally() after forceKill";
+        m_skipExternalCheck = false;
+    } else if (isProcessRunningExternally("fujinet")) {
+        // Kill any stale/external FujiNet-PC process before launching a managed one.
+        // Previous sessions may leave zombie or orphaned processes behind; pgrep can
+        // match those and, if we short-circuited here, the state would be stuck at
+        // Running with no QProcess and no onProcessFinished signal — leaving the
+        // health-check polling a dead server forever.
+        // The "Detect existing" launch mode already handles attaching to a user-started
+        // external process in MainWindow before calling start().
         qDebug() << "Found existing FujiNet-PC process - killing before managed launch";
 #ifdef Q_OS_WIN
         QProcess taskkill;
@@ -198,14 +205,26 @@ void FujiNetProcessManager::forceKill()
     }
 
     qDebug() << "Force-killing FujiNet-PC (no graceful shutdown)";
+    // Signal start() to skip isProcessRunningExternally() — we know the process is dead
+    // and that call runs a nested event loop (tasklist) on Windows which can crash.
+    m_skipExternalCheck = true;
     setState(Stopping);
 
     if (m_process->state() != QProcess::NotRunning) {
-        // Process we started — SIGKILL / TerminateProcess (synchronous on Windows)
+        // Process we started — SIGKILL / TerminateProcess
         m_process->kill();
+#ifdef Q_OS_WIN
+        // On Windows, waitForFinished() uses MsgWaitForMultipleObjects which pumps
+        // the Qt event loop. The emulator frame timer can fire during that nested loop
+        // and crash. Instead, transition to NotRunning immediately; when the async
+        // onProcessFinished(CrashExit) signal arrives, its guard will skip setState(Error).
+        setState(NotRunning);
+#else
         m_process->waitForFinished(1000);
-        // waitForFinished processes queued events, so the QProcess::finished signal
-        // will have fired by now and setState(NotRunning) called from the handler.
+        if (m_process->state() == QProcess::NotRunning) {
+            setState(NotRunning);
+        }
+#endif
     } else {
         // Externally running process — no QProcess::finished signal will come,
         // so we must transition state ourselves after the kill completes.
@@ -285,8 +304,12 @@ void FujiNetProcessManager::onProcessFinished(int exitCode, QProcess::ExitStatus
     m_lastExitStatus = exitStatus;
 
     if (exitStatus == QProcess::CrashExit) {
-        m_lastError = "FujiNet-PC crashed";
-        setState(Error);
+        // On Windows, forceKill() already called setState(NotRunning) immediately
+        // (to avoid waitForFinished's nested event loop). Don't regress to Error.
+        if (m_state != NotRunning) {
+            m_lastError = "FujiNet-PC crashed";
+            setState(Error);
+        }
     } else {
         setState(NotRunning);
     }

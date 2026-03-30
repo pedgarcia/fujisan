@@ -112,6 +112,7 @@ private:
     QProcess* m_process;
     ProcessState m_state;
     LaunchBehavior m_launchBehavior;
+    bool m_skipExternalCheck;  // Set by forceKill() to skip isProcessRunningExternally() in start()
     QString m_binaryPath;
     QStringList m_arguments;
     QString m_lastError;
