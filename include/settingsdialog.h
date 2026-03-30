@@ -361,6 +361,7 @@ private:
     // Helper functions
     void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
     void updateFujiNetConfigConfigenabled(const QString& configPath, bool enabled);
+    void updateFujiNetBinaryBrowseButtonState();
     void checkFujiNetRestartRequired();
     void checkAndMigrateFujiNetSD();
     bool migrateFujiNetSDContents(const QString& fromPath, const QString& toPath);

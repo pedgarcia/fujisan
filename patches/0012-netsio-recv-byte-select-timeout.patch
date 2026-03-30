@@ -1,5 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Developer <fujisan@atari>
+Date: Thu, 27 Mar 2026 00:00:00 -0800
+Subject: [PATCH] netsio: replace blocking recv with select-based timeout
+
+Replace the indefinite blocking read() in netsio_recv_byte() with a
+select()-based loop that times out after NETSIO_RECV_BYTE_TIMEOUT_SEC
+(default 10 s).  The old code would hang the emulator thread forever if
+FujiNet-PC stalled or crashed mid-transfer, freezing the GUI.
+
+Also guard netsio_recv_byte() against an uninitialised pipe fd.
+---
+ src/netsio.c | 57 +++++++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 46 insertions(+), 11 deletions(-)
+
 diff --git a/src/netsio.c b/src/netsio.c
-index 1e4340d3..92dfa23a 100644
+index 72e912e2..e07cbe3f 100644
 --- a/src/netsio.c
 +++ b/src/netsio.c
 @@ -17,6 +17,7 @@
@@ -10,9 +25,9 @@ index 1e4340d3..92dfa23a 100644
  #include <time.h>
  #include "netsio.h"
  #include "log.h"
-@@ -43,6 +44,12 @@ int netsio_cmd_state = 0;
- /* data frame size for SIO write commands */
- volatile int netsio_next_write_size = 0;
+@@ -47,6 +48,12 @@ volatile int netsio_next_write_size = 0;
+ volatile int netsio_ca1_state = 1;
+ volatile int netsio_cb1_state = 1;
  
 +/* Max time to wait for a byte from the RX thread (FujiNet -> emulator pipe).
 + * Prevents indefinite GUI freezes when FujiNet-PC is slow or wedged. */
@@ -23,7 +38,7 @@ index 1e4340d3..92dfa23a 100644
  /* FIFO pipe: fds0: FujiNet->emulator */
  int fds0[2];
  
-@@ -460,21 +467,51 @@ int netsio_send_byte_sync(uint8_t b)
+@@ -473,21 +480,51 @@ int netsio_send_byte_sync(uint8_t b)
  
  /* The emulator calls this to receive a data byte from FujiNet */
  int netsio_recv_byte(uint8_t *b) {

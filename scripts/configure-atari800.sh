@@ -4,6 +4,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PATCHES_SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)/patches"
 ATARI800_SRC_PATH="$1"
 
 if [ -z "$ATARI800_SRC_PATH" ]; then
@@ -30,6 +31,13 @@ export ATARI800_SRC_PATH
 
 # Change to source directory
 cd "$ATARI800_SRC_PATH"
+
+# Always refresh patch scripts from the main project so configure reruns
+# pick up patch-system fixes without requiring a full clean clone.
+if [ -d "$PATCHES_SOURCE_DIR" ]; then
+    rm -rf fujisan-patches
+    cp -R "$PATCHES_SOURCE_DIR" fujisan-patches
+fi
 
 # Apply patches if they exist
 if [ -d "fujisan-patches" ] && [ -f "fujisan-patches/apply-patches.sh" ]; then

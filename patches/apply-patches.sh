@@ -17,6 +17,27 @@ cd "$ATARI800_SRC_PATH" || exit 1
 
 echo "Applying patches to atari800 source at: $ATARI800_SRC_PATH"
 
+# Avoid re-applying patches on configure reruns in the same source tree.
+# ExternalProject may invoke configure multiple times without recloning.
+PATCH_MARKER=".fujisan-patches-applied"
+if [ -f "$PATCH_MARKER" ]; then
+    echo "Patches already applied in this source tree ($PATCH_MARKER present), skipping."
+    exit 0
+fi
+
+# Bootstrap detection for trees patched before marker support existed.
+# Require 0003 (single-step) markers too — otherwise configure reruns can skip
+# an incomplete tree that only had later NetSIO / execute_cycles hunks applied.
+if [ -f "src/netsio.c" ] && [ -f "src/netsio.h" ] && [ -f "src/libatari800/api.c" ] && \
+   grep -q 'void netsio_flush_fifo(void)' src/netsio.c && \
+   grep -q 'void netsio_flush_fifo(void);' src/netsio.h && \
+   grep -q 'int libatari800_execute_cycles(int target_cycles)' src/libatari800/api.c && \
+   grep -q 'CPU_GetInstructionCycles' src/cpu.h; then
+    echo "Detected previously patched source tree; writing $PATCH_MARKER and skipping."
+    touch "$PATCH_MARKER"
+    exit 0
+fi
+
 # Check if this is a git repository
 if [ -d .git ]; then
     echo "Git repository detected, using 'git am' for patches"
@@ -45,12 +66,23 @@ if [ -d .git ]; then
             fi
             
             # Try git apply first (more reliable than git am for patches)
-            # Use --3way for better conflict resolution and avoid prompts
+            # Use --3way for better conflict resolution and avoid prompts.
+            # If reverse-check succeeds, the patch is already present: skip.
             if git apply --check "$patch" 2>/dev/null; then
-                git apply --3way "$patch" </dev/null 2>/dev/null || git apply "$patch" </dev/null
+                if ! git apply --3way "$patch" </dev/null 2>/dev/null; then
+                    if ! git apply "$patch" </dev/null; then
+                        echo "Error: git apply failed for $patch_name"
+                        exit 1
+                    fi
+                fi
                 echo "✓ Patch applied successfully with git apply"
+            elif git apply --reverse --check "$patch" 2>/dev/null; then
+                echo "✓ Patch $patch_name already applied (skipping)"
             elif patch -p1 --dry-run --force < "$patch" >/dev/null 2>&1; then
-                patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null
+                if ! patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null; then
+                    echo "Error: patch command failed for $patch_name"
+                    exit 1
+                fi
                 echo "✓ Patch applied successfully with patch command"
             else
                     # For critical patch 0007 (BINLOAD/NetSIO), apply manually
@@ -63,8 +95,12 @@ if [ -d .git ]; then
                                 sed -i '' 's/if (netsio_enabled)/if (netsio_enabled \&\& !BINLOAD_start_binloading)/g' src/sio.c
                             fi
                             echo "✓ BINLOAD/NetSIO priority patch applied manually"
+                        elif grep -q 'BINLOAD_start_binloading' src/sio.c; then
+                            echo "✓ Patch $patch_name already applied (BINLOAD guard present)"
+                        else
+                            echo "Error: Patch $patch_name could not be applied and manual fallback failed"
+                            exit 1
                         fi
-                        echo "Warning: Patch $patch_name had issues but manual apply attempted"
                     # For critical patch 0009 (replace netsio_cold_reset with netsio_warm_reset in Atari800_Coldstart), apply manually
                     elif [[ "$patch_name" == "0009-replace-netsio-cold-with-warm-reset-in-coldstart.patch" ]]; then
                         echo "Applying netsio_cold_reset -> netsio_warm_reset replacement patch manually..."
@@ -78,12 +114,16 @@ if [ -d .git ]; then
                                 sed -i '' 's/netsio_cold_reset();/netsio_warm_reset();/g' src/atari.c
                             fi
                             echo "✓ netsio_cold_reset -> netsio_warm_reset replacement applied manually"
+                        elif grep -q 'netsio_warm_reset' src/atari.c; then
+                            echo "✓ Patch $patch_name already applied (warm reset present)"
+                        else
+                            echo "Error: Patch $patch_name could not be applied and manual fallback failed"
+                            exit 1
                         fi
-                        echo "Warning: Patch $patch_name had issues but manual apply attempted"
                     # For critical patch 0003, apply manually
                     elif [[ "$patch_name" == "0003-disk-activity-callback-integration.patch" ]]; then
                         echo "Applying disk activity callback patch manually..."
-                        
+
                         # Check if sio.c exists and apply changes
                         if [ -f "src/sio.c" ] && ! grep -q "disk_activity_callback" src/sio.c; then
                             # Create a temporary file with the changes
@@ -93,7 +133,7 @@ if [ -d .git ]; then
 @@ -78,6 +78,10 @@
  #include "cassette.h"
  #include "util.h"
- 
+
 +#ifdef LIBATARI800
 +extern void (*disk_activity_callback)(int drive, int operation);
 +#endif
@@ -103,14 +143,16 @@ if [ -d .git ]; then
  #define CONSECUTIVE_SECTORS_FAST_IO
 EOF
                             patch -p1 < /tmp/sio_patch.txt 2>/dev/null || true
-                            
-                            # Also add the callback invocations manually if needed
-                            echo "✓ Manual patch partially applied - disk LED activity may still need fixes"
+                            echo "✓ Manual patch applied for disk activity callback"
+                        elif grep -q "disk_activity_callback" src/sio.c; then
+                            echo "✓ Patch $patch_name already applied (callback present)"
+                        else
+                            echo "Error: Patch $patch_name could not be applied and manual fallback failed"
+                            exit 1
                         fi
-                        echo "Warning: Patch $patch_name had issues but continuing anyway"
                     else
-                        echo "Warning: Patch $patch_name could not be applied, skipping"
-                        continue
+                        echo "Error: Patch $patch_name could not be applied"
+                        exit 1
                     fi
             fi
         fi
@@ -134,16 +176,24 @@ else
             fi
 
             echo "Applying patch: $patch_name"
-            # Use force and no-backup-if-mismatch to avoid prompts
-            patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null || {
+            if patch -p1 --dry-run --force < "$patch" >/dev/null 2>&1; then
+                # Use force and no-backup-if-mismatch to avoid prompts
+                patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null || {
+                    echo "Error: Failed to apply patch $patch_name"
+                    exit 1
+                }
+            elif patch -p1 --dry-run -R --force < "$patch" >/dev/null 2>&1; then
+                echo "✓ Patch $patch_name already applied (skipping)"
+            else
                 echo "Error: Failed to apply patch $patch_name"
                 exit 1
-            }
+            fi
         fi
     done
 fi
 
 echo "All patches applied successfully!"
+touch "$PATCH_MARKER"
 
 # Apply inline patches for disk management functions
 INLINE_PATCH="$PATCHES_DIR/patch-libatari800-inline.sh"

@@ -1,6 +1,6 @@
 --- a/src/netsio.c
 +++ b/src/netsio.c
-@@ -352,6 +352,22 @@
+@@ -418,6 +418,22 @@
      return avail;
  }
  
@@ -20,12 +20,12 @@
 +    fcntl(fds0[0], F_SETFL, flags);
 +}
 +
- /* COMMAND ON */
- int netsio_cmd_on(void)
+ /* Flush any deferred COMMAND_ON to FujiNet-PC right now. */
+ static void netsio_flush_cmd_on(void)
  {
 --- a/src/netsio.h
 +++ b/src/netsio.h
-@@ -89,6 +89,10 @@
+@@ -90,6 +90,10 @@
  int netsio_cold_reset(void);
  int netsio_warm_reset(void);
  

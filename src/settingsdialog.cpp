@@ -156,20 +156,32 @@ void SettingsDialog::setFujiNetManagers(FujiNetProcessManager* processManager,
 
         // Update binary path display and config label if we have binary manager
         if (m_fujinetBinaryManager && m_fujinetBinaryPath) {
+            QSettings settings;
+            QString customPath = settings.value("fujinet/customBinaryPath", "").toString();
             QString bundledPath = m_fujinetBinaryManager->getBinaryPath();
-            if (QFile::exists(bundledPath)) {
-                m_fujinetBinaryPath->setText(bundledPath + " (bundled)");
-                m_fujinetBrowseButton->setEnabled(false);
-                QString version = m_fujinetBinaryManager->getInstalledVersion();
-                m_fujinetVersionLabel->setText(version.isEmpty() ? "Unknown" : version);
-                // Don't override button state here - let onFujiNetProcessStateChanged() handle it
+            QString displayPath;
+            bool usingBundled = false;
+            if (!customPath.isEmpty() && QFile::exists(customPath)) {
+                displayPath = customPath;
+            } else if (QFile::exists(bundledPath)) {
+                displayPath = bundledPath;
+                usingBundled = true;
+            } else if (!customPath.isEmpty()) {
+                displayPath = customPath;
+            }
 
-                // Set default config file location label
-                QFileInfo fileInfo(bundledPath);
+            if (!displayPath.isEmpty()) {
+                m_fujinetBinaryPath->setText(usingBundled ? displayPath + " (bundled)" : displayPath);
+                QString version = usingBundled
+                    ? m_fujinetBinaryManager->getInstalledVersion()
+                    : m_fujinetBinaryManager->parseVersionFromBinary(displayPath);
+                m_fujinetVersionLabel->setText(version.isEmpty() ? "Unknown" : version);
+                m_fujinetVersionLabel->setStyleSheet("color: #666;");
+
+                QFileInfo fileInfo(displayPath);
                 QString configPath = fileInfo.absolutePath() + "/fnconfig.ini";
                 m_fujinetDefaultConfigLabel->setText(QString("Default: %1").arg(configPath));
 
-                // Set default SD folder if not already set
                 if (m_fujinetSDPath->text().isEmpty()) {
                     QString defaultSDPath = fileInfo.absolutePath() + "/SD";
                     m_fujinetSDPath->setPlaceholderText(QString("Default: %1").arg(defaultSDPath));
@@ -3405,7 +3417,14 @@ void SettingsDialog::accept()
         } else {
             QString bundledPath = m_fujinetBinaryManager->getBinaryPath();
             QString customPath = settings.value("fujinet/customBinaryPath", "").toString();
-            QString binaryPath = QFile::exists(bundledPath) ? bundledPath : customPath;
+            QString binaryPath;
+            if (!customPath.isEmpty() && QFile::exists(customPath)) {
+                binaryPath = customPath;
+            } else if (QFile::exists(bundledPath)) {
+                binaryPath = bundledPath;
+            } else {
+                binaryPath = customPath;
+            }
             if (!binaryPath.isEmpty() && QFile::exists(binaryPath)) {
                 QFileInfo binaryInfo(binaryPath);
                 configPath = binaryInfo.absolutePath() + "/fnconfig.ini";
@@ -4833,6 +4852,25 @@ void SettingsDialog::updateFujiNetConfigConfigenabled(const QString& configPath,
     qDebug() << "Updated fnconfig.ini configenabled=" << (enabled ? 1 : 0) << "at" << configPath;
 }
 
+void SettingsDialog::updateFujiNetBinaryBrowseButtonState()
+{
+    if (!m_fujinetBrowseButton) {
+        return;
+    }
+    bool canChange = true;
+    QString tip;
+    if (m_fujinetProcessManager) {
+        FujiNetProcessManager::ProcessState s = m_fujinetProcessManager->getState();
+        if (s == FujiNetProcessManager::Starting || s == FujiNetProcessManager::Running
+            || s == FujiNetProcessManager::Stopping) {
+            canChange = false;
+            tip = tr("Stop FujiNet before choosing a different binary.");
+        }
+    }
+    m_fujinetBrowseButton->setEnabled(canChange);
+    m_fujinetBrowseButton->setToolTip(tip);
+}
+
 void SettingsDialog::onFujiNetStart()
 {
     if (!m_fujinetProcessManager || !m_fujinetBinaryManager) {
@@ -4846,10 +4884,10 @@ void SettingsDialog::onFujiNetStart()
     QString customPath = settings.value("fujinet/customBinaryPath", "").toString();
     QString binaryPath;
 
-    if (QFile::exists(bundledPath)) {
-        binaryPath = bundledPath;
-    } else if (!customPath.isEmpty() && QFile::exists(customPath)) {
+    if (!customPath.isEmpty() && QFile::exists(customPath)) {
         binaryPath = customPath;
+    } else if (QFile::exists(bundledPath)) {
+        binaryPath = bundledPath;
     } else {
         m_fujinetVersionLabel->setText("No binary configured");
         m_fujinetVersionLabel->setStyleSheet("color: red;");
@@ -5002,6 +5040,8 @@ void SettingsDialog::onFujiNetProcessStateChanged(int state)
         m_fujinetStatusLabel->setStyleSheet("color: red;");
         break;
     }
+
+    updateFujiNetBinaryBrowseButtonState();
 
     // Update restart warning visibility
     checkFujiNetRestartRequired();

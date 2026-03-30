@@ -3993,15 +3993,21 @@ void MainWindow::startFujiNetWithSavedSettings()
         return;
     }
 
-    // Get binary path
-    QString binaryPath = m_fujinetBinaryManager->getBinaryPath();
-    if (binaryPath.isEmpty()) {
+    QSettings settings;
+
+    QString bundledPath = m_fujinetBinaryManager->getBinaryPath();
+    QString customPath = settings.value("fujinet/customBinaryPath", "").toString();
+    QString binaryPath;
+    if (!customPath.isEmpty() && QFile::exists(customPath)) {
+        binaryPath = customPath;
+    } else if (QFile::exists(bundledPath)) {
+        binaryPath = bundledPath;
+    } else {
         qDebug() << "FujiNet-PC binary not found - cannot auto-start";
         return;
     }
 
-    // Read saved settings
-    QSettings settings;
+    // Read remaining FujiNet settings
     int httpPort = settings.value("fujinet/apiPort", 8000).toInt();
     int netsioPort = settings.value("fujinet/netsioPort", 9997).toInt();
     QString sdPath = settings.value("fujinet/sdCardPath", "").toString();
