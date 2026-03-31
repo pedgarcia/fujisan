@@ -17,10 +17,43 @@ cd "$ATARI800_SRC_PATH" || exit 1
 
 echo "Applying patches to atari800 source at: $ATARI800_SRC_PATH"
 
+# Normalize NetSIO sync-wait ordering to avoid a fast-response race where
+# netsio_sync_wait is set after send and then times out despite a response.
+apply_netsio_sync_race_fix() {
+    if [ -f "src/netsio.c" ]; then
+        perl -0777 -i -pe '
+            s/send_to_fujinet\(p, sizeof\(p\)\);\n\s*netsio_sync_wait = 1; \/\* pause emulation until we hear back or timeout \*\//pthread_mutex_lock\(&netsio_sync_mutex\);\n    netsio_sync_wait = 1; \/\* set before send to avoid missing a fast response \*\/\n    pthread_mutex_unlock\(&netsio_sync_mutex\);\n    send_to_fujinet\(p, sizeof\(p\)\);/g;
+            s/send_to_fujinet\(p, sizeof\(p\)\);\n\s*netsio_sync_wait = 1; \/\* pause emulation until we hear back or timeout s\*\//pthread_mutex_lock\(&netsio_sync_mutex\);\n    netsio_sync_wait = 1; \/\* set before send to avoid missing a fast response \*\/\n    pthread_mutex_unlock\(&netsio_sync_mutex\);\n    send_to_fujinet\(p, sizeof\(p\)\);/g;
+            s/netsio_sync_wait = 0; \/\* continue emulation \*\/\n\s*\/\* Wake the emulator thread immediately rather than waiting\n\s*\* for the next 5 ms busy-loop tick\. \*\/\n\s*pthread_mutex_lock\(&netsio_sync_mutex\);\n\s*pthread_cond_signal\(&netsio_sync_cond\);\n\s*pthread_mutex_unlock\(&netsio_sync_mutex\);/pthread_mutex_lock\(&netsio_sync_mutex\);\n                netsio_sync_wait = 0; \/\* continue emulation \*\/\n                pthread_cond_signal\(&netsio_sync_cond\);\n                pthread_mutex_unlock\(&netsio_sync_mutex\);/g;
+        ' src/netsio.c
+    fi
+}
+
+# FIFO-after-sync deadlock fix (patch 0015): apply when older trees lack it.
+apply_netsio_fifo_deadlock_fix() {
+    if [ ! -f "src/netsio.c" ] || [ ! -f "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" ]; then
+        return 0
+    fi
+    if grep -q 'Wake emulator BEFORE enqueue' src/netsio.c 2>/dev/null; then
+        return 0
+    fi
+    if git apply --check "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" 2>/dev/null; then
+        if [ -d .git ]; then
+            git apply "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" 2>/dev/null \
+                || patch -p1 --force --no-backup-if-mismatch < "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" </dev/null
+        else
+            patch -p1 --force --no-backup-if-mismatch < "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" </dev/null
+        fi
+        echo "✓ Applied 0015 netsio FIFO/sync deadlock fix"
+    fi
+}
+
 # Avoid re-applying patches on configure reruns in the same source tree.
 # ExternalProject may invoke configure multiple times without recloning.
 PATCH_MARKER=".fujisan-patches-applied"
 if [ -f "$PATCH_MARKER" ]; then
+    apply_netsio_sync_race_fix
+    apply_netsio_fifo_deadlock_fix
     echo "Patches already applied in this source tree ($PATCH_MARKER present), skipping."
     exit 0
 fi
@@ -33,6 +66,8 @@ if [ -f "src/netsio.c" ] && [ -f "src/netsio.h" ] && [ -f "src/libatari800/api.c
    grep -q 'void netsio_flush_fifo(void);' src/netsio.h && \
    grep -q 'int libatari800_execute_cycles(int target_cycles)' src/libatari800/api.c && \
    grep -q 'CPU_GetInstructionCycles' src/cpu.h; then
+    apply_netsio_sync_race_fix
+    apply_netsio_fifo_deadlock_fix
     echo "Detected previously patched source tree; writing $PATCH_MARKER and skipping."
     touch "$PATCH_MARKER"
     exit 0
@@ -69,9 +104,13 @@ if [ -d .git ]; then
             # Use --3way for better conflict resolution and avoid prompts.
             # If reverse-check succeeds, the patch is already present: skip.
             if git apply --check "$patch" 2>/dev/null; then
-                if ! git apply --3way "$patch" </dev/null 2>/dev/null; then
-                    if ! git apply "$patch" </dev/null; then
+                # Apply to the working tree first.  git apply --3way can fail with
+                # "does not match index" after prior patches updated files without
+                # updating the index (common for ExternalProject checkouts).
+                if ! git apply "$patch" </dev/null 2>/tmp/fujisan-git-apply.err; then
+                    if ! git apply --3way "$patch" </dev/null 2>/dev/null; then
                         echo "Error: git apply failed for $patch_name"
+                        cat /tmp/fujisan-git-apply.err 2>/dev/null || true
                         exit 1
                     fi
                 fi
@@ -155,6 +194,11 @@ EOF
                         exit 1
                     fi
             fi
+            # Perl normalization for sync-wait ordering must run after 0014 (flush/FIFO)
+            # and before 0015 applies; keeps patch 0015's line contexts matching.
+            if [[ "$patch_name" == "0014-netsio-flush-fifo-and-win-recv-timeout.patch" ]]; then
+                apply_netsio_sync_race_fix
+            fi
         fi
     done
 else
@@ -188,11 +232,15 @@ else
                 echo "Error: Failed to apply patch $patch_name"
                 exit 1
             fi
+            if [[ "$patch_name" == "0014-netsio-flush-fifo-and-win-recv-timeout.patch" ]]; then
+                apply_netsio_sync_race_fix
+            fi
         fi
     done
 fi
 
 echo "All patches applied successfully!"
+apply_netsio_fifo_deadlock_fix
 touch "$PATCH_MARKER"
 
 # Apply inline patches for disk management functions
