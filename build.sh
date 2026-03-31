@@ -377,6 +377,13 @@ bundle_fujinet_pc() {
         echo_warning "data folder not found - FujiNet may not function properly"
     fi
 
+    # Override autorun.atr with Fujisan's custom CONFIG loader
+    local custom_autorun="${PROJECT_ROOT}/data/autorun.atr"
+    if [[ -f "$custom_autorun" ]]; then
+        cp "$custom_autorun" "$fujinet_dir/data/autorun.atr"
+        echo_info "Replaced autorun.atr with Fujisan custom version"
+    fi
+
     # Create SD folder for SD card emulation
     mkdir -p "$fujinet_dir/SD"
     echo "--- FujiNet SD Card ---" > "$fujinet_dir/SD/README.txt"
@@ -1007,6 +1014,13 @@ build_fujinet_pc() {
         if [[ -d "dist/data" ]]; then
             cp -r dist/data "$PROJECT_ROOT/$TARGET_DIR/"
             echo_success "Data folder copied"
+        fi
+
+        # Override autorun.atr with Fujisan's custom CONFIG loader
+        local custom_autorun="${PROJECT_ROOT}/data/autorun.atr"
+        if [[ -f "$custom_autorun" ]]; then
+            cp "$custom_autorun" "$PROJECT_ROOT/$TARGET_DIR/data/autorun.atr"
+            echo_info "Replaced autorun.atr with Fujisan custom version"
         fi
 
         # Copy fnconfig.ini

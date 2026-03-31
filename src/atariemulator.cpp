@@ -1332,7 +1332,6 @@ void AtariEmulator::requestNextFrame()
     // adds more blocking, creating a feedback loop of progressive slowdown.
     const auto frameTimeUs = static_cast<int64_t>(m_frameTimeMs * 1000.0);
     if (delayUs < -frameTimeUs) {
-        qDebug() << "Debt cap fired: delayUs=" << delayUs << "frameTimeUs=" << frameTimeUs;
         m_firstFrameTime = now;
         // Next line in this function is m_frameCount++, so use 0 here so the first
         // deadline after reset is firstFrameTime + 1 * frameTime (not +2).

@@ -58,8 +58,6 @@ void FujiNetService::checkConnection()
 
     QNetworkReply* reply = m_networkManager->get(request);
     connect(reply, &QNetworkReply::finished, this, &FujiNetService::onHealthCheckReply);
-    connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::errorOccurred),
-            this, &FujiNetService::onNetworkError);
 }
 
 void FujiNetService::startHealthCheck(int intervalMs)

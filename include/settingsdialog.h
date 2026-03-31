@@ -82,6 +82,7 @@ private slots:
 
     // FujiNet slots
     void onFujiNetBrowseBinary();
+    void onFujiNetUseBundledBinary();
     void onFujiNetBrowseSDFolder();
     void onFujiNetOpenSDFolder();
     void onFujiNetBrowseConfig();
@@ -325,6 +326,7 @@ private:
     QLabel* m_fujinetStatusLabel;
     QLineEdit* m_fujinetBinaryPath;
     QPushButton* m_fujinetBrowseButton;
+    QPushButton* m_fujinetUseBundledButton;
     QLabel* m_fujinetVersionLabel;
     QPushButton* m_fujinetStartButton;
     QPushButton* m_fujinetStopButton;
@@ -361,6 +363,7 @@ private:
     // Helper functions
     void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
     void updateFujiNetConfigConfigenabled(const QString& configPath, bool enabled);
+    void updateFujiNetBinaryPathDisplay();
     void updateFujiNetBinaryBrowseButtonState();
     void checkFujiNetRestartRequired();
     void checkAndMigrateFujiNetSD();

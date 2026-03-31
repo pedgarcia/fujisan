@@ -50,14 +50,24 @@ bool FujiNetProcessManager::start(const QString& binaryPath, const QStringList& 
         return false;
     }
 
-    // Check if FujiNet-PC is already running externally (not managed by us)
+    // Kill any stale/external FujiNet-PC process before launching a managed one.
+    // Previous sessions may leave zombie or orphaned processes behind; pgrep can
+    // match those and, if we short-circuited here, the state would be stuck at
+    // Running with no QProcess and no onProcessFinished signal — leaving the
+    // health-check polling a dead server forever.
+    // The "Detect existing" launch mode already handles attaching to a user-started
+    // external process in MainWindow before calling start().
     if (isProcessRunningExternally("fujinet")) {
-        qDebug() << "FujiNet-PC process already running externally - attaching to external process";
-        // Set state to Running even though we didn't start it
-        // This allows UI to show correct state and cold boot logic to work
-        setState(Running);
-        emit processStarted();
-        return true; // Return success - we have a running FujiNet-PC
+        qDebug() << "Found existing FujiNet-PC process - killing before managed launch";
+#ifdef Q_OS_WIN
+        QProcess taskkill;
+        taskkill.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
+        taskkill.waitForFinished(2000);
+#else
+        QProcess pkill;
+        pkill.start("pkill", QStringList() << "-9" << "fujinet");
+        pkill.waitForFinished(2000);
+#endif
     }
 
     m_binaryPath = binaryPath.isEmpty() ? m_binaryPath : binaryPath;
