@@ -399,6 +399,13 @@ if [ -d "$FUJINET_SOURCE" ]; then
         cp -r "$FUJINET_SOURCE/data" fujisan-linux/usr/lib/fujisan/fujinet-pc/
     fi
 
+    # Override autorun.atr with Fujisan custom version if present in repo
+    if [ -f "/build/fujisan/data/autorun.atr" ]; then
+        mkdir -p fujisan-linux/usr/lib/fujisan/fujinet-pc/data
+        cp "/build/fujisan/data/autorun.atr" fujisan-linux/usr/lib/fujisan/fujinet-pc/data/autorun.atr
+        echo "✓ Replaced data/autorun.atr with Fujisan custom version"
+    fi
+
     # Main config file
     if [ -f "$FUJINET_SOURCE/fnconfig.ini" ]; then
         cp "$FUJINET_SOURCE/fnconfig.ini" fujisan-linux/usr/lib/fujisan/fujinet-pc/
@@ -686,6 +693,13 @@ QTCONF_EOF
 
         if [ -d "$FUJINET_SOURCE/data" ]; then
             cp -r "$FUJINET_SOURCE/data" fujisan-portable/bin/fujinet-pc/
+        fi
+
+        # Override autorun.atr with Fujisan custom version if present in repo
+        if [ -f "/build/fujisan/data/autorun.atr" ]; then
+            mkdir -p fujisan-portable/bin/fujinet-pc/data
+            cp "/build/fujisan/data/autorun.atr" fujisan-portable/bin/fujinet-pc/data/autorun.atr
+            echo "✓ Replaced data/autorun.atr with Fujisan custom version (portable)"
         fi
 
         if [ -f "$FUJINET_SOURCE/fnconfig.ini" ]; then

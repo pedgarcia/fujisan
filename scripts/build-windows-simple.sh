@@ -147,6 +147,11 @@ if [ "$BUILD_FUJINET_PC" != "false" ]; then
         echo "Bundling FujiNet-PC from /work/fujinet/windows-x64..."
         cp -r /work/fujinet/windows-x64/* build-windows/fujinet-pc/
         echo "✓ FujiNet-PC bundled from host fujinet/windows-x64"
+        # Override autorun.atr with Fujisan custom version if present in repo
+        if [ -f "/work/data/autorun.atr" ] && [ -d "build-windows/fujinet-pc/data" ]; then
+            cp -f "/work/data/autorun.atr" build-windows/fujinet-pc/data/autorun.atr
+            echo "✓ Replaced data/autorun.atr with Fujisan custom version"
+        fi
     else
         echo "Downloading FujiNet-PC Windows nightly..."
         GITHUB_API="https://api.github.com/repos/FujiNetWIFI/fujinet-firmware/releases"
@@ -166,6 +171,11 @@ if [ "$BUILD_FUJINET_PC" != "false" ]; then
                 fi
                 rm -rf /tmp/fujinet-win-extract /tmp/fujinet-win.zip
                 echo "✓ FujiNet-PC bundled (nightly $TAG)"
+                # Override autorun.atr with Fujisan custom version if present in repo
+                if [ -f "/work/data/autorun.atr" ] && [ -d "build-windows/fujinet-pc/data" ]; then
+                    cp -f "/work/data/autorun.atr" build-windows/fujinet-pc/data/autorun.atr
+                    echo "✓ Replaced data/autorun.atr with Fujisan custom version"
+                fi
             else
                 echo "⚠ Warning: Could not download FujiNet-PC nightly; run scripts/download-fujinet-pc.sh and rebuild with fujinet/windows-x64 present"
             fi

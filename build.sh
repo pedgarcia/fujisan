@@ -384,6 +384,14 @@ bundle_fujinet_pc() {
         echo_info "Replaced autorun.atr with Fujisan custom version"
     fi
 
+    # Override data/fnconfig.ini — this is the file FujiNet-PC actually reads at startup
+    # (because fnconfig_on_spifs=1 routes config reads into the data/ directory).
+    # The root-level fnconfig.ini heredoc below is the user-editable fallback copy only.
+    if [[ -d "$fujinet_dir/data" ]]; then
+        sed -i '' "s/^hsioindex=.*/hsioindex=16/" "$fujinet_dir/data/fnconfig.ini" 2>/dev/null || true
+        echo_info "Applied hsioindex=16 to data/fnconfig.ini"
+    fi
+
     # Create SD folder for SD card emulation
     mkdir -p "$fujinet_dir/SD"
     echo "--- FujiNet SD Card ---" > "$fujinet_dir/SD/README.txt"
