@@ -392,8 +392,8 @@ bundle_fujinet_pc() {
     # Create default fnconfig.ini
     cat > "$fujinet_dir/fnconfig.ini" << 'EOF'
 [General]
-devicename=
-hsioindex=8
+devicename=Fujinet
+hsioindex=-1
 rotationsounds=1
 configenabled=1
 config_ng=0
@@ -427,7 +427,27 @@ name=fujinet.online
 
 [Host3]
 type=TNFS
+name=apps.irata.online
+
+[Host4]
+type=TNFS
+name=fujinet.diller.org
+
+[Host5]
+type=TNFS
+name=FujiNet.Atari8bit.net
+
+[Host6]
+type=TNFS
+name=atarionline.eu
+
+[Host7]
+type=TNFS
 name=fujinet.pl
+
+[Host8]
+type=TNFS
+name=tnfs.abbuc.social
 
 [Modem]
 modem_enabled=1
