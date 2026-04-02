@@ -4122,6 +4122,9 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
                     // are applied correctly, and the HTTP health check is (re)started so the
                     // status bar and drive polling reconnect once FujiNet-PC is ready.
                     m_fujinetIntentionalRestart = true;  // suppress disconnect dialog / local-mode switch
+                    if (m_emulator) {
+                        m_emulator->resetNetSIOClientState();
+                    }
                     startFujiNetWithSavedSettings();
                     statusBar()->showMessage("Restarting FujiNet-PC after cold reset...", 2000);
                     return; // Don't show "stopped" message
@@ -4294,6 +4297,15 @@ void MainWindow::resetFujiNet()
     // will re-emit connected() even if m_isConnected was already true.
     if (m_fujinetService) {
         m_fujinetService->resetConnectionState();
+    }
+
+    // Clear NetSIO client state: netsio_enabled, fujinet_known, netsio_sync_wait,
+    // netsio_cmd_state, and any stale bytes in the FIFO pipe left over from the
+    // killed session.  Without this the new FujiNet-PC process inherits dirty state
+    // and SIO never recovers — most visible on Linux where forceKill() is a SIGKILL
+    // that gives FujiNet-PC no chance to send NETSIO_DEVICE_DISCONNECTED.
+    if (m_emulator) {
+        m_emulator->resetNetSIOClientState();
     }
 
     // Delay the restart slightly: on Windows, forceKill() no longer calls waitForFinished()
