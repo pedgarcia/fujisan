@@ -17,43 +17,10 @@ cd "$ATARI800_SRC_PATH" || exit 1
 
 echo "Applying patches to atari800 source at: $ATARI800_SRC_PATH"
 
-# Normalize NetSIO sync-wait ordering to avoid a fast-response race where
-# netsio_sync_wait is set after send and then times out despite a response.
-apply_netsio_sync_race_fix() {
-    if [ -f "src/netsio.c" ]; then
-        perl -0777 -i -pe '
-            s/send_to_fujinet\(p, sizeof\(p\)\);\n\s*netsio_sync_wait = 1; \/\* pause emulation until we hear back or timeout \*\//pthread_mutex_lock\(&netsio_sync_mutex\);\n    netsio_sync_wait = 1; \/\* set before send to avoid missing a fast response \*\/\n    pthread_mutex_unlock\(&netsio_sync_mutex\);\n    send_to_fujinet\(p, sizeof\(p\)\);/g;
-            s/send_to_fujinet\(p, sizeof\(p\)\);\n\s*netsio_sync_wait = 1; \/\* pause emulation until we hear back or timeout s\*\//pthread_mutex_lock\(&netsio_sync_mutex\);\n    netsio_sync_wait = 1; \/\* set before send to avoid missing a fast response \*\/\n    pthread_mutex_unlock\(&netsio_sync_mutex\);\n    send_to_fujinet\(p, sizeof\(p\)\);/g;
-            s/netsio_sync_wait = 0; \/\* continue emulation \*\/\n\s*\/\* Wake the emulator thread immediately rather than waiting\n\s*\* for the next 5 ms busy-loop tick\. \*\/\n\s*pthread_mutex_lock\(&netsio_sync_mutex\);\n\s*pthread_cond_signal\(&netsio_sync_cond\);\n\s*pthread_mutex_unlock\(&netsio_sync_mutex\);/pthread_mutex_lock\(&netsio_sync_mutex\);\n                netsio_sync_wait = 0; \/\* continue emulation \*\/\n                pthread_cond_signal\(&netsio_sync_cond\);\n                pthread_mutex_unlock\(&netsio_sync_mutex\);/g;
-        ' src/netsio.c
-    fi
-}
-
-# FIFO-after-sync deadlock fix (patch 0015): apply when older trees lack it.
-apply_netsio_fifo_deadlock_fix() {
-    if [ ! -f "src/netsio.c" ] || [ ! -f "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" ]; then
-        return 0
-    fi
-    if grep -q 'Wake emulator BEFORE enqueue' src/netsio.c 2>/dev/null; then
-        return 0
-    fi
-    if git apply --check "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" 2>/dev/null; then
-        if [ -d .git ]; then
-            git apply "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" 2>/dev/null \
-                || patch -p1 --force --no-backup-if-mismatch < "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" </dev/null
-        else
-            patch -p1 --force --no-backup-if-mismatch < "$PATCHES_DIR/0015-netsio-sync-wake-before-fifo-writes.patch" </dev/null
-        fi
-        echo "✓ Applied 0015 netsio FIFO/sync deadlock fix"
-    fi
-}
-
 # Avoid re-applying patches on configure reruns in the same source tree.
 # ExternalProject may invoke configure multiple times without recloning.
 PATCH_MARKER=".fujisan-patches-applied"
 if [ -f "$PATCH_MARKER" ]; then
-    apply_netsio_sync_race_fix
-    apply_netsio_fifo_deadlock_fix
     echo "Patches already applied in this source tree ($PATCH_MARKER present), skipping."
     exit 0
 fi
@@ -61,13 +28,11 @@ fi
 # Bootstrap detection for trees patched before marker support existed.
 # Require 0003 (single-step) markers too — otherwise configure reruns can skip
 # an incomplete tree that only had later NetSIO / execute_cycles hunks applied.
-if [ -f "src/netsio.c" ] && [ -f "src/netsio.h" ] && [ -f "src/libatari800/api.c" ] && \
-   grep -q 'void netsio_flush_fifo(void)' src/netsio.c && \
-   grep -q 'void netsio_flush_fifo(void);' src/netsio.h && \
+if [ -f "src/netsio.c" ] && [ -f "src/libatari800/api.c" ] && \
+   grep -q 'NETSIO_RECV_BYTE_TIMEOUT_SEC' src/netsio.c && \
+   grep -q 'netsio_sync_mutex' src/netsio.c && \
    grep -q 'int libatari800_execute_cycles(int target_cycles)' src/libatari800/api.c && \
    grep -q 'CPU_GetInstructionCycles' src/cpu.h; then
-    apply_netsio_sync_race_fix
-    apply_netsio_fifo_deadlock_fix
     echo "Detected previously patched source tree; writing $PATCH_MARKER and skipping."
     touch "$PATCH_MARKER"
     exit 0
@@ -124,49 +89,49 @@ if [ -d .git ]; then
                 fi
                 echo "✓ Patch applied successfully with patch command"
             else
-                    # For critical patch 0007 (BINLOAD/NetSIO), apply manually
-                    if [[ "$patch_name" == "0007-netsio-binload-priority.patch" ]]; then
-                        echo "Applying BINLOAD/NetSIO priority patch manually..."
-                        if [ -f "src/sio.c" ] && grep 'if (netsio_enabled)' src/sio.c | grep -v BINLOAD | grep -q .; then
-                            if sed --version 2>/dev/null | grep -q GNU; then
-                                sed -i 's/if (netsio_enabled)/if (netsio_enabled \&\& !BINLOAD_start_binloading)/g' src/sio.c
-                            else
-                                sed -i '' 's/if (netsio_enabled)/if (netsio_enabled \&\& !BINLOAD_start_binloading)/g' src/sio.c
-                            fi
-                            echo "✓ BINLOAD/NetSIO priority patch applied manually"
-                        elif grep -q 'BINLOAD_start_binloading' src/sio.c; then
-                            echo "✓ Patch $patch_name already applied (BINLOAD guard present)"
+                # For critical patch 0007 (BINLOAD/NetSIO), apply manually
+                if [[ "$patch_name" == "0007-netsio-binload-priority.patch" ]]; then
+                    echo "Applying BINLOAD/NetSIO priority patch manually..."
+                    if [ -f "src/sio.c" ] && grep 'if (netsio_enabled)' src/sio.c | grep -v BINLOAD | grep -q .; then
+                        if sed --version 2>/dev/null | grep -q GNU; then
+                            sed -i 's/if (netsio_enabled)/if (netsio_enabled \&\& !BINLOAD_start_binloading)/g' src/sio.c
                         else
-                            echo "Error: Patch $patch_name could not be applied and manual fallback failed"
-                            exit 1
+                            sed -i '' 's/if (netsio_enabled)/if (netsio_enabled \&\& !BINLOAD_start_binloading)/g' src/sio.c
                         fi
-                    # For critical patch 0009 (replace netsio_cold_reset with netsio_warm_reset in Atari800_Coldstart), apply manually
-                    elif [[ "$patch_name" == "0009-replace-netsio-cold-with-warm-reset-in-coldstart.patch" ]]; then
-                        echo "Applying netsio_cold_reset -> netsio_warm_reset replacement patch manually..."
-                        if [ -f "src/atari.c" ] && grep -q 'netsio_cold_reset' src/atari.c; then
-                            # Replace netsio_cold_reset() with netsio_warm_reset() in the NETSIO block
-                            # inside Atari800_Coldstart(). A warm reset resets FujiNet-PC's SIO state
-                            # without restarting the process, preventing SIGABRT crashes.
-                            if sed --version 2>/dev/null | grep -q GNU; then
-                                sed -i 's/netsio_cold_reset();/netsio_warm_reset();/g' src/atari.c
-                            else
-                                sed -i '' 's/netsio_cold_reset();/netsio_warm_reset();/g' src/atari.c
-                            fi
-                            echo "✓ netsio_cold_reset -> netsio_warm_reset replacement applied manually"
-                        elif grep -q 'netsio_warm_reset' src/atari.c; then
-                            echo "✓ Patch $patch_name already applied (warm reset present)"
+                        echo "✓ BINLOAD/NetSIO priority patch applied manually"
+                    elif grep -q 'BINLOAD_start_binloading' src/sio.c; then
+                        echo "✓ Patch $patch_name already applied (BINLOAD guard present)"
+                    else
+                        echo "Error: Patch $patch_name could not be applied and manual fallback failed"
+                        exit 1
+                    fi
+                # For critical patch 0009 (replace netsio_cold_reset with netsio_warm_reset in Atari800_Coldstart), apply manually
+                elif [[ "$patch_name" == "0009-replace-netsio-cold-with-warm-reset-in-coldstart.patch" ]]; then
+                    echo "Applying netsio_cold_reset -> netsio_warm_reset replacement patch manually..."
+                    if [ -f "src/atari.c" ] && grep -q 'netsio_cold_reset' src/atari.c; then
+                        # Replace netsio_cold_reset() with netsio_warm_reset() in the NETSIO block
+                        # inside Atari800_Coldstart(). A warm reset resets FujiNet-PC's SIO state
+                        # without restarting the process, preventing SIGABRT crashes.
+                        if sed --version 2>/dev/null | grep -q GNU; then
+                            sed -i 's/netsio_cold_reset();/netsio_warm_reset();/g' src/atari.c
                         else
-                            echo "Error: Patch $patch_name could not be applied and manual fallback failed"
-                            exit 1
+                            sed -i '' 's/netsio_cold_reset();/netsio_warm_reset();/g' src/atari.c
                         fi
-                    # For critical patch 0003, apply manually
-                    elif [[ "$patch_name" == "0003-disk-activity-callback-integration.patch" ]]; then
-                        echo "Applying disk activity callback patch manually..."
+                        echo "✓ netsio_cold_reset -> netsio_warm_reset replacement applied manually"
+                    elif grep -q 'netsio_warm_reset' src/atari.c; then
+                        echo "✓ Patch $patch_name already applied (warm reset present)"
+                    else
+                        echo "Error: Patch $patch_name could not be applied and manual fallback failed"
+                        exit 1
+                    fi
+                # For critical patch 0003, apply manually
+                elif [[ "$patch_name" == "0003-disk-activity-callback-integration.patch" ]]; then
+                    echo "Applying disk activity callback patch manually..."
 
-                        # Check if sio.c exists and apply changes
-                        if [ -f "src/sio.c" ] && ! grep -q "disk_activity_callback" src/sio.c; then
-                            # Create a temporary file with the changes
-                            cat > /tmp/sio_patch.txt << 'EOF'
+                    # Check if sio.c exists and apply changes
+                    if [ -f "src/sio.c" ] && ! grep -q "disk_activity_callback" src/sio.c; then
+                        # Create a temporary file with the changes
+                        cat > /tmp/sio_patch.txt << 'EOF'
 --- a/src/sio.c
 +++ b/src/sio.c
 @@ -78,6 +78,10 @@
@@ -181,23 +146,18 @@ if [ -d .git ]; then
     intervening sector. */
  #define CONSECUTIVE_SECTORS_FAST_IO
 EOF
-                            patch -p1 < /tmp/sio_patch.txt 2>/dev/null || true
-                            echo "✓ Manual patch applied for disk activity callback"
-                        elif grep -q "disk_activity_callback" src/sio.c; then
-                            echo "✓ Patch $patch_name already applied (callback present)"
-                        else
-                            echo "Error: Patch $patch_name could not be applied and manual fallback failed"
-                            exit 1
-                        fi
+                        patch -p1 < /tmp/sio_patch.txt 2>/dev/null || true
+                        echo "✓ Manual patch applied for disk activity callback"
+                    elif grep -q "disk_activity_callback" src/sio.c; then
+                        echo "✓ Patch $patch_name already applied (callback present)"
                     else
-                        echo "Error: Patch $patch_name could not be applied"
+                        echo "Error: Patch $patch_name could not be applied and manual fallback failed"
                         exit 1
                     fi
-            fi
-            # Perl normalization for sync-wait ordering must run after 0014 (flush/FIFO)
-            # and before 0015 applies; keeps patch 0015's line contexts matching.
-            if [[ "$patch_name" == "0014-netsio-flush-fifo-and-win-recv-timeout.patch" ]]; then
-                apply_netsio_sync_race_fix
+                else
+                    echo "Error: Patch $patch_name could not be applied"
+                    exit 1
+                fi
             fi
         fi
     done
@@ -232,15 +192,11 @@ else
                 echo "Error: Failed to apply patch $patch_name"
                 exit 1
             fi
-            if [[ "$patch_name" == "0014-netsio-flush-fifo-and-win-recv-timeout.patch" ]]; then
-                apply_netsio_sync_race_fix
-            fi
         fi
     done
 fi
 
 echo "All patches applied successfully!"
-apply_netsio_fifo_deadlock_fix
 touch "$PATCH_MARKER"
 
 # Apply inline patches for disk management functions

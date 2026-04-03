@@ -1,0 +1,162 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: mozzwald <mozzwald@users.noreply.github.com>
+Date: Fri, 03 Apr 2026 00:00:00 -0800
+Subject: [PATCH] netsio: fix high speed down to divisor 1
+
+Port of mozzwald/atari800@1ce4be5:
+* event driven netsio_wait_sync instead of sleep delaying
+* netsio gated extra POKEY_siocheck values
+
+Replaces the 5 ms / 40 ms busy-poll in netsio_wait_for_sync() with a
+pthread condition variable so the emulator wakes immediately when
+NETSIO_SYNC_RESPONSE arrives.
+
+Sets netsio_sync_wait = 1 under the mutex BEFORE send_to_fujinet() in
+both netsio_cmd_off_sync() and netsio_send_byte_sync() to eliminate the
+race where a very fast FujiNet response arrives before the flag is set.
+
+Extends POKEY_siocheck() to accept any AUDF3 divisor 1..40 (0x01..0x28)
+when netsio is active, enabling max-speed HSIO configurations beyond
+the four traditional hard-coded values.
+---
+--- a/src/netsio.c
++++ b/src/netsio.c
+@@ -64,17 +64,8 @@
+ 
+ /* Thread declaration */
+ static void *fujinet_rx_thread(void *arg);
+-
+-static void millisleep(unsigned int ms)
+-{
+-    struct timespec req, rem;
+-    req.tv_sec  = ms / 1000;
+-    req.tv_nsec = (long)(ms % 1000) * 1000000L;
+-
+-    while (nanosleep(&req, &rem) == -1 && errno == EINTR) {
+-        req = rem;
+-    }
+-}
++static pthread_mutex_t netsio_sync_mutex = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t netsio_sync_cond = PTHREAD_COND_INITIALIZER;
+ 
+ #ifdef DEBUG
+ char *buf_to_hex(const uint8_t *buf, size_t offset, size_t len) {
+@@ -327,20 +318,26 @@
+ /* Called when a command frame with sync response is sent to FujiNet */
+ void netsio_wait_for_sync(void)
+ {
+-    int ticker = 0;
+-    while (netsio_sync_wait)
+-    {
++    struct timespec deadline;
++
++    clock_gettime(CLOCK_REALTIME, &deadline);
++    deadline.tv_nsec += 40 * 1000000L;
++    if (deadline.tv_nsec >= 1000000000L) {
++        deadline.tv_sec += deadline.tv_nsec / 1000000000L;
++        deadline.tv_nsec %= 1000000000L;
++    }
++
++    pthread_mutex_lock(&netsio_sync_mutex);
++    while (netsio_sync_wait) {
+ #ifdef DEBUG
+-        Log_print("netsio: waiting for sync response - %d", ticker);
++        Log_print("netsio: waiting for sync response");
+ #endif
+-        millisleep(5);
+-        if (ticker > 7)
+-        {
++        if (pthread_cond_timedwait(&netsio_sync_cond, &netsio_sync_mutex, &deadline) == ETIMEDOUT) {
+             netsio_sync_wait = 0;
+             break;
+         }
+-        ticker++;
+     }
++    pthread_mutex_unlock(&netsio_sync_mutex);
+ }
+ 
+ /* Return number of bytes waiting from FujiNet to emulator */
+@@ -388,6 +385,9 @@
+ int netsio_cmd_off_sync(void)
+ {
+     uint8_t p[2];
++    pthread_mutex_lock(&netsio_sync_mutex);
++    netsio_sync_wait = 1; /* pause emulation until we hear back or timeout */
++    pthread_mutex_unlock(&netsio_sync_mutex);
+     p[0] = NETSIO_COMMAND_OFF_SYNC;
+     netsio_sync_num++;
+     p[1] = netsio_sync_num;
+@@ -395,7 +395,6 @@
+     Log_print("netsio: CMD OFF SYNC");
+ #endif
+     send_to_fujinet(p, sizeof(p));
+-    netsio_sync_wait = 1; /* pause emulation until we hear back or timeout */
+     return 0;
+ }
+ 
+@@ -466,6 +465,9 @@
+ int netsio_send_byte_sync(uint8_t b)
+ {
+     uint8_t p[3];
++    pthread_mutex_lock(&netsio_sync_mutex);
++    netsio_sync_wait = 1; /* pause emulation until we hear back or timeout */
++    pthread_mutex_unlock(&netsio_sync_mutex);
+     p[0] = NETSIO_DATA_BYTE_SYNC;
+     p[1] = b;
+     netsio_sync_num++;
+@@ -474,7 +476,6 @@
+     Log_print("netsio: send byte: 0x%02X sync: %d", b, netsio_sync_num);
+ #endif
+     send_to_fujinet(p, sizeof(p));
+-    netsio_sync_wait = 1; /* pause emulation until we hear back or timeout s*/
+     return 0;
+ }
+ 
+@@ -742,7 +743,10 @@
+ #endif
+                     }
+                 }
++                pthread_mutex_lock(&netsio_sync_mutex);
+                 netsio_sync_wait = 0; /* continue emulation */
++                pthread_cond_broadcast(&netsio_sync_cond);
++                pthread_mutex_unlock(&netsio_sync_mutex);
+                 break;
+             }
+ 
+@@ -861,7 +865,10 @@
+     netsio_initialized = 0;  /* Allow re-initialization after shutdown */
+     netsio_sync_num = 0;
+     fujinet_known = 0;
++    pthread_mutex_lock(&netsio_sync_mutex);
+     netsio_sync_wait = 0;
++    pthread_cond_broadcast(&netsio_sync_cond);
++    pthread_mutex_unlock(&netsio_sync_mutex);
+     netsio_cmd_state = 0;
+     netsio_next_write_size = 0;
+ 
+
+--- a/src/pokey.c
++++ b/src/pokey.c
+@@ -167,11 +167,18 @@
+ 
+ static int POKEY_siocheck(void)
+ {
+-	return (((POKEY_AUDF[POKEY_CHAN3] == 0x28 || POKEY_AUDF[POKEY_CHAN3] == 0x10
+-	        || POKEY_AUDF[POKEY_CHAN3] == 0x08 || POKEY_AUDF[POKEY_CHAN3] == 0x0a)
+-		&& POKEY_AUDF[POKEY_CHAN4] == 0x00) /* intelligent peripherals speeds */
++	int intelligent_peripheral_speed =
++		((POKEY_AUDF[POKEY_CHAN3] == 0x28 || POKEY_AUDF[POKEY_CHAN3] == 0x10
++		 || POKEY_AUDF[POKEY_CHAN3] == 0x08 || POKEY_AUDF[POKEY_CHAN3] == 0x0a)
++		&& POKEY_AUDF[POKEY_CHAN4] == 0x00); /* intelligent peripherals speeds */
++#ifdef NETSIO
++	if (netsio_enabled && POKEY_AUDF[POKEY_CHAN3] > 0x00 && POKEY_AUDF[POKEY_CHAN3] <= 0x28
++	    && POKEY_AUDF[POKEY_CHAN4] == 0x00)
++		intelligent_peripheral_speed = 1;
++#endif /* NETSIO */
++	return ((intelligent_peripheral_speed
+ 		|| (POKEY_SKCTL & 0x78) == 0x28) /* cassette save mode */
+-		&& (POKEY_AUDCTL[0] & 0x28) == 0x28;
++		&& (POKEY_AUDCTL[0] & 0x28) == 0x28);
+ }
+ 
+ #ifndef SOUND_GAIN /* sound gain can be pre-defined in the configure/Makefile */

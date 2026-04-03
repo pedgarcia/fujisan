@@ -7,6 +7,9 @@
 
 #ifdef _WIN32
 #include "windows_compat.h"
+#else
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 
 #include "atariemulator.h"
@@ -44,7 +47,6 @@ extern volatile int netsio_enabled;
 // NetSIO reset functions - send 0xFF/0xFE packets to FujiNet-PC
 extern int netsio_cold_reset(void);
 extern int netsio_warm_reset(void);
-extern void netsio_flush_fifo(void);
 #endif
 #include "../src/rtime.h"
 #include "../src/binload.h"
@@ -1875,7 +1877,17 @@ void AtariEmulator::resetNetSIOClientState()
     netsio_cmd_state = 0;
     // Drain any bytes left in the FIFO from the dead session so the new FujiNet
     // instance starts with a clean receive buffer and no stale data.
-    netsio_flush_fifo();
+    {
+        extern int fds0[2];
+        if (fds0[0] >= 0) {
+            int flags = fcntl(fds0[0], F_GETFL, 0);
+            fcntl(fds0[0], F_SETFL, flags | O_NONBLOCK);
+            uint8_t discard[256];
+            while (read(fds0[0], discard, sizeof(discard)) > 0)
+                ;
+            fcntl(fds0[0], F_SETFL, flags);
+        }
+    }
     qDebug() << "[NETSIO] Client state reset: netsio_enabled=0, fujinet_known=0, sync_wait=0, fifo flushed";
 #endif
 }
