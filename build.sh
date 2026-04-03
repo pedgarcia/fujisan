@@ -17,7 +17,7 @@
 #   all            - Build for all platforms
 #
 # Options:
-#   --clean              - Remove platform build dirs (build, build-arm64, build-*, …)
+#   --clean              - Remove platform build dirs and dist/ (build, build-arm64, build-*, dist/)
 #   --sign               - Sign macOS builds (requires certificates)
 #   --notarize           - Notarize macOS builds after signing
 #   --build-fujinet-pc   - Build FujiNet-PC from source (requires fujinet-firmware repo)
@@ -97,7 +97,7 @@ Platforms:
   all            Build for all platforms
 
 Options:
-  --clean              Remove build/ and build-* (CMake trees; e.g. build-arm64 + atari800-src)
+  --clean              Remove build/, build-*, and dist/ (CMake trees + all output artifacts)
   --sign               Sign macOS builds with Developer ID
   --notarize           Notarize macOS builds (implies --sign)
   --build-fujinet-pc   Build FujiNet-PC from source before Fujisan
@@ -131,14 +131,15 @@ EOF
 }
 
 # Clean function — rm -rf each platform CMake build directory (build-arm64, build-x86_64,
-# build-windows, …). That removes nested ExternalProject trees (e.g. atari800-src) so the
-# next configure reclones and re-applies patches. Does not touch dist/.
+# build-windows, …) and the dist/ output directory. That removes nested ExternalProject trees
+# (e.g. atari800-src) so the next configure reclones and re-applies patches, and ensures
+# stale artifacts from previous versions don't accumulate in dist/.
 clean_all() {
-    echo_info "Removing CMake build directories (build/, build-*, …); leaving dist/ untouched..."
+    echo_info "Removing CMake build directories (build/, build-*, …) and dist/..."
     (
         cd "$PROJECT_ROOT"
         shopt -s nullglob
-        rm -rf build build-*
+        rm -rf build build-* dist
     )
     echo_success "Clean complete"
 }
