@@ -99,6 +99,12 @@ jobs:
       - name: Build tests
         run: cmake --build build --target all -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
 
+      - name: Show patch log on failure
+        if: failure()
+        shell: ${{ matrix.shell }}
+        run: |
+          find build -name "atari800_external-patch*.log" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || true
+
       # -- Run tests --
       - name: Run tests
         run: ctest --test-dir build --output-on-failure --timeout 120

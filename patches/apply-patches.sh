@@ -42,16 +42,14 @@ fi
 if [ -d .git ]; then
     echo "Git repository detected, using 'git am' for patches"
 
-    # On native Windows (MSYS2/MinGW), git defaults to core.autocrlf=true which
-    # checks out source files with CRLF endings. Patches were created with LF
-    # context lines, so git apply fails even though the content matches. Fix this
-    # once for the whole tree before applying any patches.
-    if [[ "$MSYSTEM" != "" ]] || [[ "$OSTYPE" == "msys" ]]; then
-        echo "Windows detected: forcing LF line endings in source tree before patching"
-        git config core.autocrlf false
-        git config core.eol lf
-        git checkout -- .
-    fi
+    # Ensure LF line endings in the source tree before patching. git defaults to
+    # core.autocrlf=true on Windows, which checks out files with CRLF. Patches
+    # were created with LF context lines, so git apply fails even though the code
+    # is identical. This is a throw-away build tree so it is always safe to force
+    # LF here regardless of platform.
+    git config core.autocrlf false
+    git config core.eol lf
+    git checkout -- .
 
     for patch in "$PATCHES_DIR"/0*.patch; do
         if [ -f "$patch" ]; then
