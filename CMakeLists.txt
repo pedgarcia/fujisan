@@ -566,6 +566,16 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 # ============================================================================
+# TEST SUITE (opt-in via -DBUILD_TESTS=ON)
+# ============================================================================
+
+option(BUILD_TESTS "Build the Fujisan test suite" OFF)
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+# ============================================================================
 # INSTALL TARGET
 # ============================================================================
 

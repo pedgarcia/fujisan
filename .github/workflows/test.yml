@@ -1,0 +1,106 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            shell: bash
+          - os: macos-14
+            name: macOS (ARM64)
+            shell: bash
+          - os: windows-latest
+            name: Windows (MSYS2/MinGW64)
+            shell: msys2 {0}
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # -- Linux setup --
+      - name: Install Qt5 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qtbase5-dev \
+            qt5-qmake \
+            qtmultimedia5-dev \
+            libqt5network5 \
+            libqt5test5 \
+            cmake \
+            build-essential \
+            autoconf \
+            automake \
+            libtool
+
+      # -- macOS setup --
+      - name: Install Qt5 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install qt@5 autoconf automake libtool
+
+      # -- Windows setup --
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-qt5-base
+            mingw-w64-x86_64-qt5-multimedia
+            mingw-w64-x86_64-qt5-tools
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-make
+            autoconf
+            automake
+            libtool
+            make
+            git
+
+      # -- Configure --
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        run: cmake -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -B build
+
+      - name: Configure CMake (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cmake -DBUILD_TESTS=ON \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_PREFIX_PATH="$(brew --prefix qt@5)/lib/cmake" \
+                -B build
+
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -DBUILD_TESTS=ON \
+                -DCMAKE_BUILD_TYPE=Release \
+                -G "MSYS Makefiles" \
+                -B build
+
+      # -- Build --
+      - name: Build tests
+        run: cmake --build build --target all -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+
+      # -- Run tests --
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure --timeout 120
+        env:
+          QT_QPA_PLATFORM: offscreen

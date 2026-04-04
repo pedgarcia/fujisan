@@ -494,6 +494,67 @@ See: **[docs_local/FUJINET_PC.md](docs_local/FUJINET_PC.md)** and **[docs_local/
 fujisan.exe
 ```
 
+## Testing
+
+Fujisan includes an automated test suite built with QTest. Tests are opt-in via `-DBUILD_TESTS=ON` and never affect release builds.
+
+### Running Tests
+
+```bash
+# Configure with tests enabled
+cmake -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -B build-test
+
+# Build
+cmake --build build-test -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+# Run all tests
+QT_QPA_PLATFORM=offscreen ctest --test-dir build-test --output-on-failure
+```
+
+`QT_QPA_PLATFORM=offscreen` lets widget tests run without a display (headless CI, SSH, etc.). You can omit it when running from a graphical desktop session.
+
+### Running Individual Tests
+
+```bash
+# Run a single test suite
+QT_QPA_PLATFORM=offscreen ./build-test/tests/test_settings
+
+# Run a specific test function
+QT_QPA_PLATFORM=offscreen ./build-test/tests/test_profiles testJsonRoundTrip
+
+# Verbose output (shows each PASS/FAIL)
+QT_QPA_PLATFORM=offscreen ./build-test/tests/test_audio -v2
+```
+
+### Available Test Suites
+
+| Test | What it covers |
+|------|----------------|
+| `test_settings` | QSettings round-trip, defaults, persistence, dual-constructor consistency |
+| `test_profiles` | ConfigurationProfile JSON serialization, ProfileStorage file I/O, listing, deletion |
+| `test_rom_loading` | Argv construction per machine type, ROM fallback, file extension routing |
+| `test_audio` | Audio format selection, fragment/buffer sizing, ring buffer edge cases |
+| `test_fujinet_widget` | Widget state, LED transitions, button signal emission |
+| `test_fujinet_service` | HTTP health check (mock server), connection state, drive polling |
+| `test_fujinet_process` | Process lifecycle, forceKill, exit codes, stdout capture |
+
+### Build Artifact Validation
+
+After running `./build.sh`, validate the output packages:
+
+```bash
+./tests/test_artifacts.sh          # all platforms
+./tests/test_artifacts.sh macos    # macOS DMGs only
+./tests/test_artifacts.sh linux    # .deb + tarball
+./tests/test_artifacts.sh windows  # ZIP contents
+```
+
+This checks file existence, minimum sizes, package metadata, library linkage, and bundled FujiNet-PC presence.
+
+### CI
+
+Tests run automatically on push/PR via GitHub Actions (`.github/workflows/test.yml`) on Linux, macOS, and Windows (MSYS2/MinGW64).
+
 ## Usage
 
 ### Getting Started

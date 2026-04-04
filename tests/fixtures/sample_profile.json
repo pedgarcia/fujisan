@@ -1,0 +1,61 @@
+{
+    "profileInfo": {
+        "name": "Test Profile",
+        "description": "Sample profile for testing",
+        "created": "2025-01-01T00:00:00",
+        "lastUsed": "2025-01-01T00:00:00",
+        "version": "1.0"
+    },
+    "machineConfig": {
+        "machineType": "-xl",
+        "videoSystem": "-pal",
+        "basicEnabled": true,
+        "altirraOSEnabled": true,
+        "altirraBASICEnabled": false,
+        "osRomPath": "",
+        "basicRomPath": ""
+    },
+    "memoryConfig": {
+        "enable800Ram": false,
+        "mosaicSize": 0,
+        "axlonSize": 0,
+        "axlonShadow": false,
+        "enableMapRam": true
+    },
+    "performanceConfig": {
+        "turboMode": false,
+        "emulationSpeedIndex": 1
+    },
+    "audioConfig": {
+        "enabled": true,
+        "frequency": 44100,
+        "bits": 16,
+        "volume": 80,
+        "bufferLength": 100,
+        "latency": 20,
+        "consoleSound": true,
+        "serialSound": false,
+        "stereoPokey": false
+    },
+    "videoConfig": {
+        "artifactingMode": "none",
+        "showFPS": false,
+        "scalingFilter": true,
+        "integerScaling": true,
+        "keepAspectRatio": true,
+        "overscanFactor": 1.0,
+        "fullscreenMode": false
+    },
+    "inputConfig": {
+        "joystickEnabled": true,
+        "swapJoysticks": false,
+        "kbdJoy0Enabled": false,
+        "kbdJoy1Enabled": false,
+        "joystick1Preset": "numpad",
+        "joystick2Preset": "wasd"
+    },
+    "mediaConfig": {
+        "netSIOEnabled": false,
+        "rtimeEnabled": false
+    }
+}
