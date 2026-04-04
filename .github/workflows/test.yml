@@ -101,7 +101,6 @@ jobs:
 
       - name: Show patch log on failure
         if: failure()
-        shell: ${{ matrix.shell }}
         run: |
           find build -name "atari800_external-patch*.log" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || true
 
