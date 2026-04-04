@@ -78,19 +78,18 @@ if [ -d .git ]; then
             # Try git apply first (more reliable than git am for patches)
             # Use --3way for better conflict resolution and avoid prompts.
             # If reverse-check succeeds, the patch is already present: skip.
-            if git apply --check "$patch" 2>/dev/null; then
-                # Apply to the working tree first.  git apply --3way can fail with
-                # "does not match index" after prior patches updated files without
-                # updating the index (common for ExternalProject checkouts).
-                if ! git apply "$patch" </dev/null 2>/tmp/fujisan-git-apply.err; then
-                    if ! git apply --3way "$patch" </dev/null 2>/dev/null; then
+            # --ignore-whitespace guards against any residual CRLF/tab differences
+            # that survive the checkout normalisation above (e.g. MSYS2 git quirks).
+            if git apply --ignore-whitespace --check "$patch" 2>/dev/null; then
+                if ! git apply --ignore-whitespace "$patch" </dev/null 2>/tmp/fujisan-git-apply.err; then
+                    if ! git apply --ignore-whitespace --3way "$patch" </dev/null 2>/dev/null; then
                         echo "Error: git apply failed for $patch_name"
                         cat /tmp/fujisan-git-apply.err 2>/dev/null || true
                         exit 1
                     fi
                 fi
                 echo "✓ Patch applied successfully with git apply"
-            elif git apply --reverse --check "$patch" 2>/dev/null; then
+            elif git apply --ignore-whitespace --reverse --check "$patch" 2>/dev/null; then
                 echo "✓ Patch $patch_name already applied (skipping)"
             elif patch -p1 --dry-run --force < "$patch" >/dev/null 2>&1; then
                 if ! patch -p1 --force --no-backup-if-mismatch < "$patch" </dev/null; then
