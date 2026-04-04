@@ -47,6 +47,9 @@ extern volatile int netsio_enabled;
 // NetSIO reset functions - send 0xFF/0xFE packets to FujiNet-PC
 extern int netsio_cold_reset(void);
 extern int netsio_warm_reset(void);
+#ifdef _WIN32
+extern void netsio_flush_fifo(void);
+#endif
 #endif
 #include "../src/rtime.h"
 #include "../src/binload.h"
@@ -1318,6 +1321,13 @@ void AtariEmulator::requestNextFrame()
     // because we always measure the delay relative to the fixed absolute origin.
     using namespace std::chrono;
 
+    // Unlimited speed: fire as fast as possible, bypass all timing logic.
+    if (m_userRequestedSpeedMultiplier == 0.0) {
+        m_frameCount++;
+        m_frameTimer->start(0);
+        return;
+    }
+
     m_frameCount++;
 
     auto nextFrameTime = m_firstFrameTime +
@@ -1875,19 +1885,24 @@ void AtariEmulator::resetNetSIOClientState()
     fujinet_known = 0;
     netsio_sync_wait = 0;
     netsio_cmd_state = 0;
-    // Drain any bytes left in the FIFO from the dead session so the new FujiNet
-    // instance starts with a clean receive buffer and no stale data.
+    // Drain FujiNet->emulator RX: Windows uses netsiowin ring buffer (library symbol);
+    // POSIX uses the pipe in netsio.c — drain here so we do not require netsio_flush_fifo
+    // in libatari800 (upstream atari800 may not export it).
+#ifdef _WIN32
+    netsio_flush_fifo();
+#else
     {
         extern int fds0[2];
         if (fds0[0] >= 0) {
             int flags = fcntl(fds0[0], F_GETFL, 0);
             fcntl(fds0[0], F_SETFL, flags | O_NONBLOCK);
-            uint8_t discard[256];
+            unsigned char discard[256];
             while (read(fds0[0], discard, sizeof(discard)) > 0)
                 ;
             fcntl(fds0[0], F_SETFL, flags);
         }
     }
+#endif
     qDebug() << "[NETSIO] Client state reset: netsio_enabled=0, fujinet_known=0, sync_wait=0, fifo flushed";
 #endif
 }
@@ -2541,25 +2556,23 @@ void AtariEmulator::setEmulationSpeed(int percentage)
         Atari800_turbo_speed = percentage;
     }
 
-    // Adjust frame timer interval based on speed
-    // Update interval whether timer is active or not (for pause/resume and settings changes)
-    if (m_frameTimer) {
-        if (m_userRequestedSpeedMultiplier == 0.0) {
-            // Unlimited speed - run as fast as possible with minimal interval
-            m_frameTimer->setInterval(1);
-        } else {
-            // Calculate interval based on speed multiplier
-            // Faster speed = shorter interval
-            // e.g., 2x speed = half interval, 0.5x speed = double interval
-            int newInterval = static_cast<int>(m_frameTimeMs / m_userRequestedSpeedMultiplier);
-            m_frameTimer->setInterval(newInterval);
-        }
+    // Reset the absolute-time baseline so requestNextFrame() starts fresh from now.
+    // This prevents debt accumulation when switching modes (e.g. from MAX back to 1x,
+    // where wall-clock time has raced far ahead of the old baseline).
+    m_firstFrameTime = std::chrono::steady_clock::now();
+    m_frameCount = 0;
+
+    // Recalculate m_frameTimeMs for the new speed so requestNextFrame() uses the
+    // correct target interval immediately (unlimited uses nominal FPS for reference only).
+    if (m_userRequestedSpeedMultiplier != 0.0) {
+        double baseFps = static_cast<double>(m_targetFps > 0 ? m_targetFps : 50);
+        m_frameTimeMs = static_cast<float>((1000.0 / baseFps) / m_userRequestedSpeedMultiplier);
     }
 
     qDebug() << "Speed set to" << percentage << "% (multiplier:" << m_userRequestedSpeedMultiplier
              << ") - Atari800_turbo:" << Atari800_turbo
              << "Atari800_turbo_speed:" << Atari800_turbo_speed
-             << "Frame interval:" << (m_frameTimer ? m_frameTimer->interval() : 0) << "ms";
+             << "frameTimeMs:" << m_frameTimeMs << "ms";
 }
 
 int AtariEmulator::getCurrentEmulationSpeed() const

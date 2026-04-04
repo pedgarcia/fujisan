@@ -3195,13 +3195,21 @@ void SettingsDialog::applySettings()
     qDebug() << "[SETTINGS CHECK]   Altirra BASIC: current=" << m_emulator->isAltirraBASICEnabled() 
              << " new=" << m_altirraBASICCheck->isChecked() 
              << " changed=" << (m_altirraBASICCheck->isChecked() != m_emulator->isAltirraBASICEnabled());
-    
+    qDebug() << "[SETTINGS CHECK]   OS ROM: current=" << m_emulator->getOSRomPath()
+             << " new=" << m_osRomPath->text()
+             << " changed=" << (m_osRomPath->text() != m_emulator->getOSRomPath());
+    qDebug() << "[SETTINGS CHECK]   BASIC ROM: current=" << m_emulator->getBasicRomPath()
+             << " new=" << m_basicRomPath->text()
+             << " changed=" << (m_basicRomPath->text() != m_emulator->getBasicRomPath());
+
     // Check for changes that require emulator restart
     if (m_machineTypeCombo->currentData().toString() != m_emulator->getMachineType() ||
         m_videoSystemCombo->currentData().toString() != m_emulator->getVideoSystem() ||
         m_basicEnabledCheck->isChecked() != m_emulator->isBasicEnabled() ||
         m_altirraOSCheck->isChecked() != m_emulator->isAltirraOSEnabled() ||
-        m_altirraBASICCheck->isChecked() != m_emulator->isAltirraBASICEnabled()) {
+        m_altirraBASICCheck->isChecked() != m_emulator->isAltirraBASICEnabled() ||
+        m_osRomPath->text() != m_emulator->getOSRomPath() ||
+        m_basicRomPath->text() != m_emulator->getBasicRomPath()) {
         needsRestart = true;
         qDebug() << "[SETTINGS CHECK] RESTART REQUIRED";
     } else {
