@@ -21,29 +21,62 @@ private:
 
     // FujiNetProcessManager::start() checks QFile::exists() and ExeUser permission.
     // We create tiny helper scripts in the temp dir so we control permissions.
+    // On Windows, QProcess can't run .sh directly so we launch via m_bash.
     QString m_sleepScript;
     QString m_exitScript;
     QString m_echoScript;
+#ifdef Q_OS_WIN
+    QString m_bash;
+#endif
+
+    bool startHelper(FujiNetProcessManager &mgr, const QString &script,
+                     const QStringList &args = {})
+    {
+#ifdef Q_OS_WIN
+        QStringList fullArgs = {script};
+        fullArgs.append(args);
+        return mgr.start(m_bash, fullArgs);
+#else
+        return mgr.start(script, args);
+#endif
+    }
 
     void createHelperScripts()
     {
 #ifdef Q_OS_WIN
-        m_sleepScript = m_tempDir.path() + "/helper_sleep.bat";
+        // On Windows/MSYS2, .bat files spawn cmd.exe subprocess trees that
+        // QProcess::kill() cannot reliably terminate. Instead, create tiny
+        // .exe-based wrappers by writing shell scripts and recording the
+        // path to the MSYS2 bash.exe that will run them. The test methods
+        // call start(m_bash, {script, args...}) so QProcess launches a
+        // single killable process.
+        // $SHELL on MSYS2 is a Unix-style path (/usr/bin/bash) that
+        // QFile::exists() can't resolve. Search well-known native paths.
+        const char *candidates[] = {
+            "C:/msys64/usr/bin/bash.exe",
+            "D:/a/_temp/msys64/usr/bin/bash.exe",
+            "C:/msys64/mingw64/bin/bash.exe",
+        };
+        for (const char *p : candidates) {
+            if (QFile::exists(p)) { m_bash = p; break; }
+        }
+
+        m_sleepScript = m_tempDir.path() + "/helper_sleep.sh";
         QFile sf(m_sleepScript);
         sf.open(QIODevice::WriteOnly);
-        sf.write("@ping -n %1 127.0.0.1 >nul\r\n");
+        sf.write("#!/bin/sh\nsleep \"$1\"\n");
         sf.close();
 
-        m_exitScript = m_tempDir.path() + "/helper_exit.bat";
+        m_exitScript = m_tempDir.path() + "/helper_exit.sh";
         QFile ef(m_exitScript);
         ef.open(QIODevice::WriteOnly);
-        ef.write("@exit /b %1\r\n");
+        ef.write("#!/bin/sh\nexit \"$1\"\n");
         ef.close();
 
-        m_echoScript = m_tempDir.path() + "/helper_echo.bat";
+        m_echoScript = m_tempDir.path() + "/helper_echo.sh";
         QFile eof(m_echoScript);
         eof.open(QIODevice::WriteOnly);
-        eof.write("@echo %*\r\n");
+        eof.write("#!/bin/sh\necho \"$@\"\n");
         eof.close();
 #else
         m_sleepScript = m_tempDir.path() + "/helper_sleep.sh";
@@ -74,6 +107,12 @@ private slots:
     {
         QVERIFY(m_tempDir.isValid());
         createHelperScripts();
+#ifdef Q_OS_WIN
+        if (m_bash.isEmpty() || !QFile::exists(m_bash)) {
+            QSKIP("No MSYS2 bash.exe found; cannot run process tests on this Windows runner");
+        }
+        qDebug() << "Using bash:" << m_bash;
+#endif
     }
 
     // ---------------------------------------------------------------
@@ -95,7 +134,7 @@ private slots:
         FujiNetProcessManager mgr;
         QSignalSpy startedSpy(&mgr, &FujiNetProcessManager::processStarted);
 
-        bool result = mgr.start(m_sleepScript, {"30"});
+        bool result = startHelper(mgr, m_sleepScript, {"30"});
         QVERIFY(result);
 
         if (startedSpy.isEmpty()) {
@@ -116,12 +155,12 @@ private slots:
         FujiNetProcessManager mgr;
         QSignalSpy startedSpy(&mgr, &FujiNetProcessManager::processStarted);
 
-        mgr.start(m_sleepScript, {"30"});
+        startHelper(mgr, m_sleepScript, {"30"});
         if (startedSpy.isEmpty()) {
             QVERIFY(startedSpy.wait(5000));
         }
 
-        bool secondStart = mgr.start(m_sleepScript, {"30"});
+        bool secondStart = startHelper(mgr, m_sleepScript, {"30"});
         QVERIFY(!secondStart);
 
         mgr.forceKill();
@@ -136,7 +175,7 @@ private slots:
         QSignalSpy startedSpy(&mgr, &FujiNetProcessManager::processStarted);
         QSignalSpy stoppedSpy(&mgr, &FujiNetProcessManager::processStopped);
 
-        mgr.start(m_sleepScript, {"60"});
+        startHelper(mgr, m_sleepScript, {"60"});
         if (startedSpy.isEmpty()) {
             QVERIFY(startedSpy.wait(5000));
         }
@@ -159,7 +198,7 @@ private slots:
         QSignalSpy startedSpy(&mgr, &FujiNetProcessManager::processStarted);
         QSignalSpy stoppedSpy(&mgr, &FujiNetProcessManager::processStopped);
 
-        mgr.start(m_sleepScript, {"60"});
+        startHelper(mgr, m_sleepScript, {"60"});
         if (startedSpy.isEmpty()) {
             QVERIFY(startedSpy.wait(5000));
         }
@@ -238,7 +277,7 @@ private slots:
         FujiNetProcessManager mgr;
         QSignalSpy stoppedSpy(&mgr, &FujiNetProcessManager::processStopped);
 
-        mgr.start(m_exitScript, {"42"});
+        startHelper(mgr, m_exitScript, {"42"});
 
         if (stoppedSpy.isEmpty()) {
             QVERIFY(stoppedSpy.wait(5000));
@@ -256,7 +295,7 @@ private slots:
         QSignalSpy stdoutSpy(&mgr, &FujiNetProcessManager::stdoutReceived);
         QSignalSpy stoppedSpy(&mgr, &FujiNetProcessManager::processStopped);
 
-        mgr.start(m_echoScript, {"hello_fujisan"});
+        startHelper(mgr, m_echoScript, {"hello_fujisan"});
 
         if (stoppedSpy.isEmpty()) {
             QVERIFY(stoppedSpy.wait(5000));
