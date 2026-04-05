@@ -88,6 +88,15 @@ add_fujisan_test(test_fujinet_process
 )
 target_link_libraries(test_fujinet_process Qt5::Test Qt5::Core)
 
+# Console subsystem: QTest -v2 output is often invisible for GUI-linked or MSYS-run
+# Windows executables in CI logs.
+if(WIN32)
+    set_target_properties(test_fujinet_process PROPERTIES WIN32_EXECUTABLE OFF)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_link_options(test_fujinet_process PRIVATE -mconsole)
+    endif()
+endif()
+
 # ---------------------------------------------------------------------------
 # Convenience target: build all test executables without touching atari800_external
 # ---------------------------------------------------------------------------

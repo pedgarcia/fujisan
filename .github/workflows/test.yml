@@ -112,8 +112,18 @@ jobs:
 
       - name: Verbose FujiNet process test (Windows, on failure)
         if: failure() && runner.os == 'Windows'
-        shell: cmd
+        shell: pwsh
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          "%GITHUB_WORKSPACE%\build\tests\test_fujinet_process.exe" -v2
+          $exe = Join-Path $env:GITHUB_WORKSPACE "build\tests\test_fujinet_process.exe"
+          if (-not (Test-Path $exe)) { throw "Missing $exe" }
+          $out = Join-Path $env:GITHUB_WORKSPACE "fujinet_test_stdout.txt"
+          $err = Join-Path $env:GITHUB_WORKSPACE "fujinet_test_stderr.txt"
+          $p = Start-Process -FilePath $exe -ArgumentList @('-v2') -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $out -RedirectStandardError $err
+          Write-Host '--- test_fujinet_process stdout ---'
+          if (Test-Path $out) { Get-Content $out -ErrorAction SilentlyContinue }
+          Write-Host '--- test_fujinet_process stderr ---'
+          if (Test-Path $err) { Get-Content $err -ErrorAction SilentlyContinue }
+          exit $p.ExitCode
