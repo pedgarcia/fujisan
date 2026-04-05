@@ -18,10 +18,9 @@
 
 #ifdef Q_OS_WIN
 /*
- * Use PowerShell from SystemRoot (same as CI / interactives). ComSpec/SystemRoot
- * may be unset or misleading under some MSYS2-spawned tools; timeout.exe can also
- * exit immediately when stdin is not a console. PowerShell Start-Sleep / exit /
- * Write-Output behave predictably under QProcess.
+ * CI / hardened hosts may block or fail to launch PowerShell from non-interactive
+ * Qt (GUI-subsystem) processes. Use bare System32 tools: ping.exe (one process,
+ * ~1 s per -n count for localhost) and cmd.exe from ComSpec for exit / echo.
  */
 static QString windowsSystemRoot()
 {
@@ -41,11 +40,22 @@ static QString windowsSystemRoot()
     return QStringLiteral("C:/Windows");
 }
 
-static QString windowsPowerShellExe()
+static QString windowsCmdExe()
 {
-    const QString p = QDir(windowsSystemRoot()).filePath(
-        QStringLiteral("System32/WindowsPowerShell/v1.0/powershell.exe"));
-    return QDir::cleanPath(p);
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString comspec = env.value(QStringLiteral("ComSpec"));
+    if (!comspec.isEmpty()) {
+        const QString n = QDir::cleanPath(QDir::fromNativeSeparators(comspec));
+        if (QFileInfo::exists(n))
+            return n;
+    }
+    return QDir(windowsSystemRoot()).filePath(QStringLiteral("System32/cmd.exe"));
+}
+
+static QString windowsPingExe()
+{
+    return QDir::cleanPath(
+        QDir(windowsSystemRoot()).filePath(QStringLiteral("System32/ping.exe")));
 }
 #endif
 
@@ -56,7 +66,7 @@ private:
     QTemporaryDir m_tempDir;
 
     // FujiNetProcessManager::start() checks QFile::exists() and ExeUser permission.
-    // Unix: helper shell scripts in temp dir. Windows: PowerShell only.
+    // Unix: helper shell scripts in temp dir. Windows: ping.exe + cmd.exe.
     QString m_sleepScript;
     QString m_exitScript;
     QString m_echoScript;
@@ -64,14 +74,11 @@ private:
     bool startSleep(FujiNetProcessManager &mgr, int seconds)
     {
 #ifdef Q_OS_WIN
-        const QString ps = windowsPowerShellExe();
-        return mgr.start(ps,
-                         QStringList{QStringLiteral("-NoProfile"),
-                                     QStringLiteral("-NonInteractive"),
-                                     QStringLiteral("-ExecutionPolicy"),
-                                     QStringLiteral("Bypass"),
-                                     QStringLiteral("-Command"),
-                                     QStringLiteral("Start-Sleep -Seconds %1").arg(seconds)});
+        const QString ping = windowsPingExe();
+        /* ~1 s between echo requests to localhost; (count - 1) ~= wall seconds */
+        const int count = qMax(2, seconds + 1);
+        return mgr.start(ping, QStringList{QStringLiteral("-n"), QString::number(count),
+                                           QStringLiteral("127.0.0.1")});
 #else
         return mgr.start(m_sleepScript, {QString::number(seconds)});
 #endif
@@ -80,14 +87,9 @@ private:
     bool startExit(FujiNetProcessManager &mgr, int code)
     {
 #ifdef Q_OS_WIN
-        const QString ps = windowsPowerShellExe();
-        return mgr.start(ps,
-                         QStringList{QStringLiteral("-NoProfile"),
-                                     QStringLiteral("-NonInteractive"),
-                                     QStringLiteral("-ExecutionPolicy"),
-                                     QStringLiteral("Bypass"),
-                                     QStringLiteral("-Command"),
-                                     QStringLiteral("exit %1").arg(code)});
+        const QString cmd = windowsCmdExe();
+        return mgr.start(cmd, QStringList{QStringLiteral("/d"), QStringLiteral("/c"),
+                                           QStringLiteral("exit %1").arg(code)});
 #else
         return mgr.start(m_exitScript, {QString::number(code)});
 #endif
@@ -96,14 +98,9 @@ private:
     bool startEcho(FujiNetProcessManager &mgr, const QString &msg)
     {
 #ifdef Q_OS_WIN
-        QString quoted = msg;
-        quoted.replace(QLatin1Char('\''), QLatin1String("''"));
-        const QString ps = windowsPowerShellExe();
-        return mgr.start(
-            ps, QStringList{QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
-                             QStringLiteral("-ExecutionPolicy"), QStringLiteral("Bypass"),
-                             QStringLiteral("-Command"),
-                             QStringLiteral("Write-Output '%1'").arg(quoted)});
+        const QString cmd = windowsCmdExe();
+        return mgr.start(cmd, QStringList{QStringLiteral("/d"), QStringLiteral("/c"),
+                                           QStringLiteral("echo %1").arg(msg)});
 #else
         return mgr.start(m_echoScript, {msg});
 #endif
@@ -143,8 +140,10 @@ private slots:
         QVERIFY(m_tempDir.isValid());
         createHelperScripts();
 #ifdef Q_OS_WIN
-        QVERIFY2(QFileInfo::exists(windowsPowerShellExe()),
-                 qPrintable(QStringLiteral("missing ") + windowsPowerShellExe()));
+        QVERIFY2(QFileInfo::exists(windowsPingExe()),
+                 qPrintable(QStringLiteral("missing ") + windowsPingExe()));
+        QVERIFY2(QFileInfo::exists(windowsCmdExe()),
+                 qPrintable(QStringLiteral("missing ") + windowsCmdExe()));
 #endif
     }
 
