@@ -6,12 +6,72 @@
  */
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
+#include <QProcessEnvironment>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QtTest/QtTest>
 
 #include "fujinetprocessmanager.h"
+
+#ifdef Q_OS_WIN
+/* bash.exe must come from the *same* MSYS2 tree as mingw64/bin (where cmake runs).
+ * A stale or partial C:/msys64 is often present on runners; checking it first breaks
+ * QProcess::start (wrong DLLs / no startup) while every test burns a 5s spy timeout. */
+static QString resolveWindowsMsysBash()
+{
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    for (const char *key : {"MSYS2", "MSYS2_PATH"}) {
+        const QString root = env.value(QString::fromLatin1(key));
+        if (!root.isEmpty()) {
+            const QString bash = QDir(root).filePath(QStringLiteral("usr/bin/bash.exe"));
+            if (QFile::exists(bash))
+                return QDir::cleanPath(bash);
+        }
+    }
+
+    const QString pathVar = env.value(QStringLiteral("PATH"));
+    for (QString raw : pathVar.split(QLatin1Char(';'), QString::SkipEmptyParts)) {
+        raw = QDir::fromNativeSeparators(raw.trimmed());
+        if (raw.isEmpty())
+            continue;
+
+        const bool isToolBin =
+            raw.endsWith(QStringLiteral("/bin"), Qt::CaseInsensitive)
+            && (raw.contains(QStringLiteral("mingw64"), Qt::CaseInsensitive)
+                || raw.contains(QStringLiteral("ucrt64"), Qt::CaseInsensitive)
+                || raw.contains(QStringLiteral("clang64"), Qt::CaseInsensitive));
+
+        if (isToolBin) {
+            QDir binDir(raw);
+            if (binDir.cdUp() && binDir.cdUp()) {
+                const QString bash =
+                    binDir.filePath(QStringLiteral("usr/bin/bash.exe"));
+                if (QFile::exists(bash))
+                    return QDir::cleanPath(bash);
+            }
+        }
+
+        const QFileInfo bashInDir(raw, QStringLiteral("bash.exe"));
+        if (bashInDir.exists()
+            && raw.endsWith(QStringLiteral("/usr/bin"), Qt::CaseInsensitive)) {
+            return QDir::cleanPath(bashInDir.absoluteFilePath());
+        }
+    }
+
+    static const char *const kFallback[] = {
+        "D:/a/_temp/msys64/usr/bin/bash.exe",
+        "C:/msys64/usr/bin/bash.exe",
+    };
+    for (const char *p : kFallback) {
+        if (QFile::exists(QString::fromLocal8Bit(p)))
+            return QString::fromLocal8Bit(p);
+    }
+    return {};
+}
+#endif
 
 class TestFujiNetProcess : public QObject {
     Q_OBJECT
@@ -45,21 +105,9 @@ private:
     {
 #ifdef Q_OS_WIN
         // On Windows/MSYS2, .bat files spawn cmd.exe subprocess trees that
-        // QProcess::kill() cannot reliably terminate. Instead, create tiny
-        // .exe-based wrappers by writing shell scripts and recording the
-        // path to the MSYS2 bash.exe that will run them. The test methods
-        // call start(m_bash, {script, args...}) so QProcess launches a
-        // single killable process.
-        // $SHELL on MSYS2 is a Unix-style path (/usr/bin/bash) that
-        // QFile::exists() can't resolve. Search well-known native paths.
-        const char *candidates[] = {
-            "C:/msys64/usr/bin/bash.exe",
-            "D:/a/_temp/msys64/usr/bin/bash.exe",
-            "C:/msys64/mingw64/bin/bash.exe",
-        };
-        for (const char *p : candidates) {
-            if (QFile::exists(p)) { m_bash = p; break; }
-        }
+        // QProcess::kill() cannot reliably terminate. Instead, launch
+        // usr/bin/bash.exe from the same MSYS2 root as mingw64 (see resolveWindowsMsysBash).
+        m_bash = resolveWindowsMsysBash();
 
         m_sleepScript = m_tempDir.path() + "/helper_sleep.sh";
         QFile sf(m_sleepScript);
