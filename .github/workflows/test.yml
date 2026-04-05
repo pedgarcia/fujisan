@@ -112,6 +112,8 @@ jobs:
 
       - name: Verbose FujiNet process test (Windows, on failure)
         if: failure() && runner.os == 'Windows'
-        run: ./build/tests/test_fujinet_process.exe -v2
+        shell: cmd
         env:
           QT_QPA_PLATFORM: offscreen
+        run: |
+          "%GITHUB_WORKSPACE%\build\tests\test_fujinet_process.exe" -v2

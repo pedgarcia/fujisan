@@ -12,6 +12,7 @@
 #include <QProcessEnvironment>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QtGlobal>
 #include <QtTest/QtTest>
 
 #include "fujinetprocessmanager.h"
@@ -74,7 +75,8 @@ private:
     bool startSleep(FujiNetProcessManager &mgr, int seconds)
     {
 #ifdef Q_OS_WIN
-        const QString ping = windowsPingExe();
+        const QString ping =
+            QDir::toNativeSeparators(QDir::cleanPath(windowsPingExe()));
         /* ~1 s between echo requests to localhost; (count - 1) ~= wall seconds */
         const int count = qMax(2, seconds + 1);
         return mgr.start(ping, QStringList{QStringLiteral("-n"), QString::number(count),
@@ -87,7 +89,7 @@ private:
     bool startExit(FujiNetProcessManager &mgr, int code)
     {
 #ifdef Q_OS_WIN
-        const QString cmd = windowsCmdExe();
+        const QString cmd = QDir::toNativeSeparators(QDir::cleanPath(windowsCmdExe()));
         return mgr.start(cmd, QStringList{QStringLiteral("/d"), QStringLiteral("/c"),
                                            QStringLiteral("exit %1").arg(code)});
 #else
@@ -98,7 +100,7 @@ private:
     bool startEcho(FujiNetProcessManager &mgr, const QString &msg)
     {
 #ifdef Q_OS_WIN
-        const QString cmd = windowsCmdExe();
+        const QString cmd = QDir::toNativeSeparators(QDir::cleanPath(windowsCmdExe()));
         return mgr.start(cmd, QStringList{QStringLiteral("/d"), QStringLiteral("/c"),
                                            QStringLiteral("echo %1").arg(msg)});
 #else
@@ -137,6 +139,9 @@ private:
 private slots:
     void initTestCase()
     {
+        /* Skip tasklist/taskkill in FujiNetProcessManager::start (MSYS PATH / nested loops). */
+        qputenv("FUJISAN_TEST_SKIP_EXTERNAL_FUJINET_CHECK", "1");
+
         QVERIFY(m_tempDir.isValid());
         createHelperScripts();
 #ifdef Q_OS_WIN

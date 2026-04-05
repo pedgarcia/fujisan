@@ -12,7 +12,19 @@
 #include <QDir>
 #include <QThread>
 #include <QSettings>
+#include <QProcessEnvironment>
 #include <QRegularExpression>
+#include <QtGlobal>
+
+#ifdef Q_OS_WIN
+static QString fujisanSystem32Exe(const QString &fileName)
+{
+    const QString root = QProcessEnvironment::systemEnvironment().value(
+        QStringLiteral("SystemRoot"), QStringLiteral("C:/Windows"));
+    const QString p = QDir(root).filePath(QStringLiteral("System32/") + fileName);
+    return QDir::toNativeSeparators(QDir::cleanPath(p));
+}
+#endif
 
 FujiNetProcessManager::FujiNetProcessManager(QObject *parent)
     : QObject(parent)
@@ -57,6 +69,9 @@ bool FujiNetProcessManager::start(const QString& binaryPath, const QStringList& 
     if (m_skipExternalCheck) {
         qDebug() << "Skipping isProcessRunningExternally() after forceKill";
         m_skipExternalCheck = false;
+    } else if (qEnvironmentVariableIsSet("FUJISAN_TEST_SKIP_EXTERNAL_FUJINET_CHECK")) {
+        // Unit tests spawn non-FujiNet children; skip tasklist/taskkill (MSYS PATH,
+        // nested event loops). Set only from test_fujinet_process.
     } else if (isProcessRunningExternally("fujinet")) {
         // Kill any stale/external FujiNet-PC process before launching a managed one.
         // Previous sessions may leave zombie or orphaned processes behind; pgrep can
@@ -68,7 +83,8 @@ bool FujiNetProcessManager::start(const QString& binaryPath, const QStringList& 
         qDebug() << "Found existing FujiNet-PC process - killing before managed launch";
 #ifdef Q_OS_WIN
         QProcess taskkill;
-        taskkill.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
+        taskkill.start(fujisanSystem32Exe(QStringLiteral("taskkill.exe")),
+                       QStringList() << "/F" << "/IM" << "fujinet.exe");
         taskkill.waitForFinished(2000);
 #else
         QProcess pkill;
@@ -105,7 +121,11 @@ bool FujiNetProcessManager::start(const QString& binaryPath, const QStringList& 
     // FujiNet-PC expects fnconfig.ini, data/, and SD/ folders in its working directory
     QFileInfo fileInfo(m_binaryPath);
     QString workingDir = fileInfo.absolutePath();
+#ifdef Q_OS_WIN
+    m_process->setWorkingDirectory(QDir::toNativeSeparators(workingDir));
+#else
     m_process->setWorkingDirectory(workingDir);
+#endif
 
     // Verify required files exist
     QString configPath = workingDir + "/fnconfig.ini";
@@ -127,7 +147,11 @@ bool FujiNetProcessManager::start(const QString& binaryPath, const QStringList& 
     qDebug() << "Working directory:" << workingDir;
 
     setState(Starting);
+#ifdef Q_OS_WIN
+    m_process->start(QDir::toNativeSeparators(m_binaryPath), m_arguments);
+#else
     m_process->start(m_binaryPath, m_arguments);
+#endif
 
     // Start timeout timer
     m_startTimer->start(START_TIMEOUT_MS);
@@ -151,14 +175,16 @@ void FujiNetProcessManager::stop()
 #ifdef Q_OS_WIN
         qDebug() << "Stopping external FujiNet-PC process with taskkill";
         QProcess taskkill;
-        taskkill.start("taskkill", QStringList() << "/IM" << "fujinet.exe");
+        taskkill.start(fujisanSystem32Exe(QStringLiteral("taskkill.exe")),
+                       QStringList() << "/IM" << "fujinet.exe");
         taskkill.waitForFinished(2000);
 
         QThread::msleep(1000);
         if (isProcessRunningExternally("fujinet")) {
             qDebug() << "External FujiNet-PC did not terminate, force killing";
             QProcess taskkillForce;
-            taskkillForce.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
+            taskkillForce.start(fujisanSystem32Exe(QStringLiteral("taskkill.exe")),
+                                QStringList() << "/F" << "/IM" << "fujinet.exe");
             taskkillForce.waitForFinished(2000);
         }
 #else
@@ -230,7 +256,8 @@ void FujiNetProcessManager::forceKill()
         // so we must transition state ourselves after the kill completes.
 #ifdef Q_OS_WIN
         QProcess taskkill;
-        taskkill.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
+        taskkill.start(fujisanSystem32Exe(QStringLiteral("taskkill.exe")),
+                       QStringList() << "/F" << "/IM" << "fujinet.exe");
         taskkill.waitForFinished(1000);
 #else
         QProcess pkill;
@@ -256,7 +283,8 @@ bool FujiNetProcessManager::isProcessRunningExternally(const QString& processNam
         imageName += ".exe";
     }
     QProcess tasklist;
-    tasklist.start("tasklist", QStringList() << "/FI" << QString("IMAGENAME eq %1").arg(imageName) << "/NH");
+    tasklist.start(fujisanSystem32Exe(QStringLiteral("tasklist.exe")),
+                   QStringList() << "/FI" << QString("IMAGENAME eq %1").arg(imageName) << "/NH");
     tasklist.waitForFinished(1000);
 
     // tasklist outputs lines; if process exists, we get a line containing the image name
