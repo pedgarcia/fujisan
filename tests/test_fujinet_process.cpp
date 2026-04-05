@@ -7,69 +7,33 @@
 
 #include <QCoreApplication>
 #include <QDir>
-#include <QFileInfo>
 #include <QProcessEnvironment>
 #include <QSignalSpy>
 #include <QTemporaryDir>
-#include <QTemporaryFile>
 #include <QtTest/QtTest>
 
 #include "fujinetprocessmanager.h"
 
 #ifdef Q_OS_WIN
-/* bash.exe must come from the *same* MSYS2 tree as mingw64/bin (where cmake runs).
- * A stale or partial C:/msys64 is often present on runners; checking it first breaks
- * QProcess::start (wrong DLLs / no startup) while every test burns a 5s spy timeout. */
-static QString resolveWindowsMsysBash()
+/* Use native Windows binaries only. CI runs from MSYS2 but QProcess + bash/sleep
+ * was fragile (wrong MSYS root, PATH, DLL); 60s = many 5s spy timeouts. */
+static QString windowsSystemRoot()
 {
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    for (const char *key : {"MSYS2", "MSYS2_PATH"}) {
-        const QString root = env.value(QString::fromLatin1(key));
-        if (!root.isEmpty()) {
-            const QString bash = QDir(root).filePath(QStringLiteral("usr/bin/bash.exe"));
-            if (QFile::exists(bash))
-                return QDir::cleanPath(bash);
-        }
-    }
+    QString r =
+        QProcessEnvironment::systemEnvironment().value(QStringLiteral("SystemRoot"));
+    if (r.isEmpty())
+        r = QStringLiteral("C:/Windows");
+    return QDir::fromNativeSeparators(r);
+}
 
-    const QString pathVar = env.value(QStringLiteral("PATH"));
-    for (QString raw : pathVar.split(QLatin1Char(';'), QString::SkipEmptyParts)) {
-        raw = QDir::fromNativeSeparators(raw.trimmed());
-        if (raw.isEmpty())
-            continue;
+static QString windowsCmdExe()
+{
+    return QDir(windowsSystemRoot()).filePath(QStringLiteral("System32/cmd.exe"));
+}
 
-        const bool isToolBin =
-            raw.endsWith(QStringLiteral("/bin"), Qt::CaseInsensitive)
-            && (raw.contains(QStringLiteral("mingw64"), Qt::CaseInsensitive)
-                || raw.contains(QStringLiteral("ucrt64"), Qt::CaseInsensitive)
-                || raw.contains(QStringLiteral("clang64"), Qt::CaseInsensitive));
-
-        if (isToolBin) {
-            QDir binDir(raw);
-            if (binDir.cdUp() && binDir.cdUp()) {
-                const QString bash =
-                    binDir.filePath(QStringLiteral("usr/bin/bash.exe"));
-                if (QFile::exists(bash))
-                    return QDir::cleanPath(bash);
-            }
-        }
-
-        const QFileInfo bashInDir(raw, QStringLiteral("bash.exe"));
-        if (bashInDir.exists()
-            && raw.endsWith(QStringLiteral("/usr/bin"), Qt::CaseInsensitive)) {
-            return QDir::cleanPath(bashInDir.absoluteFilePath());
-        }
-    }
-
-    static const char *const kFallback[] = {
-        "D:/a/_temp/msys64/usr/bin/bash.exe",
-        "C:/msys64/usr/bin/bash.exe",
-    };
-    for (const char *p : kFallback) {
-        if (QFile::exists(QString::fromLocal8Bit(p)))
-            return QString::fromLocal8Bit(p);
-    }
-    return {};
+static QString windowsTimeoutExe()
+{
+    return QDir(windowsSystemRoot()).filePath(QStringLiteral("System32/timeout.exe"));
 }
 #endif
 
@@ -80,22 +44,18 @@ private:
     QTemporaryDir m_tempDir;
 
     // FujiNetProcessManager::start() checks QFile::exists() and ExeUser permission.
-    // We create tiny helper scripts in the temp dir so we control permissions.
-    // On Windows, QProcess can't run .sh directly so we launch via m_bash.
+    // Unix: helper shell scripts in temp dir. Windows: timeout.exe + cmd.exe only.
     QString m_sleepScript;
     QString m_exitScript;
     QString m_echoScript;
-#ifdef Q_OS_WIN
-    QString m_bash;
-#endif
 
     bool startSleep(FujiNetProcessManager &mgr, int seconds)
     {
 #ifdef Q_OS_WIN
-        // -lc: login shell so /etc/profile sets MSYS2 PATH (sleep lives in usr/bin).
-        // Inline command avoids Qt/MSYS path translation issues with temp .sh paths.
-        return mgr.start(m_bash, QStringList{QStringLiteral("-lc"),
-                          QStringLiteral("sleep %1").arg(seconds)});
+        const QString exe = windowsTimeoutExe();
+        return mgr.start(exe, QStringList{QStringLiteral("/t"),
+                                          QString::number(seconds),
+                                          QStringLiteral("/nobreak")});
 #else
         return mgr.start(m_sleepScript, {QString::number(seconds)});
 #endif
@@ -104,8 +64,9 @@ private:
     bool startExit(FujiNetProcessManager &mgr, int code)
     {
 #ifdef Q_OS_WIN
-        return mgr.start(m_bash, QStringList{QStringLiteral("-lc"),
-                          QStringLiteral("exit %1").arg(code)});
+        const QString exe = windowsCmdExe();
+        return mgr.start(exe, QStringList{QStringLiteral("/c"),
+                                          QStringLiteral("exit %1").arg(code)});
 #else
         return mgr.start(m_exitScript, {QString::number(code)});
 #endif
@@ -114,10 +75,9 @@ private:
     bool startEcho(FujiNetProcessManager &mgr, const QString &msg)
     {
 #ifdef Q_OS_WIN
-        QString quoted = msg;
-        quoted.replace(QLatin1Char('\''), QStringLiteral("'\"'\"'"));
-        return mgr.start(m_bash, QStringList{QStringLiteral("-lc"),
-                          QStringLiteral("echo '%1'").arg(quoted)});
+        const QString exe = windowsCmdExe();
+        return mgr.start(exe, QStringList{QStringLiteral("/c"),
+                                            QStringLiteral("echo %1").arg(msg)});
 #else
         return mgr.start(m_echoScript, {msg});
 #endif
@@ -126,7 +86,7 @@ private:
     void createHelperScripts()
     {
 #ifdef Q_OS_WIN
-        m_bash = resolveWindowsMsysBash();
+        (void)0;
 #else
         m_sleepScript = m_tempDir.path() + "/helper_sleep.sh";
         QFile sf(m_sleepScript);
@@ -157,10 +117,10 @@ private slots:
         QVERIFY(m_tempDir.isValid());
         createHelperScripts();
 #ifdef Q_OS_WIN
-        if (m_bash.isEmpty() || !QFile::exists(m_bash)) {
-            QSKIP("No MSYS2 bash.exe found; cannot run process tests on this Windows runner");
-        }
-        qDebug() << "Using bash:" << m_bash;
+        QVERIFY2(QFile::exists(windowsTimeoutExe()),
+                 qPrintable(QStringLiteral("missing ") + windowsTimeoutExe()));
+        QVERIFY2(QFile::exists(windowsCmdExe()),
+                 qPrintable(QStringLiteral("missing ") + windowsCmdExe()));
 #endif
     }
 
