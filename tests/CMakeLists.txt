@@ -87,3 +87,16 @@ add_fujisan_test(test_fujinet_process
     ${FUJISAN_INC_DIR}/fujinetprocessmanager.h
 )
 target_link_libraries(test_fujinet_process Qt5::Test Qt5::Core)
+
+# ---------------------------------------------------------------------------
+# Convenience target: build all test executables without touching atari800_external
+# ---------------------------------------------------------------------------
+add_custom_target(build_tests DEPENDS
+    test_settings
+    test_profiles
+    test_rom_loading
+    test_audio
+    test_fujinet_widget
+    test_fujinet_service
+    test_fujinet_process
+)

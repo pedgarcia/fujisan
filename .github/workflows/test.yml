@@ -97,7 +97,7 @@ jobs:
 
       # -- Build --
       - name: Build tests
-        run: cmake --build build --target all -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+        run: cmake --build build --target build_tests -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
 
       - name: Show patch log on failure
         if: failure()
