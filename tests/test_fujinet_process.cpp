@@ -7,6 +7,8 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QProcessEnvironment>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -15,25 +17,35 @@
 #include "fujinetprocessmanager.h"
 
 #ifdef Q_OS_WIN
-/* Use native Windows binaries only. CI runs from MSYS2 but QProcess + bash/sleep
- * was fragile (wrong MSYS root, PATH, DLL); 60s = many 5s spy timeouts. */
+/*
+ * Use PowerShell from SystemRoot (same as CI / interactives). ComSpec/SystemRoot
+ * may be unset or misleading under some MSYS2-spawned tools; timeout.exe can also
+ * exit immediately when stdin is not a console. PowerShell Start-Sleep / exit /
+ * Write-Output behave predictably under QProcess.
+ */
 static QString windowsSystemRoot()
 {
-    QString r =
-        QProcessEnvironment::systemEnvironment().value(QStringLiteral("SystemRoot"));
-    if (r.isEmpty())
-        r = QStringLiteral("C:/Windows");
-    return QDir::fromNativeSeparators(r);
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    QString r = env.value(QStringLiteral("SystemRoot"));
+    if (!r.isEmpty())
+        return QDir::cleanPath(QDir::fromNativeSeparators(r));
+    const QString comspec = env.value(QStringLiteral("ComSpec"));
+    if (!comspec.isEmpty()) {
+        const QFileInfo fi(QDir::fromNativeSeparators(comspec));
+        if (fi.exists()) {
+            QDir system32 = fi.absoluteDir();
+            if (system32.cdUp())
+                return system32.absolutePath();
+        }
+    }
+    return QStringLiteral("C:/Windows");
 }
 
-static QString windowsCmdExe()
+static QString windowsPowerShellExe()
 {
-    return QDir(windowsSystemRoot()).filePath(QStringLiteral("System32/cmd.exe"));
-}
-
-static QString windowsTimeoutExe()
-{
-    return QDir(windowsSystemRoot()).filePath(QStringLiteral("System32/timeout.exe"));
+    const QString p = QDir(windowsSystemRoot()).filePath(
+        QStringLiteral("System32/WindowsPowerShell/v1.0/powershell.exe"));
+    return QDir::cleanPath(p);
 }
 #endif
 
@@ -44,7 +56,7 @@ private:
     QTemporaryDir m_tempDir;
 
     // FujiNetProcessManager::start() checks QFile::exists() and ExeUser permission.
-    // Unix: helper shell scripts in temp dir. Windows: timeout.exe + cmd.exe only.
+    // Unix: helper shell scripts in temp dir. Windows: PowerShell only.
     QString m_sleepScript;
     QString m_exitScript;
     QString m_echoScript;
@@ -52,10 +64,14 @@ private:
     bool startSleep(FujiNetProcessManager &mgr, int seconds)
     {
 #ifdef Q_OS_WIN
-        const QString exe = windowsTimeoutExe();
-        return mgr.start(exe, QStringList{QStringLiteral("/t"),
-                                          QString::number(seconds),
-                                          QStringLiteral("/nobreak")});
+        const QString ps = windowsPowerShellExe();
+        return mgr.start(ps,
+                         QStringList{QStringLiteral("-NoProfile"),
+                                     QStringLiteral("-NonInteractive"),
+                                     QStringLiteral("-ExecutionPolicy"),
+                                     QStringLiteral("Bypass"),
+                                     QStringLiteral("-Command"),
+                                     QStringLiteral("Start-Sleep -Seconds %1").arg(seconds)});
 #else
         return mgr.start(m_sleepScript, {QString::number(seconds)});
 #endif
@@ -64,9 +80,14 @@ private:
     bool startExit(FujiNetProcessManager &mgr, int code)
     {
 #ifdef Q_OS_WIN
-        const QString exe = windowsCmdExe();
-        return mgr.start(exe, QStringList{QStringLiteral("/c"),
-                                          QStringLiteral("exit %1").arg(code)});
+        const QString ps = windowsPowerShellExe();
+        return mgr.start(ps,
+                         QStringList{QStringLiteral("-NoProfile"),
+                                     QStringLiteral("-NonInteractive"),
+                                     QStringLiteral("-ExecutionPolicy"),
+                                     QStringLiteral("Bypass"),
+                                     QStringLiteral("-Command"),
+                                     QStringLiteral("exit %1").arg(code)});
 #else
         return mgr.start(m_exitScript, {QString::number(code)});
 #endif
@@ -75,9 +96,14 @@ private:
     bool startEcho(FujiNetProcessManager &mgr, const QString &msg)
     {
 #ifdef Q_OS_WIN
-        const QString exe = windowsCmdExe();
-        return mgr.start(exe, QStringList{QStringLiteral("/c"),
-                                            QStringLiteral("echo %1").arg(msg)});
+        QString quoted = msg;
+        quoted.replace(QLatin1Char('\''), QLatin1String("''"));
+        const QString ps = windowsPowerShellExe();
+        return mgr.start(
+            ps, QStringList{QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
+                             QStringLiteral("-ExecutionPolicy"), QStringLiteral("Bypass"),
+                             QStringLiteral("-Command"),
+                             QStringLiteral("Write-Output '%1'").arg(quoted)});
 #else
         return mgr.start(m_echoScript, {msg});
 #endif
@@ -117,10 +143,8 @@ private slots:
         QVERIFY(m_tempDir.isValid());
         createHelperScripts();
 #ifdef Q_OS_WIN
-        QVERIFY2(QFile::exists(windowsTimeoutExe()),
-                 qPrintable(QStringLiteral("missing ") + windowsTimeoutExe()));
-        QVERIFY2(QFile::exists(windowsCmdExe()),
-                 qPrintable(QStringLiteral("missing ") + windowsCmdExe()));
+        QVERIFY2(QFileInfo::exists(windowsPowerShellExe()),
+                 qPrintable(QStringLiteral("missing ") + windowsPowerShellExe()));
 #endif
     }
 
@@ -228,7 +252,14 @@ private slots:
         FujiNetProcessManager mgr;
         QSignalSpy errorSpy(&mgr, &FujiNetProcessManager::processError);
 
-        bool result = mgr.start("/nonexistent/binary/path");
+#ifdef Q_OS_WIN
+        const QString bad = QDir::cleanPath(
+            QDir(QDir::tempPath())
+                .filePath(QStringLiteral("___fujisan_nonexistent___/nope.exe")));
+#else
+        const QString bad = QStringLiteral("/nonexistent/binary/path");
+#endif
+        bool result = mgr.start(bad);
         // start() returns false synchronously because QFile::exists() fails
         QVERIFY(!result);
         QCOMPARE(mgr.getState(), FujiNetProcessManager::Error);
