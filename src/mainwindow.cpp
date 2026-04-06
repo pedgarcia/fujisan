@@ -3778,7 +3778,11 @@ bool MainWindow::setHardDrivePathViaTCP(int driveNumber, const QString& path)
     settings.setValue(hdKey + "Path", canonicalPath);
 
     qDebug() << QString("H%1: configured via TCP with path:").arg(driveNumber) << canonicalPath;
-    restartEmulator();
+
+    // Hot-swap the H: path in the running atari800 core instead of doing a full
+    // restartEmulator() (which tears down and rebuilds everything).  This avoids an
+    // extra visible reset and keeps FujiNet-PC connected.
+    m_emulator->updateHardDrivePath(driveNumber, canonicalPath);
     return true;
 }
 

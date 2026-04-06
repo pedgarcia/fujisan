@@ -58,6 +58,8 @@ void ESC_PatchOS(void);
 void Devices_UpdatePatches(void);
 // H: device patch flag - disabled by -netsio, must re-enable for H: drives
 extern int Devices_enable_h_patch;
+// H: device directory paths (indexed 0-3 for H1:-H4:)
+extern char Devices_atari_h_dir[4][FILENAME_MAX];
 
 // Access to CPU registers for XEX loading
 extern unsigned char CPU_regS;
@@ -1375,15 +1377,21 @@ bool AtariEmulator::loadFile(const QString& filename)
     QString extension = fileInfo.suffix().toLower();
     
     if (extension == "xex" || extension == "exe" || extension == "com") {
-        // Load XEX/EXE/COM files as executables using BINLOAD
-        
-        int result = BINLOAD_Loader(filename.toUtf8().constData());
-        
-        if (result) {
-            return true;
-        } else {
-            return false;
+        // Load XEX/EXE/COM files as executables using BINLOAD.
+        // BINLOAD_Loader() calls Atari800_Coldstart() internally, which sends a 0xFF
+        // cold-reset packet to FujiNet-PC via netsio_cold_reset(), causing it to
+        // exit(75) and restart.  Suppress the packet the same way coldBoot() does so
+        // that loading a XEX does not kill the FujiNet connection.
+#ifdef NETSIO
+        if (m_netSIOEnabled && netsio_enabled) {
+            int savedNetsioEnabled = netsio_enabled;
+            netsio_enabled = 0;
+            int result = BINLOAD_Loader(filename.toUtf8().constData());
+            netsio_enabled = savedNetsioEnabled;
+            return result != 0;
         }
+#endif
+        return BINLOAD_Loader(filename.toUtf8().constData()) != 0;
     } else {
         // Load other files (CAR, ROM, etc.) as cartridges
 
@@ -1905,6 +1913,35 @@ void AtariEmulator::resetNetSIOClientState()
 #endif
     qDebug() << "[NETSIO] Client state reset: netsio_enabled=0, fujinet_known=0, sync_wait=0, fifo flushed";
 #endif
+}
+
+bool AtariEmulator::updateHardDrivePath(int driveNumber, const QString& path)
+{
+    if (driveNumber < 1 || driveNumber > 4) {
+        qWarning() << "updateHardDrivePath: invalid drive number" << driveNumber;
+        return false;
+    }
+
+    int idx = driveNumber - 1;
+    QByteArray pathBytes = path.toUtf8();
+
+    if (pathBytes.size() >= FILENAME_MAX) {
+        qWarning() << "updateHardDrivePath: path too long";
+        return false;
+    }
+
+    strncpy(Devices_atari_h_dir[idx], pathBytes.constData(), FILENAME_MAX - 1);
+    Devices_atari_h_dir[idx][FILENAME_MAX - 1] = '\0';
+
+    if (!Devices_enable_h_patch) {
+        Devices_enable_h_patch = TRUE;
+        Devices_UpdatePatches();
+        qDebug() << "H: device patch enabled on the fly";
+    }
+
+    qDebug() << QString("H%1: path updated at runtime to:").arg(driveNumber) << path;
+    coldBoot();
+    return true;
 }
 
 char AtariEmulator::getShiftedSymbol(int key, bool shiftPressed)
@@ -2588,10 +2625,26 @@ int AtariEmulator::getCurrentEmulationSpeed() const
 
 bool AtariEmulator::loadXexForDebug(const QString& filename)
 {
-    // Start the XEX loading process
+    // libatari800_reboot_with_file() calls Atari800_Coldstart() which sends a 0xFF
+    // cold-reset packet to FujiNet-PC.  Suppress it so FujiNet stays connected.
+#ifdef NETSIO
+    int savedNetsioEnabled = 0;
+    if (m_netSIOEnabled && netsio_enabled) {
+        savedNetsioEnabled = netsio_enabled;
+        netsio_enabled = 0;
+    }
+#endif
+
     if (!libatari800_reboot_with_file(filename.toUtf8().constData())) {
+#ifdef NETSIO
+        if (savedNetsioEnabled) netsio_enabled = savedNetsioEnabled;
+#endif
         return false;
     }
+
+#ifdef NETSIO
+    if (savedNetsioEnabled) netsio_enabled = savedNetsioEnabled;
+#endif
     
     // Get memory pointer for checking vectors
     unsigned char* mem = libatari800_get_main_memory_ptr();

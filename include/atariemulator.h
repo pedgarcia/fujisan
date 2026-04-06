@@ -219,6 +219,7 @@ public:
     void coldBoot();
     void warmBoot();
     void resetNetSIOClientState();
+    bool updateHardDrivePath(int driveNumber, const QString& path);
     
     bool isBasicEnabled() const { return m_basicEnabled; }
     void setBasicEnabled(bool enabled) { m_basicEnabled = enabled; }
