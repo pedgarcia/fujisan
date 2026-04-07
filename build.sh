@@ -402,7 +402,7 @@ bundle_fujinet_pc() {
     cat > "$fujinet_dir/fnconfig.ini" << 'EOF'
 [General]
 devicename=Fujinet
-hsioindex=16
+hsioindex=-1
 rotationsounds=1
 configenabled=1
 config_ng=0
