@@ -544,4 +544,23 @@ index 00000000..00000001
 +void netsio_cmd_cancel(void)
 +{
 +}
++
++/* netsio_recover_stale_sio_transaction: clear stale NetSIO state when SIO
++ * begins a new command frame mid-transaction (e.g. after cold boot). */
++void netsio_recover_stale_sio_transaction(void)
++{
++    if (!netsio_enabled)
++        return;
++
++    netsio_sync_wait = 0;
++    netsio_next_write_size = 0;
++
++    if (netsio_cmd_state) {
++        netsio_cmd_off();
++        netsio_cmd_state = 0;
++    }
++
++    /* Drain stale bytes from the ring-buffer FIFO (Windows replacement for POSIX pipe drain). */
++    netsio_flush_fifo();
++}
 
