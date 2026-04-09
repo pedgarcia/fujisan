@@ -1706,6 +1706,9 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
             // F7 or Pause = Break - libatari800 does: lastkey = -input->special
             m_currentInput.special = -AKEY_BREAK;  // Convert -5 to +5
         }
+    } else if (key == Qt::Key_F8) {
+        // F8 = Clear
+        m_currentInput.keycode = AKEY_CLEAR;
     } else if (key == Qt::Key_Insert) {
         // Insert = Insert character, Shift+Insert = Insert line
         if (shiftPressed) {

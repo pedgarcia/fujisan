@@ -341,6 +341,87 @@ void MainWindow::createMenus()
     // System menu
     QMenu* systemMenu = menuBar()->addMenu("&System");
 
+    // Special Keys submenu
+    QMenu* specialKeysMenu = systemMenu->addMenu("Special &Keys");
+
+    m_specialOptionAction = new QAction("&OPTION (F4)", this);
+    connect(m_specialOptionAction, &QAction::triggered, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F4, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F4, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+        });
+        if (m_emulatorWidget) m_emulatorWidget->setFocus();
+    });
+    specialKeysMenu->addAction(m_specialOptionAction);
+
+    m_specialSelectAction = new QAction("&SELECT (F3)", this);
+    connect(m_specialSelectAction, &QAction::triggered, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F3, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F3, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+        });
+        if (m_emulatorWidget) m_emulatorWidget->setFocus();
+    });
+    specialKeysMenu->addAction(m_specialSelectAction);
+
+    m_specialStartAction = new QAction("S&TART (F2)", this);
+    connect(m_specialStartAction, &QAction::triggered, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F2, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F2, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+        });
+        if (m_emulatorWidget) m_emulatorWidget->setFocus();
+    });
+    specialKeysMenu->addAction(m_specialStartAction);
+
+    m_specialBreakAction = new QAction("&BREAK (F7)", this);
+    connect(m_specialBreakAction, &QAction::triggered, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F7, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+        });
+        if (m_emulatorWidget) m_emulatorWidget->setFocus();
+    });
+    specialKeysMenu->addAction(m_specialBreakAction);
+
+    m_specialInsertAction = new QAction("&INSERT (Ins)", this);
+    connect(m_specialInsertAction, &QAction::triggered, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_Insert, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_Insert, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+        });
+        if (m_emulatorWidget) m_emulatorWidget->setFocus();
+    });
+    specialKeysMenu->addAction(m_specialInsertAction);
+
+    m_specialPauseAction = new QAction("&PAUSE (Ctrl+P)", this);
+    connect(m_specialPauseAction, &QAction::triggered, this, &MainWindow::togglePause);
+    specialKeysMenu->addAction(m_specialPauseAction);
+
+    m_specialClearAction = new QAction("&CLEAR (F8)", this);
+    connect(m_specialClearAction, &QAction::triggered, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F8, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F8, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+        });
+        if (m_emulatorWidget) m_emulatorWidget->setFocus();
+    });
+    specialKeysMenu->addAction(m_specialClearAction);
+
+    systemMenu->addSeparator();
+
     m_basicAction = new QAction("Enable &BASIC", this);
     m_basicAction->setCheckable(true);
     m_basicAction->setChecked(m_emulator->isBasicEnabled());
@@ -3956,12 +4037,14 @@ void MainWindow::togglePause()
         m_pauseButton->setText("PAUSE");
         m_pauseAction->setText("&Pause");
         m_pauseAction->setChecked(false);
+        m_specialPauseAction->setText("&PAUSE (Ctrl+P)");
         statusBar()->showMessage("Emulation resumed", 2000);
     } else {
         QMetaObject::invokeMethod(m_emulator, "pauseEmulation", Qt::QueuedConnection);
         m_pauseButton->setText("RESUME");
         m_pauseAction->setText("&Resume");
         m_pauseAction->setChecked(true);
+        m_specialPauseAction->setText("&RESUME (Ctrl+P)");
         statusBar()->showMessage("Emulation paused", 2000);
     }
     // Restore focus to emulator widget (fixes Linux focus loss)

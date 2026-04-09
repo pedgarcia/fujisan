@@ -258,6 +258,13 @@ private:
     QAction* m_coldBootAction;
     QAction* m_warmBootAction;
     QAction* m_pauseAction;
+    QAction* m_specialOptionAction;
+    QAction* m_specialSelectAction;
+    QAction* m_specialStartAction;
+    QAction* m_specialBreakAction;
+    QAction* m_specialInsertAction;
+    QAction* m_specialPauseAction;
+    QAction* m_specialClearAction;
     QAction* m_basicAction;
     QAction* m_altirraOSAction;
     QAction* m_altirraBASICAction;
