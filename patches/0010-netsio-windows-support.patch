@@ -81,7 +81,7 @@ new file mode 100644
 index 00000000..00000001
 --- /dev/null
 +++ b/src/netsiowin.c
-@@ -0,0 +1,462 @@
+@@ -0,0 +1,481 @@
 +/*
 + * netsiowin.c - NetSIO Windows implementation for FujiNet-PC <-> Atari800 Emulator
 + *

@@ -48,6 +48,8 @@ void netsio_recover_stale_sio_transaction(void)
     netsio_flush_fifo();
 }
 UPGRADE_EOF
+        # Force recompilation: delete stale .o so make rebuilds it
+        rm -f src/netsiowin.o src/libatari800.a
         echo "✓ netsiowin.c upgraded with netsio_recover_stale_sio_transaction"
     fi
 
@@ -251,6 +253,12 @@ else
             # Skip patches 0005 and 0006 - accepted into atari800 upstream
             if [[ "$patch_name" == "0005-netsio-so-reuseaddr.patch" ]] || [[ "$patch_name" == "0006-netsio-shutdown.patch" ]]; then
                 echo "Skipping patch $patch_name - already in upstream"
+                continue
+            fi
+
+            # Skip Windows-specific patches on non-Windows systems
+            if [[ "$patch_name" == *"windows"* ]] && [[ "$OSTYPE" != "msys" ]] && [[ "$MSYSTEM" == "" ]] && [[ "$CC" != *"mingw"* ]]; then
+                echo "Skipping Windows-specific patch on non-Windows system"
                 continue
             fi
 

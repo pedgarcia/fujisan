@@ -353,8 +353,8 @@ bundle_fujinet_pc() {
         return 1
     fi
 
-    # Get version from binary
-    local version=$("$FUJINET_SOURCE_DIR/fujinet" -V 2>&1 | grep "^FujiNet-PC" | awk '{print $2}')
+    # Get version from binary (timeout to avoid hanging if fujinet doesn't exit cleanly)
+    local version=$(timeout 5 "$FUJINET_SOURCE_DIR/fujinet" -V 2>&1 | grep "^FujiNet-PC" | awk '{print $2}')
     if [[ -z "$version" ]]; then
         version="local-build"
     fi
@@ -801,7 +801,7 @@ build_macos_arm64() {
     
     # Notarize if requested
     if [[ "$NOTARIZE" == "true" ]]; then
-        notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-arm64.dmg"
+        notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-arm64.dmg" || true
     fi
     
     # Return to project root
@@ -904,7 +904,7 @@ build_macos_x86_64() {
     
     # Notarize if requested
     if [[ "$NOTARIZE" == "true" ]]; then
-        notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-x86_64.dmg"
+        notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-x86_64.dmg" || true
     fi
     
     # Return to project root
