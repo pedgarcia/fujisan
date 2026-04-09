@@ -11,6 +11,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDesktopServices>
+#include <QThread>
 #include <QUrl>
 #include <QProcess>
 #include <QDir>
@@ -3293,8 +3294,14 @@ void SettingsDialog::applySettings()
         qDebug() << "=== SETTINGS DIALOG RESTART START ===";
         qDebug() << "NetSIO enabled from UI:" << m_netSIOEnabled->isChecked();
 
-        // Full restart needed for machine/video/OS settings
-        m_emulator->shutdown();
+        // Shutdown must run on the emulator thread (owns the frame timer).
+        auto* emulatorThread = m_emulator->thread();
+        bool onEmulatorThread = (emulatorThread == QThread::currentThread());
+        if (!onEmulatorThread && emulatorThread && emulatorThread->isRunning()) {
+            QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
+        } else {
+            m_emulator->shutdown();
+        }
 
         // Get artifact settings from UI
         QString artifactMode = m_artifactingMode->currentData().toString();
@@ -3311,12 +3318,19 @@ void SettingsDialog::applySettings()
         // Get special device settings from UI
         bool netSIOEnabled = m_netSIOEnabled->isChecked();
         bool rtimeEnabled = m_rtimeEnabled->isChecked();
+        bool kbdJoy0 = (m_joystick1Device->currentData().toString() == "keyboard");
+        bool kbdJoy1 = (m_joystick2Device->currentData().toString() == "keyboard");
+        bool swapJoys = m_swapJoysticks->isChecked();
 
         qDebug() << "*** ABOUT TO CALL initializeWithNetSIOConfig with NetSIO:" << netSIOEnabled << "RTime:" << rtimeEnabled;
 
-        // Now initialize with NetSIO config (same as MainWindow does)
-        // This ensures NetSIO is properly initialized and FujiNet-PC gets machine type updates
-        if (m_emulator->initializeWithNetSIOConfig(
+        // initializeWithNetSIOConfig() calls requestNextFrame() → m_frameTimer->start().
+        // QTimer::start() must be called from the thread that owns the timer (the emulator
+        // thread). Calling it from the dialog/main thread silently does nothing, leaving the
+        // frame loop dead after a machine-type change (same bug fixed in restartEmulator()).
+        bool initSuccess = false;
+        auto initFn = [&]() {
+            initSuccess = m_emulator->initializeWithNetSIOConfig(
                 m_emulator->isBasicEnabled(),
                 m_emulator->getMachineType(),
                 m_emulator->getVideoSystem(),
@@ -3324,12 +3338,18 @@ void SettingsDialog::applySettings()
                 horizontalArea, verticalArea,
                 horizontalShift, verticalShift,
                 fitScreen, show80Column, vSyncEnabled,
-                (m_joystick1Device->currentData().toString() == "keyboard"),
-                (m_joystick2Device->currentData().toString() == "keyboard"),
-                m_swapJoysticks->isChecked(),
-                netSIOEnabled, rtimeEnabled)) {
+                kbdJoy0, kbdJoy1, swapJoys,
+                netSIOEnabled, rtimeEnabled);
+        };
+
+        if (!onEmulatorThread && emulatorThread && emulatorThread->isRunning()) {
+            QMetaObject::invokeMethod(m_emulator, initFn, Qt::BlockingQueuedConnection);
+        } else {
+            initFn();
+        }
+
+        if (initSuccess) {
             qDebug() << "Emulator restarted with new settings";
-            
             // Reapply media settings after restart
             applyMediaSettings();
         } else {
@@ -3707,11 +3727,27 @@ void SettingsDialog::onSaveCurrentProfile(const QString& profileName)
         QSettings settings("8bitrelics", "Fujisan");
         settings.setValue("media/netSIOEnabled", m_netSIOEnabled->isChecked());
         settings.setValue("media/rtimeEnabled", m_rtimeEnabled->isChecked());
+        // Persist ROM paths so loadSettings() (triggered by syncPrinterStateRequested) reloads
+        // them correctly instead of reverting to whatever was last written by accept().
+        QString machineType = m_machineTypeCombo->currentData().toString();
+        QString osRomKey = QString("machine/osRom_%1").arg(machineType.mid(1));
+        settings.setValue(osRomKey, m_osRomPath->text());
+        settings.setValue("machine/basicRom", m_basicRomPath->text());
     }
+
+    // Snapshot ROM paths before the sync because loadSettings() will reload them from QSettings.
+    // Even though we just wrote them above, onMachineTypeChanged() (called inside loadSettings())
+    // reads the machine-type-specific key and overwrites the field, so we restore as a safety net.
+    const QString savedOsRomPath   = m_osRomPath->text();
+    const QString savedBasicRomPath = m_basicRomPath->text();
 
     // Ensure we capture the current PrinterWidget state before saving profile
     // This is important if user modified printer settings but Settings Dialog wasn't refreshed
     emit syncPrinterStateRequested();
+
+    // Restore ROM paths in case loadSettings() clobbered them with stale QSettings values.
+    m_osRomPath->setText(savedOsRomPath);
+    m_basicRomPath->setText(savedBasicRomPath);
 
     ConfigurationProfile profile = getCurrentUIState();
     profile.name = profileName;

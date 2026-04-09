@@ -1309,50 +1309,65 @@ void MainWindow::restartEmulator()
     QString osRomPath = settings.value(osRomKey, "").toString();
     QString basicRomPath = settings.value("machine/basicRom", "").toString();
 
-    // Set ROM paths in the emulator before initialization
-    m_emulator->setOSRomPath(osRomPath);
-    m_emulator->setBasicRomPath(basicRomPath);
-
     qDebug() << "Machine settings for restart - Type:" << machineType << "Video:" << videoSystem << "BASIC:" << basicEnabled;
     qDebug() << "ROM paths for restart - OS:" << osRomPath << "BASIC:" << basicRomPath;
-    qDebug() << "Altirra OS enabled:" << m_emulator->isAltirraOSEnabled();
 
-    if (m_emulator->initializeWithNetSIOConfig(basicEnabled,
-                                             machineType,
-                                             videoSystem,
-                                             artifactMode,
-                                             horizontalArea, verticalArea,
-                                             horizontalShift, verticalShift,
-                                             fitScreen, show80Column, vSyncEnabled,
-                                             kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
-                                             netSIOEnabled, rtimeEnabled)) {
+    // Load post-init settings here on the main thread before dispatching.
+    bool turboMode = settings.value("machine/turboMode", false).toBool();
+    int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt();
+    int speedPercentage;
+    if (turboMode) {
+        speedPercentage = 0;
+    } else if (speedIndex == 0) {
+        speedPercentage = 50;
+    } else {
+        speedPercentage = speedIndex * 100;
+    }
+    QString joy0Preset = settings.value("input/joystick1Preset", "numpad").toString();
+    QString joy1Preset = settings.value("input/joystick2Preset", "wasd").toString();
+
+    // Run initialization on the emulator thread.  initializeWithNetSIOConfig() calls
+    // requestNextFrame() → m_frameTimer->start(), and QTimer::start() must be called
+    // from the thread that owns the timer (the emulator thread after moveToThread).
+    // Calling it from the main thread silently does nothing, leaving the emulator frozen.
+    bool initSuccess = false;
+    auto initFn = [&]() {
+        m_emulator->setOSRomPath(osRomPath);
+        m_emulator->setBasicRomPath(basicRomPath);
+        qDebug() << "Altirra OS enabled:" << m_emulator->isAltirraOSEnabled();
+        initSuccess = m_emulator->initializeWithNetSIOConfig(basicEnabled,
+                                                             machineType,
+                                                             videoSystem,
+                                                             artifactMode,
+                                                             horizontalArea, verticalArea,
+                                                             horizontalShift, verticalShift,
+                                                             fitScreen, show80Column, vSyncEnabled,
+                                                             kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
+                                                             netSIOEnabled, rtimeEnabled);
+        if (initSuccess) {
+            m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
+            m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
+            m_emulator->setJoysticksSwapped(swapJoysticks);
+            m_emulator->setJoystick0Preset(joy0Preset);
+            m_emulator->setJoystick1Preset(joy1Preset);
+            m_emulator->setEmulationSpeed(speedPercentage);
+        }
+    };
+
+    if (m_emulatorThread && m_emulatorThread->isRunning()) {
+        QMetaObject::invokeMethod(m_emulator, initFn, Qt::BlockingQueuedConnection);
+    } else {
+        initFn();
+    }
+
+    if (initSuccess) {
         QString message = QString("Emulator restarted: %1 %2 with BASIC %3")
                          .arg(m_emulator->getMachineType())
                          .arg(m_emulator->getVideoSystem())
                          .arg(m_emulator->isBasicEnabled() ? "enabled" : "disabled");
         statusBar()->showMessage(message, 3000);
         qDebug() << message;
-
-        // Ensure keyboard joystick state is properly applied after restart
-        m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
-        m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
-        m_emulator->setJoysticksSwapped(swapJoysticks);
-        m_emulator->setJoystick0Preset(settings.value("input/joystick1Preset", "numpad").toString());
-        m_emulator->setJoystick1Preset(settings.value("input/joystick2Preset", "wasd").toString());
         qDebug() << "Applied keyboard joystick state after restart - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
-
-        // Re-apply emulation speed from QSettings (atari800 core resets it on init, so status bar would show MAX otherwise)
-        bool turboMode = settings.value("machine/turboMode", false).toBool();
-        int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt();
-        int speedPercentage;
-        if (turboMode) {
-            speedPercentage = 0;
-        } else if (speedIndex == 0) {
-            speedPercentage = 50;
-        } else {
-            speedPercentage = speedIndex * 100;
-        }
-        m_emulator->setEmulationSpeed(speedPercentage);
 
         // Update toolbar to reflect actual BASIC state (may have been auto-disabled for FujiNet)
         updateToolbarFromSettings();

@@ -21,6 +21,51 @@ echo "Applying patches to atari800 source at: $ATARI800_SRC_PATH"
 # ExternalProject may invoke configure multiple times without recloning.
 PATCH_MARKER=".fujisan-patches-applied"
 if [ -f "$PATCH_MARKER" ]; then
+    # Upgrade check: apply incremental fixes that were added after the marker was written.
+    # Each block is idempotent — grep guards prevent double-application.
+
+    # 0015/0016 upgrade: netsio_recover_stale_sio_transaction missing from netsiowin.c (Windows build)
+    if [ -f "src/netsiowin.c" ] && ! grep -q 'netsio_recover_stale_sio_transaction' src/netsiowin.c; then
+        echo "Upgrade: adding netsio_recover_stale_sio_transaction to netsiowin.c"
+        cat >> src/netsiowin.c << 'UPGRADE_EOF'
+
+/* netsio_recover_stale_sio_transaction: clear stale NetSIO state when SIO
+ * begins a new command frame mid-transaction (e.g. after cold boot). */
+void netsio_recover_stale_sio_transaction(void)
+{
+    if (!netsio_enabled)
+        return;
+
+    netsio_sync_wait = 0;
+    netsio_next_write_size = 0;
+
+    if (netsio_cmd_state) {
+        netsio_cmd_off();
+        netsio_cmd_state = 0;
+    }
+
+    /* Drain stale bytes from the ring-buffer FIFO (Windows replacement for POSIX pipe drain). */
+    netsio_flush_fifo();
+}
+UPGRADE_EOF
+        echo "✓ netsiowin.c upgraded with netsio_recover_stale_sio_transaction"
+    fi
+
+    # 0016 upgrade: INVALID_FILE_SIZE redefinition warning in guess_settings.c (Windows build)
+    if [ -f "src/libatari800/guess_settings.c" ] && \
+       grep -q '^#define INVALID_FILE_SIZE 999999' src/libatari800/guess_settings.c; then
+        echo "Upgrade: guarding INVALID_FILE_SIZE define in guess_settings.c"
+        if sed --version 2>/dev/null | grep -q GNU; then
+            sed -i 's/^#define INVALID_FILE_SIZE 999999$/#ifndef INVALID_FILE_SIZE\n#define INVALID_FILE_SIZE 999999\n#endif/' \
+                src/libatari800/guess_settings.c
+        else
+            sed -i '' 's/^#define INVALID_FILE_SIZE 999999$/#ifndef INVALID_FILE_SIZE\
+#define INVALID_FILE_SIZE 999999\
+#endif/' src/libatari800/guess_settings.c
+        fi
+        echo "✓ guess_settings.c upgraded with INVALID_FILE_SIZE guard"
+    fi
+
     echo "Patches already applied in this source tree ($PATCH_MARKER present), skipping."
     exit 0
 fi
