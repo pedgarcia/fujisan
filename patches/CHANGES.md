@@ -1,5 +1,56 @@
 # Patch System Changes
 
+## 0015-netsio-recover-stale-sio-transaction.patch (April 2026)
+
+**Problem:** After a cold boot (or similar), `TransferStatus` in `sio.c` can
+remain `SIO_StatusRead` (0x2) while the emulated hardware begins a new SIO
+command frame. NetSIO/FujiNet-PC may still be in the previous transaction’s
+CMD/ACK phase. This produced repeated `Unexpected command frame at state 2`
+logs and could end in a crash.
+
+**Fix:** Add `netsio_recover_stale_sio_transaction()` in `netsio.c`: clear
+`netsio_sync_wait`, reset `netsio_next_write_size`, send `netsio_cmd_off()` if
+`netsio_cmd_state` is still set, and non-blockingly drain the FujiNet→emulator
+RX pipe. Call it from `SIO_SwitchCommandFrame(true)` whenever the existing
+NetSIO “unexpected command frame” condition applies (same predicate as the
+log line, excluding `SIO_ReadFrame`).
+
+---
+
+## 0014-netsio-transfer-to-netsio-routing.patch (April 2026)
+
+Ports the `TransferToNetsio` per-transaction routing logic from Atari800MacX
+to fix the root cause of FujiNet loading slowness and hangs.
+
+**Problem:** Every SIO byte was unconditionally forwarded to FujiNet-PC when
+`netsio_enabled` was set, regardless of whether the target device (D1:–D8:) had
+a local disk mounted. FujiNet-PC has no handler for locally-served devices, so
+`netsio_wait_for_sync()` timed out and `NetSIO_GetByte()` blocked for up to 10
+seconds (patch 0012 timeout) on each spurious request. This directly caused
+multi-second pauses during boot and loading.
+
+**Fix:** Inspects the first byte of each SIO command frame (the device ID) to
+decide routing:
+- D1:–D8: with a local disk image mounted → handle locally (no NetSIO traffic)
+- D1:–D8: with no local disk → route to FujiNet
+- All other device IDs (N:, P:, R:, …) → route to FujiNet
+
+`netsio_cmd_on()` is deferred from `SIO_SwitchCommandFrame` to `SIO_PutByte`
+so the CMD line signal is only sent when the transaction is actually destined
+for FujiNet-PC. The CMD OFF sync wait is similarly gated on `TransferToNetsio`.
+
+**Interaction with 0007 (BINLOAD guard):** Patch 0007's
+`!BINLOAD_start_binloading` condition is preserved as the outer guard in both
+`SIO_PutByte` and `SIO_GetByte`. When BINLOAD is active, `TransferToNetsio`
+is never set, so no NetSIO traffic is generated for XEX loads.
+
+**Port rewrite not needed:** FujiNet-PC uses a plain UDP socket with `connect()`
+(no bind), so its source port is ephemeral. Responding to the recvfrom address
+as-is is correct; the MacX port-rewrite-to-9997 is only appropriate for hub
+setups where a separate process binds to port 9997.
+
+---
+
 ## 0010-netsio-windows-support.patch (NetSIO on Windows)
 
 Adds FujiNet (NetSIO) support for the atari800 Windows build by providing a Win32-native implementation in `netsiowin.c` (Winsock2, CreateThread, ring-buffer FIFO). The build uses **either** `netsio.c` (POSIX) **or** `netsiowin.c` (Windows), never both.

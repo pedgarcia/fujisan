@@ -36,7 +36,8 @@
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
-    , m_emulator(new AtariEmulator(this))
+    , m_emulator(new AtariEmulator(nullptr))
+    , m_emulatorThread(new QThread(this))
     , m_emulatorWidget(nullptr)
     , m_tcpServer(new TCPServer(m_emulator, this, this))
     , m_fujinetProcessManager(new FujiNetProcessManager(this))
@@ -90,9 +91,22 @@ MainWindow::MainWindow(QWidget *parent)
     m_pasteTimer->setInterval(75); // 75ms for character/clear cycle
     connect(m_pasteTimer, &QTimer::timeout, this, &MainWindow::sendNextCharacter);
 
-    // Load initial settings and initialize emulator with them
+    // Load initial settings and initialize emulator with them (still on main thread,
+    // before moveToThread, so libatari800 init and the frame timer start happen
+    // on the current thread and the timer is then owned by the emulator thread after
+    // the moveToThread call below).
     loadInitialSettings();
     loadVideoSettings();
+
+    // Now move the emulator to its dedicated thread.  After this point the frame
+    // timer fires on the emulator thread so netsio_recv_byte() blocking inside
+    // libatari800_next_frame() cannot freeze the Qt main / UI event loop.
+    // frameReady(QImage) is automatically delivered via QueuedConnection since
+    // sender (emulator thread) and receiver (EmulatorWidget, main thread) have
+    // different thread affinities once moveToThread completes.
+    m_emulator->moveToThread(m_emulatorThread);
+    connect(m_emulatorThread, &QThread::finished, m_emulator, &QObject::deleteLater);
+    m_emulatorThread->start();
 
     // Show initial status message
     statusBar()->showMessage("Fujisan ready", 3000);
@@ -270,7 +284,13 @@ MainWindow::~MainWindow()
     }
 
     if (m_emulator) {
-        m_emulator->shutdown();
+        if (m_emulatorThread && m_emulatorThread->isRunning()) {
+            QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
+            m_emulatorThread->quit();
+            m_emulatorThread->wait(5000);
+        } else {
+            m_emulator->shutdown();
+        }
     }
 }
 
@@ -1014,7 +1034,7 @@ void MainWindow::coldBoot()
     // The 0xFF suppression inside AtariEmulator::coldBoot() prevents the Atari800
     // core from accidentally restarting FujiNet-PC via the NetSIO cold-reset packet.
     qDebug() << "Cold boot";
-    m_emulator->coldBoot();
+    QMetaObject::invokeMethod(m_emulator, "coldBoot", Qt::QueuedConnection);
     statusBar()->showMessage("Cold boot performed", 2000);
     if (m_emulatorWidget) {
         m_emulatorWidget->setFocus();
@@ -1023,7 +1043,7 @@ void MainWindow::coldBoot()
 
 void MainWindow::warmBoot()
 {
-    m_emulator->warmBoot();
+    QMetaObject::invokeMethod(m_emulator, "warmBoot", Qt::QueuedConnection);
     statusBar()->showMessage("Warm boot performed", 2000);
     // Restore focus to emulator widget (fixes Linux focus loss)
     if (m_emulatorWidget) {
@@ -1146,7 +1166,17 @@ void MainWindow::restartEmulator()
     qDebug() << "=== RESTART EMULATOR START ===";
     qDebug() << "FujiNet-PC process running:" << (m_fujinetProcessManager && m_fujinetProcessManager->isRunning());
 
-    m_emulator->shutdown();
+    // Shut down cleanly on the emulator thread (blocks until the current frame
+    // and any netsio wait complete, then stops the frame timer and calls
+    // libatari800_exit).
+    // If the emulator thread is not yet running (e.g. this is called during
+    // startup before moveToThread completes), fall back to a direct call to
+    // avoid a BlockingQueuedConnection deadlock.
+    if (m_emulatorThread && m_emulatorThread->isRunning()) {
+        QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
+    } else {
+        m_emulator->shutdown();
+    }
 
     // Load display and artifact settings from preferences
     QSettings settings("8bitrelics", "Fujisan");
@@ -2906,7 +2936,7 @@ void MainWindow::loadInitialSettings()
         ConfigurationProfile profile = m_profileManager->loadProfile(currentProfileName);
         if (profile.isValid()) {
             qDebug() << "Applying current profile at startup:" << currentProfileName;
-            applyProfileToEmulator(profile);
+            applyProfileToEmulator(profile, false);
             m_emulator->setCurrentProfileName(currentProfileName);
         } else {
             // Profile file missing (e.g. deleted); switch to Default and apply it
@@ -2914,7 +2944,7 @@ void MainWindow::loadInitialSettings()
             m_profileManager->setCurrentProfileName("Default");
             ConfigurationProfile defaultProfile = m_profileManager->loadProfile("Default");
             if (defaultProfile.isValid()) {
-                applyProfileToEmulator(defaultProfile);
+                applyProfileToEmulator(defaultProfile, false);
                 m_emulator->setCurrentProfileName("Default");
             }
         }
@@ -3399,7 +3429,13 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 
     if (m_emulator) {
-        m_emulator->shutdown();
+        if (m_emulatorThread && m_emulatorThread->isRunning()) {
+            QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
+            m_emulatorThread->quit();
+            m_emulatorThread->wait(5000);
+        } else {
+            m_emulator->shutdown();
+        }
     }
     event->accept();
 }
@@ -3488,7 +3524,7 @@ void MainWindow::onProfileChanged(const QString& profileName)
     }
 }
 
-void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
+void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile, bool fullRestart)
 {
     if (!m_emulator) return;
 
@@ -3566,12 +3602,24 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile)
         qDebug() << "=== [TOOLBAR PROFILE] NetSIO unchanged, no FujiNet action needed";
     }
 
-    // Restart emulator to apply all configuration changes (including NetSIO)
-    // Must use restartEmulator() not coldBoot() because NetSIO requires full reinitialization
-    qDebug() << "=== [TOOLBAR PROFILE] Calling restartEmulator() to apply profile changes with NetSIO...";
-    restartEmulator();
+    const bool netSioChanged = (oldNetSIOState != newNetSIOState);
+    const bool needRestart = fullRestart || netSioChanged;
 
-    qDebug() << "Applied profile to emulator and rebooted:" << profile.name
+    // At startup, loadInitialSettings() already called initializeWithNetSIOConfig() with
+    // the same machine/media settings as this profile — restarting here would tear down
+    // libatari800 and netsio twice and make FujiNet-PC boot, stop, then boot again.
+    if (needRestart) {
+        // Must use restartEmulator() not coldBoot() because NetSIO requires full reinitialization
+        qDebug() << "=== [TOOLBAR PROFILE] Calling restartEmulator() to apply profile changes"
+                 << "(fullRestart:" << fullRestart << "netSioChanged:" << netSioChanged << ")";
+        restartEmulator();
+    } else {
+        qDebug() << "=== [TOOLBAR PROFILE] Skipping restartEmulator() — emulator already matches"
+                    " profile (startup sync only)";
+    }
+
+    qDebug() << "Applied profile to emulator:" << profile.name
+             << (needRestart ? "(rebooted)" : "(no restart)")
              << "Speed:" << speedPercentage << "% (Turbo:" << profile.turboMode << ")";
 }
 
@@ -3650,7 +3698,7 @@ void MainWindow::onDiskDroppedOnEmulator(const QString& filename)
         statusBar()->showMessage(QString("Disk mounted to D1: %1 - Rebooting...").arg(fileInfo.fileName()), 3000);
 
         // Perform cold restart to boot from the new disk
-        m_emulator->coldRestart();
+        QMetaObject::invokeMethod(m_emulator, "coldRestart", Qt::QueuedConnection);
         qDebug() << "Cold restart triggered after mounting disk to D1";
 
     } else {
@@ -3904,13 +3952,13 @@ void MainWindow::applyProfileViaTCP(const ConfigurationProfile& profile)
 void MainWindow::togglePause()
 {
     if (m_emulator->isEmulationPaused()) {
-        m_emulator->resumeEmulation();
+        QMetaObject::invokeMethod(m_emulator, "resumeEmulation", Qt::QueuedConnection);
         m_pauseButton->setText("PAUSE");
         m_pauseAction->setText("&Pause");
         m_pauseAction->setChecked(false);
         statusBar()->showMessage("Emulation resumed", 2000);
     } else {
-        m_emulator->pauseEmulation();
+        QMetaObject::invokeMethod(m_emulator, "pauseEmulation", Qt::QueuedConnection);
         m_pauseButton->setText("RESUME");
         m_pauseAction->setText("&Resume");
         m_pauseAction->setChecked(true);
@@ -4127,7 +4175,7 @@ void MainWindow::onFujiNetProcessStateChanged(int state)
                     // status bar and drive polling reconnect once FujiNet-PC is ready.
                     m_fujinetIntentionalRestart = true;  // suppress disconnect dialog / local-mode switch
                     if (m_emulator) {
-                        m_emulator->resetNetSIOClientState();
+                        QMetaObject::invokeMethod(m_emulator, "resetNetSIOClientState", Qt::QueuedConnection);
                     }
                     startFujiNetWithSavedSettings();
                     statusBar()->showMessage("Restarting FujiNet-PC after cold reset...", 2000);
@@ -4309,7 +4357,7 @@ void MainWindow::resetFujiNet()
     // and SIO never recovers — most visible on Linux where forceKill() is a SIGKILL
     // that gives FujiNet-PC no chance to send NETSIO_DEVICE_DISCONNECTED.
     if (m_emulator) {
-        m_emulator->resetNetSIOClientState();
+        QMetaObject::invokeMethod(m_emulator, "resetNetSIOClientState", Qt::QueuedConnection);
     }
 
     // Delay the restart slightly: on Windows, forceKill() no longer calls waitForFinished()
@@ -4380,6 +4428,48 @@ void MainWindow::onFujiNetConnected()
     qDebug() << "[onFujiNetConnected] calling updateFujiNetStatus";
     // Update status bar to reflect FujiNet connection state
     updateFujiNetStatus();
+
+    // FujiNet-PC is confirmed up (HTTP health check passed).  If the UDP
+    // NETSIO_DEVICE_CONNECTED handshake was missed (e.g. FujiNet-PC was already
+    // running before Fujisan opened its socket), force-enable netsio now so
+    // that any subsequent cold boot or SIO traffic can reach FujiNet-PC.
+    if (m_emulator && m_netSIOEnabled) {
+        auto shouldAutoColdBoot = [this]() -> bool {
+            if (!m_emulator) {
+                return false;
+            }
+
+            if (QThread::currentThread() == m_emulator->thread()) {
+                return m_emulator->shouldAutoColdBootForFujiNet();
+            }
+
+            bool pendingBoot = false;
+            QMetaObject::invokeMethod(m_emulator, "shouldAutoColdBootForFujiNet",
+                                      Qt::BlockingQueuedConnection,
+                                      Q_RETURN_ARG(bool, pendingBoot));
+            return pendingBoot;
+        };
+
+        const bool pendingFujiNetBoot = shouldAutoColdBoot();
+        QMetaObject::invokeMethod(m_emulator, "ensureNetsioEnabled", Qt::QueuedConnection);
+
+        // If the Atari booted before FujiNet-PC was ready (netsio_enabled was 0
+        // at initializeWithNetSIOConfig time), auto-cold-boot now so the Atari
+        // can actually load from FujiNet.  Skip the recovery boot if NetSIO is
+        // already active by the time HTTP becomes ready, which means the first
+        // boot is already talking to FujiNet.  Give FujiNet-PC 800 ms to finish
+        // its NETSIO setup after the HTTP health check passes.
+        if (pendingFujiNetBoot) {
+            qDebug() << "[NETSIO] Scheduling auto cold boot — Atari booted before FujiNet was ready";
+            QTimer::singleShot(800, this, [this, shouldAutoColdBoot]() {
+                if (m_emulator && shouldAutoColdBoot()) {
+                    qDebug() << "[NETSIO] Auto cold boot: FujiNet now ready";
+                    QMetaObject::invokeMethod(m_emulator, "coldBoot", Qt::QueuedConnection);
+                }
+            });
+        }
+    }
+
     qDebug() << "[onFujiNetConnected] done";
 }
 

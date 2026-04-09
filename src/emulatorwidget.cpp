@@ -26,7 +26,6 @@ EmulatorWidget::EmulatorWidget(QWidget *parent)
     : QWidget(parent)
     , m_emulator(nullptr)
     , m_screenImage(DISPLAY_WIDTH, DISPLAY_HEIGHT, QImage::Format_RGB32)
-    , m_needsUpdate(true)
     , m_integerScaling(false)
     , m_scalingFilter(true)
     , m_fitScreen("both")
@@ -81,11 +80,6 @@ void EmulatorWidget::paintEvent(QPaintEvent *event)
     
     QPainter painter(this);
     
-    if (m_needsUpdate) {
-        updateScreenTexture();
-        m_needsUpdate = false;
-    }
-    
     // Fill widget background with black (overscan area)
     painter.fillRect(rect(), Qt::black);
 
@@ -99,52 +93,10 @@ void EmulatorWidget::paintEvent(QPaintEvent *event)
     painter.drawImage(targetRect, m_screenImage);
 }
 
-void EmulatorWidget::updateDisplay()
+void EmulatorWidget::updateDisplay(const QImage& image)
 {
-    m_needsUpdate = true;
-    update(); // Trigger a repaint
-}
-
-void EmulatorWidget::updateScreenTexture()
-{
-    if (!m_emulator) {
-        return;
-    }
-    
-    const unsigned char* screen = m_emulator->getScreen();
-    if (!screen) {
-        return;
-    }
-    
-    // Convert Atari screen buffer to QImage
-    for (int y = 0; y < DISPLAY_HEIGHT; y++) {
-        QRgb* scanLine = reinterpret_cast<QRgb*>(m_screenImage.scanLine(y));
-        
-        for (int x = 0; x < DISPLAY_WIDTH; x++) {
-            // Direct pixel mapping from display area
-            int srcX = BORDER_LEFT + x;
-            int srcY = BORDER_TOP + y;
-            
-            // Bounds check
-            if (srcX >= SCREEN_WIDTH || srcY >= SCREEN_HEIGHT) {
-                continue;
-            }
-            
-            // Get the color index from the screen buffer
-            unsigned char colorIndex = screen[srcY * SCREEN_WIDTH + srcX];
-            
-            // Use the actual Atari color table from the emulator
-            // Colours_table[colorIndex] contains RGB in format 0x00RRGGBB
-            int rgbValue = Colours_table[colorIndex];
-            
-            // Extract RGB components
-            unsigned char r = (rgbValue >> 16) & 0xFF;
-            unsigned char g = (rgbValue >> 8) & 0xFF;
-            unsigned char b = rgbValue & 0xFF;
-            
-            scanLine[x] = qRgb(r, g, b);
-        }
-    }
+    m_screenImage = image;
+    update();
 }
 
 bool EmulatorWidget::event(QEvent *event)

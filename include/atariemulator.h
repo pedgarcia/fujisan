@@ -24,6 +24,7 @@
 #include <QSet>
 #include <QJsonObject>
 #include <QMutex>
+#include <QImage>
 
 #ifdef HAVE_SDL2_AUDIO
 // Forward declaration to avoid including SDL headers here
@@ -171,7 +172,7 @@ public:
     // Note: Display parameters are saved to profiles but not applied due to libatari800 limitations
     // FUTURE: Scanlines support (commented out - not working with current atari800 build)
     // bool initializeWithConfig(bool basicEnabled, const QString& machineType, const QString& videoSystem, const QString& artifactMode, int scanlinesPercentage, bool scanlinesInterpolation);
-    void shutdown();
+    Q_INVOKABLE void shutdown();
     
     const unsigned char* getScreen();
     bool loadFile(const QString& filename);
@@ -181,7 +182,7 @@ public:
     bool mountDiskImage(int driveNumber, const QString& filename, bool readOnly = false);
     void dismountDiskImage(int driveNumber);
     void disableDrive(int driveNumber);
-    void coldRestart();
+    Q_INVOKABLE void coldRestart();
     QString getDiskImagePath(int driveNumber) const;
     
     // Printer functions
@@ -216,9 +217,12 @@ public:
     void handleKeyRelease(QKeyEvent* event);
     bool handleJoystickKeyboardEmulation(QKeyEvent* event);
     
-    void coldBoot();
-    void warmBoot();
-    void resetNetSIOClientState();
+    Q_INVOKABLE void coldBoot();
+    Q_INVOKABLE void warmBoot();
+    Q_INVOKABLE void resetNetSIOClientState();
+    Q_INVOKABLE void ensureNetsioEnabled();
+    Q_INVOKABLE bool shouldAutoColdBootForFujiNet();
+    bool isPendingFujiNetBoot() const { return m_pendingFujiNetBoot; }
     bool updateHardDrivePath(int driveNumber, const QString& path);
     
     bool isBasicEnabled() const { return m_basicEnabled; }
@@ -284,10 +288,10 @@ public:
     QJsonObject getAllJoystickStates() const;
     
     // State save/load methods
-    bool saveState(const QString& filename);
-    bool loadState(const QString& filename);
-    bool quickSaveState();
-    bool quickLoadState();
+    Q_INVOKABLE bool saveState(const QString& filename);
+    Q_INVOKABLE bool loadState(const QString& filename);
+    Q_INVOKABLE bool quickSaveState();
+    Q_INVOKABLE bool quickLoadState();
     QString getQuickSaveStatePath() const;
     void setCurrentProfileName(const QString& profileName) { m_currentProfileName = profileName; }
     QString getCurrentProfileName() const { return m_currentProfileName; }
@@ -322,8 +326,8 @@ public:
     bool isConfigDriveSlotsScreen() const;  // Check if FujiNet CONFIG drive slots screen is displayed
 
     // Debug/execution control
-    void pauseEmulation();
-    void resumeEmulation();
+    Q_INVOKABLE void pauseEmulation();
+    Q_INVOKABLE void resumeEmulation();
     bool isEmulationPaused() const;
     void stepOneFrame();
     void stepOneInstruction();
@@ -348,7 +352,7 @@ signals:
     void diskActivity(int driveNumber, bool isWriting);  // Legacy blinking
     void diskIOStart(int driveNumber, bool isWriting);   // Turn LED ON
     void diskIOEnd(int driveNumber);                     // Turn LED OFF
-    void frameReady();
+    void frameReady(const QImage& image);
     void xexLoadedForDebug(unsigned short entryPoint);
     
     // Core debugging signals
@@ -367,6 +371,19 @@ private:
     void triggerDiskActivity();
     QString quotePath(const QString& path);  // Helper to quote paths with spaces
     bool m_enableAudioDiagnostics = false;   // Enable CSV logging for audio diagnostics
+
+    // Frame rendering: converts libatari800 screen buffer to a QImage on the emulator thread.
+    // Called at the end of processFrame() before emitting frameReady().
+    QImage renderFrameImage();
+
+    // Protects m_currentInput against concurrent access between the main thread
+    // (keyboard/joystick events) and the emulator thread (processFrame snapshot).
+    QMutex m_inputMutex;
+
+    // Reusable frame image buffer; its shared data is detached (copy-on-write) each
+    // time the emulator thread writes a new frame while the previous one is still
+    // referenced by the main-thread signal queue.
+    QImage m_frameImage;
 
     // High-resolution frame timing using absolute time scheduling.
     // Each frame is scheduled at firstFrameTime + frameCount * frameTimeMs,
@@ -488,6 +505,11 @@ private:
 
     // NetSIO/FujiNet state tracking
     bool m_netSIOEnabled;
+    // Set when the emulator booted with netSIOEnabled=true but FujiNet-PC was not
+    // yet connected (netsio_enabled=0).  Cleared by coldBoot().  Checked by
+    // MainWindow::onFujiNetConnected() to trigger an automatic cold boot once
+    // FujiNet-PC is confirmed ready, so the Atari can actually load from it.
+    bool m_pendingFujiNetBoot = false;
 
     // Current profile name for state saves
     QString m_currentProfileName;

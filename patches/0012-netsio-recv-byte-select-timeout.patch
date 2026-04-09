@@ -5,7 +5,7 @@ Subject: [PATCH] netsio: replace blocking recv with select-based timeout
 
 Replace the indefinite blocking read() in netsio_recv_byte() with a
 select()-based loop that times out after NETSIO_RECV_BYTE_TIMEOUT_SEC
-(default 10 s).  The old code would hang the emulator thread forever if
+(default 3 s).  The old code would hang the emulator thread forever if
 FujiNet-PC stalled or crashed mid-transfer, freezing the GUI.
 
 Also guard netsio_recv_byte() against an uninitialised pipe fd.
@@ -32,7 +32,7 @@ index 72e912e2..e07cbe3f 100644
 +/* Max time to wait for a byte from the RX thread (FujiNet -> emulator pipe).
 + * Prevents indefinite GUI freezes when FujiNet-PC is slow or wedged. */
 +#ifndef NETSIO_RECV_BYTE_TIMEOUT_SEC
-+#define NETSIO_RECV_BYTE_TIMEOUT_SEC 10
++#define NETSIO_RECV_BYTE_TIMEOUT_SEC 3
 +#endif
 +
  /* FIFO pipe: fds0: FujiNet->emulator */

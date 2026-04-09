@@ -25,6 +25,7 @@
 #include <QFile>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QThread>
 #include <QByteArray>
 #include <cstring>  // for memset
 #include <vector>   // for std::vector
@@ -881,6 +882,15 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
         qDebug() << "[NETSIO] netsio_enabled before test:" << netsio_enabled;
         netsio_test_cmd();
         qDebug() << "[NETSIO] netsio_enabled after test:" << netsio_enabled;
+        if (!netsio_enabled) {
+            // FujiNet-PC was not ready at boot time.  MainWindow::onFujiNetConnected()
+            // will detect this flag and trigger an automatic cold boot once the HTTP
+            // health check confirms FujiNet-PC is up.
+            m_pendingFujiNetBoot = true;
+            qDebug() << "[NETSIO] FujiNet not ready at init - pending cold boot set";
+        } else {
+            m_pendingFujiNetBoot = false;
+        }
 #else
         qDebug() << "[NETSIO] WARNING: Not compiled - test command not available";
 #endif
@@ -925,9 +935,11 @@ void AtariEmulator::processFrame()
     // NetSIO reset notifications (0xFF/0xFE packets) provide instant state sync
     // with FujiNet-PC, eliminating the need for polling and delays.
 
-    // Process device-specific joystick input
+    // Process device-specific joystick input and update m_currentInput under the
+    // input mutex so the snapshot taken below is always consistent.
 #ifdef HAVE_SDL2_JOYSTICK
     if (m_joystickManager) {
+        QMutexLocker inputLock(&m_inputMutex);
         // Process Joystick 1 based on assigned device
         if (m_joystick1AssignedDevice.startsWith("sdl_")) {
             // Extract SDL joystick index from device string (e.g., "sdl_0" -> 0)
@@ -972,23 +984,33 @@ void AtariEmulator::processFrame()
     }
 #endif
 
+    // Take a thread-safe snapshot of the current input state.  The snapshot
+    // is copied here under the input mutex so that handleKeyPress/handleKeyRelease
+    // running on the main thread cannot corrupt the struct while libatari800
+    // is blocked inside netsio_recv_byte() (up to NETSIO_RECV_BYTE_TIMEOUT_SEC).
+    input_template_t inputSnapshot;
+    {
+        QMutexLocker inputLock(&m_inputMutex);
+        inputSnapshot = m_currentInput;
+    }
+
     // Send joystick values to libatari800
 
     // Debug what we're sending to the emulator
-    if (m_currentInput.keychar != 0) {
-        // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)m_currentInput.keychar << "'" << QChar(m_currentInput.keychar) << "' ***";
+    if (inputSnapshot.keychar != 0) {
+        // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)inputSnapshot.keychar << "'" << QChar(inputSnapshot.keychar) << "' ***";
     }
     // Always debug L key specifically since AKEY_l = 0
-    bool hasInput = m_currentInput.keychar != 0 || m_currentInput.keycode != 0 || m_currentInput.special != 0 ||
-                   m_currentInput.start != 0 || m_currentInput.select != 0 || m_currentInput.option != 0;
+    bool hasInput = inputSnapshot.keychar != 0 || inputSnapshot.keycode != 0 || inputSnapshot.special != 0 ||
+                   inputSnapshot.start != 0 || inputSnapshot.select != 0 || inputSnapshot.option != 0;
     
     if (hasInput) {
-        // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)m_currentInput.keychar 
-        //          << " keycode=" << (int)m_currentInput.keycode 
-        //          << " special=" << (int)m_currentInput.special 
-        //          << " start=" << (int)m_currentInput.start
-        //          << " select=" << (int)m_currentInput.select
-        //          << " option=" << (int)m_currentInput.option << " ***";
+        // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)inputSnapshot.keychar
+        //          << " keycode=" << (int)inputSnapshot.keycode
+        //          << " special=" << (int)inputSnapshot.special
+        //          << " start=" << (int)inputSnapshot.start
+        //          << " select=" << (int)inputSnapshot.select
+        //          << " option=" << (int)inputSnapshot.option << " ***";
     }
     
     // Determine if we should use partial frame execution for precise breakpoints
@@ -1000,8 +1022,9 @@ void AtariEmulator::processFrame()
     if (false && m_usePartialFrameExecution) {
         // Partial frame execution disabled - requires patches
     } else {
-        // Normal full-frame execution
-        libatari800_next_frame(&m_currentInput);
+        // Normal full-frame execution; no lock held here — this call can block
+        // for up to NETSIO_RECV_BYTE_TIMEOUT_SEC (3 s) when FujiNet is slow.
+        libatari800_next_frame(&inputSnapshot);
 
         // Check breakpoints once after the frame (legacy behavior)
         if (m_breakpointsEnabled && !m_breakpoints.isEmpty()) {
@@ -1308,12 +1331,42 @@ void AtariEmulator::processFrame()
     // Check breakpoints after frame execution
     checkBreakpoints();
 
-    emit frameReady();
+    emit frameReady(renderFrameImage());
 
     // Schedule the next frame if emulation is running
     if (!m_emulationPaused) {
         requestNextFrame();
     }
+}
+
+QImage AtariEmulator::renderFrameImage()
+{
+    // Screen dimensions match libatari800's Screen_WIDTH / Screen_HEIGHT (384 x 240).
+    static const int W = 384;
+    static const int H = 240;
+
+    if (m_frameImage.isNull()) {
+        m_frameImage = QImage(W, H, QImage::Format_RGB32);
+    }
+
+    const unsigned char* screen = libatari800_get_screen_ptr();
+    if (!screen) {
+        return m_frameImage;
+    }
+
+    for (int y = 0; y < H; y++) {
+        QRgb* scanLine = reinterpret_cast<QRgb*>(m_frameImage.scanLine(y));
+        for (int x = 0; x < W; x++) {
+            unsigned char colorIndex = screen[y * W + x];
+            int rgb = Colours_table[colorIndex];
+            scanLine[x] = qRgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+        }
+    }
+
+    // Return by value. Qt's copy-on-write ensures the data is detached when
+    // this function is called again for the next frame while the previous
+    // image is still referenced by the queued signal on the main thread.
+    return m_frameImage;
 }
 
 void AtariEmulator::requestNextFrame()
@@ -1533,6 +1586,7 @@ QString AtariEmulator::getDiskImagePath(int driveNumber) const
 
 void AtariEmulator::handleKeyPress(QKeyEvent* event)
 {
+    QMutexLocker inputLock(&m_inputMutex);
     // Check for joystick keyboard emulation first
     if (handleJoystickKeyboardEmulation(event)) {
         return; // Key was handled by joystick emulation, don't process as regular key
@@ -1792,6 +1846,7 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
 
 void AtariEmulator::handleKeyRelease(QKeyEvent* event)
 {
+    QMutexLocker inputLock(&m_inputMutex);
     // Check for joystick keyboard emulation first  
     if (handleJoystickKeyboardEmulation(event)) {
         return; // Key was handled by joystick emulation, don't clear all input
@@ -1816,6 +1871,11 @@ void AtariEmulator::coldBoot()
     qDebug() << "[NETSIO] COLD BOOT START — m_netSIOEnabled:" << m_netSIOEnabled;
 #ifdef NETSIO
     qDebug() << "[NETSIO] netsio_enabled:" << netsio_enabled;
+    // If FujiNet mode is active but the DEVICE_CONNECTED handshake was missed
+    // (e.g. FujiNet-PC was already running when Fujisan started), force-enable
+    // netsio so the cold boot suppresses the 0xFF packet and the Atari can boot
+    // from FujiNet after the local disks are dismounted below.
+    ensureNetsioEnabled();
 #endif
 
     // Reset the Atari.  When NetSIO is active we suppress the 0xFF cold-reset packet
@@ -1852,6 +1912,10 @@ void AtariEmulator::coldBoot()
     }
 
     qDebug() << "=== COLD BOOT COMPLETE ===";
+#ifdef NETSIO
+    // Clear the pending-boot flag regardless of how we got here.
+    m_pendingFujiNetBoot = false;
+#endif
 }
 
 void AtariEmulator::warmBoot()
@@ -1913,6 +1977,32 @@ void AtariEmulator::resetNetSIOClientState()
 #endif
     qDebug() << "[NETSIO] Client state reset: netsio_enabled=0, fujinet_known=0, sync_wait=0, fifo flushed";
 #endif
+}
+
+void AtariEmulator::ensureNetsioEnabled()
+{
+#ifdef NETSIO
+    if (m_netSIOEnabled && !netsio_enabled) {
+        qDebug() << "[NETSIO] ensureNetsioEnabled: forcing netsio_enabled=1"
+                 << "(FujiNet mode active but DEVICE_CONNECTED handshake was missed)";
+        netsio_enabled = 1;
+    }
+#endif
+}
+
+bool AtariEmulator::shouldAutoColdBootForFujiNet()
+{
+#ifdef NETSIO
+    extern int fujinet_known;
+
+    const bool netsioActive = m_netSIOEnabled && netsio_enabled && fujinet_known;
+    if (m_pendingFujiNetBoot && netsioActive) {
+        qDebug() << "[NETSIO] Clearing pending auto cold boot - NetSIO is already active";
+        m_pendingFujiNetBoot = false;
+    }
+#endif
+
+    return m_pendingFujiNetBoot;
 }
 
 bool AtariEmulator::updateHardDrivePath(int driveNumber, const QString& path)
@@ -2728,6 +2818,7 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
 
 void AtariEmulator::injectCharacter(char ch)
 {
+    QMutexLocker inputLock(&m_inputMutex);
     // Clear previous input
     libatari800_clear_input_array(&m_currentInput);
     // Restore joystick center positions after clearing (using libatari800-compatible center)
@@ -2921,20 +3012,25 @@ void AtariEmulator::injectCharacter(char ch)
 
 void AtariEmulator::injectAKey(int akeyCode)
 {
-    // Clear previous input
-    libatari800_clear_input_array(&m_currentInput);
-    // Restore joystick center positions after clearing (using libatari800-compatible center)
-    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+    {
+        QMutexLocker inputLock(&m_inputMutex);
+        // Clear previous input
+        libatari800_clear_input_array(&m_currentInput);
+        // Restore joystick center positions after clearing (using libatari800-compatible center)
+        m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+        m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
+        m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
+        m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+        
+        // Directly set the raw AKEY code
+        m_currentInput.keycode = akeyCode;
+    }
     
-    // Directly set the raw AKEY code
-    m_currentInput.keycode = akeyCode;
-    
-    
-    // Schedule key release after a short delay (one frame)
+    // Schedule key release after a short delay (one frame).
+    // The lambda fires on the emulator thread's event loop (between frames),
+    // so it also needs the mutex to guard against concurrent main-thread writes.
     QTimer::singleShot(50, this, [this]() {
+        QMutexLocker inputLock(&m_inputMutex);
         libatari800_clear_input_array(&m_currentInput);
         // Restore joystick center positions after clearing
         m_currentInput.joy0 = 0x0f ^ 0xff;
@@ -2946,6 +3042,7 @@ void AtariEmulator::injectAKey(int akeyCode)
 
 void AtariEmulator::clearInput()
 {
+    QMutexLocker inputLock(&m_inputMutex);
     libatari800_clear_input_array(&m_currentInput);
     // Restore joystick center positions after clearing (using libatari800-compatible center)
     m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
@@ -3009,6 +3106,12 @@ bool AtariEmulator::isConfigDriveSlotsScreen() const
 
 void AtariEmulator::pauseEmulation()
 {
+    // Guard against cross-thread calls: m_frameTimer must be stopped from its
+    // own thread.  If we're on the wrong thread, re-invoke via the event loop.
+    if (QThread::currentThread() != this->thread()) {
+        QMetaObject::invokeMethod(this, "pauseEmulation", Qt::QueuedConnection);
+        return;
+    }
     if (!m_emulationPaused) {
         m_frameTimer->stop();
         m_emulationPaused = true;
@@ -3018,6 +3121,12 @@ void AtariEmulator::pauseEmulation()
 
 void AtariEmulator::resumeEmulation()
 {
+    // Guard against cross-thread calls: m_frameTimer must be started from its
+    // own thread.  If we're on the wrong thread, re-invoke via the event loop.
+    if (QThread::currentThread() != this->thread()) {
+        QMetaObject::invokeMethod(this, "resumeEmulation", Qt::QueuedConnection);
+        return;
+    }
     if (m_emulationPaused) {
         // Reset absolute-time scheduler and PI state when resuming
         m_firstFrameTime = std::chrono::steady_clock::now();

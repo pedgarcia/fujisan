@@ -22,6 +22,7 @@
 #include <QSettings>
 #include <QDockWidget>
 #include <QTimer>
+#include <QThread>
 #include <QClipboard>
 #include <QDialog>
 #include <QPixmap>
@@ -164,7 +165,11 @@ private:
     void exitCustomFullscreen();
     void sendTextToEmulator(const QString& text);
     void refreshProfileList();
-    void applyProfileToEmulator(const ConfigurationProfile& profile);
+    /// Apply profile settings to QSettings and the emulator. When \a fullRestart is false,
+    /// skips restartEmulator() — used at startup after initializeWithNetSIOConfig() already
+    /// matched this profile, to avoid tearing down libatari800 twice (double FujiNet boot).
+    /// NetSIO toggles still force a full restart when old/new differ.
+    void applyProfileToEmulator(const ConfigurationProfile& profile, bool fullRestart = true);
 
     // Status bar update methods
     void updateSpeedStatus();
@@ -179,6 +184,7 @@ private:
     QString getFujiNetSDPath() const;  // Get SD path with default computation
 
     AtariEmulator* m_emulator;
+    QThread* m_emulatorThread;
     EmulatorWidget* m_emulatorWidget;
     QToolBar* m_toolBar;
     

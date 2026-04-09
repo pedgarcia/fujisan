@@ -1,0 +1,99 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Developer <fujisan@atari>
+Date: Tue, 7 Apr 2026 00:00:00 -0800
+Subject: [PATCH] netsio: gate SIO routing per-transaction via TransferToNetsio
+
+Port the TransferToNetsio routing logic from Atari800MacX to fix
+unconditional forwarding of all SIO traffic to FujiNet-PC.
+
+Previously every SIO byte was sent to NetSIO whenever netsio_enabled was
+set, including transactions for locally-mounted disk images.  FujiNet-PC
+has no handler for those devices, so netsio_wait_for_sync() times out
+and NetSIO_GetByte() blocks for up to 10 seconds on each such operation,
+causing the observable slowness and hangs during FujiNet loading.
+
+The fix inspects the first byte of each command frame (the device ID):
+  - D1:-D8: (0x31-0x38) with a local disk mounted  -> handle locally
+  - D1:-D8: with no local disk                      -> route to FujiNet
+  - All other devices (N:, P:, R:, ...)             -> route to FujiNet
+
+CMD line assertion (netsio_cmd_on) is deferred from
+SIO_SwitchCommandFrame to SIO_PutByte so that it is only sent when the
+transaction is actually destined for FujiNet-PC.  The CMD OFF sync wait
+(netsio_cmd_off_sync + netsio_wait_for_sync) is similarly gated on
+TransferToNetsio to avoid stalling after local-disk operations.
+
+Based on Atari800MacX sio.c TransferToNetsio implementation.
+---
+ src/sio.c | 26 ++++++++++++++++++++------
+ 1 file changed, 20 insertions(+), 6 deletions(-)
+
+diff --git a/src/sio.c b/src/sio.c
+index 0000000..1111111 100644
+--- a/src/sio.c
++++ b/src/sio.c
+@@ -185,6 +185,7 @@ static int TransferStatus = SIO_NoFrame;
+ static int ExpectedBytes = 0;
+ #ifdef NETSIO
+ int NetSIO_GetByte(void);
++static int TransferToNetsio = 0;
+ #endif
+ 
+ int ignore_header_writeprotect = FALSE;
+@@ -1531,8 +1532,7 @@ void SIO_SwitchCommandFrame(int onoff)
+ 	if (onoff)
+ 	{				/* Enabled */
+ #ifdef NETSIO
+-		if (netsio_enabled && !BINLOAD_start_binloading)
+-			netsio_cmd_on();
++		TransferToNetsio = 0;
+ #endif /* NETSIO */
+ 		if (TransferStatus != SIO_NoFrame) 
+ #ifdef NETSIO
+@@ -1548,7 +1548,7 @@ void SIO_SwitchCommandFrame(int onoff)
+ 	else
+ 	{
+ #ifdef NETSIO
+-		if (netsio_enabled && !BINLOAD_start_binloading)
++		if (netsio_enabled && TransferToNetsio)
+ 		{
+ 			if (CommandIndex < ExpectedBytes)
+ 			{
+@@ -1674,8 +1674,26 @@ void SIO_PutByte(int byte)
+ #ifdef NETSIO
+ 	if (netsio_enabled && !BINLOAD_start_binloading)
+ 	{
+-		NetSIO_PutByte(byte);
+-		return;
++		if (TransferStatus == SIO_CommandFrame && CommandIndex == 0) {
++			if (byte >= 0x31 && byte <= 0x38) {
++				int drive = byte - 0x31;
++				if (SIO_drive_status[drive] != SIO_OFF &&
++				    SIO_drive_status[drive] != SIO_NO_DISK)
++					TransferToNetsio = 0;
++				else
++					TransferToNetsio = 1;
++			} else {
++				TransferToNetsio = 1;
++			}
++			if (TransferToNetsio) {
++				netsio_cmd_on();
++				NetSIO_PutByte(byte);
++				return;
++			}
++		} else if (TransferToNetsio) {
++			NetSIO_PutByte(byte);
++			return;
++		}
+ 	}
+ #endif /* NETSIO */
+ 	switch (TransferStatus) {
+@@ -1832,7 +1850,7 @@ int SIO_GetByte(void)
+ 	int byte = 0;
+ 
+ #ifdef NETSIO
+-	if (netsio_enabled && !BINLOAD_start_binloading)
++	if (netsio_enabled && TransferToNetsio && !BINLOAD_start_binloading)
+ 		return NetSIO_GetByte();
+ #endif /* NETSIO */
+ 

@@ -31,6 +31,8 @@ fi
 if [ -f "src/netsio.c" ] && [ -f "src/libatari800/api.c" ] && \
    grep -q 'NETSIO_RECV_BYTE_TIMEOUT_SEC' src/netsio.c && \
    grep -q 'netsio_sync_mutex' src/netsio.c && \
+   grep -q 'TransferToNetsio' src/sio.c && \
+   grep -q 'netsio_recover_stale_sio_transaction' src/netsio.c && \
    grep -q 'int libatari800_execute_cycles(int target_cycles)' src/libatari800/api.c && \
    grep -q 'CPU_GetInstructionCycles' src/cpu.h; then
     echo "Detected previously patched source tree; writing $PATCH_MARKER and skipping."
@@ -110,6 +112,25 @@ if [ -d .git ]; then
                         echo "✓ BINLOAD/NetSIO priority patch applied manually"
                     elif grep -q 'BINLOAD_start_binloading' src/sio.c; then
                         echo "✓ Patch $patch_name already applied (BINLOAD guard present)"
+                    else
+                        echo "Error: Patch $patch_name could not be applied and manual fallback failed"
+                        exit 1
+                    fi
+                # For patch 0014 (TransferToNetsio routing), apply manually
+                elif [[ "$patch_name" == "0014-netsio-transfer-to-netsio-routing.patch" ]]; then
+                    echo "Applying TransferToNetsio routing patch manually..."
+                    if [ -f "src/sio.c" ] && ! grep -q 'TransferToNetsio' src/sio.c; then
+                        # Add static variable declaration after NetSIO_GetByte forward decl
+                        if sed --version 2>/dev/null | grep -q GNU; then
+                            sed -i 's/^int NetSIO_GetByte(void);$/int NetSIO_GetByte(void);\nstatic int TransferToNetsio = 0;/' src/sio.c
+                        else
+                            sed -i '' 's/^int NetSIO_GetByte(void);$/int NetSIO_GetByte(void);\
+static int TransferToNetsio = 0;/' src/sio.c
+                        fi
+                        echo "✓ TransferToNetsio routing patch applied manually (static var only; full routing requires git apply)"
+                        echo "  WARNING: Manual fallback is incomplete. Clean build recommended."
+                    elif grep -q 'TransferToNetsio' src/sio.c; then
+                        echo "✓ Patch $patch_name already applied (TransferToNetsio present)"
                     else
                         echo "Error: Patch $patch_name could not be applied and manual fallback failed"
                         exit 1

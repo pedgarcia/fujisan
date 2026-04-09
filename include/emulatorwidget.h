@@ -47,17 +47,15 @@ protected:
     void dropEvent(QDropEvent* event) override;
 
 private slots:
-    void updateDisplay();
+    void updateDisplay(const QImage& image);
 
 private:
-    void updateScreenTexture();
     QRect calculateDisplayRect() const;
     bool isValidExecutableFile(const QString& fileName) const;
     bool isValidDiskFile(const QString& fileName) const;
 
     AtariEmulator* m_emulator;
     QImage m_screenImage;
-    bool m_needsUpdate;
 
     // Video scaling settings
     bool m_integerScaling;

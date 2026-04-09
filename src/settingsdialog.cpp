@@ -2044,8 +2044,8 @@ void SettingsDialog::createFujiNetTab()
     connect(m_loadConfigOnBoot, &QCheckBox::toggled, this, &SettingsDialog::checkFujiNetRestartRequired);
 
     // Connect service signals
-    connect(m_fujinetService, &FujiNetService::connected, [this]() { onFujiNetConnectionChanged(true); });
-    connect(m_fujinetService, &FujiNetService::disconnected, [this]() { onFujiNetConnectionChanged(false); });
+    connect(m_fujinetService, &FujiNetService::connected, this, [this]() { onFujiNetConnectionChanged(true); });
+    connect(m_fujinetService, &FujiNetService::disconnected, this, [this]() { onFujiNetConnectionChanged(false); });
 
     // NOTE: Process manager signal connection is done in setFujiNetManagers()
     // since the manager is shared with MainWindow and may not be set yet
