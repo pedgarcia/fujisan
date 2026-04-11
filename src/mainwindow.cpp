@@ -12,10 +12,15 @@
 #include "mainwindow.h"
 #include "version.h"  // For FUJISAN_FULL_VERSION_STRING
 #include <QApplication>
+#include <QAbstractScrollArea>
+#include <QComboBox>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QResizeEvent>
 #include <QKeyEvent>
+#include <QPlainTextEdit>
+#include <QTextEdit>
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <QDebug>
@@ -259,11 +264,17 @@ MainWindow::MainWindow(QWidget *parent)
         updateFujiNetStatus();
     });
 
+    installChromeFocusRestore();
+
     qDebug() << "Fujisan initialized successfully";
 }
 
 MainWindow::~MainWindow()
 {
+    if (qApp) {
+        qApp->removeEventFilter(this);
+    }
+
     // Stop FujiNet-PC process if we started it
     if (m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
         qDebug() << "Stopping FujiNet-PC process...";
@@ -292,6 +303,84 @@ MainWindow::~MainWindow()
             m_emulator->shutdown();
         }
     }
+}
+
+void MainWindow::restoreEmulatorFocus()
+{
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setFocus();
+    }
+}
+
+void MainWindow::installChromeFocusRestore()
+{
+    qApp->installEventFilter(this);
+
+    if (m_machineCombo) {
+        connect(m_machineCombo, QOverload<int>::of(&QComboBox::activated),
+                this, [this](int) { restoreEmulatorFocus(); });
+    }
+    if (m_profileCombo) {
+        connect(m_profileCombo, QOverload<int>::of(&QComboBox::activated),
+                this, [this](int) { restoreEmulatorFocus(); });
+    }
+    if (m_mediaPeripheralsDock) {
+        const QList<QComboBox*> combos = m_mediaPeripheralsDock->findChildren<QComboBox*>();
+        for (QComboBox *cb : combos) {
+            connect(cb, QOverload<int>::of(&QComboBox::activated),
+                    this, [this](int) { restoreEmulatorFocus(); });
+        }
+    }
+}
+
+bool MainWindow::widgetIsUnderChrome(const QWidget *w) const
+{
+    if (!w) {
+        return false;
+    }
+    if (m_toolBar && m_toolBar->isAncestorOf(w)) {
+        return true;
+    }
+    if (m_mediaPeripheralsDock && m_mediaPeripheralsDock->isAncestorOf(w)) {
+        return true;
+    }
+    if (m_debuggerWidget && m_debuggerWidget->isAncestorOf(w)) {
+        return true;
+    }
+    return false;
+}
+
+bool MainWindow::shouldSuppressChromeFocusRestore(const QWidget *w, QEvent::Type type) const
+{
+    if (!w) {
+        return true;
+    }
+    if (type == QEvent::Wheel) {
+        for (const QWidget *x = w; x; x = x->parentWidget()) {
+            if (qobject_cast<const QAbstractScrollArea*>(x)) {
+                return true;
+            }
+        }
+    }
+    for (const QWidget *x = w; x; x = x->parentWidget()) {
+        if (qobject_cast<const QComboBox*>(x)) {
+            return true;
+        }
+        if (qobject_cast<const QLineEdit*>(x)) {
+            return true;
+        }
+        if (const auto *pte = qobject_cast<const QPlainTextEdit*>(x)) {
+            if (!pte->isReadOnly()) {
+                return true;
+            }
+        }
+        if (const auto *te = qobject_cast<const QTextEdit*>(x)) {
+            if (!te->isReadOnly()) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void MainWindow::createMenus()
@@ -1103,6 +1192,8 @@ void MainWindow::loadRom()
             QMessageBox::warning(this, "Error", "Failed to load ROM file: " + fileName);
         }
     }
+
+    restoreEmulatorFocus();
 }
 
 
@@ -1371,6 +1462,8 @@ void MainWindow::restartEmulator()
 
         // Update toolbar to reflect actual BASIC state (may have been auto-disabled for FujiNet)
         updateToolbarFromSettings();
+
+        restoreEmulatorFocus();
     } else {
         QMessageBox::critical(this, "Error", "Failed to restart emulator");
     }
@@ -3290,6 +3383,14 @@ bool MainWindow::eventFilter(QObject *object, QEvent *event)
         // Don't intercept - let the event propagate naturally
     }
 
+    const QEvent::Type et = event->type();
+    if (et == QEvent::MouseButtonRelease || et == QEvent::Wheel) {
+        QWidget *w = qobject_cast<QWidget*>(object);
+        if (w && widgetIsUnderChrome(w) && !shouldSuppressChromeFocusRestore(w, et)) {
+            QTimer::singleShot(0, this, &MainWindow::restoreEmulatorFocus);
+        }
+    }
+
     return QMainWindow::eventFilter(object, event);
 }
 
@@ -3302,10 +3403,7 @@ void MainWindow::toggleDebugger()
         m_debuggerWidget->updateCPUState();
         m_debuggerWidget->updateMemoryView();
     }
-    // Restore focus to emulator widget (fixes Linux focus loss)
-    if (m_emulatorWidget) {
-        m_emulatorWidget->setFocus();
-    }
+    restoreEmulatorFocus();
 }
 
 void MainWindow::quickSaveState()
@@ -4464,6 +4562,8 @@ void MainWindow::resetFujiNet()
     QTimer::singleShot(300, this, [this]() {
         startFujiNetWithSavedSettings();
     });
+
+    restoreEmulatorFocus();
 }
 
 void MainWindow::swapFujiNetDisks()
@@ -4474,6 +4574,8 @@ void MainWindow::swapFujiNetDisks()
     } else {
         qWarning() << "swapFujiNetDisks: FujiNet not connected";
     }
+
+    restoreEmulatorFocus();
 }
 
 void MainWindow::onFujiNetConnected()

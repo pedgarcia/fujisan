@@ -26,6 +26,7 @@
 #include <QClipboard>
 #include <QDialog>
 #include <QPixmap>
+#include <QEvent>
 #include "atariemulator.h"
 #include "emulatorwidget.h"
 #include "toggleswitch.h"
@@ -174,6 +175,12 @@ private:
     // Status bar update methods
     void updateSpeedStatus();
     void updateFujiNetStatus();
+
+    /// Return keyboard focus to the emulator after toolbar / dock / debugger interaction (Win/Linux).
+    void restoreEmulatorFocus();
+    void installChromeFocusRestore();
+    bool widgetIsUnderChrome(const QWidget *w) const;
+    bool shouldSuppressChromeFocusRestore(const QWidget *w, QEvent::Type type) const;
 
     // FujiNet helper methods
     void updateFujiNetConfigFile(const QString& configPath, int netsioPort);
