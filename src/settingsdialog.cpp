@@ -330,6 +330,18 @@ void SettingsDialog::createHardwareTab()
     connect(m_enableAxlonCheck, &QCheckBox::toggled, m_axlonSizeCombo, &QComboBox::setEnabled);
     m_axlonSizeCombo->setEnabled(false);
 
+    // Mosaic and Axlon are mutually exclusive — enabling one must uncheck the other.
+    connect(m_enableMosaicCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        if (checked && m_enableAxlonCheck->isChecked()) {
+            m_enableAxlonCheck->setChecked(false);
+        }
+    });
+    connect(m_enableAxlonCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        if (checked && m_enableMosaicCheck->isChecked()) {
+            m_enableMosaicCheck->setChecked(false);
+        }
+    });
+
     memoryLayout->addLayout(axlonLayout);
     
     m_axlonShadowCheck = new QCheckBox("Use Axlon shadow at 0x0FC0-0x0FFF");

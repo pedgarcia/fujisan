@@ -502,13 +502,23 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
 
     // Mosaic RAM expansion (48-1024 KB, in 4KB increments)
     bool enableMosaic = memSettings.value("machine/enableMosaic", false).toBool();
+
+    // Axlon RAM expansion (valid total sizes: 32, 160, 288, 544, 1056 KB)
+    bool enableAxlon = memSettings.value("machine/enableAxlon", false).toBool();
+
+    // libatari800 rejects init if both -mosaic and -axlon are passed simultaneously.
+    // If both are enabled in settings (misconfiguration), prefer Axlon and skip Mosaic.
+    if (enableMosaic && enableAxlon) {
+        qWarning() << "Both Mosaic and Axlon RAM expansions are enabled — they are mutually exclusive."
+                   << "Disabling Mosaic; only Axlon will be used.";
+        enableMosaic = false;
+    }
+
     if (enableMosaic) {
         int mosaicSize = memSettings.value("machine/mosaicSize", 320).toInt();
         argList << "-mosaic" << QString::number(mosaicSize);
     }
 
-    // Axlon RAM expansion (48-1024 KB, in 16KB banks)
-    bool enableAxlon = memSettings.value("machine/enableAxlon", false).toBool();
     if (enableAxlon) {
         int axlonSize = memSettings.value("machine/axlonSize", 320).toInt();
         argList << "-axlon" << QString::number(axlonSize);
@@ -744,13 +754,15 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     qDebug() << "  Arguments:" << argString.trimmed();
     qDebug() << "  Total argument count:" << argList.size();
 
-    // Force complete libatari800 reset to clear any persistent ROM state
-    // This ensures ROM configuration changes are applied properly
-    static bool libatari800_previously_initialized = false;
-    if (libatari800_previously_initialized) {
-        qDebug() << "=== libatari800 RESTART DETECTED ===";
+    // Force complete libatari800 reset to clear any persistent ROM state.
+    // shutdown() already calls libatari800_exit() and clears m_libatari800Initialized,
+    // so this guard only fires when initializeWithInputConfig() is called without a
+    // prior shutdown() (e.g. the very first initialization path).
+    if (m_libatari800Initialized) {
+        qDebug() << "=== libatari800 RESTART DETECTED (no prior shutdown) ===";
         qDebug() << "  Calling libatari800_exit() to reset state...";
         libatari800_exit();
+        m_libatari800Initialized = false;
         qDebug() << "  libatari800_exit() completed";
     } else {
         qDebug() << "=== FIRST libatari800 INITIALIZATION ===";
@@ -759,7 +771,7 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
     qDebug() << "  Calling libatari800_init()...";
     if (libatari800_init(argBytes.size(), args.data())) {
         qDebug() << "  libatari800_init() returned SUCCESS";
-        libatari800_previously_initialized = true;  // Mark as initialized for future resets
+        m_libatari800Initialized = true;
 
         // H: device is CIO-based; re-enable its patch even when -netsio disabled it
         if (anyHDriveEnabled) {
@@ -925,6 +937,7 @@ void AtariEmulator::shutdown()
 #endif
 
     libatari800_exit();
+    m_libatari800Initialized = false;
 }
 
 void AtariEmulator::processFrame()
@@ -1572,6 +1585,13 @@ void AtariEmulator::coldRestart()
 {
     // Trigger Atari800 cold start to refresh boot sequence
     Atari800_Coldstart();
+
+    m_firstFrameTime = std::chrono::steady_clock::now();
+    m_frameCount = 0;
+    if (m_emulationPaused) {
+        m_emulationPaused = false;
+        requestNextFrame();
+    }
 }
 
 QString AtariEmulator::getDiskImagePath(int driveNumber) const
@@ -1919,6 +1939,19 @@ void AtariEmulator::coldBoot()
     // Clear the pending-boot flag regardless of how we got here.
     m_pendingFujiNetBoot = false;
 #endif
+
+    // Reset the absolute-time frame scheduler baseline so the timing debt that
+    // accumulated while waiting for the cold boot to be delivered does not cause
+    // a burst of catch-up frames immediately after the reset.
+    m_firstFrameTime = std::chrono::steady_clock::now();
+    m_frameCount = 0;
+
+    // If emulation was paused when cold boot was pressed, restart the frame loop
+    // so the reset screen is actually rendered and displayed.
+    if (m_emulationPaused) {
+        m_emulationPaused = false;
+        requestNextFrame();
+    }
 }
 
 void AtariEmulator::warmBoot()
@@ -1947,6 +1980,15 @@ void AtariEmulator::warmBoot()
     // Reset the Atari
     Atari800_Warmstart();
     qDebug() << "[NETSIO] WARM BOOT COMPLETE";
+
+    // Reset the absolute-time frame scheduler baseline and restart the frame
+    // loop if emulation was paused, so the reset screen is rendered.
+    m_firstFrameTime = std::chrono::steady_clock::now();
+    m_frameCount = 0;
+    if (m_emulationPaused) {
+        m_emulationPaused = false;
+        requestNextFrame();
+    }
 }
 
 void AtariEmulator::resetNetSIOClientState()
@@ -2329,6 +2371,26 @@ void AtariEmulator::setupAudio()
     m_avgGap = 0.0;
     
     
+    // Stop and release any previous QAudioOutput before creating a new one,
+    // otherwise each restart leaks the old output object and its OS audio device.
+    // Use deleteLater() so the object is always destroyed on the thread that owns
+    // it (the thread it was created on), avoiding the "Timers cannot be stopped
+    // from another thread" crash when teardown happens on the emulator thread but
+    // the object was created on the main thread (at startup).
+    if (m_audioOutput) {
+        // QAudioOutput has internal timers registered on the thread that started
+        // the audio device.  At startup that is the main thread (before moveToThread);
+        // on subsequent restarts it is the emulator thread.  To avoid
+        // "Timers cannot be stopped from another thread" and the resulting crash,
+        // move the object back to the main thread before scheduling deletion so
+        // that Qt stops its timers and destroys it on the correct thread.
+        m_audioOutput->setParent(nullptr);  // detach from AtariEmulator so moveToThread works
+        m_audioOutput->moveToThread(QCoreApplication::instance()->thread());
+        m_audioOutput->deleteLater();
+        m_audioOutput = nullptr;
+        m_audioDevice = nullptr;
+    }
+
     // Create and configure audio output
     m_audioOutput = new QAudioOutput(format, this);
     

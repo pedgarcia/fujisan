@@ -510,6 +510,7 @@ private:
     // MainWindow::onFujiNetConnected() to trigger an automatic cold boot once
     // FujiNet-PC is confirmed ready, so the Atari can actually load from it.
     bool m_pendingFujiNetBoot = false;
+    bool m_libatari800Initialized = false;  // Tracks whether libatari800_init() succeeded; reset by shutdown() to prevent double libatari800_exit()
 
     // Current profile name for state saves
     QString m_currentProfileName;
