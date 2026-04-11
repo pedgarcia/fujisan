@@ -87,6 +87,7 @@ I guess, the big difference is that Fujisan is a UI-based emulator that is avail
 - **Print Management**: View, save, and clear printer output with tear-off animation
 
 ### Debugging & Development
+- **VS Code + FastBasic**: Step-by-step setup for the [FastBasic Debugger](https://marketplace.visualstudio.com/items?itemName=ericcarr.fastbasic-debugger) extension with Fujisan — see **[docs/FASTBASIC_VSCODE_DEBUGGER.md](docs/FASTBASIC_VSCODE_DEBUGGER.md)**
 - **Integrated Debugger**: 6502 debugging with breakpoints, stepping, and memory inspection
 - **Breakpoint System**: Set/remove breakpoints with automatic execution pause and visual indicators
 - **CPU State Monitoring**: Real-time register display (A, X, Y, PC, SP, P) in hex format
