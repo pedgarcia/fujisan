@@ -183,6 +183,12 @@ if [ "$BUILD_FUJINET_PC" != "false" ]; then
             echo "⚠ Warning: Could not find FujiNet-PC nightly tag; run scripts/download-fujinet-pc.sh and rebuild with fujinet/windows-x64 present"
         fi
     fi
+    if [ -f "/work/scripts/install-fujisan-fnconfig.sh" ] && [ -d "build-windows/fujinet-pc" ]; then
+        if [ -f "build-windows/fujinet-pc/fujinet.exe" ] || [ -f "build-windows/fujinet-pc/fujinet" ]; then
+            bash /work/scripts/install-fujisan-fnconfig.sh /work/build-windows/fujinet-pc
+            echo "✓ Fujisan fnconfig.ini installed (Windows fujinet-pc bundle)"
+        fi
+    fi
 fi
 
 echo "✓ Windows package created in build-windows/"

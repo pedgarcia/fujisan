@@ -385,116 +385,20 @@ bundle_fujinet_pc() {
         echo_info "Replaced autorun.atr with Fujisan custom version"
     fi
 
-    # Override data/fnconfig.ini — this is the file FujiNet-PC actually reads at startup
-    # (because fnconfig_on_spifs=1 routes config reads into the data/ directory).
-    # The root-level fnconfig.ini heredoc below is the user-editable fallback copy only.
-    if [[ -d "$fujinet_dir/data" ]]; then
-        sed -i '' "s/^hsioindex=.*/hsioindex=16/" "$fujinet_dir/data/fnconfig.ini" 2>/dev/null || true
-        echo_info "Applied hsioindex=16 to data/fnconfig.ini"
+    # Canonical fnconfig: data/fnconfig-fujisan.ini (repo root of truth).
+    # Installed to both data/fnconfig.ini and fnconfig.ini — with fnconfig_on_spifs=1,
+    # FujiNet-PC reads data/fnconfig.ini at startup; root copy matches for -c and user edits.
+    if [[ ! -f "$PROJECT_ROOT/data/fnconfig-fujisan.ini" ]]; then
+        echo_error "Missing $PROJECT_ROOT/data/fnconfig-fujisan.ini"
+        return 1
     fi
+    bash "$SCRIPT_DIR/scripts/install-fujisan-fnconfig.sh" "$fujinet_dir"
+    echo_info "Installed Fujisan fnconfig.ini (data/ + root)"
 
     # Create SD folder for SD card emulation
     mkdir -p "$fujinet_dir/SD"
     echo "--- FujiNet SD Card ---" > "$fujinet_dir/SD/README.txt"
     echo "Place disk images (.atr, .xex files) here for FujiNet access" >> "$fujinet_dir/SD/README.txt"
-
-    # Create default fnconfig.ini
-    cat > "$fujinet_dir/fnconfig.ini" << 'EOF'
-[General]
-devicename=Fujinet
-hsioindex=-1
-rotationsounds=1
-configenabled=1
-config_ng=0
-altconfigfile=
-boot_mode=0
-fnconfig_on_spifs=1
-status_wait_enabled=1
-printer_enabled=1
-encrypt_passphrase=0
-
-[WiFi]
-enabled=1
-SSID=Dummy Cafe
-passphrase=
-
-[Bluetooth]
-devicename=SIO2BTFujiNet
-enabled=0
-baud=19200
-
-[Network]
-sntpserver=pool.ntp.org
-
-[Host1]
-type=SD
-name=SD
-
-[Host2]
-type=TNFS
-name=fujinet.online
-
-[Host3]
-type=TNFS
-name=apps.irata.online
-
-[Host4]
-type=TNFS
-name=fujinet.diller.org
-
-[Host5]
-type=TNFS
-name=FujiNet.Atari8bit.net
-
-[Host6]
-type=TNFS
-name=atarionline.eu
-
-[Host7]
-type=TNFS
-name=fujinet.pl
-
-[Host8]
-type=TNFS
-name=tnfs.abbuc.social
-
-[Modem]
-modem_enabled=1
-sniffer_enabled=0
-
-[Cassette]
-play_record=0 Play
-pulldown=1 Pulldown Resistor
-cassette_enabled=1
-
-[CPM]
-cpm_enabled=1
-ccp=
-
-[ENABLE]
-enable_device_slot_1=1
-enable_device_slot_2=1
-enable_device_slot_3=1
-enable_device_slot_4=1
-enable_device_slot_5=1
-enable_device_slot_6=1
-enable_device_slot_7=1
-enable_device_slot_8=1
-enable_apetime=1
-enable_pclink=1
-
-[BOIP]
-enabled=1
-host=localhost
-port=
-
-[Serial]
-port=
-command=DSR
-proceed=DTR
-EOF
-
-    echo_info "Created default fnconfig.ini"
 
     # Create version file
     echo "$version" > "$fujinet_dir/version.txt"
@@ -1052,11 +956,8 @@ build_fujinet_pc() {
             echo_info "Replaced autorun.atr with Fujisan custom version"
         fi
 
-        # Copy fnconfig.ini
-        if [[ -f "dist/fnconfig.ini" ]]; then
-            cp dist/fnconfig.ini "$PROJECT_ROOT/$TARGET_DIR/"
-            echo_success "fnconfig.ini copied"
-        fi
+        bash "$PROJECT_ROOT/scripts/install-fujisan-fnconfig.sh" "$PROJECT_ROOT/$TARGET_DIR"
+        echo_success "Fujisan fnconfig.ini installed (data/ + root)"
 
         # Copy SD folder
         if [[ -d "dist/SD" ]]; then

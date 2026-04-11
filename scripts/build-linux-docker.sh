@@ -471,6 +471,12 @@ else
     echo "⚠ Warning: No FujiNet-PC found to bundle"
 fi
 
+# Fujisan canonical fnconfig (overrides firmware dist / prebuilt copies)
+if [ -f "/tmp/fujisan-build/scripts/install-fujisan-fnconfig.sh" ] && [ -f "fujisan-linux/usr/lib/fujisan/fujinet-pc/fujinet" ]; then
+    bash /tmp/fujisan-build/scripts/install-fujisan-fnconfig.sh "$(pwd)/fujisan-linux/usr/lib/fujisan/fujinet-pc"
+    echo "✓ Fujisan fnconfig.ini installed (.deb fujinet-pc bundle)"
+fi
+
 # Bundle Fastbasic if requested
 mkdir -p fujisan-linux/usr/lib/fujisan/fastbasic
 if [ "$BUILD_FASTBASIC_COMPILER" = "true" ]; then
@@ -759,6 +765,11 @@ QTCONF_EOF
         [ -f "$FUJINET_DIST/VERSION" ]        && cp "$FUJINET_DIST/VERSION"        fujisan-portable/bin/fujinet-pc/
 
         echo "✓ FujiNet-PC bundled in portable package (from source)"
+    fi
+
+    if [ -f "/tmp/fujisan-build/scripts/install-fujisan-fnconfig.sh" ] && [ -f "fujisan-portable/bin/fujinet-pc/fujinet" ]; then
+        bash /tmp/fujisan-build/scripts/install-fujisan-fnconfig.sh "$(pwd)/fujisan-portable/bin/fujinet-pc"
+        echo "✓ Fujisan fnconfig.ini installed (portable fujinet-pc bundle)"
     fi
 
     # Copy Fastbasic to portable if bundled

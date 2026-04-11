@@ -89,6 +89,19 @@ for platform_config in "${PLATFORMS[@]}"; do
     echo
 done
 
+# Match release bundles: install Fujisan canonical fnconfig (data/ + root)
+INSTALL_FNCFG="$SCRIPT_DIR/install-fujisan-fnconfig.sh"
+if [[ -f "$INSTALL_FNCFG" ]] && [[ -f "$PROJECT_ROOT/data/fnconfig-fujisan.ini" ]]; then
+    for platform_config in "${PLATFORMS[@]}"; do
+        IFS='|' read -r folder _ <<< "$platform_config"
+        BUNDLE="$FUJINET_DIR/$folder"
+        if [[ -f "$BUNDLE/fujinet" ]] || [[ -f "$BUNDLE/fujinet.exe" ]]; then
+            bash "$INSTALL_FNCFG" "$BUNDLE"
+            echo "✓ Fujisan fnconfig applied to $folder"
+        fi
+    done
+fi
+
 echo "=== Download Complete ==="
 echo
 echo "FujiNet-PC binaries downloaded to: $FUJINET_DIR"
