@@ -240,6 +240,10 @@ public:
     QString getVideoSystem() const { return m_videoSystem; }
     void setVideoSystem(const QString& videoSystem) { m_videoSystem = videoSystem; }
     int getCurrentEmulationSpeed() const;
+
+    /// True after a successful libatari800_init() until shutdown() clears the core.
+    /// Used to avoid deferred Qt callbacks touching lib globals after libatari800_exit().
+    bool isLibatari800Initialized() const { return m_libatari800Initialized; }
     
     QString getOSRomPath() const { return m_osRomPath; }
     void setOSRomPath(const QString& path) { m_osRomPath = path; }
@@ -371,6 +375,8 @@ private:
     unsigned char convertQtKeyToAtari(int key, Qt::KeyboardModifiers modifiers);
     char getShiftedSymbol(int key, bool shiftPressed);
     void setupAudio();
+    /// Caller must hold m_inputMutex. Uses lib clear only while the core is initialized.
+    void clearCurrentInputLocked();
     void triggerDiskActivity();
     QString quotePath(const QString& path);  // Helper to quote paths with spaces
     bool m_enableAudioDiagnostics = false;   // Enable CSV logging for audio diagnostics

@@ -34,11 +34,11 @@ private slots:
 
     void testInjectCharacterFromNonEmulatorThreadDoesNotCrash()
     {
+        QThread thread;
         auto* emu = new AtariEmulator(nullptr);
-        auto* thread = new QThread(this);
 
-        emu->moveToThread(thread);
-        thread->start();
+        emu->moveToThread(&thread);
+        thread.start();
 
         bool initOk = false;
         QMetaObject::invokeMethod(
@@ -91,17 +91,16 @@ private slots:
         QMetaObject::invokeMethod(
             emu, [emu]() { delete emu; }, Qt::BlockingQueuedConnection);
 
-        thread->quit();
-        QVERIFY(thread->wait(5000));
-        thread->deleteLater();
+        thread.quit();
+        QVERIFY2(thread.wait(5000), "emulator thread must stop before scope exit");
     }
 
     void testInjectCharacterUnknownCharClearsPendingFrames()
     {
+        QThread thread;
         auto* emu = new AtariEmulator(nullptr);
-        auto* thread = new QThread(this);
-        emu->moveToThread(thread);
-        thread->start();
+        emu->moveToThread(&thread);
+        thread.start();
 
         bool initOk = false;
         QMetaObject::invokeMethod(
@@ -138,9 +137,8 @@ private slots:
         QMetaObject::invokeMethod(emu, "shutdown", Qt::BlockingQueuedConnection);
         QMetaObject::invokeMethod(
             emu, [emu]() { delete emu; }, Qt::BlockingQueuedConnection);
-        thread->quit();
-        QVERIFY(thread->wait(5000));
-        thread->deleteLater();
+        thread.quit();
+        QVERIFY2(thread.wait(5000), "emulator thread must stop before scope exit");
     }
 };
 

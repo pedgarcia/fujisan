@@ -26,6 +26,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QThread>
+#include <QCoreApplication>
 #include <QByteArray>
 #include <cstring>  // for memset
 #include <vector>   // for std::vector
@@ -84,6 +85,8 @@ static void diskActivityCallback(int drive, int operation) {
         
         // Set a timer to turn the LED off after a short time (hardware-accurate timing)
         QTimer::singleShot(100, s_emulatorInstance, [drive]() {
+            if (!s_emulatorInstance || !s_emulatorInstance->isLibatari800Initialized())
+                return;
             QMetaObject::invokeMethod(s_emulatorInstance, "diskIOEnd", Qt::QueuedConnection,
                                     Q_ARG(int, drive));
         });
@@ -124,7 +127,8 @@ AtariEmulator::AtariEmulator(QObject *parent)
     , m_joystick2AssignedDevice("keyboard")
 #endif
 {
-    libatari800_clear_input_array(&m_currentInput);
+    // libatari800 is not initialized yet; only reset our template (see clearCurrentInputLocked).
+    std::memset(&m_currentInput, 0, sizeof(m_currentInput));
 
     // Initialize joysticks to center position (inverted for libatari800)
     m_currentInput.joy0 = 0x0f ^ 0xff;  // 15 ^ 255 = 240
@@ -167,6 +171,21 @@ AtariEmulator::~AtariEmulator()
         libatari800_set_disk_activity_callback(nullptr);
     }
     shutdown();
+
+    // Tear down Qt audio output safely.  The destructor may be called from the
+    // emulator thread (via QObject::deleteLater + QThread::finished), but the
+    // first QAudioOutput was created on the main thread (before moveToThread).
+    // Destroying it here would crash with "Timers cannot be stopped from another
+    // thread".  Disconnect signals, move back to the main thread, and defer deletion.
+    if (m_audioOutput) {
+        m_audioOutput->disconnect();
+        m_audioOutput->stop();
+        m_audioOutput->setParent(nullptr);
+        m_audioOutput->moveToThread(QCoreApplication::instance()->thread());
+        m_audioOutput->deleteLater();
+        m_audioOutput = nullptr;
+        m_audioDevice = nullptr;
+    }
 
     // Clean up unified audio backend
 #ifdef HAVE_SDL2_AUDIO
@@ -396,13 +415,16 @@ bool AtariEmulator::initializeWithDisplayConfig(bool basicEnabled, const QString
     // This ensures ROM configuration changes are applied properly
     static bool libatari800_previously_initialized = false;
     if (libatari800_previously_initialized) {
+        // Match shutdown(): clear flag before exit so deferred Qt timers skip lib calls.
+        m_libatari800Initialized = false;
         libatari800_exit();
     } else {
     }
     
     if (libatari800_init(argBytes.size(), args.data())) {
         libatari800_previously_initialized = true;  // Mark as initialized for future resets
-        
+        m_libatari800Initialized = true;
+
         // Verify ROM loading status
         if (!m_altirraOSEnabled && !m_osRomPath.isEmpty()) {
         } else if (m_altirraOSEnabled) {
@@ -923,6 +945,10 @@ void AtariEmulator::shutdown()
 {
     m_frameTimer->stop();
 
+    // Before libatari800_exit(): queued single-shot timers (e.g. injectAKey) must not call
+    // libatari800_clear_input_array(), which writes lib globals that exit() tears down.
+    m_libatari800Initialized = false;
+
     // Clear BINLOAD state to prevent XEX from persisting across restarts/profile loads
     if (BINLOAD_bin_file != NULL) {
         fclose(BINLOAD_bin_file);
@@ -937,11 +963,32 @@ void AtariEmulator::shutdown()
 #endif
 
     libatari800_exit();
-    m_libatari800Initialized = false;
+}
+
+void AtariEmulator::clearCurrentInputLocked()
+{
+    // libatari800_clear_input_array() also writes lib globals (e.g. INPUT_key_code).
+    // Call it only on the emulator thread; UI/TCP call inject* from other threads and
+    // must only update m_currentInput under the mutex — processFrame() passes the
+    // snapshot into libatari800_next_frame on the correct thread.
+    const bool onEmulatorThread = (QThread::currentThread() == thread());
+    if (m_libatari800Initialized && onEmulatorThread) {
+        libatari800_clear_input_array(&m_currentInput);
+    } else {
+        std::memset(&m_currentInput, 0, sizeof(m_currentInput));
+    }
+    m_currentInput.joy0 = 0x0f ^ 0xff;
+    m_currentInput.joy1 = 0x0f ^ 0xff;
+    m_currentInput.trig0 = 0;
+    m_currentInput.trig1 = 0;
 }
 
 void AtariEmulator::processFrame()
 {
+    if (!m_libatari800Initialized) {
+        return;
+    }
+
     // Advance frame counter; next interval will be computed in requestNextFrame()
     // at the end of this function (absolute-time scheduling, no per-frame work needed here).
     // Delayed restart mechanism removed - no longer needed!
@@ -1050,11 +1097,7 @@ void AtariEmulator::processFrame()
         if (m_injectKeyFramesRemaining > 0) {
             m_injectKeyFramesRemaining--;
             if (m_injectKeyFramesRemaining == 0) {
-                libatari800_clear_input_array(&m_currentInput);
-                m_currentInput.joy0 = 0x0f ^ 0xff;
-                m_currentInput.joy1 = 0x0f ^ 0xff;
-                m_currentInput.trig0 = 0;
-                m_currentInput.trig1 = 0;
+                clearCurrentInputLocked();
             }
         }
     }
@@ -2385,20 +2428,23 @@ void AtariEmulator::setupAudio()
     m_avgGap = 0.0;
     
     
-    // Stop and release any previous QAudioOutput before creating a new one,
-    // otherwise each restart leaks the old output object and its OS audio device.
-    // Use deleteLater() so the object is always destroyed on the thread that owns
-    // it (the thread it was created on), avoiding the "Timers cannot be stopped
-    // from another thread" crash when teardown happens on the emulator thread but
-    // the object was created on the main thread (at startup).
+    // Stop and release any previous QAudioOutput before creating a new one.
+    // The tricky part: QAudioOutput registers internal timers on whichever thread
+    // called start().  At startup that is the main thread (before moveToThread);
+    // on subsequent restarts it is the emulator thread.  Calling stop() or the
+    // destructor from the wrong thread triggers "Timers cannot be stopped from
+    // another thread" and a crash.
+    //
+    // Strategy: disconnect all signals immediately so no callbacks fire, then
+    // move the object to the main thread and let it self-destruct there via
+    // deleteLater(), which guarantees timer teardown on the right thread.
     if (m_audioOutput) {
-        // QAudioOutput has internal timers registered on the thread that started
-        // the audio device.  At startup that is the main thread (before moveToThread);
-        // on subsequent restarts it is the emulator thread.  To avoid
-        // "Timers cannot be stopped from another thread" and the resulting crash,
-        // move the object back to the main thread before scheduling deletion so
-        // that Qt stops its timers and destroys it on the correct thread.
-        m_audioOutput->setParent(nullptr);  // detach from AtariEmulator so moveToThread works
+        // Disconnect first — stop() fires stateChanged which would call killTimer
+        // on the wrong thread if the timer was registered on the main thread.
+        m_audioOutput->disconnect();
+        // stop() on the current (emulator) thread is safe now: no timer callbacks.
+        m_audioOutput->stop();
+        m_audioOutput->setParent(nullptr);  // detach so moveToThread is allowed
         m_audioOutput->moveToThread(QCoreApplication::instance()->thread());
         m_audioOutput->deleteLater();
         m_audioOutput = nullptr;
@@ -2518,6 +2564,10 @@ void AtariEmulator::setupAudio()
 
 void AtariEmulator::enableAudio(bool enabled)
 {
+    if (QThread::currentThread() != thread()) {
+        QMetaObject::invokeMethod(this, [this, enabled]() { enableAudio(enabled); }, Qt::QueuedConnection);
+        return;
+    }
     if (m_audioEnabled != enabled) {
         m_audioEnabled = enabled;
         
@@ -2555,8 +2605,11 @@ void AtariEmulator::enableAudio(bool enabled)
             }
 #endif
             if (m_audioOutput && m_audioBackend == QtAudio) {
+                m_audioOutput->disconnect();
                 m_audioOutput->stop();
-                delete m_audioOutput;
+                m_audioOutput->setParent(nullptr);
+                m_audioOutput->moveToThread(QCoreApplication::instance()->thread());
+                m_audioOutput->deleteLater();
                 m_audioOutput = nullptr;
                 m_audioDevice = nullptr;
                 // Clear DSP buffer positions
@@ -2570,6 +2623,10 @@ void AtariEmulator::enableAudio(bool enabled)
 
 void AtariEmulator::setVolume(float volume)
 {
+    if (QThread::currentThread() != thread()) {
+        QMetaObject::invokeMethod(this, [this, volume]() { setVolume(volume); }, Qt::QueuedConnection);
+        return;
+    }
 #ifdef HAVE_SDL2_AUDIO
     if (m_audioBackend == UnifiedAudio && m_unifiedAudio) {
         m_unifiedAudio->setVolume(volume);
@@ -2588,6 +2645,10 @@ void AtariEmulator::setVolume(float volume)
 void AtariEmulator::setAudioBackend(AudioBackend backend)
 {
 #ifdef HAVE_SDL2_AUDIO
+    if (QThread::currentThread() != thread()) {
+        QMetaObject::invokeMethod(this, [this, backend]() { setAudioBackend(backend); }, Qt::QueuedConnection);
+        return;
+    }
     if (m_audioBackend != backend) {
         // Stop current audio
         if (m_audioEnabled) {
@@ -2898,14 +2959,8 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
 void AtariEmulator::injectCharacter(char ch)
 {
     QMutexLocker inputLock(&m_inputMutex);
-    // Clear previous input
-    libatari800_clear_input_array(&m_currentInput);
-    // Restore joystick center positions after clearing (using libatari800-compatible center)
-    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
-    
+    clearCurrentInputLocked();
+
     if (ch >= 'A' && ch <= 'Z') {
         // Uppercase letters - use AKEY_A through AKEY_Z (includes SHIFT modifier)
         unsigned char atariKey = 0;
@@ -3081,14 +3136,8 @@ void AtariEmulator::injectAKey(int akeyCode)
 {
     {
         QMutexLocker inputLock(&m_inputMutex);
-        // Clear previous input
-        libatari800_clear_input_array(&m_currentInput);
-        // Restore joystick center positions after clearing (using libatari800-compatible center)
-        m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-        m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-        m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-        m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
-        
+        clearCurrentInputLocked();
+
         // Directly set the raw AKEY code
         m_currentInput.keycode = akeyCode;
     }
@@ -3098,12 +3147,7 @@ void AtariEmulator::injectAKey(int akeyCode)
     // so it also needs the mutex to guard against concurrent main-thread writes.
     QTimer::singleShot(50, this, [this]() {
         QMutexLocker inputLock(&m_inputMutex);
-        libatari800_clear_input_array(&m_currentInput);
-        // Restore joystick center positions after clearing
-        m_currentInput.joy0 = 0x0f ^ 0xff;
-        m_currentInput.joy1 = 0x0f ^ 0xff;
-        m_currentInput.trig0 = 0;
-        m_currentInput.trig1 = 0;
+        clearCurrentInputLocked();
     });
 }
 
@@ -3116,12 +3160,7 @@ int AtariEmulator::injectedKeyFramesRemainingForTest() const
 void AtariEmulator::clearInput()
 {
     QMutexLocker inputLock(&m_inputMutex);
-    libatari800_clear_input_array(&m_currentInput);
-    // Restore joystick center positions after clearing (using libatari800-compatible center)
-    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+    clearCurrentInputLocked();
 }
 
 void AtariEmulator::setCapsLock(bool enabled)
