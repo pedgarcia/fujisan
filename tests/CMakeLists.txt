@@ -180,6 +180,20 @@ elseif(WIN32)
 endif()
 
 # ---------------------------------------------------------------------------
+# 9. TCP JSON API (links fujisan_core — same stack as the app; FastBasic / FujisanClient)
+# ---------------------------------------------------------------------------
+add_fujisan_test(test_tcp_commands test_tcp_commands.cpp)
+add_dependencies(test_tcp_commands atari800_external)
+target_link_libraries(test_tcp_commands PRIVATE fujisan_core Qt5::Test)
+
+if(WIN32)
+    set_target_properties(test_tcp_commands PROPERTIES WIN32_EXECUTABLE OFF)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_link_options(test_tcp_commands PRIVATE -mconsole)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # Convenience target: build all test executables without touching atari800_external
 # ---------------------------------------------------------------------------
 add_custom_target(build_tests DEPENDS
@@ -191,4 +205,5 @@ add_custom_target(build_tests DEPENDS
     test_fujinet_service
     test_fujinet_process
     test_character_injection
+    test_tcp_commands
 )

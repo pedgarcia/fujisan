@@ -532,9 +532,15 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir build-test -R test_character_injectio
 # Same suite: run the executable directly (optional: one test function)
 QT_QPA_PLATFORM=offscreen ./build-test/tests/test_character_injection
 QT_QPA_PLATFORM=offscreen ./build-test/tests/test_character_injection testInjectCharacterFromNonEmulatorThreadDoesNotCrash
+
+# TCP JSON API (links full app core; same commands as FastBasic Debugger / fujisanClient.ts)
+QT_QPA_PLATFORM=offscreen ctest --test-dir build-test -R test_tcp_commands -V
+QT_QPA_PLATFORM=offscreen ./build-test/tests/test_tcp_commands -v2
 ```
 
 `test_character_injection` initializes libatari800 on a worker thread and calls `injectCharacter()` from the test thread, matching how the UI pastes into BASIC. It guards against regressions where the core is stepped from the wrong thread (which previously caused crashes).
+
+`test_tcp_commands` starts a hidden `MainWindow`, listens on an ephemeral TCP port, and drives JSON requests over a local socket. It covers protocol errors plus `status.get_state`, `system.get_speed`, `input.send_text` (empty), `media.load_xex` / `debug.load_xex_for_debug` (missing files), and `config.set_hard_drive` for H4: (as used by the VS Code FastBasic extension). The client connection loop calls `QCoreApplication::processEvents()` so the server can accept on the same thread.
 
 ### Available Test Suites
 
@@ -548,6 +554,7 @@ QT_QPA_PLATFORM=offscreen ./build-test/tests/test_character_injection testInject
 | `test_fujinet_service` | HTTP health check (mock server), connection state, drive polling |
 | `test_fujinet_process` | Process lifecycle, forceKill, exit codes, stdout capture |
 | `test_character_injection` | Paste/TCP `injectCharacter()` from non-emulator thread with libatari800 on a worker thread (no cross-thread `next_frame`) |
+| `test_tcp_commands` | JSON TCP API: welcome event, `status` / `system.get_speed` / `input` / `media` / `debug` / `config.set_hard_drive` (FastBasic / FujisanClient paths) |
 
 ### Build Artifact Validation
 

@@ -337,16 +337,27 @@ set(HEADERS
 )
 
 # ============================================================================
+# STATIC CORE LIBRARY (shared by Fujisan app and test_tcp_commands)
+# ============================================================================
+
+set(FUJISAN_CORE_SOURCES ${SOURCES})
+list(REMOVE_ITEM FUJISAN_CORE_SOURCES src/main.cpp)
+
+add_library(fujisan_core STATIC ${FUJISAN_CORE_SOURCES} ${HEADERS})
+add_dependencies(fujisan_core atari800_external)
+set_target_properties(fujisan_core PROPERTIES AUTOMOC ON)
+
+# ============================================================================
 # CREATE FUJISAN EXECUTABLE
 # ============================================================================
 
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+add_executable(${PROJECT_NAME} src/main.cpp)
 
 # Add dependency to ensure atari800 is built before Fujisan
 add_dependencies(${PROJECT_NAME} atari800_external)
 
 # Include directories for Fujisan and atari800 headers
-target_include_directories(${PROJECT_NAME} PRIVATE
+target_include_directories(fujisan_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_BINARY_DIR}/include  # For generated version.h
     ${ATARI800_SOURCE_DIR}/src/libatari800
@@ -395,7 +406,7 @@ endif()
 # ============================================================================
 
 # Add compile definitions
-target_compile_definitions(${PROJECT_NAME} PRIVATE
+target_compile_definitions(fujisan_core PRIVATE
     SCREENSHOTS
     # Remove dependency on runtime ATARI800_SRC_PATH
     EMBEDDED_LIBATARI800
@@ -410,24 +421,26 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 # Add architecture-specific definitions for macOS
 if(APPLE)
     if(CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
-        target_compile_definitions(${PROJECT_NAME} PRIVATE FUJISAN_X86_64_BUILD)
+        target_compile_definitions(fujisan_core PRIVATE FUJISAN_X86_64_BUILD)
     endif()
     
     if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
-        target_compile_definitions(${PROJECT_NAME} PRIVATE FUJISAN_ARM64_BUILD)
+        target_compile_definitions(fujisan_core PRIVATE FUJISAN_ARM64_BUILD)
     endif()
 endif()
 
-# Link libraries
-target_link_libraries(${PROJECT_NAME}
+# Link libraries (core). PUBLIC so executables that link fujisan_core (Fujisan, tests) resolve Qt/libatari800.
+target_link_libraries(fujisan_core PUBLIC
     libatari800
     Qt5::Core
     Qt5::Widgets
     Qt5::Gui
     Qt5::Multimedia
     Qt5::Network
-    -lm
 )
+if(UNIX)
+    target_link_libraries(fujisan_core PUBLIC -lm)
+endif()
 
 # Link SDL2 only if available (for unified audio backend and/or joystick support)
 if(HAVE_SDL2_AUDIO OR HAVE_SDL2_JOYSTICK)
@@ -447,7 +460,7 @@ if(HAVE_SDL2_AUDIO OR HAVE_SDL2_JOYSTICK)
 
         if(SDL2_TARGET_WORKS)
             message(STATUS "SDL2::SDL2 target linking works")
-            target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+            target_link_libraries(fujisan_core PUBLIC SDL2::SDL2)
         else()
             if(NOT (WIN32 AND CMAKE_CROSSCOMPILING))
                 message(WARNING "SDL2::SDL2 target linking failed, falling back to library paths")
@@ -464,17 +477,17 @@ if(HAVE_SDL2_AUDIO OR HAVE_SDL2_JOYSTICK)
                 )
                 if(SDL2_FALLBACK_LIB)
                     message(STATUS "Using SDL2 fallback library: ${SDL2_FALLBACK_LIB} (Windows cross-compile)")
-                    target_link_libraries(${PROJECT_NAME} ${SDL2_FALLBACK_LIB})
+                    target_link_libraries(fujisan_core PUBLIC ${SDL2_FALLBACK_LIB})
                 else()
                     message(FATAL_ERROR "SDL2 fallback library not found")
                 endif()
             elseif(SDL2_LIBRARIES)
-                target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+                target_link_libraries(fujisan_core PUBLIC ${SDL2_LIBRARIES})
             endif()
         endif()
     elseif(SDL2_LIBRARIES)
         message(STATUS "Using SDL2_LIBRARIES: ${SDL2_LIBRARIES}")
-        target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+        target_link_libraries(fujisan_core PUBLIC ${SDL2_LIBRARIES})
     else()
         message(FATAL_ERROR "SDL2 required but not found")
     endif()
@@ -482,7 +495,7 @@ endif()
 
 # Platform-specific linking and resources
 if(APPLE)
-    target_link_libraries(${PROJECT_NAME}
+    target_link_libraries(fujisan_core PUBLIC
         "-framework Cocoa"
         "-framework UniformTypeIdentifiers"
     )
@@ -494,7 +507,7 @@ elseif(WIN32)
         set(Qt5_USE_STATIC_RUNTIME ON)
         
         # Add static linking flags
-        target_link_libraries(${PROJECT_NAME}
+        target_link_libraries(fujisan_core PUBLIC
             -static-libgcc
             -static-libstdc++
             -static
@@ -518,12 +531,12 @@ elseif(WIN32)
         )
         
         # Additional static linking options - force all linking to be static
-        set_target_properties(${PROJECT_NAME} PROPERTIES
+        set_target_properties(fujisan_core PROPERTIES
             LINK_FLAGS "-static-libgcc -static-libstdc++ -static -Wl,-Bstatic -Wl,--no-undefined"
         )
     endif()
     # Windows-specific compiler settings to fix SDK compatibility
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
+    target_compile_definitions(fujisan_core PRIVATE
         WIN32_LEAN_AND_MEAN
         NOMINMAX
         _WIN32_WINNT=0x0A00  # Windows 10
@@ -544,7 +557,7 @@ elseif(WIN32)
     
     # MSVC-specific compiler options
     if(MSVC)
-        target_compile_options(${PROJECT_NAME} PRIVATE
+        target_compile_options(fujisan_core PRIVATE
             /permissive-    # Disable non-conforming code
             /Zc:__cplusplus # Enable __cplusplus macro
             /utf-8          # Specify UTF-8 encoding
@@ -560,10 +573,8 @@ elseif(WIN32)
     endif()
 endif()
 
-# Enable Qt's MOC (Meta-Object Compiler)
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    AUTOMOC ON
-)
+# Application links the static core library (main.cpp only in this target).
+target_link_libraries(${PROJECT_NAME} PRIVATE fujisan_core)
 
 # ============================================================================
 # TEST SUITE (opt-in via -DBUILD_TESTS=ON)

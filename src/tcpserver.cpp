@@ -82,6 +82,9 @@ bool TCPServer::startServer(quint16 port)
         return false;
     }
 
+    // listen(port==0) chooses an ephemeral port; keep m_port in sync for status.get_state etc.
+    m_port = m_server->serverPort();
+
     m_isRunning = true;
     qDebug() << "[TCP] Server started successfully on localhost:" << m_port;
     qDebug() << "[TCP] Clients can connect to: http://localhost:" << m_port;
@@ -486,7 +489,13 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
         qDebug() << "TCP Server: Using path directly:" << validatedPath;
         
         qDebug() << "TCP Server: Attempting to insert disk via MainWindow:" << validatedPath;
-        
+
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
+
         // Use MainWindow's insertDiskViaTCP method to properly enable drive and update GUI
         bool success = false;
         try {
@@ -528,7 +537,13 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
                         "Invalid drive number. Must be 1-8");
             return;
         }
-        
+
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
+
         bool success = m_mainWindow->ejectDiskViaTCP(drive);
         
         QJsonObject result;
@@ -546,7 +561,13 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
     } else if (subCommand == "insert_cartridge") {
         // Insert cartridge
         QString path = params["path"].toString();
-        
+
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
+
         QString validatedPath = validateAndNormalizePath(path);
         if (validatedPath.isEmpty()) {
             sendResponse(client, requestId, false, QJsonValue(), 
@@ -576,6 +597,12 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
         
     } else if (subCommand == "eject_cartridge") {
         // Eject cartridge using CartridgeWidget
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
+
         bool success = m_mainWindow->ejectCartridgeViaTCP();
         
         if (success) {
@@ -631,7 +658,13 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
                         "Invalid drive number. Must be 1-8");
             return;
         }
-        
+
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
+
         bool success = m_mainWindow->enableDriveViaTCP(drive, true);
         
         QJsonObject result;
@@ -654,7 +687,13 @@ void TCPServer::handleMediaCommand(QTcpSocket* client, const QJsonObject& reques
                         "Invalid drive number. Must be 1-8");
             return;
         }
-        
+
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
+
         bool success = m_mainWindow->enableDriveViaTCP(drive, false);
         
         QJsonObject result;
@@ -1845,6 +1884,12 @@ void TCPServer::handleConfigCommand(QTcpSocket* client, const QJsonObject& reque
         QString internalFormat = "-" + machineType;
         m_emulator->setMachineType(internalFormat);
 
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
+
         // Restart the emulator to apply the change
         m_mainWindow->requestEmulatorRestart();
 
@@ -1884,6 +1929,12 @@ void TCPServer::handleConfigCommand(QTcpSocket* client, const QJsonObject& reque
         // Add dash prefix for internal format
         QString internalFormat = "-" + videoSystem;
         m_emulator->setVideoSystem(internalFormat);
+
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
 
         // Restart the emulator to apply the change
         m_mainWindow->requestEmulatorRestart();
@@ -2180,7 +2231,13 @@ void TCPServer::handleConfigCommand(QTcpSocket* client, const QJsonObject& reque
                         "Path is not a directory: " + path);
             return;
         }
-        
+
+        if (!m_mainWindow) {
+            sendResponse(client, requestId, false, QJsonValue(),
+                        "Main window not available");
+            return;
+        }
+
         bool success = m_mainWindow->setHardDrivePathViaTCP(drive, path);
         
         if (success) {
