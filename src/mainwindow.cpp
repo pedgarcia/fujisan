@@ -327,7 +327,9 @@ MainWindow::~MainWindow()
             m_emulatorThread->quit();
             m_emulatorThread->wait(5000);
         } else {
-            // Thread never started or already stopped — everything is on main thread.
+            // Thread not running (never started, or already finished).  AtariEmulator
+            // may still have affinity to that thread — do NOT assume main-thread ownership.
+            // shutdown()/teardownAudio() handle cross-thread and dead-worker cases.
             m_emulator->shutdown();
             m_emulator->teardownAudio();
         }

@@ -916,7 +916,48 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
 
 void AtariEmulator::shutdown()
 {
-    m_frameTimer->stop();
+    // Must not call m_frameTimer->stop() from a thread other than the object's thread()
+    // (same rule as pauseEmulation).  MainWindow::~MainWindow() may run when the worker
+    // thread has already stopped but AtariEmulator still has affinity to it — in that
+    // case QTimer::stop() from the main thread crashes inside Qt.
+    if (QThread::currentThread() != thread()) {
+        if (thread() && thread()->isRunning()) {
+            QMetaObject::invokeMethod(this, "shutdown", Qt::BlockingQueuedConnection);
+            return;
+        }
+        // Worker's event loop is gone; skip timer teardown (would be UB).  Tear down
+        // lib only if it was still marked initialized.
+        if (!m_libatari800Initialized) {
+            return;
+        }
+        // Orphan the frame timer so ~QObject does not destroy it from this thread
+        // (the timer still has the dead worker's affinity).
+        if (m_frameTimer) {
+            m_frameTimer->disconnect();
+            m_frameTimer->setParent(nullptr);
+            m_frameTimer = nullptr;
+        }
+        m_libatari800Initialized = false;
+        if (BINLOAD_bin_file != NULL) {
+            fclose(BINLOAD_bin_file);
+            BINLOAD_bin_file = NULL;
+        }
+        BINLOAD_start_binloading = FALSE;
+#ifdef NETSIO
+        netsio_shutdown();
+#endif
+        libatari800_exit();
+        return;
+    }
+
+    if (m_frameTimer) {
+        m_frameTimer->stop();
+    }
+
+    // Idempotent: ~AtariEmulator and MainWindow may both call shutdown().
+    if (!m_libatari800Initialized) {
+        return;
+    }
 
     // Before libatari800_exit(): queued single-shot timers (e.g. injectAKey) must not call
     // libatari800_clear_input_array(), which writes lib globals that exit() tears down.
@@ -940,6 +981,39 @@ void AtariEmulator::shutdown()
 
 void AtariEmulator::teardownAudio()
 {
+    if (QThread::currentThread() != thread()) {
+        if (thread() && thread()->isRunning()) {
+            QMetaObject::invokeMethod(this, "teardownAudio", Qt::BlockingQueuedConnection);
+            return;
+        }
+        // Worker thread is gone; do not call stop()/delete on QObjects that still have
+        // that thread affinity.  Orphan them so ~AtariEmulator does not auto-delete
+        // children from the main thread (which would crash in timers/audio/SDL).
+        if (m_audioOutput) {
+            m_audioOutput->disconnect();
+            m_audioOutput->setParent(nullptr);
+            m_audioOutput = nullptr;
+            m_audioDevice = nullptr;
+        }
+#ifdef HAVE_SDL2_AUDIO
+        if (m_unifiedAudio) {
+            m_unifiedAudio->setParent(nullptr);
+            m_unifiedAudio = nullptr;
+        }
+        if (m_sdl2Audio) {
+            m_sdl2Audio->setParent(nullptr);
+            m_sdl2Audio = nullptr;
+        }
+#endif
+#ifdef HAVE_SDL2_JOYSTICK
+        if (m_joystickManager) {
+            m_joystickManager->setParent(nullptr);
+            m_joystickManager = nullptr;
+        }
+#endif
+        return;
+    }
+
     // Must be called on the thread that owns the QAudioOutput — i.e. the thread
     // that called start().  MainWindow::~MainWindow() ensures this:
     //  • If the emulator thread is running, it calls this via BlockingQueuedConnection
@@ -948,7 +1022,6 @@ void AtariEmulator::teardownAudio()
     //  • If the emulator thread is not running (first run, thread never started, or
     //    already stopped), MainWindow calls this directly on the main thread, where
     //    QAudioOutput was created at startup.
-    // In both cases the caller guarantees we are on the correct thread.
     if (m_audioOutput) {
         m_audioOutput->disconnect();
         m_audioOutput->stop();
