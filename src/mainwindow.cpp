@@ -296,12 +296,28 @@ MainWindow::~MainWindow()
 
     if (m_emulator) {
         if (m_emulatorThread && m_emulatorThread->isRunning()) {
+            // Shut down the emulator core on its own thread (stops frame timer,
+            // calls libatari800_exit, clears m_libatari800Initialized).
             QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
+
+            // Disconnect the QThread::finished → deleteLater connection so the
+            // emulator is NOT deleted on the worker thread.  We will delete it
+            // below on the main thread after the thread has fully stopped.
+            disconnect(m_emulatorThread, &QThread::finished, m_emulator, &QObject::deleteLater);
+
             m_emulatorThread->quit();
             m_emulatorThread->wait(5000);
         } else {
             m_emulator->shutdown();
         }
+
+        // Delete the emulator here, on the main thread.  ~AtariEmulator tears
+        // down QAudioOutput; the first one was created on the main thread (before
+        // moveToThread) so its internal QTimers must be stopped here — not on
+        // the worker thread — to avoid "Timers cannot be stopped from another
+        // thread" and the resulting crash/bus error.
+        delete m_emulator;
+        m_emulator = nullptr;
     }
 }
 
