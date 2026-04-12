@@ -3597,10 +3597,8 @@ void MainWindow::sendNextCharacter()
         return;
     }
 
-    // Send character and immediately clear in single phase
     QChar ch = m_pasteBuffer.at(m_pasteIndex);
     m_emulator->injectCharacter(ch.toLatin1());
-    m_emulator->clearInput();
     m_pasteIndex++;
 
     // Allow some processing time

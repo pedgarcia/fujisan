@@ -1044,6 +1044,20 @@ void AtariEmulator::processFrame()
             checkBreakpoints();
         }
     }
+
+    {
+        QMutexLocker inputLock(&m_inputMutex);
+        if (m_injectKeyFramesRemaining > 0) {
+            m_injectKeyFramesRemaining--;
+            if (m_injectKeyFramesRemaining == 0) {
+                libatari800_clear_input_array(&m_currentInput);
+                m_currentInput.joy0 = 0x0f ^ 0xff;
+                m_currentInput.joy1 = 0x0f ^ 0xff;
+                m_currentInput.trig0 = 0;
+                m_currentInput.trig1 = 0;
+            }
+        }
+    }
     
     // Disk I/O monitoring is now handled by libatari800 callback
 
@@ -3054,25 +3068,13 @@ void AtariEmulator::injectCharacter(char ch)
         // Circumflex
         m_currentInput.keycode = AKEY_CIRCUMFLEX;
     } else {
+        m_injectKeyFramesRemaining = 0;
         return;
     }
-    
-    // IMPROVED FIX: Let the input persist for multiple frames to ensure proper processing
-    // The main emulation loop will process this input over several frames
-    // Don't clear immediately - let the regular frame processing handle it
-    
-    // Process a few frames to ensure the character is registered
-    for (int i = 0; i < 3; i++) {
-        libatari800_next_frame(&m_currentInput);
-    }
-    
-    // Now clear the input after multiple frame processing
-    libatari800_clear_input_array(&m_currentInput);
-    // Restore joystick center positions after clearing
-    m_currentInput.joy0 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.joy1 = 0x0f ^ 0xff;  // INPUT_STICK_CENTRE for libatari800
-    m_currentInput.trig0 = 0;  // 0 = released (inverted for libatari800)
-    m_currentInput.trig1 = 0;  // 0 = released (inverted for libatari800)
+
+    // Keep the key asserted for several emulator-thread frames only — never call
+    // libatari800_next_frame() from here (main thread / TCP thread); it races processFrame().
+    m_injectKeyFramesRemaining = 3;
 }
 
 void AtariEmulator::injectAKey(int akeyCode)
@@ -3103,6 +3105,12 @@ void AtariEmulator::injectAKey(int akeyCode)
         m_currentInput.trig0 = 0;
         m_currentInput.trig1 = 0;
     });
+}
+
+int AtariEmulator::injectedKeyFramesRemainingForTest() const
+{
+    QMutexLocker inputLock(&m_inputMutex);
+    return m_injectKeyFramesRemaining;
 }
 
 void AtariEmulator::clearInput()

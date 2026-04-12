@@ -318,6 +318,9 @@ public:
     void injectAKey(int akeyCode);  // For raw AKEY code injection
     void clearInput();
 
+    /// Thread-safe; for unit tests verifying paste/TCP injection (see test_character_injection).
+    int injectedKeyFramesRemainingForTest() const;
+
     // Caps lock control
     void setCapsLock(bool enabled);  // Set caps lock to specific state
     bool getCapsLockState() const;   // Get current caps lock state
@@ -378,7 +381,10 @@ private:
 
     // Protects m_currentInput against concurrent access between the main thread
     // (keyboard/joystick events) and the emulator thread (processFrame snapshot).
-    QMutex m_inputMutex;
+    mutable QMutex m_inputMutex;
+    // Injected keys (paste / TCP) must only advance libatari800 on the emulator thread.
+    // Hold the injected key for this many processFrame() iterations, then clear.
+    int m_injectKeyFramesRemaining = 0;
 
     // Reusable frame image buffer; its shared data is detached (copy-on-write) each
     // time the emulator thread writes a new frame while the previous one is still

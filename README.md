@@ -502,10 +502,10 @@ Fujisan includes an automated test suite built with QTest. Tests are opt-in via 
 ### Running Tests
 
 ```bash
-# Configure with tests enabled
+# Configure with tests enabled (first build also builds libatari800 for emulator-linked tests)
 cmake -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -B build-test
 
-# Build
+# Build all test executables
 cmake --build build-test -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # Run all tests
@@ -525,7 +525,16 @@ QT_QPA_PLATFORM=offscreen ./build-test/tests/test_profiles testJsonRoundTrip
 
 # Verbose output (shows each PASS/FAIL)
 QT_QPA_PLATFORM=offscreen ./build-test/tests/test_audio -v2
+
+# Paste / character-injection regression (via ctest name filter)
+QT_QPA_PLATFORM=offscreen ctest --test-dir build-test -R test_character_injection -V
+
+# Same suite: run the executable directly (optional: one test function)
+QT_QPA_PLATFORM=offscreen ./build-test/tests/test_character_injection
+QT_QPA_PLATFORM=offscreen ./build-test/tests/test_character_injection testInjectCharacterFromNonEmulatorThreadDoesNotCrash
 ```
+
+`test_character_injection` initializes libatari800 on a worker thread and calls `injectCharacter()` from the test thread, matching how the UI pastes into BASIC. It guards against regressions where the core is stepped from the wrong thread (which previously caused crashes).
 
 ### Available Test Suites
 
@@ -538,6 +547,7 @@ QT_QPA_PLATFORM=offscreen ./build-test/tests/test_audio -v2
 | `test_fujinet_widget` | Widget state, LED transitions, button signal emission |
 | `test_fujinet_service` | HTTP health check (mock server), connection state, drive polling |
 | `test_fujinet_process` | Process lifecycle, forceKill, exit codes, stdout capture |
+| `test_character_injection` | Paste/TCP `injectCharacter()` from non-emulator thread with libatari800 on a worker thread (no cross-thread `next_frame`) |
 
 ### Build Artifact Validation
 

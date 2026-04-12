@@ -104,7 +104,7 @@ jobs:
         run: |
           find build -name "atari800_external-patch*.log" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || true
 
-      # -- Run tests --
+      # -- Run tests (all add_test targets, including test_character_injection / libatari800) --
       - name: Run tests
         run: ctest --test-dir build --output-on-failure --timeout 120
         env:
