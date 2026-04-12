@@ -25,6 +25,7 @@
 #include <QJsonObject>
 #include <QMutex>
 #include <QImage>
+#include <atomic>
 
 #ifdef HAVE_SDL2_AUDIO
 // Forward declaration to avoid including SDL headers here
@@ -203,12 +204,6 @@ public:
     void enableAudio(bool enabled);
     bool isAudioEnabled() const { return m_audioEnabled; }
     void setVolume(float volume);
-    /// Returns true if the current QAudioOutput was created on the emulator thread
-    /// (i.e. after at least one restart).  Used by MainWindow to decide which thread
-    /// to call teardownAudio() from.
-    bool isAudioOnEmulatorThread() const {
-        return m_audioOutput && (m_audioOutput->thread() == thread());
-    }
     
     // Audio backend selection
     enum AudioBackend {
@@ -228,10 +223,19 @@ public:
     Q_INVOKABLE void resetNetSIOClientState();
     Q_INVOKABLE void ensureNetsioEnabled();
 
-    /// Tear down QAudioOutput (and stop SDL audio) while still on the owning thread.
-    /// Must be called via BlockingQueuedConnection on the emulator thread before the
-    /// thread is quit()ted, so that timers are stopped on the thread that registered them.
-    Q_INVOKABLE void teardownAudio();
+    /// Tear down audio output objects (Qt audio, SDL backends). Must be called on the
+    /// thread that owns the emulator (the worker thread during normal operation).
+    void teardownAudio();
+    /// Runs shutdown(), teardownAudio(), clears deferred QMetaCallEvents for this object,
+    /// moveToThread(GUI), then quits the worker thread. Must be invoked with
+    /// Qt::QueuedConnection from the GUI thread after requestShutdown() so timers are
+    /// stopped on the worker and the object tree is re-homed before delete on the GUI.
+    Q_INVOKABLE void finalizeShutdownOnWorkerAndRehomeToGui();
+    /// Signal the emulator to stop processing frames. Safe to call from any thread.
+    /// Then queue finalizeShutdownOnWorkerAndRehomeToGui() on the worker.
+    void requestShutdown() { m_shuttingDown.store(true); }
+    void setDeferTimerStart(bool defer) { m_deferTimerStart = defer; }
+    void startDeferredTimers();
     Q_INVOKABLE bool shouldAutoColdBootForFujiNet();
     bool isPendingFujiNetBoot() const { return m_pendingFujiNetBoot; }
     bool updateHardDrivePath(int driveNumber, const QString& path);
@@ -534,6 +538,8 @@ private:
     // FujiNet-PC is confirmed ready, so the Atari can actually load from it.
     bool m_pendingFujiNetBoot = false;
     bool m_libatari800Initialized = false;  // Tracks whether libatari800_init() succeeded; reset by shutdown() to prevent double libatari800_exit()
+    std::atomic<bool> m_shuttingDown{false}; // Set from GUI thread to interrupt processFrame before cleanup lambda runs
+    bool m_deferTimerStart = false;          // When true, requestNextFrame() records intent but doesn't start the timer (call startDeferredTimers() on the worker later)
 
     // Current profile name for state saves
     QString m_currentProfileName;

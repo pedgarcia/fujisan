@@ -89,8 +89,13 @@ void SDL2JoystickManager::shutdown()
         return;
     }
 
-    // Stop polling
-    setEnabled(false);
+    // Stop polling timer only if we're on the owning thread.
+    if (QThread::currentThread() == thread()) {
+        setEnabled(false);
+    } else {
+        // Cross-thread: just mark disabled without touching the timer.
+        m_enabled = false;
+    }
 
     // Close all joysticks
     closeAllJoysticks();

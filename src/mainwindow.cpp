@@ -96,22 +96,15 @@ MainWindow::MainWindow(QWidget *parent)
     m_pasteTimer->setInterval(75); // 75ms for character/clear cycle
     connect(m_pasteTimer, &QTimer::timeout, this, &MainWindow::sendNextCharacter);
 
-    // Load initial settings and initialize emulator with them (still on main thread,
-    // before moveToThread, so libatari800 init and the frame timer start happen
-    // on the current thread and the timer is then owned by the emulator thread after
-    // the moveToThread call below).
-    loadInitialSettings();
-    loadVideoSettings();
-
-    // Now move the emulator to its dedicated thread.  After this point the frame
-    // timer fires on the emulator thread so netsio_recv_byte() blocking inside
-    // libatari800_next_frame() cannot freeze the Qt main / UI event loop.
-    // frameReady(QImage) is automatically delivered via QueuedConnection since
-    // sender (emulator thread) and receiver (EmulatorWidget, main thread) have
-    // different thread affinities once moveToThread completes.
+    // Move the emulator to its worker thread BEFORE loadInitialSettings.
+    // loadInitialSettings runs emulator init via BlockingQueuedConnection so
+    // all timer starts (frame timer, joystick poll timer) happen on the worker.
     m_emulator->moveToThread(m_emulatorThread);
     connect(m_emulatorThread, &QThread::finished, m_emulator, &QObject::deleteLater);
     m_emulatorThread->start();
+
+    loadInitialSettings();
+    loadVideoSettings();
 
     // Show initial status message
     statusBar()->showMessage("Fujisan ready", 3000);
@@ -269,6 +262,40 @@ MainWindow::MainWindow(QWidget *parent)
     qDebug() << "Fujisan initialized successfully";
 }
 
+void MainWindow::stopEmulatorWorkerIfRunning()
+{
+    if (!m_emulator || !m_emulatorThread || !m_emulatorThread->isRunning()) {
+        return;
+    }
+    AtariEmulator* emu = m_emulator;
+    // Keep m_emulator until delete succeeds so ~MainWindow does not run shutdown/delete
+    // on a worker-affined emulator if this path fails partway.
+    disconnect(m_emulatorThread, &QThread::finished, emu, &QObject::deleteLater);
+    // Stop the frame loop from re-arming; then worker runs full teardown, re-homes the
+    // QObject tree to the GUI thread, and quits. Deleting emu on the GUI thread without
+    // moveToThread would leave timers with worker affinity and trigger killTimer from
+    // the wrong thread (~QObject / QTimer). See Qt thread affinity rules.
+    emu->requestShutdown();
+    if (!QMetaObject::invokeMethod(emu, "finalizeShutdownOnWorkerAndRehomeToGui",
+                                   Qt::QueuedConnection)) {
+        qWarning() << "Failed to queue finalizeShutdownOnWorkerAndRehomeToGui on emulator thread";
+        m_emulatorThread->quit();
+    }
+    // Allow NetSIO wait (up to ~3s) plus teardown; QueuedConnection avoids GUI deadlock.
+    if (!m_emulatorThread->wait(8000)) {
+        qWarning() << "Emulator thread did not stop in time; forcing termination";
+        m_emulatorThread->terminate();
+        m_emulatorThread->wait(1000);
+    }
+    if (emu->thread() != QCoreApplication::instance()->thread()) {
+        qWarning() << "Emulator was not moved to GUI thread; skipping delete to avoid undefined behavior";
+        m_emulator = nullptr;
+        return;
+    }
+    delete emu;
+    m_emulator = nullptr;
+}
+
 MainWindow::~MainWindow()
 {
     if (qApp) {
@@ -295,46 +322,13 @@ MainWindow::~MainWindow()
     }
 
     if (m_emulator) {
-        if (m_emulatorThread && m_emulatorThread->isRunning()) {
-            // 1. Shut down the emulator core on its own thread.
-            QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
-
-            // 2. Tear down audio on the emulator thread while it is still running.
-            //
-            //    QAudioOutput registers internal QTimers on the thread that called
-            //    start().  After any restart, start() was called on the emulator
-            //    thread (setupAudio runs via BlockingQueuedConnection), so we must
-            //    call stop()+delete on the emulator thread.
-            //
-            //    First-run edge case: if no restart ever happened, QAudioOutput was
-            //    created on the main thread (loadInitialSettings runs before
-            //    moveToThread).  We handle this by tearing it down on the main thread
-            //    here, directly, before handing over to the emulator thread — because
-            //    at this point the emulator thread is blocked waiting for us and the
-            //    main thread's event loop is idle (no pump), so it is safe.
-            if (m_emulator->isAudioOnEmulatorThread()) {
-                // Post-restart: audio timers are on the emulator thread.
-                QMetaObject::invokeMethod(m_emulator, "teardownAudio", Qt::BlockingQueuedConnection);
-            } else {
-                // First-run: audio timers are on the main thread — tear down here.
-                m_emulator->teardownAudio();
-            }
-
-            // 3. Disconnect finished→deleteLater so the emulator is NOT deleted on
-            //    the worker thread after we stop it.
-            disconnect(m_emulatorThread, &QThread::finished, m_emulator, &QObject::deleteLater);
-
-            m_emulatorThread->quit();
-            m_emulatorThread->wait(5000);
-        } else {
-            // Thread not running (never started, or already finished).  AtariEmulator
-            // may still have affinity to that thread — do NOT assume main-thread ownership.
-            // shutdown()/teardownAudio() handle cross-thread and dead-worker cases.
-            m_emulator->shutdown();
-            m_emulator->teardownAudio();
-        }
-
-        // Thread fully stopped. Delete on main thread — audio already gone.
+        stopEmulatorWorkerIfRunning();
+    }
+    // If the worker was already stopped (or never started), the emulator was never
+    // cleaned up above. Handle that edge case.
+    if (m_emulator) {
+        m_emulator->shutdown();
+        m_emulator->teardownAudio();
         delete m_emulator;
         m_emulator = nullptr;
     }
@@ -3089,65 +3083,64 @@ void MainWindow::loadInitialSettings()
     qDebug() << "Altirra OS enabled:" << altirraOSEnabled;
     qDebug() << "Altirra BASIC enabled:" << altirraBASICEnabled;
 
-    // Initialize emulator with loaded settings including display and input options
-    if (!m_emulator->initializeWithNetSIOConfig(basicEnabled, machineType, videoSystem, artifactMode,
-                                               horizontalArea, verticalArea, horizontalShift, verticalShift,
-                                               fitScreen, show80Column, vSyncEnabled,
-                                               kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
-                                               netSIOEnabled, rtimeEnabled)) {
+    // Initialize emulator on the worker thread. initializeWithNetSIOConfig calls
+    // requestNextFrame → m_frameTimer->start(), and setRealJoysticksEnabled calls
+    // m_pollTimer->start(). QTimer::start() registers with the *current* thread's
+    // event loop, so these must run on the worker — not the GUI thread.
+#ifdef HAVE_SDL2_JOYSTICK
+    QString joystick1Device = settings.value("input/joystick1Device", "keyboard").toString();
+    QString joystick2Device = settings.value("input/joystick2Device", "keyboard").toString();
+    bool realJoysticksNeeded = joystick1Device.startsWith("sdl_") || joystick2Device.startsWith("sdl_");
+#endif
+    QString joy0Preset = settings.value("input/joystick1Preset", "numpad").toString();
+    QString joy1Preset = settings.value("input/joystick2Preset", "wasd").toString();
+    bool turboMode = settings.value("machine/turboMode", false).toBool();
+    int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt();
+    int speedPercentage;
+    if (turboMode) {
+        speedPercentage = 0;
+    } else if (speedIndex == 0) {
+        speedPercentage = 50;
+    } else {
+        speedPercentage = speedIndex * 100;
+    }
+
+    bool initSuccess = false;
+    QMetaObject::invokeMethod(m_emulator, [&, this]() {
+        initSuccess = m_emulator->initializeWithNetSIOConfig(
+            basicEnabled, machineType, videoSystem, artifactMode,
+            horizontalArea, verticalArea, horizontalShift, verticalShift,
+            fitScreen, show80Column, vSyncEnabled,
+            kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
+            netSIOEnabled, rtimeEnabled);
+        if (initSuccess) {
+            m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
+            m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
+            m_emulator->setJoysticksSwapped(swapJoysticks);
+            m_emulator->setJoystick0Preset(joy0Preset);
+            m_emulator->setJoystick1Preset(joy1Preset);
+            m_emulator->setEmulationSpeed(speedPercentage);
+#ifdef HAVE_SDL2_JOYSTICK
+            m_emulator->setJoystick1Device(joystick1Device);
+            m_emulator->setJoystick2Device(joystick2Device);
+            m_emulator->setRealJoysticksEnabled(realJoysticksNeeded);
+#endif
+        }
+    }, Qt::BlockingQueuedConnection);
+
+    if (!initSuccess) {
         QMessageBox::critical(this, "Error", "Failed to initialize Atari800 emulator");
         QApplication::quit();
         return;
     }
-
-    // Ensure keyboard joystick state is properly applied after initialization
-    // This is needed because the initial state from command line args might not match
-    // the effective state we want (main joystick disabled should disable kbd joy)
-    m_emulator->setKbdJoy0Enabled(kbdJoy0Enabled);
-    m_emulator->setKbdJoy1Enabled(kbdJoy1Enabled);
-    m_emulator->setJoysticksSwapped(swapJoysticks);
-    m_emulator->setJoystick0Preset(settings.value("input/joystick1Preset", "numpad").toString());
-    m_emulator->setJoystick1Preset(settings.value("input/joystick2Preset", "wasd").toString());
     qDebug() << "Applied keyboard joystick state after init - Joy0:" << kbdJoy0Enabled << "Joy1:" << kbdJoy1Enabled;
-
 #ifdef HAVE_SDL2_JOYSTICK
-    // Load USB joystick device assignments
-    // This ensures USB joysticks work on startup, not just after opening settings dialog
-    QString joystick1Device = settings.value("input/joystick1Device", "keyboard").toString();
-    QString joystick2Device = settings.value("input/joystick2Device", "keyboard").toString();
-
-    m_emulator->setJoystick1Device(joystick1Device);
-    m_emulator->setJoystick2Device(joystick2Device);
-
-    // Enable SDL joystick manager if any SDL device is selected
-    bool realJoysticksNeeded = joystick1Device.startsWith("sdl_") || joystick2Device.startsWith("sdl_");
-    m_emulator->setRealJoysticksEnabled(realJoysticksNeeded);
-
     qDebug() << "Applied joystick device assignments - Joy1:" << joystick1Device
              << "Joy2:" << joystick2Device << "SDL enabled:" << realJoysticksNeeded;
 #endif
 
     // Load and apply media settings (disk images, etc.)
     loadAndApplyMediaSettings();
-
-    // Load and apply speed settings
-    bool turboMode = settings.value("machine/turboMode", false).toBool();
-    int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt(); // Default to 1x (index 1)
-
-    // Convert speed index to percentage
-    int speedPercentage;
-    if (turboMode) {
-        // Turbo mode = host speed (unlimited)
-        speedPercentage = 0;
-    } else if (speedIndex == 0) {
-        // Index 0 = 0.5x speed
-        speedPercentage = 50;
-    } else {
-        // Index 1-10 = 1x-10x speed (index * 100)
-        speedPercentage = speedIndex * 100;
-    }
-
-    m_emulator->setEmulationSpeed(speedPercentage);
     qDebug() << "Applied speed settings - Turbo:" << turboMode << "Index:" << speedIndex << "Percentage:" << speedPercentage;
 
     // Update toolbar to reflect loaded settings
@@ -3656,13 +3649,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 
     if (m_emulator) {
-        if (m_emulatorThread && m_emulatorThread->isRunning()) {
-            QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
-            m_emulatorThread->quit();
-            m_emulatorThread->wait(5000);
-        } else {
-            m_emulator->shutdown();
-        }
+        stopEmulatorWorkerIfRunning();
     }
     event->accept();
 }

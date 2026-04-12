@@ -27,6 +27,7 @@
 #include <QMutexLocker>
 #include <QThread>
 #include <QCoreApplication>
+#include <QEvent>
 #include <QByteArray>
 #include <cstring>  // for memset
 #include <vector>   // for std::vector
@@ -165,15 +166,12 @@ AtariEmulator::AtariEmulator(QObject *parent)
 
 AtariEmulator::~AtariEmulator()
 {
-    // Clear the global instance pointer
     if (s_emulatorInstance == this) {
         s_emulatorInstance = nullptr;
         libatari800_set_disk_activity_callback(nullptr);
     }
     shutdown();
-    // Audio backends are torn down by teardownAudio(), which MainWindow calls
-    // via BlockingQueuedConnection on the emulator thread before stopping it.
-    // By the time we reach here all audio objects are already null.
+    teardownAudio();
 }
 
 bool AtariEmulator::initialize()
@@ -833,6 +831,17 @@ bool AtariEmulator::initializeWithInputConfig(bool basicEnabled, const QString& 
 
         // Schedule first frame
         requestNextFrame();
+#ifdef HAVE_SDL2_JOYSTICK
+        // shutdown() calls SDL2JoystickManager::shutdown() before lib exit; re-open SDL
+        // and restore polling if real joysticks were enabled (restart path).
+        if (m_joystickManager) {
+            if (!m_joystickManager->initialize()) {
+                qWarning() << "SDL joystick re-initialization after restart failed";
+            } else {
+                m_joystickManager->setEnabled(m_realJoysticksEnabled);
+            }
+        }
+#endif
         qDebug() << "=== INITIALIZATION COMPLETE - Emulator started successfully ===";
         return true;
     }
@@ -916,54 +925,26 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
 
 void AtariEmulator::shutdown()
 {
-    // Must not call m_frameTimer->stop() from a thread other than the object's thread()
-    // (same rule as pauseEmulation).  MainWindow::~MainWindow() may run when the worker
-    // thread has already stopped but AtariEmulator still has affinity to it — in that
-    // case QTimer::stop() from the main thread crashes inside Qt.
-    if (QThread::currentThread() != thread()) {
-        if (thread() && thread()->isRunning()) {
-            QMetaObject::invokeMethod(this, "shutdown", Qt::BlockingQueuedConnection);
-            return;
-        }
-        // Worker's event loop is gone; skip timer teardown (would be UB).  Tear down
-        // lib only if it was still marked initialized.
-        if (!m_libatari800Initialized) {
-            return;
-        }
-        // Orphan the frame timer so ~QObject does not destroy it from this thread
-        // (the timer still has the dead worker's affinity).
-        if (m_frameTimer) {
-            m_frameTimer->disconnect();
-            m_frameTimer->setParent(nullptr);
-            m_frameTimer = nullptr;
-        }
-        m_libatari800Initialized = false;
-        if (BINLOAD_bin_file != NULL) {
-            fclose(BINLOAD_bin_file);
-            BINLOAD_bin_file = NULL;
-        }
-        BINLOAD_start_binloading = FALSE;
-#ifdef NETSIO
-        netsio_shutdown();
-#endif
-        libatari800_exit();
-        return;
-    }
-
-    if (m_frameTimer) {
+    m_shuttingDown.store(false);  // reset so restart works
+    // Only stop the frame timer if we're on the thread that owns it.
+    // When called after stopEmulatorWorkerIfRunning (worker already quit),
+    // the timer is already inactive — skip to avoid the cross-thread warning.
+    if (m_frameTimer && QThread::currentThread() == thread()) {
         m_frameTimer->stop();
     }
 
-    // Idempotent: ~AtariEmulator and MainWindow may both call shutdown().
+#ifdef HAVE_SDL2_JOYSTICK
+    if (m_joystickManager) {
+        m_joystickManager->shutdown();
+    }
+#endif
+
     if (!m_libatari800Initialized) {
         return;
     }
 
-    // Before libatari800_exit(): queued single-shot timers (e.g. injectAKey) must not call
-    // libatari800_clear_input_array(), which writes lib globals that exit() tears down.
     m_libatari800Initialized = false;
 
-    // Clear BINLOAD state to prevent XEX from persisting across restarts/profile loads
     if (BINLOAD_bin_file != NULL) {
         fclose(BINLOAD_bin_file);
         BINLOAD_bin_file = NULL;
@@ -971,57 +952,51 @@ void AtariEmulator::shutdown()
     BINLOAD_start_binloading = FALSE;
 
 #ifdef NETSIO
-    // Perform a clean NetSIO shutdown so FujiNet-PC sees a proper
-    // device disconnect before the atari800 core is torn down.
     netsio_shutdown();
 #endif
 
     libatari800_exit();
 }
 
-void AtariEmulator::teardownAudio()
+void AtariEmulator::startDeferredTimers()
 {
-    if (QThread::currentThread() != thread()) {
-        if (thread() && thread()->isRunning()) {
-            QMetaObject::invokeMethod(this, "teardownAudio", Qt::BlockingQueuedConnection);
-            return;
-        }
-        // Worker thread is gone; do not call stop()/delete on QObjects that still have
-        // that thread affinity.  Orphan them so ~AtariEmulator does not auto-delete
-        // children from the main thread (which would crash in timers/audio/SDL).
-        if (m_audioOutput) {
-            m_audioOutput->disconnect();
-            m_audioOutput->setParent(nullptr);
-            m_audioOutput = nullptr;
-            m_audioDevice = nullptr;
-        }
-#ifdef HAVE_SDL2_AUDIO
-        if (m_unifiedAudio) {
-            m_unifiedAudio->setParent(nullptr);
-            m_unifiedAudio = nullptr;
-        }
-        if (m_sdl2Audio) {
-            m_sdl2Audio->setParent(nullptr);
-            m_sdl2Audio = nullptr;
-        }
-#endif
-#ifdef HAVE_SDL2_JOYSTICK
-        if (m_joystickManager) {
-            m_joystickManager->setParent(nullptr);
-            m_joystickManager = nullptr;
-        }
-#endif
+    if (!m_deferTimerStart) {
         return;
     }
+    m_deferTimerStart = false;
+    // Reset the absolute-time baseline so the first frame is scheduled from now.
+    m_firstFrameTime = std::chrono::steady_clock::now();
+    m_frameCount = 0;
+    // Arm the frame timer on this (worker) thread.
+    if (m_libatari800Initialized && !m_shuttingDown.load()) {
+        m_frameTimer->start(0);
+    }
+#ifdef HAVE_SDL2_JOYSTICK
+    // Re-apply joystick polling on the worker thread.
+    if (m_joystickManager && m_realJoysticksEnabled) {
+        m_joystickManager->setEnabled(true);
+    }
+#endif
+}
 
-    // Must be called on the thread that owns the QAudioOutput — i.e. the thread
-    // that called start().  MainWindow::~MainWindow() ensures this:
-    //  • If the emulator thread is running, it calls this via BlockingQueuedConnection
-    //    so it executes on the emulator thread.  After any restart, QAudioOutput was
-    //    created/started on the emulator thread, so stop()+delete are safe.
-    //  • If the emulator thread is not running (first run, thread never started, or
-    //    already stopped), MainWindow calls this directly on the main thread, where
-    //    QAudioOutput was created at startup.
+void AtariEmulator::finalizeShutdownOnWorkerAndRehomeToGui()
+{
+    if (QThread::currentThread() != thread()) {
+        return;
+    }
+    shutdown();
+    teardownAudio();
+    // Drop QTimer::singleShot / queued slot calls targeting this object on the worker.
+    QCoreApplication::removePostedEvents(this, QEvent::MetaCall);
+    QThread* gui = QCoreApplication::instance()->thread();
+    if (thread() != gui) {
+        moveToThread(gui);
+    }
+    QThread::currentThread()->quit();
+}
+
+void AtariEmulator::teardownAudio()
+{
     if (m_audioOutput) {
         m_audioOutput->disconnect();
         m_audioOutput->stop();
@@ -1061,7 +1036,7 @@ void AtariEmulator::clearCurrentInputLocked()
 
 void AtariEmulator::processFrame()
 {
-    if (!m_libatari800Initialized) {
+    if (!m_libatari800Initialized || m_shuttingDown.load()) {
         return;
     }
 
@@ -1517,6 +1492,13 @@ QImage AtariEmulator::renderFrameImage()
 
 void AtariEmulator::requestNextFrame()
 {
+    if (m_shuttingDown.load()) {
+        return;
+    }
+    if (m_deferTimerStart) {
+        // Timer start is deferred until startDeferredTimers() is called on the worker.
+        return;
+    }
     // Absolute-time scheduling: each frame fires at firstFrameTime + frameCount * frameTimeMs.
     // Any Qt timer overshoot or undershoot is automatically corrected on the next frame
     // because we always measure the delay relative to the fixed absolute origin.
@@ -4097,7 +4079,7 @@ void AtariEmulator::setRealJoysticksEnabled(bool enabled)
 
     m_realJoysticksEnabled = enabled;
 
-    if (m_joystickManager) {
+    if (m_joystickManager && !m_deferTimerStart) {
         m_joystickManager->setEnabled(enabled);
     }
 }

@@ -179,6 +179,9 @@ private:
     /// Return keyboard focus to the emulator after toolbar / dock / debugger interaction (Win/Linux).
     void restoreEmulatorFocus();
     void installChromeFocusRestore();
+    /// Shutdown + teardown + delete the emulator on the worker, then quit/wait the
+    /// thread. Sets m_emulator to nullptr. No-op if the worker is not running.
+    void stopEmulatorWorkerIfRunning();
     bool widgetIsUnderChrome(const QWidget *w) const;
     bool shouldSuppressChromeFocusRestore(const QWidget *w, QEvent::Type type) const;
 
