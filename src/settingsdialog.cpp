@@ -3509,22 +3509,40 @@ void SettingsDialog::triggerNetSIORestart(bool netSIOEnabled)
     qDebug() << "Restarting emulator with NetSIO:" << netSIOEnabled
              << "RTime:" << rtimeEnabled << "Machine:" << machineType << "Video:" << videoSystem;
 
-    // Reinitialize emulator with new NetSIO configuration
-    if (m_emulator->initializeWithNetSIOConfig(basicEnabled, machineType, videoSystem, artifactMode,
-                                             horizontalArea, verticalArea, horizontalShift, verticalShift,
-                                             fitScreen, show80Column, vSyncEnabled,
-                                             kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
-                                             netSIOEnabled, rtimeEnabled)) {
+    // Shutdown and init must run on the emulator thread (owns m_frameTimer).
+    // Same issue as applySettings() full restart: calling initializeWithNetSIOConfig()
+    // from the dialog thread leaves QTimer::start() ineffective and the frame loop dead
+    // (cold/warm boot then resets CPU state but nothing draws).
+    auto* emulatorThread = m_emulator->thread();
+    bool onEmulatorThread = (emulatorThread == QThread::currentThread());
+    if (!onEmulatorThread && emulatorThread && emulatorThread->isRunning()) {
+        QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
+    } else {
+        m_emulator->shutdown();
+    }
+
+    bool initSuccess = false;
+    auto initFn = [&]() {
+        initSuccess = m_emulator->initializeWithNetSIOConfig(
+            basicEnabled, machineType, videoSystem, artifactMode,
+            horizontalArea, verticalArea, horizontalShift, verticalShift,
+            fitScreen, show80Column, vSyncEnabled,
+            kbdJoy0Enabled, kbdJoy1Enabled, swapJoysticks,
+            netSIOEnabled, rtimeEnabled);
+    };
+
+    if (!onEmulatorThread && emulatorThread && emulatorThread->isRunning()) {
+        QMetaObject::invokeMethod(m_emulator, initFn, Qt::BlockingQueuedConnection);
+    } else {
+        initFn();
+    }
+
+    if (initSuccess) {
         qDebug() << "Emulator restarted successfully with NetSIO" << (netSIOEnabled ? "ENABLED" : "DISABLED");
         qDebug() << "SIO patch updated - Disk access is now" << (netSIOEnabled ? "REALISTIC" : "FAST");
 
-        // Apply other settings that don't require restart
         m_emulator->enableAudio(m_soundEnabled->isChecked());
-
-        // Apply media settings (cartridges, disks, etc.)
         applyMediaSettings();
-
-        // Emit signal to update UI components
         emit settingsChanged();
     } else {
         qDebug() << "Failed to restart emulator with new NetSIO configuration";
@@ -4665,7 +4683,9 @@ void SettingsDialog::checkAndMigrateFujiNetSD()
                     "FujiNet SD card files have been successfully moved to the new location.");
             } else {
                 QMessageBox::warning(this, "Migration Failed",
-                    "Could not move SD card files. Please select a location manually.");
+                    "Could not copy one or more SD card files from the app bundle.\n\n"
+                    "Check disk space, folder permissions, and that nothing is locking files "
+                    "in the destination. You can set the SD folder manually in FujiNet settings.");
             }
         } else if (msgBox.clickedButton() == startFreshButton) {
             m_fujinetSDPath->setText(newDefaultPath);
@@ -4717,6 +4737,11 @@ bool SettingsDialog::migrateFujiNetSDContents(const QString& fromPath, const QSt
                 return false;
             }
         } else {
+            // QFile::copy fails if dest already exists. Users often pre-create
+            // ~/FujiNet-SD or copy files manually; treat existing dest as OK.
+            if (QFile::exists(destPath)) {
+                continue;
+            }
             if (!QFile::copy(entry.absoluteFilePath(), destPath)) {
                 return false;
             }
