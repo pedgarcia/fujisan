@@ -171,36 +171,9 @@ AtariEmulator::~AtariEmulator()
         libatari800_set_disk_activity_callback(nullptr);
     }
     shutdown();
-
-    // Tear down Qt audio output safely.  The destructor may be called from the
-    // emulator thread (via QObject::deleteLater + QThread::finished), but the
-    // first QAudioOutput was created on the main thread (before moveToThread).
-    // Destroying it here would crash with "Timers cannot be stopped from another
-    // thread".  Disconnect signals, move back to the main thread, and defer deletion.
-    if (m_audioOutput) {
-        m_audioOutput->disconnect();
-        m_audioOutput->stop();
-        m_audioOutput->setParent(nullptr);
-        m_audioOutput->moveToThread(QCoreApplication::instance()->thread());
-        m_audioOutput->deleteLater();
-        m_audioOutput = nullptr;
-        m_audioDevice = nullptr;
-    }
-
-    // Clean up unified audio backend
-#ifdef HAVE_SDL2_AUDIO
-    if (m_unifiedAudio) {
-        delete m_unifiedAudio;
-        m_unifiedAudio = nullptr;
-    }
-#endif
-
-#ifdef HAVE_SDL2_AUDIO
-    if (m_sdl2Audio) {
-        delete m_sdl2Audio;
-        m_sdl2Audio = nullptr;
-    }
-#endif
+    // Audio backends are torn down by teardownAudio(), which MainWindow calls
+    // via BlockingQueuedConnection on the emulator thread before stopping it.
+    // By the time we reach here all audio objects are already null.
 }
 
 bool AtariEmulator::initialize()
@@ -963,6 +936,36 @@ void AtariEmulator::shutdown()
 #endif
 
     libatari800_exit();
+}
+
+void AtariEmulator::teardownAudio()
+{
+    // Must be called on the thread that owns the QAudioOutput — i.e. the thread
+    // that called start().  MainWindow::~MainWindow() ensures this:
+    //  • If the emulator thread is running, it calls this via BlockingQueuedConnection
+    //    so it executes on the emulator thread.  After any restart, QAudioOutput was
+    //    created/started on the emulator thread, so stop()+delete are safe.
+    //  • If the emulator thread is not running (first run, thread never started, or
+    //    already stopped), MainWindow calls this directly on the main thread, where
+    //    QAudioOutput was created at startup.
+    // In both cases the caller guarantees we are on the correct thread.
+    if (m_audioOutput) {
+        m_audioOutput->disconnect();
+        m_audioOutput->stop();
+        delete m_audioOutput;
+        m_audioOutput = nullptr;
+        m_audioDevice = nullptr;
+    }
+#ifdef HAVE_SDL2_AUDIO
+    if (m_unifiedAudio) {
+        delete m_unifiedAudio;
+        m_unifiedAudio = nullptr;
+    }
+    if (m_sdl2Audio) {
+        delete m_sdl2Audio;
+        m_sdl2Audio = nullptr;
+    }
+#endif
 }
 
 void AtariEmulator::clearCurrentInputLocked()

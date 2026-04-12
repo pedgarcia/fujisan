@@ -296,26 +296,43 @@ MainWindow::~MainWindow()
 
     if (m_emulator) {
         if (m_emulatorThread && m_emulatorThread->isRunning()) {
-            // Shut down the emulator core on its own thread (stops frame timer,
-            // calls libatari800_exit, clears m_libatari800Initialized).
+            // 1. Shut down the emulator core on its own thread.
             QMetaObject::invokeMethod(m_emulator, "shutdown", Qt::BlockingQueuedConnection);
 
-            // Disconnect the QThread::finished → deleteLater connection so the
-            // emulator is NOT deleted on the worker thread.  We will delete it
-            // below on the main thread after the thread has fully stopped.
+            // 2. Tear down audio on the emulator thread while it is still running.
+            //
+            //    QAudioOutput registers internal QTimers on the thread that called
+            //    start().  After any restart, start() was called on the emulator
+            //    thread (setupAudio runs via BlockingQueuedConnection), so we must
+            //    call stop()+delete on the emulator thread.
+            //
+            //    First-run edge case: if no restart ever happened, QAudioOutput was
+            //    created on the main thread (loadInitialSettings runs before
+            //    moveToThread).  We handle this by tearing it down on the main thread
+            //    here, directly, before handing over to the emulator thread — because
+            //    at this point the emulator thread is blocked waiting for us and the
+            //    main thread's event loop is idle (no pump), so it is safe.
+            if (m_emulator->isAudioOnEmulatorThread()) {
+                // Post-restart: audio timers are on the emulator thread.
+                QMetaObject::invokeMethod(m_emulator, "teardownAudio", Qt::BlockingQueuedConnection);
+            } else {
+                // First-run: audio timers are on the main thread — tear down here.
+                m_emulator->teardownAudio();
+            }
+
+            // 3. Disconnect finished→deleteLater so the emulator is NOT deleted on
+            //    the worker thread after we stop it.
             disconnect(m_emulatorThread, &QThread::finished, m_emulator, &QObject::deleteLater);
 
             m_emulatorThread->quit();
             m_emulatorThread->wait(5000);
         } else {
+            // Thread never started or already stopped — everything is on main thread.
             m_emulator->shutdown();
+            m_emulator->teardownAudio();
         }
 
-        // Delete the emulator here, on the main thread.  ~AtariEmulator tears
-        // down QAudioOutput; the first one was created on the main thread (before
-        // moveToThread) so its internal QTimers must be stopped here — not on
-        // the worker thread — to avoid "Timers cannot be stopped from another
-        // thread" and the resulting crash/bus error.
+        // Thread fully stopped. Delete on main thread — audio already gone.
         delete m_emulator;
         m_emulator = nullptr;
     }

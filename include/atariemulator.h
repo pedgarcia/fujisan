@@ -203,6 +203,12 @@ public:
     void enableAudio(bool enabled);
     bool isAudioEnabled() const { return m_audioEnabled; }
     void setVolume(float volume);
+    /// Returns true if the current QAudioOutput was created on the emulator thread
+    /// (i.e. after at least one restart).  Used by MainWindow to decide which thread
+    /// to call teardownAudio() from.
+    bool isAudioOnEmulatorThread() const {
+        return m_audioOutput && (m_audioOutput->thread() == thread());
+    }
     
     // Audio backend selection
     enum AudioBackend {
@@ -221,6 +227,11 @@ public:
     Q_INVOKABLE void warmBoot();
     Q_INVOKABLE void resetNetSIOClientState();
     Q_INVOKABLE void ensureNetsioEnabled();
+
+    /// Tear down QAudioOutput (and stop SDL audio) while still on the owning thread.
+    /// Must be called via BlockingQueuedConnection on the emulator thread before the
+    /// thread is quit()ted, so that timers are stopped on the thread that registered them.
+    Q_INVOKABLE void teardownAudio();
     Q_INVOKABLE bool shouldAutoColdBootForFujiNet();
     bool isPendingFujiNetBoot() const { return m_pendingFujiNetBoot; }
     bool updateHardDrivePath(int driveNumber, const QString& path);
