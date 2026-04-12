@@ -3,8 +3,8 @@
 # build-macos-separate-dmgs.sh - Build separate DMGs for Intel and Apple Silicon
 #
 # Creates two DMGs:
-# - Fujisan-{version}-arm64.dmg   - For Apple Silicon Macs
-# - Fujisan-{version}-x86_64.dmg  - For Intel Macs
+# - Fujisan-{version}-macOS-Apple-Silicon.dmg  - For Apple Silicon Macs
+# - Fujisan-{version}-macOS-Intel.dmg          - For Intel Macs
 #
 # Each contains a properly configured Fujisan.app with native frameworks
 #
@@ -102,8 +102,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --help               Show this help message"
             echo ""
             echo "Output:"
-            echo "  dist/Fujisan-{version}-arm64.dmg   - Apple Silicon DMG"
-            echo "  dist/Fujisan-{version}-x86_64.dmg  - Intel DMG"
+            echo "  dist/Fujisan-{version}-macOS-Apple-Silicon.dmg  - Apple Silicon DMG"
+            echo "  dist/Fujisan-{version}-macOS-Intel.dmg          - Intel DMG"
             exit 0
             ;;
         *)
@@ -356,7 +356,7 @@ if [[ "$SKIP_ARM64" == "false" ]]; then
     if [[ "$SKIP_DMG" == "false" ]]; then
         echo ""
         create_dmg "$ARM64_BUILD_DIR/Fujisan.app" \
-                   "Fujisan-${PROJECT_VERSION}-arm64.dmg" \
+                   "Fujisan-${PROJECT_VERSION}-macOS-Apple-Silicon.dmg" \
                    "Fujisan (Apple Silicon)"
     fi
     
@@ -426,7 +426,7 @@ if [[ "$SKIP_X86_64" == "false" ]]; then
     if [[ "$SKIP_DMG" == "false" ]]; then
         echo ""
         create_dmg "$X86_64_BUILD_DIR/Fujisan.app" \
-                   "Fujisan-${PROJECT_VERSION}-x86_64.dmg" \
+                   "Fujisan-${PROJECT_VERSION}-macOS-Intel.dmg" \
                    "Fujisan (Intel)"
     fi
     
@@ -436,14 +436,14 @@ fi
 # Final summary
 echo_step "Build Complete"
 
-if [[ -f "$DIST_DIR/Fujisan-${PROJECT_VERSION}-arm64.dmg" ]]; then
-    SIZE=$(du -h "$DIST_DIR/Fujisan-${PROJECT_VERSION}-arm64.dmg" | cut -f1)
-    echo_success "Apple Silicon DMG: Fujisan-${PROJECT_VERSION}-arm64.dmg ($SIZE)"
+if [[ -f "$DIST_DIR/Fujisan-${PROJECT_VERSION}-macOS-Apple-Silicon.dmg" ]]; then
+    SIZE=$(du -h "$DIST_DIR/Fujisan-${PROJECT_VERSION}-macOS-Apple-Silicon.dmg" | cut -f1)
+    echo_success "Apple Silicon DMG: Fujisan-${PROJECT_VERSION}-macOS-Apple-Silicon.dmg ($SIZE)"
 fi
 
-if [[ -f "$DIST_DIR/Fujisan-${PROJECT_VERSION}-x86_64.dmg" ]]; then
-    SIZE=$(du -h "$DIST_DIR/Fujisan-${PROJECT_VERSION}-x86_64.dmg" | cut -f1)
-    echo_success "Intel DMG: Fujisan-${PROJECT_VERSION}-x86_64.dmg ($SIZE)"
+if [[ -f "$DIST_DIR/Fujisan-${PROJECT_VERSION}-macOS-Intel.dmg" ]]; then
+    SIZE=$(du -h "$DIST_DIR/Fujisan-${PROJECT_VERSION}-macOS-Intel.dmg" | cut -f1)
+    echo_success "Intel DMG: Fujisan-${PROJECT_VERSION}-macOS-Intel.dmg ($SIZE)"
 fi
 
 echo ""
@@ -458,5 +458,5 @@ fi
 
 echo ""
 echo "Users should download:"
-echo "  • Apple Silicon Macs (M1/M2/M3): Fujisan-${PROJECT_VERSION}-arm64.dmg"
-echo "  • Intel Macs: Fujisan-${PROJECT_VERSION}-x86_64.dmg"
+echo "  • Apple Silicon Macs (M1/M2/M3): Fujisan-${PROJECT_VERSION}-macOS-Apple-Silicon.dmg"
+echo "  • Intel Macs: Fujisan-${PROJECT_VERSION}-macOS-Intel.dmg"

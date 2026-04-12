@@ -217,7 +217,7 @@ main() {
     
     if [[ ${#dmg_files[@]} -eq 0 ]]; then
         log_error "No Fujisan DMG files found in $DIST_DIR"
-        log_info "Expected files like: Fujisan-v1.0.0-arm64.dmg, Fujisan-v1.0.0-x86_64.dmg"
+        log_info "Expected files like: Fujisan-v1.0.0-macOS-Apple-Silicon.dmg, Fujisan-v1.0.0-macOS-Intel.dmg"
         exit 1
     fi
 

@@ -20,8 +20,8 @@ The easiest way to build Fujisan is using the unified build script:
 ```
 
 All outputs go to `dist/`:
-- `dist/Fujisan-{version}-arm64.dmg` - macOS Apple Silicon
-- `dist/Fujisan-{version}-x86_64.dmg` - macOS Intel
+- `dist/Fujisan-{version}-macOS-Apple-Silicon.dmg` - macOS Apple Silicon
+- `dist/Fujisan-{version}-macOS-Intel.dmg` - macOS Intel
 - `dist/Fujisan-{version}-windows.zip` - Windows package
 - `dist/fujisan-{version}-linux-x64.tar.gz` - Linux tarball
 - `dist/fujisan_{version}_amd64.deb` - Debian/Ubuntu package
@@ -206,7 +206,7 @@ The MOC (Meta-Object Compiler) step can take 2-5 minutes in containers due to pr
 ./build.sh macos
 
 # Test changes
-open dist/Fujisan-*-arm64.dmg
+open dist/macos/Fujisan-*-macOS-Apple-Silicon.dmg
 ```
 
 ### Release Process

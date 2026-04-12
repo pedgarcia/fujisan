@@ -117,8 +117,8 @@ Output:
   All builds output to: dist/
   
   dist/macos/
-    - Fujisan-{version}-arm64.dmg
-    - Fujisan-{version}-x86_64.dmg
+    - Fujisan-{version}-macOS-Apple-Silicon.dmg
+    - Fujisan-{version}-macOS-Intel.dmg
   dist/windows/
     - Fujisan-{version}-windows.zip
   dist/linux/
@@ -698,14 +698,14 @@ build_macos_arm64() {
     fi
 
     create_dmg "$ARM64_BUILD_DIR/Fujisan.app" \
-               "Fujisan-${VERSION_CLEAN}-arm64.dmg" \
+               "Fujisan-${VERSION_CLEAN}-macOS-Apple-Silicon.dmg" \
                "Fujisan (Apple Silicon)" \
                "$dmg_sign" \
                "$dev_id"
     
     # Notarize if requested
     if [[ "$NOTARIZE" == "true" ]]; then
-        notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-arm64.dmg" || true
+        notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-macOS-Apple-Silicon.dmg" || true
     fi
     
     # Return to project root
@@ -801,14 +801,14 @@ build_macos_x86_64() {
     fi
     
     create_dmg "$X86_64_BUILD_DIR/Fujisan.app" \
-               "Fujisan-${VERSION_CLEAN}-x86_64.dmg" \
+               "Fujisan-${VERSION_CLEAN}-macOS-Intel.dmg" \
                "Fujisan (Intel)" \
                "$dmg_sign" \
                "$dev_id"
     
     # Notarize if requested
     if [[ "$NOTARIZE" == "true" ]]; then
-        notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-x86_64.dmg" || true
+        notarize_dmg "$MACOS_DIST_DIR/Fujisan-${VERSION_CLEAN}-macOS-Intel.dmg" || true
     fi
     
     # Return to project root

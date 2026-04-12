@@ -417,8 +417,8 @@ For distributing macOS applications, you need to sign them with a Developer ID c
 ./build.sh macos --sign
 
 # This creates signed DMGs ready for notarization:
-# dist/macos/Fujisan-{version}-arm64.dmg
-# dist/macos/Fujisan-{version}-x86_64.dmg
+# dist/macos/Fujisan-{version}-macOS-Apple-Silicon.dmg
+# dist/macos/Fujisan-{version}-macOS-Intel.dmg
 ```
 
 #### **Notarization Process**
