@@ -452,6 +452,9 @@ void DebuggerWidget::updateDisassemblyDisplay()
     const int maxInstructions = m_isRunning ? 20 : 100;  // 100 instructions when paused, 20 when running
     
     while (instructionCount < maxInstructions && pc < 0xFFFF) {
+        if (!m_emulator) {
+            break;
+        }
         QString line = formatInstructionLine(pc, pc == currentPC);
         disassemblyText += line + "\n";
         
@@ -873,8 +876,12 @@ void DebuggerWidget::onMemoryAddressChanged()
 
 void DebuggerWidget::refreshDebugInfo()
 {
-    // Breakpoint checking is now handled by the core emulator
-    
+    // Emulator may be deleted during app shutdown while this timer slot still fires.
+    if (!m_emulator) {
+        m_refreshTimer->stop();
+        return;
+    }
+
     updateCPUState();
     updateMemoryView();
     updateDisassemblyView();
@@ -1018,7 +1025,9 @@ void DebuggerWidget::clearAllBreakpoints()
 
 bool DebuggerWidget::hasBreakpoint(unsigned short address) const
 {
-    // Use core emulator breakpoint check
+    if (!m_emulator) {
+        return false;
+    }
     return m_emulator->hasBreakpoint(address);
 }
 
@@ -1101,6 +1110,9 @@ void DebuggerWidget::onEmulatorBreakpointAdded(unsigned short address)
 {
     qDebug() << QString("Debugger: Breakpoint added at $%1").arg(address, 4, 16, QChar('0')).toUpper();
     
+    if (!m_emulator) {
+        return;
+    }
     // Update our local breakpoint list from the emulator
     m_breakpoints = m_emulator->getBreakpoints();
     updateBreakpointList();
@@ -1114,7 +1126,9 @@ void DebuggerWidget::onEmulatorBreakpointRemoved(unsigned short address)
 {
     qDebug() << QString("Debugger: Breakpoint removed at $%1").arg(address, 4, 16, QChar('0')).toUpper();
     
-    // Update our local breakpoint list from the emulator
+    if (!m_emulator) {
+        return;
+    }
     m_breakpoints = m_emulator->getBreakpoints();
     updateBreakpointList();
     

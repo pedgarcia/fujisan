@@ -21,6 +21,7 @@
 #include <QSpinBox>
 #include <QListWidget>
 #include <QSet>
+#include <QPointer>
 #include "atariemulator.h"
 
 class DebuggerWidget : public QWidget
@@ -84,7 +85,7 @@ private:
     void loadBreakpoints();
     void checkBreakpoints();
     
-    AtariEmulator* m_emulator;
+    QPointer<AtariEmulator> m_emulator;
     QTimer* m_refreshTimer;
     
     // CPU State UI
