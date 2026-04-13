@@ -112,3 +112,8 @@ CLAUDE.md
 
 # FujiNet-PC downloaded binaries (use scripts/download-fujinet-pc.sh to populate)
 fujinet/
+
+
+./release.sh
+./mac.sh
+
