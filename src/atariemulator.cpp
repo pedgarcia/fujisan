@@ -1118,6 +1118,12 @@ void AtariEmulator::processFrame()
         injectPostAtStart = m_injectPostReleaseFrames;
     }
 
+    // libatari800_next_frame() may rewrite inputSnapshot; post-release accounting must use
+    // whether our template was keyboard-idle *before* the frame, or we never decrement
+    // m_injectPostReleaseFrames (snapshot often stays non-zero after the call).
+    const bool templateKeyboardIdleBeforeFrame = inputSnapshot.keychar == 0 &&
+                                                 inputSnapshot.keycode == 0 &&
+                                                 inputSnapshot.special == 0;
 
     // Determine if we should use partial frame execution for precise breakpoints
     m_usePartialFrameExecution = m_breakpointsEnabled && !m_breakpoints.isEmpty() && !m_emulationPaused;
@@ -1140,19 +1146,16 @@ void AtariEmulator::processFrame()
 
     {
         QMutexLocker inputLock(&m_inputMutex);
-        const bool snapshotKeyboardIdle = inputSnapshot.keychar == 0 && inputSnapshot.keycode == 0 &&
-                                          inputSnapshot.special == 0;
         if (injectHoldAtStart > 0) {
             m_injectKeyFramesRemaining--;
             if (m_injectKeyFramesRemaining == 0) {
                 clearCurrentInputLocked();
                 m_injectPostReleaseFrames = kInjectPostReleaseFrameCount;
             }
-        } else if (injectPostAtStart > 0 && snapshotKeyboardIdle) {
+        } else if (injectPostAtStart > 0 && templateKeyboardIdleBeforeFrame) {
             if (m_injectPostReleaseFrames > 0) {
                 m_injectPostReleaseFrames--;
             }
-        } else if (injectPostAtStart > 0 && !snapshotKeyboardIdle) {
         }
     }
     
@@ -3217,6 +3220,12 @@ int AtariEmulator::injectedKeyFramesRemainingForTest() const
 {
     QMutexLocker inputLock(&m_inputMutex);
     return m_injectKeyFramesRemaining;
+}
+
+bool AtariEmulator::injectionTimersIdleForTest() const
+{
+    QMutexLocker inputLock(&m_inputMutex);
+    return m_injectKeyFramesRemaining == 0 && m_injectPostReleaseFrames == 0;
 }
 
 bool AtariEmulator::isCharacterInjectionIdle() const

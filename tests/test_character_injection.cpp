@@ -17,7 +17,9 @@
 #include "atariemulator.h"
 
 namespace {
-constexpr int kMaxFramesUntilIdle = 64;
+// Enough for post-release frames (kInjectPostReleaseFrameCount) plus margin; keep small because
+// each processFrame runs libatari800_next_frame() which can block seconds when NETSIO is enabled.
+constexpr int kMaxFramesForInjectTimersIdle = 16;
 }
 
 class TestCharacterInjection : public QObject {
@@ -90,28 +92,27 @@ private slots:
             Qt::BlockingQueuedConnection);
         QCOMPARE(remaining, 0);
 
-        bool idle = true;
+        bool timersIdle = true;
         QMetaObject::invokeMethod(
             emu,
-            [&idle, emu]() { idle = emu->isCharacterInjectionIdle(); },
+            [&timersIdle, emu]() { timersIdle = emu->injectionTimersIdleForTest(); },
             Qt::BlockingQueuedConnection);
-        QVERIFY2(!idle,
-                 "post-release frames (kInjectPostReleaseFrameCount) and/or CH still pending after hold");
+        QVERIFY2(!timersIdle, "inject post-release counters should be non-zero right after hold");
 
         int stepped = 0;
-        while (stepped < kMaxFramesUntilIdle) {
+        while (stepped < kMaxFramesForInjectTimersIdle) {
             QMetaObject::invokeMethod(emu, "processFrame", Qt::BlockingQueuedConnection);
             ++stepped;
             QMetaObject::invokeMethod(
                 emu,
-                [&idle, emu]() { idle = emu->isCharacterInjectionIdle(); },
+                [&timersIdle, emu]() { timersIdle = emu->injectionTimersIdleForTest(); },
                 Qt::BlockingQueuedConnection);
-            if (idle)
+            if (timersIdle)
                 break;
         }
-        QVERIFY2(idle,
-                 "injection idle after post-release and OS CH ($02FC) clear "
-                 "(stepped processFrame until idle, max kMaxFramesUntilIdle)");
+        QVERIFY2(timersIdle,
+                 "inject hold/post-release counters must return to zero "
+                 "(step processFrame; max kMaxFramesForInjectTimersIdle)");
 
         QMetaObject::invokeMethod(emu, "shutdown", Qt::BlockingQueuedConnection);
         // Destroy on the emulator thread so QTimer children match the owning thread

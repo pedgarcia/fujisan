@@ -339,6 +339,9 @@ public:
 
     /// Thread-safe; for unit tests verifying paste/TCP injection (see test_character_injection).
     int injectedKeyFramesRemainingForTest() const;
+    /// Thread-safe. True when inject hold/post-release counters are zero (ignores OS CH).
+    /// Use in unit tests; production paste uses isCharacterInjectionIdle() which also polls CH.
+    bool injectionTimersIdleForTest() const;
     /// Thread-safe. False while hold/post-release frames are pending, or until CH ($02FC) is clear
     /// (OS keyboard buffer) when libatari800 is initialized — see kInjectPostReleaseFrameCount.
     bool isCharacterInjectionIdle() const;
