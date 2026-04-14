@@ -12,7 +12,9 @@
 #include "configurationprofile.h"
 #include "configurationprofilemanager.h"
 #include "disasm6502.h"
+#include <QCoreApplication>
 #include <QDebug>
+#include <QEventLoop>
 #include <QJsonArray>
 #include <QJsonParseError>
 #include <QFileInfo>
@@ -22,6 +24,22 @@
 #include <QImageReader>
 #include <QDateTime>
 #include <QThread>
+
+namespace {
+
+void waitForCharacterInjectionIdle(AtariEmulator* emu)
+{
+    if (!emu) {
+        return;
+    }
+    constexpr int kMaxMs = 30000;
+    for (int ms = 0; ms < kMaxMs && !emu->isCharacterInjectionIdle(); ++ms) {
+        QThread::msleep(1);
+        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    }
+}
+
+}  // namespace
 
 extern "C" {
     // Access to CPU registers for debug commands
@@ -1056,6 +1074,7 @@ void TCPServer::handleInputCommand(QTcpSocket* client, const QJsonObject& reques
         
         // Inject each character using the emulator's character injection
         for (int i = 0; i < text.length(); ++i) {
+            waitForCharacterInjectionIdle(m_emulator);
             QChar ch = text.at(i);
             m_emulator->injectCharacter(ch.toLatin1());
         }

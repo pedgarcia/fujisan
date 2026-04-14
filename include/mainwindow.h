@@ -27,6 +27,7 @@
 #include <QDialog>
 #include <QPixmap>
 #include <QEvent>
+#include <QShowEvent>
 #include "atariemulator.h"
 #include "emulatorwidget.h"
 #include "toggleswitch.h"
@@ -59,6 +60,7 @@ public slots:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void showEvent(QShowEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *object, QEvent *event) override;
     void changeEvent(QEvent *event) override;
@@ -303,6 +305,7 @@ private:
     // Fullscreen state
     bool m_isInCustomFullscreen;
     QWidget* m_fullscreenWidget;
+    EmulatorWidget* m_fullscreenEmulatorWidget;
 
     // NetSIO state tracking (for BASIC toggle disabling)
     bool m_netSIOEnabled;

@@ -10,6 +10,7 @@
 #endif
 
 #include "mainwindow.h"
+#include "macosfullscreen.h"
 #include "version.h"  // For FUJISAN_FULL_VERSION_STRING
 #include <QApplication>
 #include <QAbstractScrollArea>
@@ -55,6 +56,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_startInFullscreen(false)
     , m_isInCustomFullscreen(false)
     , m_fullscreenWidget(nullptr)
+    , m_fullscreenEmulatorWidget(nullptr)
     , m_netSIOEnabled(false)
     , m_pasteTimer(new QTimer(this))
     , m_pasteIndex(0)
@@ -604,6 +606,8 @@ void MainWindow::createMenus()
 
     m_fullscreenAction = new QAction("&Fullscreen", this);
 #ifdef Q_OS_MACOS
+    // Stay in View menu only; avoid Qt/macOS duplicating into Window alongside "Enter Full Screen"
+    m_fullscreenAction->setMenuRole(QAction::NoRole);
     m_fullscreenAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Return));
     m_fullscreenAction->setToolTip("Toggle fullscreen mode (Cmd+Enter)");
 #else
@@ -1987,8 +1991,9 @@ void MainWindow::enterCustomFullscreen()
     m_fullscreenWidget->showFullScreen();
     fullscreenEmulator->setFocus();
 
-    // Install event filter to handle key presses in fullscreen
-    m_fullscreenWidget->installEventFilter(this);
+    // Filter key events on the focused emulator widget (keys go to focus, not the parent window)
+    m_fullscreenEmulatorWidget = fullscreenEmulator;
+    fullscreenEmulator->installEventFilter(this);
 
     // Update state
     m_isInCustomFullscreen = true;
@@ -2005,8 +2010,10 @@ void MainWindow::exitCustomFullscreen()
 {
     if (!m_isInCustomFullscreen || !m_fullscreenWidget) return;
 
-    // Remove event filter
-    m_fullscreenWidget->removeEventFilter(this);
+    if (m_fullscreenEmulatorWidget) {
+        m_fullscreenEmulatorWidget->removeEventFilter(this);
+        m_fullscreenEmulatorWidget = nullptr;
+    }
 
     // Close and delete the fullscreen widget (this also deletes the fullscreen emulator widget)
     m_fullscreenWidget->close();
@@ -3388,12 +3395,14 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 
 bool MainWindow::eventFilter(QObject *object, QEvent *event)
 {
-    if (object == m_fullscreenWidget && event->type() == QEvent::KeyPress) {
+    if (m_fullscreenEmulatorWidget && object == m_fullscreenEmulatorWidget
+        && event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
 
         // Handle fullscreen toggle shortcut
 #ifdef Q_OS_MACOS
-        if (keyEvent->modifiers() & Qt::ControlModifier && keyEvent->key() == Qt::Key_Return) {
+        const Qt::KeyboardModifiers mod = keyEvent->modifiers();
+        if ((mod & (Qt::ControlModifier | Qt::MetaModifier)) && keyEvent->key() == Qt::Key_Return) {
 #else
         if (keyEvent->key() == Qt::Key_F11) {
 #endif
@@ -3406,9 +3415,6 @@ bool MainWindow::eventFilter(QObject *object, QEvent *event)
             exitCustomFullscreen();
             return true;
         }
-
-        // Let the fullscreen emulator widget handle all other keys normally
-        // Don't intercept - let the event propagate naturally
     }
 
     const QEvent::Type et = event->type();
@@ -3625,12 +3631,23 @@ void MainWindow::sendNextCharacter()
         return;
     }
 
+    // Wait until inject hold/post-release finished and OS CH ($02FC) clear — otherwise
+    // repeated characters or fast OS buffer can drop keys.
+    if (!m_emulator->isCharacterInjectionIdle()) {
+        return;
+    }
+
     QChar ch = m_pasteBuffer.at(m_pasteIndex);
     m_emulator->injectCharacter(ch.toLatin1());
     m_pasteIndex++;
+}
 
-    // Allow some processing time
-    QCoreApplication::processEvents();
+void MainWindow::showEvent(QShowEvent *event)
+{
+    QMainWindow::showEvent(event);
+#ifdef Q_OS_MACOS
+    fujisanConfigureMacMainWindowNoNativeFullscreen(this);
+#endif
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

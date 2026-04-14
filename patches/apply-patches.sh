@@ -68,6 +68,8 @@ UPGRADE_EOF
         echo "✓ guess_settings.c upgraded with INVALID_FILE_SIZE guard"
     fi
 
+    # 0017 upgrade: POKEY debounce patch disabled for testing.
+
     echo "Patches already applied in this source tree ($PATCH_MARKER present), skipping."
     exit 0
 fi
@@ -114,6 +116,12 @@ if [ -d .git ]; then
             # Skip patches 0005 and 0006 - accepted into atari800 upstream
             if [[ "$patch_name" == "0005-netsio-so-reuseaddr.patch" ]] || [[ "$patch_name" == "0006-netsio-shutdown.patch" ]]; then
                 echo "Skipping patch $patch_name - already in upstream"
+                continue
+            fi
+
+            # Skip 0017 - POKEY debounce patch disabled for testing
+            if [[ "$patch_name" == "0017-libatari800-fresh-keypress-latch.patch" ]]; then
+                echo "Skipping patch 0017 - disabled for testing"
                 continue
             fi
 
@@ -253,6 +261,12 @@ else
             # Skip patches 0005 and 0006 - accepted into atari800 upstream
             if [[ "$patch_name" == "0005-netsio-so-reuseaddr.patch" ]] || [[ "$patch_name" == "0006-netsio-shutdown.patch" ]]; then
                 echo "Skipping patch $patch_name - already in upstream"
+                continue
+            fi
+
+            # Skip 0017 - POKEY debounce patch disabled for testing
+            if [[ "$patch_name" == "0017-libatari800-fresh-keypress-latch.patch" ]]; then
+                echo "Skipping patch 0017 - disabled for testing"
                 continue
             fi
 

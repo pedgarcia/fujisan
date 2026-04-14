@@ -339,6 +339,9 @@ public:
 
     /// Thread-safe; for unit tests verifying paste/TCP injection (see test_character_injection).
     int injectedKeyFramesRemainingForTest() const;
+    /// Thread-safe. False while hold/post-release frames are pending, or until CH ($02FC) is clear
+    /// (OS keyboard buffer) when libatari800 is initialized — see kInjectPostReleaseFrameCount.
+    bool isCharacterInjectionIdle() const;
 
     // Caps lock control
     void setCapsLock(bool enabled);  // Set caps lock to specific state
@@ -404,8 +407,12 @@ private:
     // (keyboard/joystick events) and the emulator thread (processFrame snapshot).
     mutable QMutex m_inputMutex;
     // Injected keys (paste / TCP) must only advance libatari800 on the emulator thread.
-    // Hold the injected key for this many processFrame() iterations, then clear.
+    static constexpr int kInjectKeyHoldFrameCount = 3;
+    // After the hold, require this many frames at AKEY_NONE (same order as Atari800MacX paste:
+    // POKEY XOR debounce needs multiple idle frames before the same scancode re-latches).
+    static constexpr int kInjectPostReleaseFrameCount = 3;
     int m_injectKeyFramesRemaining = 0;
+    int m_injectPostReleaseFrames = 0;
 
     // Reusable frame image buffer; its shared data is detached (copy-on-write) each
     // time the emulator thread writes a new frame while the previous one is still

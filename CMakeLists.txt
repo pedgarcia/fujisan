@@ -307,6 +307,12 @@ set(SOURCES
     src/fujinetwidget.cpp
 )
 
+if(APPLE)
+    list(APPEND SOURCES src/macosfullscreen.mm)
+else()
+    list(APPEND SOURCES src/macosfullscreen_stub.cpp)
+endif()
+
 set(HEADERS
     include/mainwindow.h
     include/emulatorwidget.h
@@ -334,6 +340,7 @@ set(HEADERS
     include/fujinetprocessmanager.h
     include/fujinetbinarymanager.h
     include/fujinetwidget.h
+    include/macosfullscreen.h
 )
 
 # ============================================================================

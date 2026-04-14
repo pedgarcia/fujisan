@@ -70,6 +70,9 @@ extern unsigned short CPU_regPC;
 
 // Access to GTIA console override for warm boot BASIC state preservation
 extern int GTIA_consol_override;
+
+// Direct Atari RAM access — used to poll CH ($02FC) for OS keyboard readiness.
+unsigned char *libatari800_get_main_memory_ptr();
 }
 
 // Static callback function for libatari800 disk activity
@@ -1099,31 +1102,23 @@ void AtariEmulator::processFrame()
     // is copied here under the input mutex so that handleKeyPress/handleKeyRelease
     // running on the main thread cannot corrupt the struct while libatari800
     // is blocked inside netsio_recv_byte() (up to NETSIO_RECV_BYTE_TIMEOUT_SEC).
+    //
+    // Also snapshot inject counters here (same lock). injectCharacter() can run on
+    // another thread after libatari800_next_frame() returns but before the block
+    // below; using live m_injectKeyFramesRemaining then would decrement the *new*
+    // injection on the same frame as a key-up, skipping a hold frame and letting
+    // POKEY see repeated keys without an AKEY_NONE between them.
     input_template_t inputSnapshot;
+    int injectHoldAtStart = 0;
+    int injectPostAtStart = 0;
     {
         QMutexLocker inputLock(&m_inputMutex);
         inputSnapshot = m_currentInput;
+        injectHoldAtStart = m_injectKeyFramesRemaining;
+        injectPostAtStart = m_injectPostReleaseFrames;
     }
 
-    // Send joystick values to libatari800
 
-    // Debug what we're sending to the emulator
-    if (inputSnapshot.keychar != 0) {
-        // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)inputSnapshot.keychar << "'" << QChar(inputSnapshot.keychar) << "' ***";
-    }
-    // Always debug L key specifically since AKEY_l = 0
-    bool hasInput = inputSnapshot.keychar != 0 || inputSnapshot.keycode != 0 || inputSnapshot.special != 0 ||
-                   inputSnapshot.start != 0 || inputSnapshot.select != 0 || inputSnapshot.option != 0;
-    
-    if (hasInput) {
-        // qDebug() << "*** SENDING TO EMULATOR: keychar=" << (int)inputSnapshot.keychar
-        //          << " keycode=" << (int)inputSnapshot.keycode
-        //          << " special=" << (int)inputSnapshot.special
-        //          << " start=" << (int)inputSnapshot.start
-        //          << " select=" << (int)inputSnapshot.select
-        //          << " option=" << (int)inputSnapshot.option << " ***";
-    }
-    
     // Determine if we should use partial frame execution for precise breakpoints
     m_usePartialFrameExecution = m_breakpointsEnabled && !m_breakpoints.isEmpty() && !m_emulationPaused;
     
@@ -1145,11 +1140,19 @@ void AtariEmulator::processFrame()
 
     {
         QMutexLocker inputLock(&m_inputMutex);
-        if (m_injectKeyFramesRemaining > 0) {
+        const bool snapshotKeyboardIdle = inputSnapshot.keychar == 0 && inputSnapshot.keycode == 0 &&
+                                          inputSnapshot.special == 0;
+        if (injectHoldAtStart > 0) {
             m_injectKeyFramesRemaining--;
             if (m_injectKeyFramesRemaining == 0) {
                 clearCurrentInputLocked();
+                m_injectPostReleaseFrames = kInjectPostReleaseFrameCount;
             }
+        } else if (injectPostAtStart > 0 && snapshotKeyboardIdle) {
+            if (m_injectPostReleaseFrames > 0) {
+                m_injectPostReleaseFrames--;
+            }
+        } else if (injectPostAtStart > 0 && !snapshotKeyboardIdle) {
         }
     }
     
@@ -3018,6 +3021,7 @@ void AtariEmulator::injectCharacter(char ch)
 {
     QMutexLocker inputLock(&m_inputMutex);
     clearCurrentInputLocked();
+    m_injectPostReleaseFrames = 0;
 
     if (ch >= 'A' && ch <= 'Z') {
         // Uppercase letters - use AKEY_A through AKEY_Z (includes SHIFT modifier)
@@ -3187,7 +3191,7 @@ void AtariEmulator::injectCharacter(char ch)
 
     // Keep the key asserted for several emulator-thread frames only — never call
     // libatari800_next_frame() from here (main thread / TCP thread); it races processFrame().
-    m_injectKeyFramesRemaining = 3;
+    m_injectKeyFramesRemaining = kInjectKeyHoldFrameCount;
 }
 
 void AtariEmulator::injectAKey(int akeyCode)
@@ -3213,6 +3217,22 @@ int AtariEmulator::injectedKeyFramesRemainingForTest() const
 {
     QMutexLocker inputLock(&m_inputMutex);
     return m_injectKeyFramesRemaining;
+}
+
+bool AtariEmulator::isCharacterInjectionIdle() const
+{
+    QMutexLocker inputLock(&m_inputMutex);
+    if (m_injectKeyFramesRemaining != 0 || m_injectPostReleaseFrames != 0)
+        return false;
+    // Also wait until the Atari OS has consumed the previous keystroke.
+    // CH ($02FC = 764) holds 0xFF when no key is pending in the OS buffer.
+    // Sending the next character before the OS clears CH causes a silent drop.
+    if (m_libatari800Initialized) {
+        unsigned char *mem = reinterpret_cast<unsigned char *>(libatari800_get_main_memory_ptr());
+        if (mem && mem[764] != 0xFF)
+            return false;
+    }
+    return true;
 }
 
 void AtariEmulator::clearInput()
@@ -3284,6 +3304,12 @@ void AtariEmulator::pauseEmulation()
     }
     if (!m_emulationPaused) {
         m_frameTimer->stop();
+        {
+            QMutexLocker inputLock(&m_inputMutex);
+            clearCurrentInputLocked();
+            m_injectKeyFramesRemaining = 0;
+            m_injectPostReleaseFrames = 0;
+        }
         m_emulationPaused = true;
         emit executionPaused();
     }

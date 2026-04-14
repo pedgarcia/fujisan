@@ -16,6 +16,10 @@
 
 #include "atariemulator.h"
 
+namespace {
+constexpr int kMaxFramesUntilIdle = 64;
+}
+
 class TestCharacterInjection : public QObject {
     Q_OBJECT
 
@@ -85,6 +89,29 @@ private slots:
             [&remaining, emu]() { remaining = emu->injectedKeyFramesRemainingForTest(); },
             Qt::BlockingQueuedConnection);
         QCOMPARE(remaining, 0);
+
+        bool idle = true;
+        QMetaObject::invokeMethod(
+            emu,
+            [&idle, emu]() { idle = emu->isCharacterInjectionIdle(); },
+            Qt::BlockingQueuedConnection);
+        QVERIFY2(!idle,
+                 "post-release frames (kInjectPostReleaseFrameCount) and/or CH still pending after hold");
+
+        int stepped = 0;
+        while (stepped < kMaxFramesUntilIdle) {
+            QMetaObject::invokeMethod(emu, "processFrame", Qt::BlockingQueuedConnection);
+            ++stepped;
+            QMetaObject::invokeMethod(
+                emu,
+                [&idle, emu]() { idle = emu->isCharacterInjectionIdle(); },
+                Qt::BlockingQueuedConnection);
+            if (idle)
+                break;
+        }
+        QVERIFY2(idle,
+                 "injection idle after post-release and OS CH ($02FC) clear "
+                 "(stepped processFrame until idle, max kMaxFramesUntilIdle)");
 
         QMetaObject::invokeMethod(emu, "shutdown", Qt::BlockingQueuedConnection);
         // Destroy on the emulator thread so QTimer children match the owning thread

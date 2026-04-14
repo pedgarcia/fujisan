@@ -237,7 +237,7 @@ cat > Makefile << EOF
 
 CC = gcc
 AR = ar
-CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800 -DNETSIO
+CFLAGS = -O2 -DHAVE_CONFIG_H -I. -Isrc -DTARGET_LIBATARI800 -DLIBATARI800=1 -DNETSIO
 ARFLAGS = rcs
 
 LDLIBS = -lws2_32
@@ -271,6 +271,9 @@ cat > src/config.h << 'EOF'
 #define PACKAGE_STRING "atari800 4.2.0"
 #define PACKAGE_VERSION "4.2.0"
 #define VERSION "4.2.0"
+
+/* Match autotools libatari800 target so optional core code can use #ifdef LIBATARI800 */
+#define LIBATARI800 1
 
 #define HAVE_STDINT_H 1
 #define HAVE_STDLIB_H 1
