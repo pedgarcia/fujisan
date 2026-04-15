@@ -1774,14 +1774,15 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
         m_capsLockEnabled = !m_capsLockEnabled;
     } else if (key >= Qt::Key_A && key <= Qt::Key_Z) {
         if (key == Qt::Key_L) {
-            // Special handling for L key since AKEY_l = 0 causes issues
-            // Use keychar approach for L key only - send lowercase so emulator can apply case logic
-            m_currentInput.keychar = 'l';  // Send lowercase, emulator handles case via CAPS LOCK
+            // Special handling for L key since AKEY_l = 0 causes issues with the keycode path.
+            // Use keychar so the core maps it through the character table, which handles case via CAPS LOCK.
+            // When Shift is held, send uppercase 'L' so the core maps it to AKEY_L (AKEY_SHFT | AKEY_l).
+            m_currentInput.keychar = shiftPressed ? 'L' : 'l';
         } else {
-            // Normal letter handling using keycode
+            // Normal letter handling using keycode; OR in AKEY_SHFT when Shift is held so the
+            // emulator receives an uppercase key regardless of the current CAPS LOCK state.
             unsigned char baseKey = convertQtKeyToAtari(key, Qt::NoModifier);
-            m_currentInput.keycode = baseKey;
-            // Letter key
+            m_currentInput.keycode = shiftPressed ? (baseKey | AKEY_SHFT) : baseKey;
         }
     } else if (key >= Qt::Key_0 && key <= Qt::Key_9) {
         if (shiftPressed) {
