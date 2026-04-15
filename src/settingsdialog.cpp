@@ -488,10 +488,16 @@ void SettingsDialog::createHardwareTab()
     // Link turbo mode checkbox to unlimited host speed
     connect(m_turboModeCheck, &QCheckBox::toggled, [this](bool checked) {
         if (m_emulator) {
+            QSettings speedSettings("8bitrelics", "Fujisan");
+            bool speedToggleOn = speedSettings.value("machine/speedToggleOn", false).toBool();
             if (checked) {
                 // Enable unlimited host speed
                 m_emulator->setEmulationSpeed(0);
-                m_speedSlider->setEnabled(false); // Disable slider when host speed is active
+                m_speedSlider->setEnabled(false);
+            } else if (speedToggleOn) {
+                // MAX toggle is still on, but host speed turned off: switch to 10x
+                m_emulator->setEmulationSpeed(1000);
+                m_speedSlider->setEnabled(true);
             } else {
                 // Restore slider-based speed
                 m_speedSlider->setEnabled(true);
@@ -3375,13 +3381,19 @@ void SettingsDialog::applySettings()
     
     // Apply speed setting (can be applied live)
     if (m_emulator) {
-        if (m_turboModeCheck->isChecked()) {
-            // Host speed (unlimited)
+        QSettings speedSettings("8bitrelics", "Fujisan");
+        bool speedToggleOn = speedSettings.value("machine/speedToggleOn", false).toBool();
+        if (speedToggleOn) {
+            // Toolbar MAX toggle is active: re-apply MAX speed using updated host-speed setting
+            bool hostSpeed = m_turboModeCheck->isChecked();
+            m_emulator->setEmulationSpeed(hostSpeed ? 0 : 1000);
+        } else if (m_turboModeCheck->isChecked()) {
+            // Host speed (unlimited), toggle is off but host-speed checkbox is on
             m_emulator->setEmulationSpeed(0);
         } else {
             // Slider-based speed
             int speedIndex = m_speedSlider->value();
-            int percentage = (speedIndex == 0) ? 50 : speedIndex * 100; // 0.5x = 50%, others = index * 100
+            int percentage = (speedIndex == 0) ? 50 : speedIndex * 100;
             m_emulator->setEmulationSpeed(percentage);
         }
     }

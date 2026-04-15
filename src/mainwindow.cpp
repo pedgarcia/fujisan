@@ -1162,6 +1162,13 @@ void MainWindow::updateSpeedStatus()
     }
 
     m_speedStatusLabel->setText(speedText);
+
+    // Keep the toggle ON-label in sync: show what MAX will do based on host-speed setting
+    if (m_speedToggle) {
+        QSettings settings("8bitrelics", "Fujisan");
+        bool hostSpeed = settings.value("machine/turboMode", false).toBool();
+        m_speedToggle->setLabels(hostSpeed ? "MAX" : "10x", "1x");
+    }
 }
 
 void MainWindow::updateFujiNetStatus()
@@ -1437,11 +1444,14 @@ void MainWindow::restartEmulator()
     qDebug() << "ROM paths for restart - OS:" << osRomPath << "BASIC:" << basicRomPath;
 
     // Load post-init settings here on the main thread before dispatching.
+    // speedToggleOn: toolbar MAX toggle state (independent from host-speed setting)
+    // turboMode: "Run as fast as possible (Host Speed)" from settings dialog
+    bool speedToggleOn = settings.value("machine/speedToggleOn", false).toBool();
     bool turboMode = settings.value("machine/turboMode", false).toBool();
     int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt();
     int speedPercentage;
-    if (turboMode) {
-        speedPercentage = 0;
+    if (speedToggleOn) {
+        speedPercentage = turboMode ? 0 : 1000; // host speed vs 10x
     } else if (speedIndex == 0) {
         speedPercentage = 50;
     } else {
@@ -1537,15 +1547,23 @@ void MainWindow::onSpeedToggled(bool isFullSpeed)
     QSettings settings("8bitrelics", "Fujisan");
 
     if (isFullSpeed) {
-        // Full speed mode (toggle ON) - unlimited host speed
-        m_emulator->setEmulationSpeed(0); // 0 = unlimited/host speed
-        settings.setValue("machine/turboMode", true);
-        statusBar()->showMessage("Emulation speed set to Full (unlimited host speed)", 2000);
+        // MAX toggle ON: speed depends on the "Run as fast as possible (Host Speed)" setting.
+        // If host speed is enabled, run unlimited; otherwise cap at 10x.
+        settings.setValue("machine/speedToggleOn", true);
+        bool hostSpeed = settings.value("machine/turboMode", false).toBool();
+        if (hostSpeed) {
+            m_emulator->setEmulationSpeed(0);
+            statusBar()->showMessage("Emulation speed set to MAX (unlimited host speed)", 2000);
+        } else {
+            m_emulator->setEmulationSpeed(1000); // 10x
+            statusBar()->showMessage("Emulation speed set to MAX (10x)", 2000);
+        }
     } else {
-        // Real speed mode (toggle OFF) - authentic Atari timing
-        m_emulator->setEmulationSpeed(100);
-        settings.setValue("machine/turboMode", false);
-        settings.setValue("machine/emulationSpeedIndex", 1);  // Always 1x when toggling off
+        // Real speed mode (toggle OFF) - restore slider-based speed
+        settings.setValue("machine/speedToggleOn", false);
+        int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt();
+        int percentage = (speedIndex == 0) ? 50 : (speedIndex * 100);
+        m_emulator->setEmulationSpeed(percentage);
         statusBar()->showMessage("Emulation speed set to Real (authentic Atari speed)", 2000);
     }
 
@@ -1687,11 +1705,12 @@ void MainWindow::updateToolbarFromSettings()
     m_videoToggle->blockSignals(false);
 
 
-    // Update speed toggle from settings
+    // Update speed toggle from settings (speedToggleOn tracks the toolbar MAX toggle state,
+    // independently from the "Run as fast as possible (Host Speed)" setting)
     QSettings speedSettings("8bitrelics", "Fujisan");
-    bool turboMode = speedSettings.value("machine/turboMode", false).toBool();
+    bool speedToggleOn = speedSettings.value("machine/speedToggleOn", false).toBool();
     m_speedToggle->blockSignals(true);
-    m_speedToggle->setChecked(turboMode);
+    m_speedToggle->setChecked(speedToggleOn);
     m_speedToggle->blockSignals(false);
 
     // Update menu actions
@@ -2739,7 +2758,11 @@ void MainWindow::createMediaPeripheralsDock()
     // QLabel* speedLabel = new QLabel("Speed:");
     // speedLabel->setMinimumWidth(35);
     m_speedToggle = new ToggleSwitch();
-    m_speedToggle->setLabels("MAX", "1x");
+    {
+        QSettings initSettings("8bitrelics", "Fujisan");
+        bool hostSpeed = initSettings.value("machine/turboMode", false).toBool();
+        m_speedToggle->setLabels(hostSpeed ? "MAX" : "10x", "1x");
+    }
     m_speedToggle->setColors(QColor(70, 130, 180), QColor(70, 130, 180)); // Steel blue for both states
     m_speedToggle->setChecked(false); // Default to Real speed (OFF position = authentic Atari speed)
     connect(m_speedToggle, &ToggleSwitch::toggled, this, &MainWindow::onSpeedToggled);
@@ -3101,11 +3124,12 @@ void MainWindow::loadInitialSettings()
 #endif
     QString joy0Preset = settings.value("input/joystick1Preset", "numpad").toString();
     QString joy1Preset = settings.value("input/joystick2Preset", "wasd").toString();
+    bool speedToggleOn = settings.value("machine/speedToggleOn", false).toBool();
     bool turboMode = settings.value("machine/turboMode", false).toBool();
     int speedIndex = settings.value("machine/emulationSpeedIndex", 1).toInt();
     int speedPercentage;
-    if (turboMode) {
-        speedPercentage = 0;
+    if (speedToggleOn) {
+        speedPercentage = turboMode ? 0 : 1000; // host speed vs 10x
     } else if (speedIndex == 0) {
         speedPercentage = 50;
     } else {
@@ -3792,10 +3816,7 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile, boo
     // Update status bar to reflect profile speed
     updateSpeedStatus();
 
-    // Update UI to reflect changes
-    updateToolbarFromSettings();
-
-    // Save profile values to QSettings so Settings Dialog will show correct values
+    // Save profile values to QSettings so Settings Dialog and toolbar will show correct values
     QSettings settings("8bitrelics", "Fujisan");
 
     // Check if NetSIO state is changing (read old state BEFORE saving new value)
@@ -3807,7 +3828,11 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile, boo
     settings.setValue("machine/videoSystem", profile.videoSystem);
     settings.setValue("machine/basicEnabled", profile.basicEnabled);
     settings.setValue("machine/turboMode", profile.turboMode);
+    settings.setValue("machine/speedToggleOn", profile.turboMode); // toggle ON when host speed profile
     settings.setValue("machine/emulationSpeedIndex", profile.emulationSpeedIndex);
+
+    // Update UI to reflect changes (must happen after settings are saved above)
+    updateToolbarFromSettings();
     settings.setValue("audio/enabled", profile.audioEnabled);
     settings.setValue("audio/volume", profile.audioVolume);
     settings.setValue("media/netSIOEnabled", profile.netSIOEnabled);
