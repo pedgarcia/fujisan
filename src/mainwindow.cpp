@@ -699,8 +699,8 @@ void MainWindow::createJoystickToolbarSection()
     // Create joystick configuration container
     QWidget* joystickContainer = new QWidget(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(joystickContainer);
-    mainLayout->setContentsMargins(8, 0, 8, 2); // Reduced top margin from 2 to 0
-    mainLayout->setSpacing(3); // Increased spacing from 2 to 3
+    mainLayout->setContentsMargins(4, 0, 4, 2); 
+    mainLayout->setSpacing(3); 
 
     // Title label
     QLabel* titleLabel = new QLabel("🕹️ Joystick");
@@ -747,6 +747,7 @@ void MainWindow::createJoystickToolbarSection()
 
     // Right column: compact swap widget
     m_joystickSwapWidget = new JoystickSwapWidget(this, true); // Compact mode
+    m_joystickSwapWidget->setMaximumWidth(25);
     controlsLayout->addWidget(m_joystickSwapWidget);
 
     mainLayout->addWidget(controlsWidget);
@@ -860,7 +861,7 @@ void MainWindow::createAudioToolbarSection()
     // Create audio configuration container
     QWidget* audioContainer = new QWidget(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(audioContainer);
-    mainLayout->setContentsMargins(8, 2, 8, 2);
+    mainLayout->setContentsMargins(4, 2, 4, 2);
     mainLayout->setSpacing(2);
 
     // Title label
@@ -926,7 +927,7 @@ void MainWindow::createProfileToolbarSection()
     // Create profile configuration container
     QWidget* profileContainer = new QWidget(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(profileContainer);
-    mainLayout->setContentsMargins(8, 0, 8, 2);
+    mainLayout->setContentsMargins(4, 0, 4, 2);
     mainLayout->setSpacing(0);  // Reduce spacing between label and controls
 
     // Add centered label at the top
@@ -945,7 +946,7 @@ void MainWindow::createProfileToolbarSection()
     m_profileCombo = new QComboBox();
     m_profileCombo->setStyleSheet("font-size: 10px;");
     m_profileCombo->setToolTip("Select configuration profile");
-    m_profileCombo->setMinimumWidth(120);  // Wider combo box
+    m_profileCombo->setMinimumWidth(96);  // Wider combo box
     m_profileCombo->setFixedHeight(20);  // Fixed height for consistent alignment
     topLayout->addWidget(m_profileCombo, 0, Qt::AlignVCenter);
 
@@ -994,8 +995,8 @@ void MainWindow::createProfileToolbarSection()
         "    border: 1px solid %1;"
         "    background-color: %2;"
         "    color: %3;"
-        "    min-width: 50px;"
-        "    max-width: 80px;"  // Increased for longer text
+        "    min-width: 45px;"
+        "    max-width: 72px;"  // Increased for longer text
         "    min-height: 16px;"  // Increased from 10px to prevent clipping
         "    max-height: 18px;"  // Increased from 12px
         "}"
@@ -1907,8 +1908,8 @@ void MainWindow::updateToolbarButtonStyles()
         "    border: 1px solid %1;"
         "    background-color: %2;"
         "    color: %3;"
-        "    min-width: 50px;"
-        "    max-width: 60px;"
+        "    min-width: 45px;"
+        "    max-width: 54px;"
         "    min-height: 14px;"
         "    max-height: 16px;"
         "}"
@@ -1931,12 +1932,42 @@ void MainWindow::updateToolbarButtonStyles()
     if (m_optionButton) m_optionButton->setStyleSheet(buttonStyle);
     if (m_breakButton) m_breakButton->setStyleSheet(buttonStyle);
     if (m_pauseButton) m_pauseButton->setStyleSheet(buttonStyle);
+    if (m_insertButton) m_insertButton->setStyleSheet(buttonStyle);
+    if (m_clearButton) m_clearButton->setStyleSheet(buttonStyle);
+
+    // Boot buttons (COLD/WARM) use height-unconstrained style since they have setFixedHeight
+    QString bootButtonStyle = QString(
+        "QPushButton {"
+        "    font-size: 9px;"
+        "    font-weight: bold;"
+        "    padding: 2px 4px;"
+        "    margin: 0px;"
+        "    border: 1px solid %1;"
+        "    background-color: %2;"
+        "    color: %3;"
+        "    min-width: 45px;"
+        "    max-width: 54px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: %4;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: %5;"
+        "    border: 1px solid %6;"
+        "}").arg(borderColor.name())
+            .arg(buttonColor.name())
+            .arg(buttonTextColor.name())
+            .arg(buttonHoverColor.name())
+            .arg(buttonPressedColor.name())
+            .arg(borderColor.darker(120).name());
 
     // Apply to other buttons that may exist in the dock
     QList<QPushButton*> allButtons = findChildren<QPushButton*>();
     for (QPushButton* button : allButtons) {
         QString text = button->text();
-        if (text == "COLD" || text == "WARM" || text == "INVERSE") {
+        if (text == "COLD" || text == "WARM") {
+            button->setStyleSheet(bootButtonStyle);
+        } else if (text == "INVERSE") {
             button->setStyleSheet(buttonStyle);
         }
     }
@@ -1951,8 +1982,8 @@ void MainWindow::updateToolbarButtonStyles()
         "    border: 1px solid %1;"
         "    background-color: %2;"
         "    color: %3;"
-        "    min-width: 50px;"
-        "    max-width: 80px;"
+        "    min-width: 45px;"
+        "    max-width: 72px;"
         "    min-height: 16px;"
         "    max-height: 18px;"
         "}"
@@ -2437,7 +2468,7 @@ void MainWindow::createMediaPeripheralsDock()
     cartridgeMainLayout->setAlignment(Qt::AlignCenter);
 
     QWidget* cartridgeWidget = new QWidget();
-    cartridgeWidget->setFixedWidth(70);
+    cartridgeWidget->setFixedWidth(55);
     QHBoxLayout* cartridgeLayout = new QHBoxLayout(cartridgeWidget);
     cartridgeLayout->setContentsMargins(0, 0, 0, 0);
     cartridgeLayout->addWidget(m_cartridgeWidget, 0, Qt::AlignCenter);
@@ -2456,7 +2487,7 @@ void MainWindow::createMediaPeripheralsDock()
     m_optionButton = new QPushButton("OPTION", this);
     m_breakButton = new QPushButton("BREAK", this);
 
-    // Create reset/system buttons section
+    // Create reset/system buttons section (col 2: INSERT, CLEAR, INVERSE, PAUSE)
     QWidget* systemButtonsContainer = new QWidget(this);
     QVBoxLayout* systemButtonsLayout = new QVBoxLayout(systemButtonsContainer);
     systemButtonsLayout->setContentsMargins(2, 2, 2, 2);
@@ -2467,6 +2498,14 @@ void MainWindow::createMediaPeripheralsDock()
     QPushButton* warmBootButton = new QPushButton("WARM", this);
     QPushButton* inverseButton = new QPushButton("INVERSE", this);
     m_pauseButton = new QPushButton("PAUSE", this);
+    m_insertButton = new QPushButton("INSERT", this);
+    m_clearButton = new QPushButton("CLEAR", this);
+
+    // Create boot buttons section (col 3: COLD, WARM)
+    QWidget* bootButtonsContainer = new QWidget(this);
+    QVBoxLayout* bootButtonsLayout = new QVBoxLayout(bootButtonsContainer);
+    bootButtonsLayout->setContentsMargins(2, 2, 2, 2);
+    bootButtonsLayout->setSpacing(1);
 
     // Style console buttons - use system palette colors for dark mode compatibility
     QPalette pal = QApplication::palette();
@@ -2510,8 +2549,8 @@ void MainWindow::createMediaPeripheralsDock()
         "    border: 1px solid %1;"
         "    background-color: %2;"
         "    color: %3;"
-        "    min-width: 50px;"
-        "    max-width: 60px;"
+        "    min-width: 45px;"
+        "    max-width: 54px;"
         "    min-height: 14px;"
         "    max-height: 16px;"
         "}"
@@ -2534,10 +2573,39 @@ void MainWindow::createMediaPeripheralsDock()
     m_breakButton->setStyleSheet(buttonStyle);
 
     // Apply same style to system buttons
-    coldBootButton->setStyleSheet(buttonStyle);
-    warmBootButton->setStyleSheet(buttonStyle);
     inverseButton->setStyleSheet(buttonStyle);
     m_pauseButton->setStyleSheet(buttonStyle);
+    m_insertButton->setStyleSheet(buttonStyle);
+    m_clearButton->setStyleSheet(buttonStyle);
+
+    // Boot buttons get the same style but without height constraints (height set via setFixedHeight)
+    QString bootButtonStyle = QString(
+        "QPushButton {"
+        "    font-size: 9px;"
+        "    font-weight: bold;"
+        "    padding: 2px 4px;"
+        "    margin: 0px;"
+        "    border: 1px solid %1;"
+        "    background-color: %2;"
+        "    color: %3;"
+        "    min-width: 45px;"
+        "    max-width: 54px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: %4;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: %5;"
+        "    border: 1px solid %6;"
+        "}").arg(borderColor.name())
+            .arg(buttonColor.name())
+            .arg(buttonTextColor.name())
+            .arg(buttonHoverColor.name())
+            .arg(buttonPressedColor.name())
+            .arg(borderColor.darker(120).name());
+
+    coldBootButton->setStyleSheet(bootButtonStyle);
+    warmBootButton->setStyleSheet(bootButtonStyle);
 
     // Add tooltips
     m_startButton->setToolTip("START button (F2)");
@@ -2550,6 +2618,8 @@ void MainWindow::createMediaPeripheralsDock()
     warmBootButton->setToolTip("Warm boot (soft reset)");
     inverseButton->setToolTip("INVERSE key (video inverse)");
     m_pauseButton->setToolTip("Pause/Resume emulation");
+    m_insertButton->setToolTip("INSERT key (Ins)");
+    m_clearButton->setToolTip("CLEAR key (F8)");
 
     // Add buttons to layout (reordered: option, select, start, break)
     buttonsLayout->addWidget(m_optionButton);
@@ -2557,11 +2627,18 @@ void MainWindow::createMediaPeripheralsDock()
     buttonsLayout->addWidget(m_startButton);
     buttonsLayout->addWidget(m_breakButton);
 
-    // Add system buttons to layout
-    systemButtonsLayout->addWidget(coldBootButton);
-    systemButtonsLayout->addWidget(warmBootButton);
+    // Col 2: INSERT, CLEAR, INVERSE, PAUSE
+    systemButtonsLayout->addWidget(m_insertButton);
+    systemButtonsLayout->addWidget(m_clearButton);
     systemButtonsLayout->addWidget(inverseButton);
     systemButtonsLayout->addWidget(m_pauseButton);
+
+    // Col 3: COLD, WARM - each spans 2 button heights to match the 4-button columns
+    // 2 buttons * 16px max-height + 1px spacing = 33px each
+    coldBootButton->setFixedHeight(43);
+    warmBootButton->setFixedHeight(43);
+    bootButtonsLayout->addWidget(coldBootButton);
+    bootButtonsLayout->addWidget(warmBootButton);
 
     // Connect console button signals - send press event and delay release to allow one frame processing
     connect(m_startButton, &QPushButton::clicked, this, [this]() {
@@ -2633,6 +2710,30 @@ void MainWindow::createMediaPeripheralsDock()
     connect(coldBootButton, &QPushButton::clicked, this, &MainWindow::coldBoot);
     connect(warmBootButton, &QPushButton::clicked, this, &MainWindow::warmBoot);
 
+    // Connect INSERT key
+    connect(m_insertButton, &QPushButton::clicked, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_Insert, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        qDebug() << "*** INSERT button clicked ***";
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_Insert, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+        });
+        if (m_emulatorWidget) m_emulatorWidget->setFocus();
+    });
+
+    // Connect CLEAR key (F8)
+    connect(m_clearButton, &QPushButton::clicked, this, [this]() {
+        QKeyEvent pressEvent(QEvent::KeyPress, Qt::Key_F8, Qt::NoModifier);
+        m_emulator->handleKeyPress(&pressEvent);
+        qDebug() << "*** CLEAR button clicked - F8 pressed ***";
+        QTimer::singleShot(50, [this]() {
+            QKeyEvent releaseEvent(QEvent::KeyRelease, Qt::Key_F8, Qt::NoModifier);
+            m_emulator->handleKeyRelease(&releaseEvent);
+        });
+        if (m_emulatorWidget) m_emulatorWidget->setFocus();
+    });
+
     // Connect inverse key - send AKEY_ATARI directly for inverse video toggle
     connect(inverseButton, &QPushButton::clicked, this, [this]() {
         m_emulator->injectAKey(AKEY_ATARI);
@@ -2656,8 +2757,8 @@ void MainWindow::createMediaPeripheralsDock()
     // Machine selector on top
     m_machineCombo = new QComboBox();
     m_machineCombo->setIconSize(QSize(32, 20));
-    m_machineCombo->setMinimumWidth(200);
-    m_machineCombo->setMaximumWidth(200);
+    m_machineCombo->setMinimumWidth(180);
+    m_machineCombo->setMaximumWidth(180);
 
     // Create machine icons (same as original createToolBar)
     auto createMachineIcon = [](const QColor& baseColor, const QString& text) -> QIcon {
@@ -2791,12 +2892,14 @@ void MainWindow::createMediaPeripheralsDock()
     // Plus the ones we just inserted: d1(1) + sep(1) + cart(1) + sep(1) + machine(1) + sep(1) = 6
     // Total before spacer = 6, so spacer is at index 6+6 = 12
 
-    // Insert console and system buttons after the spacer (logo will be added at the very end)
+    // Insert console (col 1), system (col 2), and boot (col 3) buttons after the spacer
     int insertIndex = 12;
 
     m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex), consoleButtonsContainer);
     m_toolBar->insertSeparator(m_toolBar->actions().at(insertIndex + 1));
     m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex + 2), systemButtonsContainer);
+    m_toolBar->insertSeparator(m_toolBar->actions().at(insertIndex + 3));
+    m_toolBar->insertWidget(m_toolBar->actions().at(insertIndex + 4), bootButtonsContainer);
 
     // Add logo at the very end (after console and system buttons)
     QFrame* logoSeparator = new QFrame();

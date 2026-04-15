@@ -230,11 +230,13 @@ private:
     QPushButton* m_mediaToggleButton;
 
     // Console buttons
-    QPushButton* m_startButton;
-    QPushButton* m_selectButton;
-    QPushButton* m_optionButton;
-    QPushButton* m_breakButton;
-    QPushButton* m_pauseButton;
+    QPushButton* m_startButton = nullptr;
+    QPushButton* m_selectButton = nullptr;
+    QPushButton* m_optionButton = nullptr;
+    QPushButton* m_breakButton = nullptr;
+    QPushButton* m_pauseButton = nullptr;
+    QPushButton* m_insertButton = nullptr;
+    QPushButton* m_clearButton = nullptr;
 
     // Toolbar widgets
     ToggleSwitch* m_basicToggle;
