@@ -23,16 +23,41 @@
 #include <QLabel>
 #include <QTimer>
 #include <QDebug>
+#include <functional>
 
 static const char* KEY_FOLDER = "fastbasic/buildPanelFolder";
 static const char* KEY_FILE = "fastbasic/buildPanelFile";
+
+namespace {
+
+class ComboWithPrescan : public QComboBox {
+public:
+    explicit ComboWithPrescan(QWidget* parent = nullptr)
+        : QComboBox(parent)
+    {
+    }
+
+    std::function<void()> beforeShowPopup;
+
+protected:
+    void showPopup() override
+    {
+        if (beforeShowPopup)
+            beforeShowPopup();
+        QComboBox::showPopup();
+    }
+};
+
+} // namespace
 
 FastbasicBuildPanel::FastbasicBuildPanel(MainWindow* mainWindow, QWidget* parent)
     : QWidget(parent)
     , m_mainWindow(mainWindow)
     , m_process(nullptr)
 {
-    m_fileCombo = new QComboBox(this);
+    auto* prescanCombo = new ComboWithPrescan(this);
+    prescanCombo->beforeShowPopup = [this]() { rescanFileListKeepingSelection(); };
+    m_fileCombo = prescanCombo;
     m_fileCombo->setEditable(false);
     m_fileCombo->setMinimumWidth(120);
     m_fileCombo->setMaximumWidth(200);
@@ -149,6 +174,16 @@ void FastbasicBuildPanel::refreshFileList()
         m_fileCombo->addItem(f);
 }
 
+void FastbasicBuildPanel::rescanFileListKeepingSelection()
+{
+    if (m_currentFolder.isEmpty())
+        return;
+    const QString previous = m_fileCombo->currentText();
+    refreshFileList();
+    const int idx = m_fileCombo->findText(previous);
+    m_fileCombo->setCurrentIndex(idx >= 0 ? idx : -1);
+}
+
 void FastbasicBuildPanel::onBrowseFolder()
 {
     QString dir = QFileDialog::getExistingDirectory(this, tr("Select folder with .bas files"),
@@ -197,7 +232,9 @@ void FastbasicBuildPanel::onRun()
     m_process->start(compiler, QStringList() << basPath);
     if (!m_process->waitForStarted(5000)) {
         m_lastOutput = tr("Failed to start compiler: %1").arg(m_process->errorString());
-        QMessageBox::warning(this, tr("Fastbasic"), m_lastOutput);
+        if (m_mainWindow && m_mainWindow->statusBar())
+            m_mainWindow->statusBar()->showMessage(tr("Compile failed"), 5000);
+        showOutputDialog();
         m_runButton->setEnabled(true);
         return;
     }
@@ -225,13 +262,14 @@ void FastbasicBuildPanel::onProcessFinished(int exitCode, QProcess::ExitStatus s
     if (status != QProcess::NormalExit || exitCode != 0) {
         if (m_mainWindow && m_mainWindow->statusBar())
             m_mainWindow->statusBar()->showMessage(tr("Compile failed"), 5000);
-        QMessageBox::warning(this, tr("Fastbasic"), tr("Compilation failed. Use \"Show Output\" for details."));
+        showOutputDialog();
         return;
     }
     if (!QFile::exists(xexInSource)) {
         if (m_mainWindow && m_mainWindow->statusBar())
             m_mainWindow->statusBar()->showMessage(tr("No .xex produced"), 5000);
-        QMessageBox::warning(this, tr("Fastbasic"), tr("Compiler did not produce %1.xex").arg(stem));
+        m_lastOutput += tr("\nCompiler did not produce %1.xex\n").arg(stem);
+        showOutputDialog();
         return;
     }
 
@@ -291,13 +329,13 @@ void FastbasicBuildPanel::onProcessError(QProcess::ProcessError error)
 {
     m_runButton->setEnabled(true);
     m_lastOutput += tr("Process error: %1").arg(m_process->errorString());
-    QMessageBox::warning(this, tr("Fastbasic"), m_process->errorString());
     if (m_mainWindow && m_mainWindow->statusBar())
         m_mainWindow->statusBar()->showMessage(tr("Compile error"), 5000);
+    showOutputDialog();
     (void)error;
 }
 
-void FastbasicBuildPanel::onShowOutput()
+void FastbasicBuildPanel::showOutputDialog()
 {
     QDialog* dlg = new QDialog(this);
     dlg->setWindowTitle(tr("Fastbasic Output"));
@@ -312,4 +350,9 @@ void FastbasicBuildPanel::onShowOutput()
     dlg->resize(600, 400);
     dlg->exec();
     dlg->deleteLater();
+}
+
+void FastbasicBuildPanel::onShowOutput()
+{
+    showOutputDialog();
 }

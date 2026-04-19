@@ -42,6 +42,8 @@ private:
     void persistFolder(const QString& folder);
     void persistFile(const QString& fileName);
     void updatePathLabel();
+    void rescanFileListKeepingSelection();
+    void showOutputDialog();
 
     MainWindow* m_mainWindow;
     QComboBox* m_fileCombo;
