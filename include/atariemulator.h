@@ -217,6 +217,9 @@ public:
     void handleKeyPress(QKeyEvent* event);
     void handleKeyRelease(QKeyEvent* event);
     bool handleJoystickKeyboardEmulation(QKeyEvent* event);
+
+    /// Master "enable joystick" (toolbar / settings). When false, SDL sticks and kbd-joy maps are inactive.
+    bool isJoystickInputEnabled() const { return m_joystickInputEnabled.load(); }
     
     Q_INVOKABLE void coldBoot();
     Q_INVOKABLE void warmBoot();
@@ -280,6 +283,12 @@ public:
     void setJoystick1Preset(const QString& preset);
     QString getJoystick0Preset() const { return m_joystick0Preset; }
     QString getJoystick1Preset() const { return m_joystick1Preset; }
+
+public slots:
+    /// Apply joystick master flag, per-port devices, kbd-joy flags, swap, and presets (must run on emulator thread).
+    void applyJoystickInputBundle(bool master, const QString& device1, const QString& device2,
+                                  bool kbd0, bool kbd1, bool swap,
+                                  const QString& preset0, const QString& preset1);
 
 #ifdef HAVE_SDL2_JOYSTICK
     // Real joystick (SDL2) support
@@ -437,6 +446,7 @@ private:
     QString m_basicRomPath;
     
     // Joystick keyboard emulation settings
+    std::atomic<bool> m_joystickInputEnabled{true};
     bool m_kbdJoy0Enabled = false;  // Default false - keyboard joysticks disabled by default
     bool m_kbdJoy1Enabled = false;  // Default false - keyboard joysticks disabled by default
     bool m_swapJoysticks = false;   // Default false: Joy0=Numpad, Joy1=WASD

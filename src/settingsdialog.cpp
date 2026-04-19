@@ -12,6 +12,7 @@
 #include <QMessageBox>
 #include <QDesktopServices>
 #include <QThread>
+#include <QMetaObject>
 #include <QUrl>
 #include <QProcess>
 #include <QDir>
@@ -2958,6 +2959,17 @@ void SettingsDialog::saveSettings()
     settings.setValue("input/joystick1Preset", m_joystick1Preset ? m_joystick1Preset->currentData().toString() : "numpad");
     settings.setValue("input/joystick2Preset", m_joystick2Preset ? m_joystick2Preset->currentData().toString() : "wasd");
 
+    {
+        const QString d1 = m_joystick1Device->currentData().toString();
+        const QString d2 = m_joystick2Device->currentData().toString();
+        if (d1 != QStringLiteral("keyboard")) {
+            settings.setValue(QStringLiteral("input/kbdJoy0Enabled"), false);
+        }
+        if (d2 != QStringLiteral("keyboard")) {
+            settings.setValue(QStringLiteral("input/kbdJoy1Enabled"), false);
+        }
+    }
+
     settings.setValue("input/swapJoysticks", m_swapJoysticks->isChecked());
     settings.setValue("input/grabMouse", m_grabMouse->isChecked());
     settings.setValue("input/mouseDevice", m_mouseDevice->text());
@@ -3237,22 +3249,27 @@ void SettingsDialog::applySettings()
     
     // Apply joystick settings immediately (no restart needed)
     if (m_emulator) {
-        bool mainJoystickEnabled = m_joystickEnabled->isChecked();
-        bool swapped = m_swapJoysticks->isChecked();
+        QSettings st(QStringLiteral("8bitrelics"), QStringLiteral("Fujisan"));
+        const bool mainJoystickEnabled = m_joystickEnabled->isChecked();
+        const QString device1 = m_joystick1Device->currentData().toString();
+        const QString device2 = m_joystick2Device->currentData().toString();
+        const QString presetJoy1 = m_joystick1Preset ? m_joystick1Preset->currentData().toString() : QStringLiteral("numpad");
+        const QString presetJoy2 = m_joystick2Preset ? m_joystick2Preset->currentData().toString() : QStringLiteral("wasd");
+        const bool swapped = m_swapJoysticks->isChecked();
+        const bool kbd0 = mainJoystickEnabled && (device1 == QStringLiteral("keyboard")) &&
+                          st.value(QStringLiteral("input/kbdJoy0Enabled"), false).toBool();
+        const bool kbd1 = mainJoystickEnabled && (device2 == QStringLiteral("keyboard")) &&
+                          st.value(QStringLiteral("input/kbdJoy1Enabled"), false).toBool();
 
-        // Apply joystick device settings
-        if (mainJoystickEnabled) {
-            onJoystickDeviceChanged(); // This handles the device-specific logic
-        } else {
-            // Disable all joystick input when main joystick is disabled
-            m_emulator->setKbdJoy0Enabled(false);
-            m_emulator->setKbdJoy1Enabled(false);
-#ifdef HAVE_SDL2_JOYSTICK
-            m_emulator->setRealJoysticksEnabled(false);
-#endif
-        }
-
-        m_emulator->setJoysticksSwapped(swapped);
+        QMetaObject::invokeMethod(m_emulator, "applyJoystickInputBundle", Qt::BlockingQueuedConnection,
+                                  Q_ARG(bool, mainJoystickEnabled),
+                                  Q_ARG(QString, device1),
+                                  Q_ARG(QString, device2),
+                                  Q_ARG(bool, kbd0),
+                                  Q_ARG(bool, kbd1),
+                                  Q_ARG(bool, swapped),
+                                  Q_ARG(QString, presetJoy1),
+                                  Q_ARG(QString, presetJoy2));
 
         qDebug() << "Applied joystick settings live - MainJoystick:" << mainJoystickEnabled
                  << "Swap:" << swapped;
@@ -3892,9 +3909,17 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     profile.joystick2Hat = false;
     profile.joystick3Hat = false;
     profile.joyDistinct = false;
-    // Convert device selection to keyboard emulation flags for profile compatibility
-    profile.kbdJoy0Enabled = (m_joystick1Device->currentData().toString() == "keyboard");
-    profile.kbdJoy1Enabled = (m_joystick2Device->currentData().toString() == "keyboard");
+    {
+        QSettings st(QStringLiteral("8bitrelics"), QStringLiteral("Fujisan"));
+        const QString d1 = m_joystick1Device->currentData().toString();
+        const QString d2 = m_joystick2Device->currentData().toString();
+        profile.joystick1Device = d1;
+        profile.joystick2Device = d2;
+        profile.kbdJoy0Enabled = (d1 == QStringLiteral("keyboard")) &&
+                                 st.value(QStringLiteral("input/kbdJoy0Enabled"), false).toBool();
+        profile.kbdJoy1Enabled = (d2 == QStringLiteral("keyboard")) &&
+                                 st.value(QStringLiteral("input/kbdJoy1Enabled"), false).toBool();
+    }
     profile.joystick1Preset = m_joystick1Preset ? m_joystick1Preset->currentData().toString() : "numpad";
     profile.joystick2Preset = m_joystick2Preset ? m_joystick2Preset->currentData().toString() : "wasd";
     profile.swapJoysticks = m_swapJoysticks->isChecked();
@@ -4156,9 +4181,14 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     
     // Input Configuration
     m_joystickEnabled->setChecked(profile.joystickEnabled);
-    // Convert keyboard emulation flags back to device selection for compatibility
-    QString device1 = profile.kbdJoy0Enabled ? "keyboard" : "none";
-    QString device2 = profile.kbdJoy1Enabled ? "keyboard" : "none";
+    QString device1 = profile.joystick1Device;
+    QString device2 = profile.joystick2Device;
+    if (device1.isEmpty()) {
+        device1 = profile.kbdJoy0Enabled ? QStringLiteral("keyboard") : QStringLiteral("none");
+    }
+    if (device2.isEmpty()) {
+        device2 = profile.kbdJoy1Enabled ? QStringLiteral("keyboard") : QStringLiteral("none");
+    }
 
     // Set dropdown selections based on profile data
     for (int i = 0; i < m_joystick1Device->count(); ++i) {
@@ -4297,7 +4327,7 @@ bool SettingsDialog::eventFilter(QObject *watched, QEvent *event)
             joyManager->blockSignals(true);
 
             qDebug() << "Refreshing joysticks before opening dropdown...";
-            joyManager->refreshJoysticks();
+            QMetaObject::invokeMethod(joyManager, "refreshJoysticks", Qt::BlockingQueuedConnection);
 
             // Unblock signals
             joyManager->blockSignals(false);
@@ -4332,6 +4362,13 @@ bool SettingsDialog::eventFilter(QObject *watched, QEvent *event)
 void SettingsDialog::populateJoystickDevices()
 {
     qDebug() << "SettingsDialog::populateJoystickDevices() called";
+
+#ifdef HAVE_SDL2_JOYSTICK
+    if (m_emulator && m_emulator->getJoystickManager()) {
+        SDL2JoystickManager* jm = m_emulator->getJoystickManager();
+        QMetaObject::invokeMethod(jm, "refreshJoysticks", Qt::BlockingQueuedConnection);
+    }
+#endif
 
     // Clear existing items
     m_joystick1Device->clear();
@@ -4440,35 +4477,29 @@ void SettingsDialog::onJoystickDeviceChanged()
         return;
     }
 
-    // Apply joystick device and preset changes immediately
-    QString device1 = m_joystick1Device->currentData().toString();
-    QString device2 = m_joystick2Device->currentData().toString();
-    QString preset1 = m_joystick1Preset ? m_joystick1Preset->currentData().toString() : "numpad";
-    QString preset2 = m_joystick2Preset ? m_joystick2Preset->currentData().toString() : "wasd";
+    QSettings st(QStringLiteral("8bitrelics"), QStringLiteral("Fujisan"));
+    const bool mainJoystickEnabled = m_joystickEnabled->isChecked();
+    const QString device1 = m_joystick1Device->currentData().toString();
+    const QString device2 = m_joystick2Device->currentData().toString();
+    const QString preset1 = m_joystick1Preset ? m_joystick1Preset->currentData().toString() : QStringLiteral("numpad");
+    const QString preset2 = m_joystick2Preset ? m_joystick2Preset->currentData().toString() : QStringLiteral("wasd");
+    const bool swapped = m_swapJoysticks->isChecked();
+    const bool kbd0 = mainJoystickEnabled && (device1 == QStringLiteral("keyboard")) &&
+                      st.value(QStringLiteral("input/kbdJoy0Enabled"), false).toBool();
+    const bool kbd1 = mainJoystickEnabled && (device2 == QStringLiteral("keyboard")) &&
+                      st.value(QStringLiteral("input/kbdJoy1Enabled"), false).toBool();
 
     qDebug() << "Joystick devices changed - J1:" << device1 << "J2:" << device2 << "Presets:" << preset1 << preset2;
 
-    // Enable keyboard emulation based on device selections
-    bool kbd1Enabled = (device1 == "keyboard");
-    bool kbd2Enabled = (device2 == "keyboard");
-
-    m_emulator->setKbdJoy0Enabled(kbd1Enabled);
-    m_emulator->setKbdJoy1Enabled(kbd2Enabled);
-    m_emulator->setJoystick0Preset(preset1);
-    m_emulator->setJoystick1Preset(preset2);
-
-#ifdef HAVE_SDL2_JOYSTICK
-    // Set device assignments for precise joystick control
-    m_emulator->setJoystick1Device(device1);
-    m_emulator->setJoystick2Device(device2);
-
-    // Enable real joysticks if any SDL device is selected
-    bool realJoysticksNeeded = device1.startsWith("sdl_") || device2.startsWith("sdl_");
-    m_emulator->setRealJoysticksEnabled(realJoysticksNeeded);
-
-    qDebug() << "Applied joystick settings - Kbd1:" << kbd1Enabled
-             << "Kbd2:" << kbd2Enabled << "Real:" << realJoysticksNeeded;
-#endif
+    QMetaObject::invokeMethod(m_emulator, "applyJoystickInputBundle", Qt::BlockingQueuedConnection,
+                              Q_ARG(bool, mainJoystickEnabled),
+                              Q_ARG(QString, device1),
+                              Q_ARG(QString, device2),
+                              Q_ARG(bool, kbd0),
+                              Q_ARG(bool, kbd1),
+                              Q_ARG(bool, swapped),
+                              Q_ARG(QString, preset1),
+                              Q_ARG(QString, preset2));
 }
 
 void SettingsDialog::onJoystickPresetChanged(int joystickNumber)

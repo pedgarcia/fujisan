@@ -155,6 +155,8 @@ private:
     void createMediaPeripheralsDock();
     void restartEmulator();
     void updateToolbarFromSettings();
+    /// Read input/joystick* from QSettings and apply via AtariEmulator::applyJoystickInputBundle (worker thread).
+    void syncEmulatorJoystickFromQSettings();
     void updateBasicToggleState();
     void updateToolbarLogo();
     void updateToolbarButtonStyles();

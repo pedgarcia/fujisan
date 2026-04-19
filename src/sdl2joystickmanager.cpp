@@ -11,7 +11,6 @@
 #include <SDL.h>
 #include <QDebug>
 #include <QThread>
-#include <QCoreApplication>
 
 // Atari INPUT_STICK constants (from atari800/src/input.h)
 // libatari800 XORs these with 0xff, so we pre-calculate the inverted values
@@ -149,11 +148,11 @@ void SDL2JoystickManager::onPollTimer()
         return;
     }
 
-    // Verify we're on the main thread (critical for macOS)
-    if (QThread::currentThread() != QCoreApplication::instance()->thread()) {
+    // Poll on the thread that owns this QObject (emulator worker after moveToThread).
+    if (QThread::currentThread() != thread()) {
         qWarning() << "SDL2JoystickManager: onPollTimer called from wrong thread!"
                    << "Current:" << QThread::currentThread()
-                   << "Main:" << QCoreApplication::instance()->thread();
+                   << "Owner:" << thread();
         return;
     }
 

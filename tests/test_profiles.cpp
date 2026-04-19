@@ -72,6 +72,8 @@ private:
 
         p.joystickEnabled = false;
         p.swapJoysticks = true;
+        p.joystick1Device = QStringLiteral("keyboard");
+        p.joystick2Device = QStringLiteral("none");
         p.kbdJoy0Enabled = true;
         p.kbdJoy1Enabled = true;
         p.joystick1Preset = "arrows";
@@ -180,6 +182,8 @@ private slots:
 
         QCOMPARE(loaded.joystickEnabled, original.joystickEnabled);
         QCOMPARE(loaded.swapJoysticks, original.swapJoysticks);
+        QCOMPARE(loaded.joystick1Device, original.joystick1Device);
+        QCOMPARE(loaded.joystick2Device, original.joystick2Device);
         QCOMPARE(loaded.kbdJoy0Enabled, original.kbdJoy0Enabled);
         QCOMPARE(loaded.kbdJoy1Enabled, original.kbdJoy1Enabled);
         QCOMPARE(loaded.joystick1Preset, original.joystick1Preset);

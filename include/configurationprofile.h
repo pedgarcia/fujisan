@@ -93,6 +93,9 @@ struct ConfigurationProfile {
     bool joyDistinct = false;
     bool kbdJoy0Enabled = false;
     bool kbdJoy1Enabled = false;
+    /// Per-port device id: "keyboard", "none", or "sdl_N". Empty = derive from kbdJoy* when loading old profiles.
+    QString joystick1Device;
+    QString joystick2Device;
     QString joystick1Preset = "numpad";
     QString joystick2Preset = "wasd";
     bool swapJoysticks = false;

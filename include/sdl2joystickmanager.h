@@ -62,8 +62,8 @@ public:
     void setEnabled(bool enabled);
     bool isEnabled() const;
 
-    // Manual refresh (useful for settings dialogs)
-    void refreshJoysticks();
+    // Manual refresh (useful for settings dialogs). Q_INVOKABLE for cross-thread invoke from GUI.
+    Q_INVOKABLE void refreshJoysticks();
 
 signals:
     void joystickConnected(int index, const QString &name);
