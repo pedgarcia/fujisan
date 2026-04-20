@@ -49,7 +49,7 @@
 | | Space | WASD Joystick Fire |
 | | Q,E,Z,C | WASD Joystick Diagonals |
 | **Special Functions** | | |
-| | Escape | Exit Fullscreen |
+| | Escape | Atari Escape |
 | | Caps Lock | Atari Caps Lock |
 
 ## Notes

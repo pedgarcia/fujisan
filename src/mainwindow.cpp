@@ -3511,12 +3511,7 @@ bool MainWindow::eventFilter(QObject *object, QEvent *event)
             toggleFullscreen();
             return true;
         }
-
-        // Handle Escape key to exit fullscreen
-        if (keyEvent->key() == Qt::Key_Escape) {
-            exitCustomFullscreen();
-            return true;
-        }
+        // Do not intercept Escape: it maps to the Atari Escape key (AKEY_ESCAPE).
     }
 
     const QEvent::Type et = event->type();
