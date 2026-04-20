@@ -170,6 +170,12 @@ void SettingsDialog::setFujiNetManagers(FujiNetProcessManager* processManager,
     }
 
     qDebug() << "FujiNet managers set - using shared instances from MainWindow";
+
+    // Run SD migration now that legacy/default paths can be computed (was skipped in
+    // onNetSIOToggled during constructor before managers were available).
+    if (m_netSIOEnabled && m_netSIOEnabled->isChecked()) {
+        checkAndMigrateFujiNetSD();
+    }
 }
 
 void SettingsDialog::createHardwareTab()
@@ -2331,7 +2337,11 @@ void SettingsDialog::onAltirraBASICChanged()
 void SettingsDialog::onNetSIOToggled(bool enabled)
 {
     if (enabled) {
-        checkAndMigrateFujiNetSD();
+        // Migration needs FujiNetBinaryManager (legacy vs default paths). That is set in
+        // setFujiNetManagers() after this dialog's constructor runs, so skip here when null.
+        if (m_fujinetBinaryManager) {
+            checkAndMigrateFujiNetSD();
+        }
 
         m_basicEnabledCheck->setToolTip("BASIC setting applies to SmartDOS/MyDOS\n"
                                        "SmartDOS/MyDOS will use the configured BASIC ROM");
@@ -4575,7 +4585,7 @@ void SettingsDialog::updateFujiNetBinaryPathDisplay()
         m_fujinetDefaultConfigLabel->setText(QString("Default: %1").arg(configPath));
 
         if (m_fujinetSDPath->text().isEmpty()) {
-            QString defaultSDPath = fileInfo.absolutePath() + "/SD";
+            QString defaultSDPath = m_fujinetBinaryManager->getDefaultSDPath();
             m_fujinetSDPath->setPlaceholderText(QString("Default: %1").arg(defaultSDPath));
         }
     } else {
@@ -4671,6 +4681,10 @@ void SettingsDialog::onFujiNetOpenSDFolder()
 void SettingsDialog::checkAndMigrateFujiNetSD()
 {
     if (!m_netSIOEnabled->isChecked()) {
+        return;
+    }
+
+    if (!m_fujinetBinaryManager) {
         return;
     }
 
@@ -5081,10 +5095,14 @@ void SettingsDialog::onFujiNetStart()
     // SD card folder parameter (-s)
     QString sdPath = m_fujinetSDPath->text();
     if (sdPath.isEmpty()) {
-        // Use default SD folder (relative path)
-        sdPath = "SD";
+        sdPath = m_fujinetBinaryManager->getDefaultSDPath();
+        QDir defaultDir(sdPath);
+        if (!defaultDir.exists() && !defaultDir.mkpath(".")) {
+            QMessageBox::warning(this, "SD Folder Not Found",
+                QString("Could not create default SD card folder:\n%1").arg(sdPath));
+            return;
+        }
     } else {
-        // Use custom absolute path
         if (!QDir(sdPath).exists()) {
             QMessageBox::warning(this, "SD Folder Not Found",
                 QString("SD card folder not found:\n%1").arg(sdPath));

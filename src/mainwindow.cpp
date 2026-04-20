@@ -4428,8 +4428,18 @@ void MainWindow::startFujiNetWithSavedSettings()
     }
 
     // SD card folder parameter (-s)
+    // Empty setting means "platform default" (same as getFujiNetSDPath()), not the legacy
+    // relative path "SD" next to the binary — that breaks after updates when the bundle path changes.
     if (sdPath.isEmpty()) {
-        sdPath = "SD";  // Default
+        if (m_fujinetBinaryManager) {
+            sdPath = m_fujinetBinaryManager->getDefaultSDPath();
+            QDir defaultDir(sdPath);
+            if (!defaultDir.exists()) {
+                defaultDir.mkpath(".");
+            }
+        } else {
+            sdPath = QStringLiteral("SD");
+        }
     } else if (!QDir(sdPath).exists()) {
         qWarning() << "SD card folder not found:" << sdPath << "- will use saved path anyway";
     }
