@@ -16,6 +16,15 @@
 #include <QRegularExpression>
 #include <QtGlobal>
 
+namespace {
+/* Quit / stop: shorter waits than generic defaults — user expects the window to close promptly. */
+constexpr int kManagedGracefulStopMs = 800;
+constexpr int kAfterKillWaitMs = 800;
+constexpr int kExternalSignalWaitMs = 1200;
+constexpr int kExternalPollIntervalMs = 100;
+constexpr int kExternalPollMaxIterations = 25;
+} // namespace
+
 #ifdef Q_OS_WIN
 static QString fujisanSystem32Exe(const QString &fileName)
 {
@@ -177,39 +186,44 @@ void FujiNetProcessManager::stop()
         QProcess taskkill;
         taskkill.start(fujisanSystem32Exe(QStringLiteral("taskkill.exe")),
                        QStringList() << "/IM" << "fujinet.exe");
-        taskkill.waitForFinished(2000);
+        taskkill.waitForFinished(kExternalSignalWaitMs);
 
-        QThread::msleep(1000);
+        for (int i = 0; i < kExternalPollMaxIterations
+             && isProcessRunningExternally(QStringLiteral("fujinet")); ++i) {
+            QThread::msleep(kExternalPollIntervalMs);
+        }
         if (isProcessRunningExternally("fujinet")) {
             qDebug() << "External FujiNet-PC did not terminate, force killing";
             QProcess taskkillForce;
             taskkillForce.start(fujisanSystem32Exe(QStringLiteral("taskkill.exe")),
                                 QStringList() << "/F" << "/IM" << "fujinet.exe");
-            taskkillForce.waitForFinished(2000);
+            taskkillForce.waitForFinished(kExternalSignalWaitMs);
         }
 #else
         qDebug() << "Stopping external FujiNet-PC process with pkill";
         QProcess pkill;
         pkill.start("pkill", QStringList() << "-TERM" << "fujinet");
-        pkill.waitForFinished(2000);
+        pkill.waitForFinished(kExternalSignalWaitMs);
 
-        QThread::msleep(1000);
+        for (int i = 0; i < kExternalPollMaxIterations
+             && isProcessRunningExternally(QStringLiteral("fujinet")); ++i) {
+            QThread::msleep(kExternalPollIntervalMs);
+        }
         if (isProcessRunningExternally("fujinet")) {
             qDebug() << "External FujiNet-PC did not terminate, force killing";
             QProcess pkillForce;
             pkillForce.start("pkill", QStringList() << "-9" << "fujinet");
-            pkillForce.waitForFinished(2000);
+            pkillForce.waitForFinished(kExternalSignalWaitMs);
         }
 #endif
     } else {
         // Process we started - use QProcess methods
         m_process->terminate();
 
-        // Wait up to 5 seconds for graceful shutdown
-        if (!m_process->waitForFinished(5000)) {
+        if (!m_process->waitForFinished(kManagedGracefulStopMs)) {
             qWarning() << "FujiNet-PC did not terminate gracefully, killing process";
             m_process->kill();
-            m_process->waitForFinished(1000);
+            m_process->waitForFinished(kAfterKillWaitMs);
         }
     }
 

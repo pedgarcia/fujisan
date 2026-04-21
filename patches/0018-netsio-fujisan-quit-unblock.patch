@@ -1,0 +1,93 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fujisan Developer <fujisan@8bitrelics.com>
+Date: Sun, 19 Apr 2026 00:00:00 +0000
+Subject: [PATCH] netsio: safe shutdown from GUI + rx thread exit + fds0 init
+
+- Initialize fds0 to {-1,-1} so netsio_shutdown() before netsio_init does not close fd 0.
+- netsio_shutdown(): return early when !netsio_initialized (idempotent, GUI-safe).
+- fujinet_rx_thread: exit recv loop on socket close/error instead of busy-spinning on
+  recvfrom failure; handle EINTR.
+- Close fds0[1] before fds0[0] in netsio_shutdown so any thread blocked in
+  select()/read() on fds0[0] is unblocked instantly via EOF, instead of waiting for
+  the rx-side close to race with the kernel.
+
+Fujisan calls netsio_shutdown() from the GUI thread during quit to unblock the worker
+from netsio_recv_byte() / select() so finalizeShutdown can run.
+---
+ src/netsio.c | 28 +++++++++++++++++++---------
+ 1 file changed, 19 insertions(+), 9 deletions(-)
+
+diff --git a/src/netsio.c b/src/netsio.c
+--- a/src/netsio.c
++++ b/src/netsio.c
+@@ -54,8 +54,8 @@
+ #define NETSIO_RECV_BYTE_TIMEOUT_SEC 3
+ #endif
+ 
+-/* FIFO pipe: fds0: FujiNet->emulator */
+-int fds0[2];
++/* FIFO pipe: fds0: FujiNet->emulator (-1 until netsio_init succeeds) */
++int fds0[2] = { -1, -1 };
+ 
+ /* UDP socket for NetSIO and return address holder */
+ static int sockfd = -1;
+@@ -615,7 +615,10 @@
+             addr_in->sin_len = sizeof(struct sockaddr_in);
+         }
+ #endif
+-        
++
++        if (sockfd < 0)
++            break;
++
+         n = recvfrom(sockfd,
+                              buf, sizeof(buf),
+                              0,
+@@ -624,10 +627,12 @@
+ 
+         if (n <= 0)
+         {
++            if (n < 0 && errno == EINTR)
++                continue;
+ #ifdef DEBUG
+-            Log_print("netsio: recv");
++            Log_print("netsio: recvfrom exit (n=%zd errno=%d)", n, n < 0 ? errno : 0);
+ #endif
+-            continue;
++            break;
+         }
+         fujinet_known = 1;
+         
+@@ -865,6 +870,10 @@
+     Log_print("netsio: shutting down...");
+ #endif
+ 
++    if (!netsio_initialized) {
++        return;
++    }
++
+     /* Send disconnect notification to FujiNet-PC (if connected) */
+     if (netsio_enabled) {
+         uint8_t pkt = NETSIO_DEVICE_DISCONNECTED;
+@@ -883,15 +892,16 @@
+         sockfd = -1;
+     }
+ 
+-    /* Close FIFO pipes */
+-    if (fds0[0] >= 0) {
+-        close(fds0[0]);
+-        fds0[0] = -1;
+-    }
++    /* Close FIFO pipes. Close the write end first so any thread blocked in select()/read()
++     * on fds0[0] sees EOF immediately and unblocks before we close the read fd itself. */
+     if (fds0[1] >= 0) {
+         close(fds0[1]);
+         fds0[1] = -1;
+     }
++    if (fds0[0] >= 0) {
++        close(fds0[0]);
++        fds0[0] = -1;
++    }
+ 
+     /* Reset global state variables */
+     netsio_enabled = 0;

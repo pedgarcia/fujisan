@@ -33,6 +33,9 @@
 #include <QFileInfo>
 #include <QDateTime>
 #include <QMetaObject>
+#include <QElapsedTimer>
+#include <QCoreApplication>
+#include <QProcess>
 
 #include "fujinetprocessmanager.h"
 #include "fujinetbinarymanager.h"
@@ -69,6 +72,13 @@ JoystickSettingsSnapshot readJoystickSettingsSnapshot(QSettings& settings)
     sn.effKbd1 = sn.master && (sn.device2 == QStringLiteral("keyboard")) && kbd1Saved;
     return sn;
 }
+
+/* Quit: netsio_shutdown() unblock + finalizeShutdown usually completes in well under 1s.
+ * Cap GUI wait before QThread::terminate() so closing the window does not sit at 8s. */
+constexpr int kEmulatorThreadQuitWaitMs = 2500;
+constexpr int kPostTerminatePollIterations = 25; /* 25 * kPostTerminatePollIntervalMs */
+constexpr int kPostTerminatePollIntervalMs = 100;
+constexpr int kFujiNetOrphanKillWaitMs = 800;
 
 } // namespace
 
@@ -296,7 +306,7 @@ MainWindow::MainWindow(QWidget *parent)
     qDebug() << "Fujisan initialized successfully";
 }
 
-void MainWindow::stopEmulatorWorkerIfRunning()
+void MainWindow::kickEmulatorWorkerShutdown()
 {
     if (!m_emulator || !m_emulatorThread || !m_emulatorThread->isRunning()) {
         return;
@@ -305,29 +315,97 @@ void MainWindow::stopEmulatorWorkerIfRunning()
     // Keep m_emulator until delete succeeds so ~MainWindow does not run shutdown/delete
     // on a worker-affined emulator if this path fails partway.
     disconnect(m_emulatorThread, &QThread::finished, emu, &QObject::deleteLater);
-    // Stop the frame loop from re-arming; then worker runs full teardown, re-homes the
-    // QObject tree to the GUI thread, and quits. Deleting emu on the GUI thread without
-    // moveToThread would leave timers with worker affinity and trigger killTimer from
-    // the wrong thread (~QObject / QTimer). See Qt thread affinity rules.
+    // Stop the frame loop from re-arming; the worker will then run full teardown and
+    // re-home the QObject tree to the GUI thread before quitting.
     emu->requestShutdown();
+#ifdef NETSIO
+    /* Idempotent when !netsio_initialized (atari800 0018); unblocks recv/select if NetSIO was ever on. */
+    emu->netsioShutdownFromOtherThreadForQuit();
+#endif
     if (!QMetaObject::invokeMethod(emu, "finalizeShutdownOnWorkerAndRehomeToGui",
                                    Qt::QueuedConnection)) {
         qWarning() << "Failed to queue finalizeShutdownOnWorkerAndRehomeToGui on emulator thread";
         m_emulatorThread->quit();
     }
-    // Allow NetSIO wait (up to ~3s) plus teardown; QueuedConnection avoids GUI deadlock.
-    if (!m_emulatorThread->wait(8000)) {
-        qWarning() << "Emulator thread did not stop in time; forcing termination";
-        m_emulatorThread->terminate();
-        m_emulatorThread->wait(1000);
-    }
-    if (emu->thread() != QCoreApplication::instance()->thread()) {
-        qWarning() << "Emulator was not moved to GUI thread; skipping delete to avoid undefined behavior";
+}
+
+void MainWindow::joinEmulatorWorkerShutdown()
+{
+    if (!m_emulatorThread) {
         m_emulator = nullptr;
         return;
     }
-    delete emu;
+    AtariEmulator* emu = m_emulator;
+    if (!m_emulatorThread->isRunning()) {
+        // Already stopped.
+        if (emu && emu->thread() == QCoreApplication::instance()->thread()) {
+            delete emu;
+        }
+        m_emulator = nullptr;
+        return;
+    }
+    if (!m_emulatorThread->wait(kEmulatorThreadQuitWaitMs)) {
+        qWarning() << "Emulator thread did not stop in time; forcing termination";
+        m_emulatorThread->terminate();
+        for (int i = 0; i < kPostTerminatePollIterations && m_emulatorThread->isRunning(); ++i) {
+            m_emulatorThread->wait(kPostTerminatePollIntervalMs);
+        }
+        if (m_emulatorThread->isRunning()) {
+            qCritical() << "Emulator thread still running after terminate; detaching QThread to avoid UB";
+            QThread* t = m_emulatorThread;
+            m_emulatorThread = nullptr;
+            t->setParent(nullptr);
+            // Drop any cross-thread events still queued for emu so the GUI loop does not
+            // dispatch them to a worker-affined object after we return.
+            if (emu) {
+                QCoreApplication::removePostedEvents(emu);
+            }
+            m_emulator = nullptr;
+            return;
+        }
+    }
+    if (emu && emu->thread() != QCoreApplication::instance()->thread()) {
+        qWarning() << "Emulator was not moved to GUI thread; skipping delete to avoid undefined behavior";
+        QCoreApplication::removePostedEvents(emu);
+        m_emulator = nullptr;
+        return;
+    }
+    if (emu) {
+        delete emu;
+    }
     m_emulator = nullptr;
+}
+
+void MainWindow::stopEmulatorWorkerIfRunning()
+{
+    if (!m_emulator || !m_emulatorThread || !m_emulatorThread->isRunning()) {
+        return;
+    }
+    kickEmulatorWorkerShutdown();
+    joinEmulatorWorkerShutdown();
+}
+
+void MainWindow::shutdownFujiNetOnQuit()
+{
+    QElapsedTimer timer;
+    timer.start();
+    if (m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
+        qDebug() << "shutdownFujiNetOnQuit: stopping managed FujiNet-PC (elapsed" << timer.elapsed() << "ms)";
+        m_fujinetProcessManager->stop();
+    }
+    if (FujiNetProcessManager::isProcessRunningExternally(QStringLiteral("fujinet"))) {
+        qDebug() << "shutdownFujiNetOnQuit: detaching orphaned FujiNet-PC kill (elapsed" << timer.elapsed() << "ms)";
+        // Fire-and-forget: we do not need the kill to complete before we close. Avoid the
+        // 800ms waitForFinished that previously dominated the orphan-cleanup branch.
+#ifdef Q_OS_WIN
+        QProcess::startDetached(QStringLiteral("taskkill"),
+                                {QStringLiteral("/F"), QStringLiteral("/IM"), QStringLiteral("fujinet.exe")});
+#else
+        QProcess::startDetached(QStringLiteral("pkill"),
+                                {QStringLiteral("-9"), QStringLiteral("fujinet")});
+#endif
+    }
+    qDebug() << "shutdownFujiNetOnQuit: done in" << timer.elapsed() << "ms";
 }
 
 MainWindow::~MainWindow()
@@ -336,36 +414,36 @@ MainWindow::~MainWindow()
         qApp->removeEventFilter(this);
     }
 
-    // Stop FujiNet-PC process if we started it
-    if (m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
-        qDebug() << "Stopping FujiNet-PC process...";
-        m_fujinetProcessManager->stop();
+    if (m_quitTeardownDone) {
+        // closeEvent already ran the parallel teardown. Just clean up dangling pointers.
+        if (m_emulator) {
+            // If for some reason the worker was already stopped before quit (no closeEvent
+            // path took ownership), the emulator may still need a final cleanup pass.
+            if (m_emulator->thread() == QCoreApplication::instance()->thread()) {
+                m_emulator->shutdown();
+                m_emulator->teardownAudio();
+                delete m_emulator;
+            }
+            m_emulator = nullptr;
+        }
+        return;
     }
 
-    // Aggressive cleanup: kill ALL FujiNet-PC processes to prevent orphans
-    qDebug() << "Performing aggressive FujiNet-PC cleanup...";
-    QProcess cleanup;
-#ifdef Q_OS_WIN
-    cleanup.start("taskkill", QStringList() << "/F" << "/IM" << "fujinet.exe");
-#else
-    cleanup.start("pkill", QStringList() << "-9" << "fujinet");
-#endif
-    cleanup.waitForFinished(2000);
-    if (cleanup.exitCode() == 0) {
-        qDebug() << "Killed orphaned FujiNet-PC processes";
-    }
-
+    // Fallback path: app was destroyed without closeEvent (e.g. QApplication::quit chain).
+    // Mirror closeEvent's order: kick worker, stop FujiNet on GUI thread, then join.
+    kickEmulatorWorkerShutdown();
+    shutdownFujiNetOnQuit();
+    joinEmulatorWorkerShutdown();
     if (m_emulator) {
-        stopEmulatorWorkerIfRunning();
-    }
-    // If the worker was already stopped (or never started), the emulator was never
-    // cleaned up above. Handle that edge case.
-    if (m_emulator) {
+        // joinEmulatorWorkerShutdown only deletes the emulator if a worker thread was
+        // actually running. If the emulator was already on the GUI thread (no worker),
+        // finish the cleanup here.
         m_emulator->shutdown();
         m_emulator->teardownAudio();
         delete m_emulator;
         m_emulator = nullptr;
     }
+    m_quitTeardownDone = true;
 }
 
 void MainWindow::restoreEmulatorFocus()
@@ -3749,6 +3827,18 @@ void MainWindow::showEvent(QShowEvent *event)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    QElapsedTimer quitTimer;
+    quitTimer.start();
+
+    if (m_quitTeardownDone) {
+        event->accept();
+        return;
+    }
+
+    // Hide first so the window disappears immediately; remaining teardown happens "behind" it.
+    hide();
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 5);
+
     // Exit fullscreen if active
     if (m_isInCustomFullscreen) {
         exitCustomFullscreen();
@@ -3762,9 +3852,26 @@ void MainWindow::closeEvent(QCloseEvent *event)
         }
     }
 
-    if (m_emulator) {
-        stopEmulatorWorkerIfRunning();
-    }
+    // Step 1 (non-blocking): kick the worker so it starts tearing down on its own thread.
+    // We do this before the FujiNet stop so the two teardowns overlap in real wall time
+    // even though both helpers run on the GUI thread (the worker proceeds on its own).
+    kickEmulatorWorkerShutdown();
+
+    // Step 2: stop FujiNet on the GUI thread. QProcess is thread-affined to the GUI thread,
+    // so this MUST stay here. Touching it from another thread caused QSocketNotifier
+    // warnings and a delayed segfault in QCoreApplication::notifyInternal2 at exit time.
+    shutdownFujiNetOnQuit();
+
+    // Step 3: now wait for the worker we kicked in Step 1.
+    joinEmulatorWorkerShutdown();
+
+    // Drain any cross-thread events queued during teardown before we return control to
+    // the QApplication event loop (which is about to start the quit chain).
+    QCoreApplication::sendPostedEvents();
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 5);
+
+    m_quitTeardownDone = true;
+    qDebug() << "closeEvent quit path completed in" << quitTimer.elapsed() << "ms";
     event->accept();
 }
 
