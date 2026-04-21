@@ -186,6 +186,19 @@ private:
     /// Shutdown + teardown + delete the emulator on the worker, then quit/wait the
     /// thread. Sets m_emulator to nullptr. No-op if the worker is not running.
     void stopEmulatorWorkerIfRunning();
+    /// Non-blocking: signal the worker thread to start tearing itself down (sets
+    /// m_shuttingDown, queues finalizeShutdown, calls netsio_shutdown to unblock
+    /// select()/read() in the worker). Idempotent; safe to call before quitting.
+    void kickEmulatorWorkerShutdown();
+    /// Blocking: wait for the worker thread quit() initiated by kickEmulatorWorkerShutdown(),
+    /// then move/delete the emulator. Falls back to terminate()/detach if the worker
+    /// is wedged. Sets m_emulator to nullptr. No-op if no worker exists.
+    void joinEmulatorWorkerShutdown();
+    /// Stops managed FujiNet-PC and only then kills orphaned external processes.
+    /// MUST be called from the GUI thread (uses QProcess which is thread-affined).
+    void shutdownFujiNetOnQuit();
+    /// True after the first quit teardown so closeEvent + ~MainWindow do not duplicate work.
+    bool m_quitTeardownDone = false;
     bool widgetIsUnderChrome(const QWidget *w) const;
     bool shouldSuppressChromeFocusRestore(const QWidget *w, QEvent::Type type) const;
 

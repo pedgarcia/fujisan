@@ -237,6 +237,10 @@ public:
     /// Signal the emulator to stop processing frames. Safe to call from any thread.
     /// Then queue finalizeShutdownOnWorkerAndRehomeToGui() on the worker.
     void requestShutdown() { m_shuttingDown.store(true); }
+    /// Call from the GUI thread during quit before waiting on the worker. Unblocks
+    /// netsio_recv_byte() / select() so finalizeShutdown can run (requires atari800 0018 patch).
+    /// Safe to call even when NetSIO is toggled off: netsio_shutdown() is a no-op if uninitialized.
+    void netsioShutdownFromOtherThreadForQuit();
     void setDeferTimerStart(bool defer) { m_deferTimerStart = defer; }
     void startDeferredTimers();
     Q_INVOKABLE bool shouldAutoColdBootForFujiNet();

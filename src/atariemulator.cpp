@@ -919,6 +919,13 @@ bool AtariEmulator::initializeWithNetSIOConfig(bool basicEnabled, const QString&
     return true;
 }
 
+void AtariEmulator::netsioShutdownFromOtherThreadForQuit()
+{
+#ifdef NETSIO
+    netsio_shutdown();
+#endif
+}
+
 void AtariEmulator::shutdown()
 {
     m_shuttingDown.store(false);  // reset so restart works
@@ -980,8 +987,11 @@ void AtariEmulator::finalizeShutdownOnWorkerAndRehomeToGui()
     if (QThread::currentThread() != thread()) {
         return;
     }
-    shutdown();
+    // Tear down audio first so the user gets immediate silence even if shutdown() ends up
+    // blocking briefly inside netsio/atari800 cleanup. teardownAudio() only touches our own
+    // Qt/SDL audio members, so it is safe to call before shutdown().
     teardownAudio();
+    shutdown();
     // Drop QTimer::singleShot / queued slot calls targeting this object on the worker.
     QCoreApplication::removePostedEvents(this, QEvent::MetaCall);
     QThread* gui = QCoreApplication::instance()->thread();

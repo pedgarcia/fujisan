@@ -70,6 +70,35 @@ UPGRADE_EOF
 
     # 0017 upgrade: POKEY debounce patch disabled for testing.
 
+    # 0018 upgrade: netsio quit-unblock (fds0 init, shutdown guard, rx thread exit,
+    # close fds0[1] before fds0[0] to wake select()/read() instantly via EOF).
+    NETSIO_NEEDS_0018=0
+    if [ -f "src/netsio.c" ]; then
+        if ! grep -q 'recvfrom exit (n=%zd errno=%d)' src/netsio.c; then
+            NETSIO_NEEDS_0018=1
+        elif ! grep -q 'Close the write end first so any thread blocked in select' src/netsio.c; then
+            # Older 0018 (without fds0 close-order swap) is present; reapply newer 0018.
+            echo "Upgrade: refreshing 0018 with fds0 close-order swap"
+            git checkout -- src/netsio.c 2>/dev/null || true
+            NETSIO_NEEDS_0018=1
+        fi
+    fi
+    if [ "$NETSIO_NEEDS_0018" = "1" ]; then
+        echo "Upgrade: applying 0018 netsio-fujisan-quit-unblock.patch"
+        if [ -f "$PATCHES_DIR/0018-netsio-fujisan-quit-unblock.patch" ]; then
+            if git apply --ignore-whitespace --check "$PATCHES_DIR/0018-netsio-fujisan-quit-unblock.patch" 2>/dev/null; then
+                git apply --ignore-whitespace "$PATCHES_DIR/0018-netsio-fujisan-quit-unblock.patch" </dev/null || \
+                patch -p1 --force --no-backup-if-mismatch < "$PATCHES_DIR/0018-netsio-fujisan-quit-unblock.patch" </dev/null
+            elif git apply --ignore-whitespace --reverse --check "$PATCHES_DIR/0018-netsio-fujisan-quit-unblock.patch" 2>/dev/null; then
+                echo "✓ 0018 already applied"
+            else
+                patch -p1 --force --no-backup-if-mismatch < "$PATCHES_DIR/0018-netsio-fujisan-quit-unblock.patch" </dev/null || true
+            fi
+            rm -f src/netsio.o src/libatari800.a
+            echo "✓ netsio.c upgraded with 0018 quit-unblock"
+        fi
+    fi
+
     echo "Patches already applied in this source tree ($PATCH_MARKER present), skipping."
     exit 0
 fi
@@ -82,6 +111,8 @@ if [ -f "src/netsio.c" ] && [ -f "src/libatari800/api.c" ] && \
    grep -q 'netsio_sync_mutex' src/netsio.c && \
    grep -q 'TransferToNetsio' src/sio.c && \
    grep -q 'netsio_recover_stale_sio_transaction' src/netsio.c && \
+   grep -q 'recvfrom exit (n=%zd errno=%d)' src/netsio.c && \
+   grep -q 'Close the write end first so any thread blocked in select' src/netsio.c && \
    grep -q 'int libatari800_execute_cycles(int target_cycles)' src/libatari800/api.c && \
    grep -q 'CPU_GetInstructionCycles' src/cpu.h; then
     echo "Detected previously patched source tree; writing $PATCH_MARKER and skipping."
