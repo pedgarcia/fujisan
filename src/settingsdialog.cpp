@@ -1798,28 +1798,28 @@ void SettingsDialog::createEmulatorTab()
     mainLayout->addWidget(tcpServerGroup);
 
     // Log Filtering Configuration
-    QGroupBox* logFilterGroup = new QGroupBox("Console Log Filtering");
+    QGroupBox* logFilterGroup = new QGroupBox("Console log filter");
     QVBoxLayout* logFilterLayout = new QVBoxLayout(logFilterGroup);
 
     // Filter string input
     QHBoxLayout* filterStringLayout = new QHBoxLayout();
-    QLabel* filterLabel = new QLabel("Filter out messages containing:");
+    QLabel* filterLabel = new QLabel("Show only messages containing:");
     m_logFilterString = new QLineEdit();
-    m_logFilterString->setPlaceholderText("Enter text to filter (case-sensitive)");
-    m_logFilterString->setToolTip("Console messages containing this text will be hidden");
+    m_logFilterString->setPlaceholderText("Enter text to match (case-sensitive); leave empty for all lines");
+    m_logFilterString->setToolTip("Only console messages containing this text are shown (others are hidden)");
     filterStringLayout->addWidget(filterLabel);
     filterStringLayout->addWidget(m_logFilterString);
     logFilterLayout->addLayout(filterStringLayout);
 
     // Regex mode checkbox
     m_logFilterRegex = new QCheckBox("Use regular expression matching");
-    m_logFilterRegex->setToolTip("Treat filter text as a regular expression pattern");
+    m_logFilterRegex->setToolTip("Match filter text as a regular expression; only matching lines are shown");
     logFilterLayout->addWidget(m_logFilterRegex);
 
     // Add description
     QLabel* logDescription = new QLabel(
-        "These filters reduce console log noise by hiding specific messages.\n"
-        "Logs are still generated internally; these settings only control what appears in the console output."
+        "When set, only log lines that match the text or regex are printed; other lines are hidden.\n"
+        "Leave empty to show all lines. Logs are still generated internally; this only affects console output."
     );
     logDescription->setWordWrap(true);
     logDescription->setStyleSheet("color: #666; font-size: 11px; margin-top: 10px;");
