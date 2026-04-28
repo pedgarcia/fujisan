@@ -100,6 +100,7 @@ private:
 
     void setState(ProcessState newState);
     QString processErrorToString(QProcess::ProcessError error);
+    /** When log/filterString is set: hide lines that do not match (include-only). */
     bool shouldFilterLogMessage(const QString& message);
 
     // FujiNet log parsing for LED activity

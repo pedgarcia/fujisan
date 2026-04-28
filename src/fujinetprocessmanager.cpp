@@ -418,6 +418,9 @@ void FujiNetProcessManager::onReadyReadStderr()
             m_stderrBuffer = m_stderrBuffer.right(MAX_BUFFER_SIZE / 2);
         }
 
+        // Drive LED parsing (same patterns as stdout; some builds or hosts may log here)
+        parseFujiNetLogsForLEDActivity(output);
+
         // Check if FujiNet-PC logs should be hidden
         QSettings settings("8bitrelics", "Fujisan");
         bool hideFujiNetLogs = settings.value("log/hideFujiNetLogs", false).toBool();
@@ -486,26 +489,24 @@ bool FujiNetProcessManager::shouldFilterLogMessage(const QString& message)
 {
     QSettings settings("8bitrelics", "Fujisan");
 
-    // Check if general text filtering is enabled
     QString filterString = settings.value("log/filterString", "").toString();
-    if (!filterString.isEmpty()) {
-        bool useRegex = settings.value("log/useRegex", false).toBool();
-
-        if (useRegex) {
-            // Use regular expression matching
-            QRegularExpression regex(filterString);
-            if (regex.isValid() && regex.match(message).hasMatch()) {
-                return true;  // Filter out this message
-            }
-        } else {
-            // Simple string contains (case-sensitive)
-            if (message.contains(filterString, Qt::CaseSensitive)) {
-                return true;  // Filter out this message
-            }
-        }
+    if (filterString.isEmpty()) {
+        return false;  // No filter: show all lines
     }
 
-    return false;  // Don't filter this message
+    bool useRegex = settings.value("log/useRegex", false).toBool();
+
+    if (useRegex) {
+        QRegularExpression regex(filterString);
+        if (!regex.isValid()) {
+            return false;  // Invalid pattern: show lines (same as before)
+        }
+        // Include only lines that match the regex
+        return !regex.match(message).hasMatch();
+    }
+
+    // Include only lines that contain the substring (case-sensitive)
+    return !message.contains(filterString, Qt::CaseSensitive);
 }
 
 // FujiNet log parsing for LED activity
@@ -525,7 +526,13 @@ void FujiNetProcessManager::parseFujiNetLogsForLEDActivity(const QString& output
 
         // Step 2: Operation detection (requires cached device ID)
         if (m_lastDeviceId != -1) {
-            if (trimmed.contains("ATR READ")) {
+            // FujiNet-PC logs disk I/O per image type (ATR / ATX / XEX). Fujisan must
+            // recognize all of them; only matching "ATR READ" misses common .atx/.xex use.
+            const bool atrRead = trimmed.contains(QLatin1String("ATR READ"));
+            const bool atrWrite = trimmed.contains(QLatin1String("ATR WRITE"));
+            const bool atxRead = trimmed.contains(QLatin1String("ATX READ"));
+            const bool xexRead = trimmed.contains(QLatin1String("XEX READ"));
+            if (atrRead || atxRead || xexRead) {
                 int drive = m_lastDeviceId - 0x30;
                 if (drive >= 1 && drive <= 8) {
                     startDriveOperation(drive, false); // READ
@@ -533,7 +540,7 @@ void FujiNetProcessManager::parseFujiNetLogsForLEDActivity(const QString& output
                 }
                 continue;
             }
-            if (trimmed.contains("ATR WRITE")) {
+            if (atrWrite) {
                 int drive = m_lastDeviceId - 0x30;
                 if (drive >= 1 && drive <= 8) {
                     startDriveOperation(drive, true); // WRITE

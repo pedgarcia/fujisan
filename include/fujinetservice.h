@@ -9,6 +9,7 @@
 #define FUJINETSERVICE_H
 
 #include <QObject>
+#include <QPointer>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QUrl>
@@ -161,6 +162,7 @@ private:
     QNetworkAccessManager* m_networkManager;
     QString m_serverUrl;
     bool m_isConnected;
+    QPointer<QNetworkReply> m_healthCheckReply;
     QTimer* m_healthCheckTimer;
     QTimer* m_drivePollingTimer;  // New timer for drive status polling
     QTimer* m_printerPollTimer;   // Timer for printer output polling

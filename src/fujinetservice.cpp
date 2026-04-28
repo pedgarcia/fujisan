@@ -57,6 +57,7 @@ void FujiNetService::checkConnection()
     request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
 
     QNetworkReply* reply = m_networkManager->get(request);
+    m_healthCheckReply = reply;
     connect(reply, &QNetworkReply::finished, this, &FujiNetService::onHealthCheckReply);
 }
 
@@ -71,6 +72,10 @@ void FujiNetService::startHealthCheck(int intervalMs)
 void FujiNetService::stopHealthCheck()
 {
     m_healthCheckTimer->stop();
+    if (!m_healthCheckReply.isNull()) {
+        m_healthCheckReply->abort();
+        m_healthCheckReply.clear();
+    }
     abortAllRequests();
 }
 
@@ -362,6 +367,11 @@ void FujiNetService::onHealthCheckReply()
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
 
+    if (reply->error() == QNetworkReply::OperationCanceledError) {
+        reply->deleteLater();
+        return;
+    }
+
     bool wasConnected = m_isConnected;
 
     if (reply->error() == QNetworkReply::NoError) {
@@ -387,6 +397,9 @@ void FujiNetService::onHealthCheckReply()
         }
     }
 
+    if (m_healthCheckReply.data() == reply) {
+        m_healthCheckReply.clear();
+    }
     reply->deleteLater();
 }
 

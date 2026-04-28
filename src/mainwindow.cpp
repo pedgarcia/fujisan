@@ -389,6 +389,15 @@ void MainWindow::shutdownFujiNetOnQuit()
 {
     QElapsedTimer timer;
     timer.start();
+    // Quit path: stopping FujiNet-PC makes the HTTP health check fail. Without this,
+    // onFujiNetDisconnected() can run after hide() and show the "FujiNet-PC has
+    // disconnected" dialog on an invisible main window. Mirror resetFujiNet().
+    m_fujinetIntentionalRestart = true;
+    if (m_fujinetService) {
+        m_fujinetService->stopHealthCheck();
+        m_fujinetService->stopDrivePolling();
+        m_fujinetService->resetConnectionState();
+    }
     if (m_fujinetProcessManager && m_fujinetProcessManager->isRunning()) {
         qDebug() << "shutdownFujiNetOnQuit: stopping managed FujiNet-PC (elapsed" << timer.elapsed() << "ms)";
         m_fujinetProcessManager->stop();
@@ -4949,6 +4958,10 @@ void MainWindow::onFujiNetDisconnected()
     qDebug() << "FujiNet service disconnected";
 
     if (!m_fujinetService) {
+        return;
+    }
+
+    if (QCoreApplication::closingDown()) {
         return;
     }
 
