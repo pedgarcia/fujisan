@@ -1160,8 +1160,27 @@ void AtariEmulator::processFrame()
                 m_injectPostReleaseFrames--;
             }
         }
+
+        // Tick the direct-key minimum-hold counter.  This runs independently of the
+        // inject path so that normal typing is never blocked by paste operations.
+        if (m_directKeyMinHoldFrames > 0) {
+            --m_directKeyMinHoldFrames;
+            if (m_directKeyMinHoldFrames == 0 && m_directKeyPendingRelease) {
+                // Key was released before the hold elapsed — apply the deferred clear now.
+                // Only clear keyboard fields; joystick values must persist.
+                m_currentInput.keychar  = 0;
+                m_currentInput.keycode  = 0;
+                m_currentInput.special  = 0;
+                m_currentInput.shift    = 0;
+                m_currentInput.control  = 0;
+                m_currentInput.start    = 0;
+                m_currentInput.select   = 0;
+                m_currentInput.option   = 0;
+                m_directKeyPendingRelease = false;
+            }
+        }
     }
-    
+
     // Disk I/O monitoring is now handled by libatari800 callback
 
 #ifdef HAVE_SDL2_AUDIO
@@ -1735,7 +1754,13 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
     if (handleJoystickKeyboardEmulation(event)) {
         return; // Key was handled by joystick emulation, don't process as regular key
     }
-    
+
+    // Arm the minimum-hold guarantee: if the user releases this key before
+    // processFrame() has run kDirectKeyMinHoldFrames times, the release is
+    // deferred so libatari800 / POKEY never misses a fast keystroke.
+    m_directKeyMinHoldFrames  = kDirectKeyMinHoldFrames;
+    m_directKeyPendingRelease = false;
+
     // Don't clear input here - let keys persist across frames until released
     
     int key = event->key();
@@ -1788,7 +1813,18 @@ void AtariEmulator::handleKeyPress(QKeyEvent* event)
             m_currentInput.keycode = shiftPressed ? (baseKey | AKEY_SHFT) : baseKey;
         }
     } else if (key >= Qt::Key_0 && key <= Qt::Key_9) {
-        if (shiftPressed) {
+        if (controlKeyPressed) {
+            // Ctrl+digit: send the proper AKEY_CTRL_N keycode to the emulator
+            // (e.g. Ctrl+1 = pause, Ctrl+2 = beep, Ctrl+9 = invert char, Ctrl+0 = normal char)
+            static const int ctrlDigitAkeys[] = {
+                AKEY_CTRL_0, AKEY_CTRL_1, AKEY_CTRL_2, AKEY_CTRL_3, AKEY_CTRL_4,
+                AKEY_CTRL_5, AKEY_CTRL_6, AKEY_CTRL_7, AKEY_CTRL_8, AKEY_CTRL_9
+            };
+            int index = key - Qt::Key_0;
+            m_currentInput.keycode = ctrlDigitAkeys[index];
+            qDebug() << "Ctrl+digit press: digit=" << index
+                     << "keycode=" << (int)m_currentInput.keycode;
+        } else if (shiftPressed) {
             // Handle shifted number keys
             QString shiftedSymbols = ")!@#$%^&*(";
             int index = key - Qt::Key_0;
@@ -1999,19 +2035,25 @@ void AtariEmulator::handleKeyRelease(QKeyEvent* event)
     if (handleJoystickKeyboardEmulation(event)) {
         return; // Key was handled by joystick emulation, don't clear all input
     }
-    
-    // For regular keyboard input, only clear keyboard-related fields
-    // DO NOT clear joystick values as they should persist
-    m_currentInput.keychar = 0;
-    m_currentInput.keycode = 0;
-    m_currentInput.special = 0;
-    m_currentInput.shift = 0;
-    m_currentInput.control = 0;
-    m_currentInput.start = 0;
-    m_currentInput.select = 0;
-    m_currentInput.option = 0;
-    // Leave joystick values (joy0, joy1, trig0, trig1) unchanged
-    // Clear keyboard input on key release
+
+    // If the minimum-hold guarantee is still counting down, defer the clear.
+    // processFrame() will clear keyboard fields once the hold has elapsed,
+    // ensuring libatari800 always sees every keystroke for at least 2 frames.
+    if (m_directKeyMinHoldFrames > 0) {
+        m_directKeyPendingRelease = true;
+        return;
+    }
+
+    // Minimum hold already elapsed (key was held naturally) — clear immediately.
+    // Only clear keyboard-related fields; joystick values must persist.
+    m_currentInput.keychar  = 0;
+    m_currentInput.keycode  = 0;
+    m_currentInput.special  = 0;
+    m_currentInput.shift    = 0;
+    m_currentInput.control  = 0;
+    m_currentInput.start    = 0;
+    m_currentInput.select   = 0;
+    m_currentInput.option   = 0;
 }
 
 void AtariEmulator::coldBoot()
@@ -3321,7 +3363,9 @@ void AtariEmulator::pauseEmulation()
             QMutexLocker inputLock(&m_inputMutex);
             clearCurrentInputLocked();
             m_injectKeyFramesRemaining = 0;
-            m_injectPostReleaseFrames = 0;
+            m_injectPostReleaseFrames  = 0;
+            m_directKeyMinHoldFrames   = 0;
+            m_directKeyPendingRelease  = false;
         }
         m_emulationPaused = true;
         emit executionPaused();

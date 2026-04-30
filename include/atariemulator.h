@@ -430,6 +430,15 @@ private:
     int m_injectKeyFramesRemaining = 0;
     int m_injectPostReleaseFrames = 0;
 
+    // Minimum frame-hold guarantee for direct keyboard input.
+    // If a key is pressed and released faster than one frame period (~17 ms at 60 fps /
+    // ~20 ms at 50 fps), handleKeyRelease() fires before processFrame() has ever seen
+    // the key, causing a silent drop.  Holding for at least 2 frames guarantees
+    // libatari800 / POKEY receives and latches every keystroke.
+    static constexpr int kDirectKeyMinHoldFrames = 2;
+    int  m_directKeyMinHoldFrames  = 0;
+    bool m_directKeyPendingRelease = false;
+
     // Reusable frame image buffer; its shared data is detached (copy-on-write) each
     // time the emulator thread writes a new frame while the previous one is still
     // referenced by the main-thread signal queue.
