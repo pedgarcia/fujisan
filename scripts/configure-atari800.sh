@@ -195,6 +195,14 @@ else
     # Unix/macOS: Use full configuration
     # Disable MP3 support to avoid libmp3lame dependency (users can still record to WAV/PCM)
     ./configure --target=libatari800 --enable-netsio --with-mp3=no
+
+    # Enable per-instruction code breakpoints (forced off by the libatari800 target preset).
+    # This activates the atari800 core's MONITOR_breakpoint_table[] so the CPU halts
+    # (via Atari800_Exit) precisely at a PC breakpoint, letting libatari800_next_frame()
+    # return early parked at the breakpoint. Fujisan's post-frame checkBreakpoints() then
+    # sees the correct PC. See patches/0019-libatari800-pc-breakpoints.patch.
+    sed -i.bak 's|/\* #undef MONITOR_BREAK \*/|#define MONITOR_BREAK 1|' src/config.h
+    sed -i.bak 's|/\* #undef MONITOR_BREAKPOINTS \*/|#define MONITOR_BREAKPOINTS 1|' src/config.h
 fi
 
 echo "atari800 configuration completed"

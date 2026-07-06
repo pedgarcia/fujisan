@@ -1,0 +1,186 @@
+From 549865c39dcdff63c4145850bfcbd56c57331ee7 Mon Sep 17 00:00:00 2001
+From: Fujisan <fujisan@8bitrelics.com>
+Date: Mon, 6 Jul 2026 00:00:00 -0700
+Subject: [PATCH] libatari800: add PC breakpoint API for per-instruction
+ debugging
+
+Expose the atari800 core's per-instruction PC breakpoint table
+(MONITOR_breakpoint_table[]) to libatari800 clients via a new
+libatari800_set_pc_breakpoints() call, and make a breakpoint hit return
+control to the host instead of terminating the process.
+
+libatari800 has no interactive monitor, so the core's DO_BREAK path
+(ENTER_MONITOR -> Atari800_Exit(TRUE)) would call exit(0) once a breakpoint
+fired. Instead, PLATFORM_Exit() now longjmps back into
+libatari800_next_frame() (via libatari800_monitor_jmp), which returns early
+with the CPU parked exactly at the breakpoint PC and libatari800_break_hit set.
+
+Built with MONITOR_BREAK/MONITOR_BREAKPOINTS enabled, this gives debuggers
+one-shot PC breakpoint precision instead of only detecting breakpoints at
+frame boundaries.
+---
+ src/libatari800/api.c         | 63 ++++++++++++++++++++++++++++++++---
+ src/libatari800/exit.c        | 21 ++++++++++++
+ src/libatari800/libatari800.h |  8 +++++
+ 3 files changed, 87 insertions(+), 5 deletions(-)
+
+diff --git a/src/libatari800/api.c b/src/libatari800/api.c
+index 4b8db15c..7ba672b4 100644
+--- a/src/libatari800/api.c
++++ b/src/libatari800/api.c
+@@ -45,6 +45,7 @@
+ #include "screen.h"
+ #include "sio.h"
+ #include "../sound.h"
++#include "../monitor.h"
+ #include "util.h"
+ #include "libatari800/main.h"
+ #include "libatari800/cpu_crash.h"
+@@ -57,7 +58,18 @@
+ 
+ #ifdef HAVE_SETJMP
+ jmp_buf libatari800_cpu_crash;
++/* Landing pad for a debugger PC breakpoint (see PLATFORM_Exit()). libatari800
++   has no interactive monitor, so when the CPU core hits a breakpoint we longjmp
++   back here to return control to the host with the CPU parked at the break PC,
++   rather than terminating the process via exit(0). */
++jmp_buf libatari800_monitor_jmp;
++/* Non-zero while inside LIBATARI800_Frame(); tells PLATFORM_Exit() it is safe to
++   longjmp back into libatari800_next_frame() instead of exiting. */
++int libatari800_monitor_active = 0;
+ #endif
++/* Set to non-zero by libatari800_next_frame() when the frame ended because a
++   debugger PC breakpoint fired (as opposed to completing normally). */
++int libatari800_break_hit = 0;
+ 
+ /* global variable indicating that BRK instruction should exit emulation */
+ int libatari800_continue_on_brk = 0;
+@@ -224,12 +236,29 @@ int libatari800_next_frame(input_template_t *input)
+ #endif /* HAVE_SETJMP */
+ 	{
+ 		/* normal operation */
+-		LIBATARI800_Frame();
+-		if (CPU_cim_encountered) {
+-			libatari800_error_code = LIBATARI800_CPU_CRASH;
++		libatari800_break_hit = 0;
++#ifdef HAVE_SETJMP
++		if (setjmp(libatari800_monitor_jmp) != 0) {
++			/* A debugger PC breakpoint fired; the CPU is parked at the break
++			   PC (CPU_regPC). Return early so the host can inspect state. */
++			libatari800_break_hit = 1;
+ 		}
+-		else if (ANTIC_dlist == 0) {
+-			libatari800_error_code = LIBATARI800_DLIST_ERROR;
++		else
++#endif /* HAVE_SETJMP */
++		{
++#ifdef HAVE_SETJMP
++			libatari800_monitor_active = 1;
++#endif
++			LIBATARI800_Frame();
++#ifdef HAVE_SETJMP
++			libatari800_monitor_active = 0;
++#endif
++			if (CPU_cim_encountered) {
++				libatari800_error_code = LIBATARI800_CPU_CRASH;
++			}
++			else if (ANTIC_dlist == 0) {
++				libatari800_error_code = LIBATARI800_DLIST_ERROR;
++			}
+ 		}
+ 	}
+ 	PLATFORM_DisplayScreen();
+@@ -589,6 +618,30 @@ int libatari800_execute_cycles(int target_cycles)
+ 	return cycles_executed;
+ }
+ 
++/* Set the PC breakpoint list for the debugger (per-instruction precision).
++ * Populates the atari800 core's MONITOR_breakpoint_table[] with PC-equals
++ * conditions so CPU_GO() halts (PC--; DO_BREAK -> Atari800_Exit) exactly at a
++ * breakpoint address, causing libatari800_next_frame() to return early parked
++ * at that PC. Passing count <= 0 disables all breakpoints. */
++void libatari800_set_pc_breakpoints(const unsigned short *addrs, int count)
++{
++#ifdef MONITOR_BREAKPOINTS
++	int i;
++	if (count < 0) count = 0;
++	if (count > MONITOR_BREAKPOINT_TABLE_MAX) count = MONITOR_BREAKPOINT_TABLE_MAX;
++	for (i = 0; i < count; i++) {
++		MONITOR_breakpoint_table[i].enabled   = TRUE;
++		MONITOR_breakpoint_table[i].condition = MONITOR_BREAKPOINT_PC | MONITOR_BREAKPOINT_EQUAL;
++		MONITOR_breakpoint_table[i].value     = addrs[i];
++		MONITOR_breakpoint_table[i].m_addr    = 0;
++	}
++	MONITOR_breakpoint_table_size = count;
++	MONITOR_breakpoints_enabled   = (count > 0) ? 1 : 0;
++#else
++	(void)addrs; (void)count;
++#endif
++}
++
+ /*
+ vim:ts=4:sw=4:
+ */
+diff --git a/src/libatari800/exit.c b/src/libatari800/exit.c
+index b9cf7955..f8a759fc 100644
+--- a/src/libatari800/exit.c
++++ b/src/libatari800/exit.c
+@@ -26,10 +26,20 @@
+ #include "config.h"
+ #include <stdio.h>
+ #include <string.h>
++#ifdef HAVE_SETJMP
++#include <setjmp.h>
++#endif
+ 
+ /* Atari800 includes */
+ #include "log.h"
+ 
++#ifdef HAVE_SETJMP
++/* Defined in api.c: landing pad and guard used to return control to the host
++   when the CPU core enters the monitor (e.g. a debugger PC breakpoint). */
++extern jmp_buf libatari800_monitor_jmp;
++extern int libatari800_monitor_active;
++#endif
++
+ 
+ /* This is placed in a separate file so other programs that include this code
+  in their own makefile can redefine this function and point to their own
+@@ -40,6 +50,17 @@ int PLATFORM_Exit(int run_monitor)
+ {
+ 	Log_flushlog();
+ 
++#ifdef HAVE_SETJMP
++	if (run_monitor && libatari800_monitor_active) {
++		/* A monitor break (debugger PC breakpoint) fired during a frame.
++		   libatari800 has no interactive monitor, so instead of terminating
++		   the process, longjmp back into libatari800_next_frame(), leaving the
++		   CPU parked at the break PC for the host to inspect. */
++		libatari800_monitor_active = 0;
++		longjmp(libatari800_monitor_jmp, 1);
++	}
++#endif
++
+ 	return 0;  /* always exit. There is no monitor in libatari800 */
+ }
+ 
+diff --git a/src/libatari800/libatari800.h b/src/libatari800/libatari800.h
+index eb5ed5da..42c575ee 100644
+--- a/src/libatari800/libatari800.h
++++ b/src/libatari800/libatari800.h
+@@ -319,4 +319,12 @@ int libatari800_set_sio_patch_enabled(int enabled);
+ /* Partial frame execution for fine-grained debugging */
+ int libatari800_execute_cycles(int target_cycles);
+ 
++/* Set the debugger PC breakpoint list (per-instruction precision).
++ * addrs points to count 16-bit addresses; count <= 0 disables all breakpoints. */
++void libatari800_set_pc_breakpoints(const unsigned short *addrs, int count);
++
++/* Non-zero if the most recent libatari800_next_frame() returned early because a
++ * debugger PC breakpoint fired (CPU parked at the breakpoint PC). */
++extern int libatari800_break_hit;
++
+ #endif /* LIBATARI800_H_ */
+-- 
+2.43.0
+
