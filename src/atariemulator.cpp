@@ -2963,6 +2963,48 @@ int AtariEmulator::getCurrentEmulationSpeed() const
 }
 
 
+// Parse an Atari executable (XEX/COM/EXE) header and return its run address
+// (RUNAD, the two bytes destined for $02E0/$02E1), or 0 if none is present.
+// This lets loadXexForDebug arm the entry point in the CPU breakpoint table
+// BEFORE the binary loader auto-runs the program, so we halt exactly at entry.
+static unsigned short parseXexRunAddress(const QString& filename)
+{
+    QFile f(filename);
+    if (!f.open(QIODevice::ReadOnly)) {
+        return 0;
+    }
+    QByteArray d = f.readAll();
+    f.close();
+    const unsigned char* p = reinterpret_cast<const unsigned char*>(d.constData());
+    int n = d.size();
+    int i = 0;
+    if (n >= 2 && p[0] == 0xFF && p[1] == 0xFF) {
+        i = 2;  // skip leading $FFFF marker
+    }
+    unsigned short runad = 0;
+    while (i + 4 <= n) {
+        // Optional $FFFF marker may separate segments
+        if (p[i] == 0xFF && p[i + 1] == 0xFF) {
+            i += 2;
+            continue;
+        }
+        int start = p[i] | (p[i + 1] << 8);
+        int end   = p[i + 2] | (p[i + 3] << 8);
+        i += 4;
+        int len = end - start + 1;
+        if (len <= 0 || i + len > n) {
+            break;
+        }
+        // RUNAD lives at $02E0/$02E1; capture it if this segment covers it
+        if (start <= 0x2E0 && end >= 0x2E1) {
+            int off = i + (0x2E0 - start);
+            runad = p[off] | (p[off + 1] << 8);
+        }
+        i += len;
+    }
+    return runad;
+}
+
 bool AtariEmulator::loadXexForDebug(const QString& filename)
 {
     // libatari800_reboot_with_file() calls Atari800_Coldstart() which sends a 0xFF
@@ -2992,50 +3034,69 @@ bool AtariEmulator::loadXexForDebug(const QString& filename)
         return false;
     }
     
-    // Step frames until loading completes (max 120 frames = 2 seconds at 60fps)
+    // Step frames until the program reaches its entry point (max 120 frames =
+    // 2 seconds at 60fps). As soon as the loader populates the entry vector
+    // (RUNAD, or INITAD as a fallback) we arm it in libatari800's per-instruction
+    // breakpoint table, so the CPU halts EXACTLY at the entry point rather than
+    // overshooting it by a whole frame's worth of instructions. This leaves the
+    // debugger parked precisely at the first instruction of the loaded program,
+    // which is what a one-shot entry-point breakpoint expects.
     const int maxFrames = 120;
     int framesProcessed = 0;
     bool loadingComplete = false;
-    
-    
+    bool entryArmed = false;
+    unsigned short armedEntry = 0;
+
+    // Pre-arm the entry point from the file's RUNAD BEFORE any frame runs. The
+    // binary loader auto-runs the program (JSR RUNAD) during loading, so arming
+    // only after detecting the vector in memory would race and miss it. With the
+    // breakpoint already in the core table, the CPU halts precisely when the
+    // loaded program first executes its entry instruction.
+    unsigned short fileEntry = parseXexRunAddress(filename);
+    if (fileEntry != 0x0000 && fileEntry != 0xFFFF) {
+        armedEntry = fileEntry;
+        libatari800_set_pc_breakpoints(&armedEntry, 1);
+        entryArmed = true;
+    }
+
     while (framesProcessed < maxFrames) {
-        // Process one frame to advance the loading
+        // Process one frame to advance the loading. Once the entry point is
+        // armed, this returns early the instant the CPU core reaches it.
         processFrame();
         framesProcessed++;
-        
-        // Check if loading has completed
-        // BINLOAD_start_binloading is set to TRUE when loading starts and FALSE when done
-        if (!BINLOAD_start_binloading) {
-            // Also verify RUNAD or INITAD is set
-            unsigned short runad = mem[0x2E0] | (mem[0x2E1] << 8);
-            unsigned short initad = mem[0x2E2] | (mem[0x2E3] << 8);
-            
-            if ((runad != 0x0000 && runad != 0xFFFF) || 
-                (initad != 0x0000 && initad != 0xFFFF)) {
-                loadingComplete = true;
-                break;
-            }
+
+        // Determine the entry vector once the loader has populated it.
+        unsigned short runad = mem[0x2E0] | (mem[0x2E1] << 8);
+        unsigned short initad = mem[0x2E2] | (mem[0x2E3] << 8);
+        unsigned short entry = 0;
+        if (runad != 0x0000 && runad != 0xFFFF) {
+            entry = runad;
+        } else if (initad != 0x0000 && initad != 0xFFFF) {
+            entry = initad;
         }
-        
-        // For initial frames, BINLOAD_start_binloading might not be set yet
-        // So also check if vectors become valid
-        if (framesProcessed > 10) {
-            unsigned short runad = mem[0x2E0] | (mem[0x2E1] << 8);
-            unsigned short initad = mem[0x2E2] | (mem[0x2E3] << 8);
-            
-            if ((runad != 0x0000 && runad != 0xFFFF) || 
-                (initad != 0x0000 && initad != 0xFFFF)) {
-                // Vectors are set, check if we're past the loader
-                if (CPU_regPC < 0xD000 || CPU_regPC >= 0xE000) {
-                    // PC is not in ROM loader area, likely done
-                    loadingComplete = true;
-                    break;
-                }
-            }
+
+        // Arm the entry point in the core breakpoint table as soon as we know it,
+        // so execution halts precisely when the loaded program first runs.
+        if (!entryArmed && entry != 0) {
+            armedEntry = entry;
+            libatari800_set_pc_breakpoints(&armedEntry, 1);
+            entryArmed = true;
+        }
+
+        // Halted precisely at the entry point (the core breakpoint fired and
+        // libatari800_next_frame() returned early parked at that PC).
+        if (entryArmed && CPU_regPC == armedEntry) {
+            loadingComplete = true;
+            break;
         }
     }
-    
-    // Pause execution now that loading is complete (or timeout)
+
+    // Remove the temporary entry-point breakpoint. The core table now reflects
+    // only user-defined breakpoints (empty unless the caller added some), so a
+    // subsequent add_breakpoint + resume behaves predictably.
+    syncBreakpointsToCore();
+
+    // Pause execution now that we're parked at the entry point (or timed out).
     pauseEmulation();
     
     // Read the entry point vectors
@@ -4140,6 +4201,7 @@ void AtariEmulator::addBreakpoint(unsigned short address)
 {
     if (!m_breakpoints.contains(address)) {
         m_breakpoints.insert(address);
+        syncBreakpointsToCore();
         emit breakpointAdded(address);
     }
 }
@@ -4147,6 +4209,7 @@ void AtariEmulator::addBreakpoint(unsigned short address)
 void AtariEmulator::removeBreakpoint(unsigned short address)
 {
     if (m_breakpoints.remove(address)) {
+        syncBreakpointsToCore();
         emit breakpointRemoved(address);
     }
 }
@@ -4155,6 +4218,7 @@ void AtariEmulator::clearAllBreakpoints()
 {
     if (!m_breakpoints.isEmpty()) {
         m_breakpoints.clear();
+        syncBreakpointsToCore();
         emit breakpointsCleared();
     }
 }
@@ -4172,6 +4236,22 @@ QSet<unsigned short> AtariEmulator::getBreakpoints() const
 void AtariEmulator::setBreakpointsEnabled(bool enabled)
 {
     m_breakpointsEnabled = enabled;
+    syncBreakpointsToCore();
+}
+
+// Push the Qt-side breakpoint set into libatari800's per-instruction PC breakpoint
+// table so the CPU core halts (via Atari800_Exit) precisely at the breakpoint PC,
+// returning early from libatari800_next_frame(). This gives one-shot PC breakpoints
+// instruction-level precision instead of only being caught at frame boundaries.
+void AtariEmulator::syncBreakpointsToCore()
+{
+    std::vector<unsigned short> v;
+    if (m_breakpointsEnabled) {
+        for (unsigned short a : m_breakpoints) {
+            v.push_back(a);
+        }
+    }
+    libatari800_set_pc_breakpoints(v.empty() ? nullptr : v.data(), (int)v.size());
 }
 
 bool AtariEmulator::areBreakpointsEnabled() const

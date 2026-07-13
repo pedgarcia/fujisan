@@ -1,5 +1,39 @@
 # Patch System Changes
 
+## 0019-libatari800-pc-breakpoints.patch (July 2026)
+
+**Problem:** Fujisan runs the CPU a whole frame at a time via
+`libatari800_next_frame()` and only checks breakpoints at frame boundaries, so
+PC breakpoints on one-shot addresses (e.g. a program's entry point) are sailed
+past and never hit. The atari800 core has a correct per-instruction PC
+breakpoint table (`MONITOR_breakpoint_table[]`), but the `libatari800` configure
+preset forces `MONITOR_BREAK`/`MONITOR_BREAKPOINTS` off, and even with them on
+the core's break path (`DO_BREAK` -> `ENTER_MONITOR` -> `Atari800_Exit(TRUE)`)
+calls `exit(0)` in libatari800 because `PLATFORM_Exit()` "always exits - there is
+no monitor in libatari800". A breakpoint would therefore terminate the process.
+
+**Fix (three parts):**
+1. `libatari800_set_pc_breakpoints(const unsigned short *addrs, int count)` in
+   `api.c` (declared in `libatari800.h`) populates `MONITOR_breakpoint_table[]`
+   with PC-equals conditions so the CPU core halts every-instruction at a
+   breakpoint. `count <= 0` disables all breakpoints.
+2. `PLATFORM_Exit()` (`exit.c`) no longer terminates on a monitor break: when a
+   break fires inside a frame it `longjmp`s back into `libatari800_next_frame()`
+   (landing pad `libatari800_monitor_jmp`, guarded by `libatari800_monitor_active`),
+   returning early with the CPU parked exactly at the breakpoint PC and
+   `libatari800_break_hit` set.
+3. The build must enable the core defines - `scripts/configure-atari800.sh`
+   patches `src/config.h` to `#define MONITOR_BREAK 1` / `MONITOR_BREAKPOINTS 1`
+   after `./configure` (they are forced off by the libatari800 target preset).
+
+Fujisan wires its Qt breakpoint set into the table via
+`AtariEmulator::syncBreakpointsToCore()` and arms a loaded program's entry point
+during `loadXexForDebug()` so the debugger parks precisely at the first
+instruction. BRK handling is unaffected (libatari800 traps BRK via
+`longjmp(libatari800_cpu_crash, ...)`, not `DO_BREAK`).
+
+---
+
 ## 0015-netsio-recover-stale-sio-transaction.patch (April 2026)
 
 **Problem:** After a cold boot (or similar), `TransferStatus` in `sio.c` can

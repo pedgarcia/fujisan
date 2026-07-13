@@ -479,6 +479,7 @@ private:
     bool m_breakpointsEnabled = true;
     unsigned short m_lastPC = 0xFFFF;  // Track last PC for breakpoint detection
     void checkBreakpoints();  // Internal breakpoint checking
+    void syncBreakpointsToCore();  // Push Qt breakpoint set into libatari800's per-instruction table
     
     // Disk drive tracking
     QString m_diskImages[8]; // Paths for D1: through D8:
