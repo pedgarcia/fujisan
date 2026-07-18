@@ -55,6 +55,20 @@ no monitor in libatari800". A breakpoint would therefore terminate the process.
    `api.c` (declared in `libatari800.h`) populates `MONITOR_breakpoint_table[]`
    with PC-equals conditions so the CPU core halts every-instruction at a
    breakpoint. `count <= 0` disables all breakpoints.
+
+   Note the table is an AND/OR *expression* list, not a flat list of addresses:
+   `cpu.c` ANDs consecutive entries together, and an entry whose condition is
+   `MONITOR_BREAKPOINT_OR` separates alternatives (reaching one means the
+   preceding group matched, so the breakpoint fires). Writing N bare PC
+   conditions therefore means `PC == a AND PC == b`, which is never true, so
+   with two or more breakpoints set none of them fire. We emit a
+   `MONITOR_BREAKPOINT_OR` separator between addresses, which caps the usable
+   breakpoint count at `(MONITOR_BREAKPOINT_TABLE_MAX + 1) / 2`.
+
+   This was a real bug in the first version of this patch, and it hid well: a
+   breakpoint in a *hot loop* still appeared to work, because Fujisan's coarse
+   post-frame PC scan caught it by coincidence. Only one-shot addresses (a
+   specific source line) exposed it.
 2. `PLATFORM_Exit()` (`exit.c`) no longer terminates on a monitor break: when a
    break fires inside a frame it `longjmp`s back into `libatari800_next_frame()`
    (landing pad `libatari800_monitor_jmp`, guarded by `libatari800_monitor_active`),
