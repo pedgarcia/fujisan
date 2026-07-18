@@ -1,5 +1,43 @@
 # Patch System Changes
 
+## Single-instruction stepping (July 2026)
+
+**Problem:** `AtariEmulator::stepOneInstruction()` did not step an instruction --
+it called `libatari800_next_frame()`, executing thousands of instructions per
+"step" (its comment claimed no patch was available for true single stepping).
+This silently broke debugging over the TCP API: to resume from a breakpoint a
+debugger must lift that breakpoint and step one instruction off it, so a
+frame-sized step runs past every other breakpoint in that frame. Source-level
+stepping also jumped to essentially arbitrary lines, and `debug.step_over`
+(which loops `stepOneInstruction()` until it reaches the return address) could
+never converge.
+
+`patches/0003-single-instruction-stepping.patch` was meant to provide
+`libatari800_step_instruction()`, but it is not applied in the current build and
+its implementation is itself broken: `CPU_GO(20)` executes nothing whenever the
+CPU is already past cycle 20 of the current scanline, because CPU_GO() runs
+while `ANTIC_xpos < limit`. A step built on it is a silent no-op.
+
+**Fix:** `scripts/configure-atari800.sh` injects
+`libatari800_debug_step_instruction()` into `src/libatari800/api.c` (and its
+declaration into `libatari800.h`) after configure, so it is immune to context
+drift in api.c and cannot clash with 0003. It:
+  - sets `MONITOR_break_step`, which stops `CPU_GO()` after one instruction and
+    makes the core skip the PC breakpoint table for that instruction -- exactly
+    the semantics needed to step off a breakpoint;
+  - passes `CPU_GO(ANTIC_xpos + 8)` so the limit is relative to the current
+    position in the scanline rather than a fixed value;
+  - arms the same `longjmp` landing pad `libatari800_next_frame()` uses, since
+    the stop arrives as `DO_BREAK -> ENTER_MONITOR -> Atari800_Exit()`, which in
+    libatari800 would otherwise terminate the process.
+
+`AtariEmulator::stepOneInstruction()` now calls it. Verified: PC advances one
+instruction per step ($2096 -> $2098 -> $209A -> $209C -> $209F, then JSR/RTS
+transfers), ~20 ms per step, and source-level stepping lands on the next source
+line instead of an arbitrary one.
+
+---
+
 ## 0019-libatari800-pc-breakpoints.patch (July 2026)
 
 **Problem:** Fujisan runs the CPU a whole frame at a time via
