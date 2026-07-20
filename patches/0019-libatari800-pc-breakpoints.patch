@@ -90,29 +90,46 @@ index 4b8db15c..7ba672b4 100644
  		}
  	}
  	PLATFORM_DisplayScreen();
-@@ -589,6 +618,30 @@ int libatari800_execute_cycles(int target_cycles)
+@@ -589,6 +618,47 @@ int libatari800_execute_cycles(int target_cycles)
  	return cycles_executed;
  }
  
 +/* Set the PC breakpoint list for the debugger (per-instruction precision).
-+ * Populates the atari800 core's MONITOR_breakpoint_table[] with PC-equals
-+ * conditions so CPU_GO() halts (PC--; DO_BREAK -> Atari800_Exit) exactly at a
-+ * breakpoint address, causing libatari800_next_frame() to return early parked
-+ * at that PC. Passing count <= 0 disables all breakpoints. */
++ *
++ * The core's breakpoint table is an AND/OR expression list, not a flat list of
++ * addresses: entries are ANDed together, and an entry whose condition is
++ * MONITOR_BREAKPOINT_OR separates alternatives (see cpu.c -- reaching such an
++ * entry means the preceding group matched, so the breakpoint fires). Writing
++ * several bare PC conditions therefore means "PC == a AND PC == b", which is
++ * never true, so with two or more breakpoints set none of them would ever fire.
++ * Emit an OR separator between addresses.
++ *
++ * Passing count <= 0 disables all breakpoints. */
 +void libatari800_set_pc_breakpoints(const unsigned short *addrs, int count)
 +{
 +#ifdef MONITOR_BREAKPOINTS
 +	int i;
++	int n = 0;
++	/* each extra breakpoint also costs one OR separator entry */
++	int max = (MONITOR_BREAKPOINT_TABLE_MAX + 1) / 2;
 +	if (count < 0) count = 0;
-+	if (count > MONITOR_BREAKPOINT_TABLE_MAX) count = MONITOR_BREAKPOINT_TABLE_MAX;
++	if (count > max) count = max;
 +	for (i = 0; i < count; i++) {
-+		MONITOR_breakpoint_table[i].enabled   = TRUE;
-+		MONITOR_breakpoint_table[i].condition = MONITOR_BREAKPOINT_PC | MONITOR_BREAKPOINT_EQUAL;
-+		MONITOR_breakpoint_table[i].value     = addrs[i];
-+		MONITOR_breakpoint_table[i].m_addr    = 0;
++		if (i > 0) {
++			MONITOR_breakpoint_table[n].enabled   = TRUE;
++			MONITOR_breakpoint_table[n].condition = MONITOR_BREAKPOINT_OR;
++			MONITOR_breakpoint_table[n].value     = 0;
++			MONITOR_breakpoint_table[n].m_addr    = 0;
++			n++;
++		}
++		MONITOR_breakpoint_table[n].enabled   = TRUE;
++		MONITOR_breakpoint_table[n].condition = MONITOR_BREAKPOINT_PC | MONITOR_BREAKPOINT_EQUAL;
++		MONITOR_breakpoint_table[n].value     = addrs[i];
++		MONITOR_breakpoint_table[n].m_addr    = 0;
++		n++;
 +	}
-+	MONITOR_breakpoint_table_size = count;
-+	MONITOR_breakpoints_enabled   = (count > 0) ? 1 : 0;
++	MONITOR_breakpoint_table_size = n;
++	MONITOR_breakpoints_enabled   = (n > 0) ? 1 : 0;
 +#else
 +	(void)addrs; (void)count;
 +#endif

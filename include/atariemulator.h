@@ -135,6 +135,9 @@ extern "C" {
     
     // Single-instruction stepping for debugger
     extern void libatari800_step_instruction(void);
+
+    // True single-instruction step (injected by scripts/configure-atari800.sh)
+    extern void libatari800_debug_step_instruction(void);
     
     // NOTE: libatari800_exit and Atari800_InitialiseMachine are already declared
     // in libatari800.h and atari.h respectively, so we don't redeclare them here

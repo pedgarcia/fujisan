@@ -203,6 +203,55 @@ else
     # sees the correct PC. See patches/0019-libatari800-pc-breakpoints.patch.
     sed -i.bak 's|/\* #undef MONITOR_BREAK \*/|#define MONITOR_BREAK 1|' src/config.h
     sed -i.bak 's|/\* #undef MONITOR_BREAKPOINTS \*/|#define MONITOR_BREAKPOINTS 1|' src/config.h
+
+    # Provide a true single-instruction step entry point.
+    #
+    # Fujisan's stepOneInstruction() previously ran a whole frame, which breaks
+    # debugging: resuming from a breakpoint requires lifting that breakpoint and
+    # stepping one instruction off it, so a frame-sized "step" runs past every
+    # other breakpoint in that frame and they never fire again. The core skips
+    # the PC breakpoint table while MONITOR_break_step is set, which is exactly
+    # the semantics needed here.
+    #
+    # Injected here rather than as a diff so it is immune to context drift in
+    # api.c, and under its own name so it cannot clash with the
+    # libatari800_step_instruction() added by patches/0003.
+    if ! grep -q 'libatari800_debug_step_instruction' src/libatari800/api.c; then
+        cat >> src/libatari800/api.c <<'FUJISAN_STEP_EOF'
+
+/* Execute exactly one 6502 instruction (debugger single-step).
+ *
+ * MONITOR_break_step makes CPU_GO() stop after a single instruction, and the
+ * core skips the PC breakpoint table while it is set -- exactly what a debugger
+ * needs to step off a breakpoint. The stop arrives as DO_BREAK -> ENTER_MONITOR
+ * -> Atari800_Exit(), which in libatari800 would terminate the process, so arm
+ * the same longjmp landing pad libatari800_next_frame() uses (see
+ * PLATFORM_Exit() in exit.c) for the duration of the step. */
+void libatari800_debug_step_instruction(void)
+{
+#if defined(MONITOR_BREAK) && defined(HAVE_SETJMP)
+	if (setjmp(libatari800_monitor_jmp) == 0) {
+		libatari800_monitor_active = 1;
+		MONITOR_break_step = TRUE;
+		/* CPU_GO() runs while ANTIC_xpos < limit, so the limit must be
+		   relative to where we currently are in the scanline. A fixed
+		   limit (e.g. CPU_GO(20)) silently executes nothing whenever the
+		   CPU is already past that cycle, making the "step" a no-op.
+		   MONITOR_break_step stops us after one instruction regardless,
+		   so a small margin is enough. */
+		CPU_GO(ANTIC_xpos + 8);
+	}
+	libatari800_monitor_active = 0;
+	MONITOR_break_step = FALSE;
+#endif
+}
+FUJISAN_STEP_EOF
+        echo "injected libatari800_debug_step_instruction() into api.c"
+    fi
+    if ! grep -q 'libatari800_debug_step_instruction' src/libatari800/libatari800.h; then
+        sed -i.bak 's|#endif /\* LIBATARI800_H_ \*/|/* Execute exactly one 6502 instruction (debugger single-step). */\nvoid libatari800_debug_step_instruction(void);\n\n#endif /* LIBATARI800_H_ */|' src/libatari800/libatari800.h
+        echo "declared libatari800_debug_step_instruction() in libatari800.h"
+    fi
 fi
 
 echo "atari800 configuration completed"

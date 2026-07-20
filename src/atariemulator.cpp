@@ -3474,15 +3474,23 @@ void AtariEmulator::stepOneFrame()
 void AtariEmulator::stepOneInstruction()
 {
     if (m_emulationPaused) {
-        // Without patches, we can't do true single-instruction stepping
-        // We'll use frame stepping as an approximation
-        // This executes many instructions but is the best we can do without patches
         unsigned short startPC = CPU_regPC;
-        
-        // Execute one frame
-        // This will execute thousands of instructions, but it's all we have
-        libatari800_next_frame(&m_currentInput);
-        
+
+        // True single-instruction step, via libatari800_step_instruction()
+        // (added by patches/0003-single-instruction-stepping.patch).
+        //
+        // This previously ran libatari800_next_frame(), i.e. thousands of
+        // instructions. That silently broke debuggers: to resume from a
+        // breakpoint a debugger must lift that breakpoint and step one
+        // instruction off it, so a "step" that executes a whole frame runs
+        // past every other breakpoint in that frame -- they never fire again
+        // for the rest of the session. It also made source-level stepping
+        // jump to essentially arbitrary lines.
+        //
+        // The core skips the PC breakpoint table while MONITOR_break_step is
+        // set, which is exactly the semantics needed to step off a breakpoint.
+        libatari800_debug_step_instruction();
+
         // Check breakpoints after execution
         checkBreakpoints();
 
