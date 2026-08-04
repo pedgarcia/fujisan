@@ -187,7 +187,7 @@ echo_info "Building Ubuntu 22.04 based container for $ARCH..."
 $CONTAINER_RUNTIME build \
     --platform linux/$ARCH \
     -f docker/Dockerfile.ubuntu-22.04 \
-    -t fujisan-linux-builder:ubuntu22-$ARCH \
+    -t localhost/fujisan-linux-builder:ubuntu22-$ARCH \
     . || {
     echo_error "Failed to build container image"
     exit 1
@@ -951,8 +951,8 @@ echo_step "Building Fujisan in Container"
 echo_info "Running build for version $VERSION on $ARCH..."
 $CONTAINER_RUNTIME run --rm \
     --platform linux/$ARCH \
-    -v "$PROJECT_ROOT:/build/fujisan:ro" \
-    -v "$LINUX_BUILD_DIR:/output" \
+    -v "$PROJECT_ROOT:/build/fujisan:ro,z" \
+    -v "$LINUX_BUILD_DIR:/output:z" \
     ${FUJINET_VOLUME_ARG:+$FUJINET_VOLUME_ARG} \
     ${FASTBASIC_VOLUME_ARG:+$FASTBASIC_VOLUME_ARG} \
     -e VERSION="$VERSION" \
@@ -960,7 +960,7 @@ $CONTAINER_RUNTIME run --rm \
     -e ARCH="$ARCH" \
     -e BUILD_FUJINET_PC="$BUILD_FUJINET_PC" \
     -e BUILD_FASTBASIC_COMPILER="$BUILD_FASTBASIC_COMPILER" \
-    fujisan-linux-builder:ubuntu22-$ARCH \
+    localhost/fujisan-linux-builder:ubuntu22-$ARCH \
     bash /output/build-in-container.sh "$VERSION" "$VERSION_CLEAN" "$BUILD_DEB" "$BUILD_TARBALL" "$ARCH" || {
     echo_error "Build failed"
     exit 1
@@ -1001,7 +1001,7 @@ fi
 # Clean up container if not keeping
 if [[ "$KEEP_CONTAINER" == "false" ]]; then
     echo_info "Removing container image..."
-    $CONTAINER_RUNTIME rmi fujisan-linux-builder:ubuntu22-$ARCH 2>/dev/null || true
+    $CONTAINER_RUNTIME rmi localhost/fujisan-linux-builder:ubuntu22-$ARCH 2>/dev/null || true
 fi
 
 # Summary
