@@ -59,30 +59,44 @@ void JoystickSwapWidget::setCompactMode(bool compact)
     }
 }
 
+void JoystickSwapWidget::setJoystickKeyLabels(const QStringList& joy1Lines, const QStringList& joy2Lines)
+{
+    m_joy1KeyLines = joy1Lines;
+    m_joy2KeyLines = joy2Lines;
+    updateTooltip();
+    update();
+}
+
 void JoystickSwapWidget::updateTooltip()
 {
+    // Historical defaults when no custom labels were provided
+    const QStringList joy1 = m_joy1KeyLines.isEmpty()
+        ? QStringList{"↑", "←↓→", "Enter"} : m_joy1KeyLines;
+    const QStringList joy2 = m_joy2KeyLines.isEmpty()
+        ? QStringList{"W", "ASD", "Space"} : m_joy2KeyLines;
+    const QString j1Text = joy1.join(' ');
+    const QString j2Text = joy2.join(' ');
+
     if (m_compactMode) {
         QString tooltip = QString("Click to swap joystick assignments\n\n");
         if (!m_swapped) {
             tooltip += "Current (Normal):\n";
-            tooltip += "• J1 (Player 1): Numpad/Arrows (↑←↓→, Enter)\n";
-            tooltip += "• J2 (Player 2): WASD (WASD, Space)\n\n";
+            tooltip += QString("• J1 (Player 1): %1\n").arg(j1Text);
+            tooltip += QString("• J2 (Player 2): %1\n\n").arg(j2Text);
             tooltip += "Click to swap to:\n";
-            tooltip += "• J1 (Player 1): WASD (WASD, Space)\n";
-            tooltip += "• J2 (Player 2): Numpad/Arrows (↑←↓→, Enter)";
+            tooltip += QString("• J1 (Player 1): %1\n").arg(j2Text);
+            tooltip += QString("• J2 (Player 2): %1").arg(j1Text);
         } else {
             tooltip += "Current (Swapped):\n";
-            tooltip += "• J1 (Player 1): WASD (WASD, Space)\n";
-            tooltip += "• J2 (Player 2): Numpad/Arrows (↑←↓→, Enter)\n\n";
+            tooltip += QString("• J1 (Player 1): %1\n").arg(j2Text);
+            tooltip += QString("• J2 (Player 2): %1\n\n").arg(j1Text);
             tooltip += "Click to swap to:\n";
-            tooltip += "• J1 (Player 1): Numpad/Arrows (↑←↓→, Enter)\n";
-            tooltip += "• J2 (Player 2): WASD (WASD, Space)";
+            tooltip += QString("• J1 (Player 1): %1\n").arg(j1Text);
+            tooltip += QString("• J2 (Player 2): %1").arg(j2Text);
         }
         setToolTip(tooltip);
     } else {
-        setToolTip("Click to swap joystick assignments\n"
-                   "Default: WASD→J2, Numpad→J1\n"
-                   "Swapped: WASD→J1, Numpad→J2");
+        setToolTip("Click to swap joystick assignments");
     }
 }
 
@@ -142,12 +156,16 @@ void JoystickSwapWidget::paintEvent(QPaintEvent *event)
     }
     
     // Draw joystick boxes
+    const QStringList joy1Lines = m_joy1KeyLines.isEmpty()
+        ? QStringList{"↑", "←↓→", "Enter"} : m_joy1KeyLines;
+    const QStringList joy2Lines = m_joy2KeyLines.isEmpty()
+        ? QStringList{"W", "ASD", "Space"} : m_joy2KeyLines;
     if (!m_swapped) {
-        drawJoystickBox(painter, leftBox, "Player 1", {"↑", "←↓→", "Enter"}, true, true);
-        drawJoystickBox(painter, rightBox, "Player 2", {"W", "ASD", "Space"}, true, false);
+        drawJoystickBox(painter, leftBox, "Player 1", joy1Lines, true, true);
+        drawJoystickBox(painter, rightBox, "Player 2", joy2Lines, true, false);
     } else {
-        drawJoystickBox(painter, leftBox, "Player 1", {"W", "ASD", "Space"}, true, true);
-        drawJoystickBox(painter, rightBox, "Player 2", {"↑", "←↓→", "Enter"}, true, false);
+        drawJoystickBox(painter, leftBox, "Player 1", joy2Lines, true, true);
+        drawJoystickBox(painter, rightBox, "Player 2", joy1Lines, true, false);
     }
     
     // Draw swap arrows

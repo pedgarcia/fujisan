@@ -11,6 +11,7 @@
 
 #include "mainwindow.h"
 #include "macosfullscreen.h"
+#include "keyboardjoystickmap.h"
 #include "version.h"  // For FUJISAN_FULL_VERSION_STRING
 #include <QApplication>
 #include <QAbstractScrollArea>
@@ -55,6 +56,9 @@ struct JoystickSettingsSnapshot {
     bool swap = false;
     QString preset0 = QStringLiteral("numpad");
     QString preset1 = QStringLiteral("wasd");
+    // Encoded custom key maps (keyboardjoystickmap.h); empty = derive from preset.
+    QString map0;
+    QString map1;
 };
 
 JoystickSettingsSnapshot readJoystickSettingsSnapshot(QSettings& settings)
@@ -68,6 +72,8 @@ JoystickSettingsSnapshot readJoystickSettingsSnapshot(QSettings& settings)
     sn.swap = settings.value(QStringLiteral("input/swapJoysticks"), false).toBool();
     sn.preset0 = settings.value(QStringLiteral("input/joystick1Preset"), QStringLiteral("numpad")).toString();
     sn.preset1 = settings.value(QStringLiteral("input/joystick2Preset"), QStringLiteral("wasd")).toString();
+    sn.map0 = settings.value(QStringLiteral("input/joy0KeyMap"), QString()).toString();
+    sn.map1 = settings.value(QStringLiteral("input/joy1KeyMap"), QString()).toString();
     sn.effKbd0 = sn.master && (sn.device1 == QStringLiteral("keyboard")) && kbd0Saved;
     sn.effKbd1 = sn.master && (sn.device2 == QStringLiteral("keyboard")) && kbd1Saved;
     return sn;
@@ -846,12 +852,12 @@ void MainWindow::createJoystickToolbarSection()
 
     m_kbdJoy0Check = new QCheckBox("Kbd J1");
     m_kbdJoy0Check->setStyleSheet("font-size: 10px;");
-    m_kbdJoy0Check->setToolTip("Enable keyboard joystick 1 (Numpad)");
+    m_kbdJoy0Check->setToolTip("Enable keyboard joystick 1");
     leftLayout->addWidget(m_kbdJoy0Check);
 
     m_kbdJoy1Check = new QCheckBox("Kbd J2");
     m_kbdJoy1Check->setStyleSheet("font-size: 10px;");
-    m_kbdJoy1Check->setToolTip("Enable keyboard joystick 2 (WASD)");
+    m_kbdJoy1Check->setToolTip("Enable keyboard joystick 2");
     leftLayout->addWidget(m_kbdJoy1Check);
 
     controlsLayout->addWidget(leftColumn);
@@ -948,6 +954,9 @@ void MainWindow::createJoystickToolbarSection()
     m_kbdJoy0Check->setChecked(port0Kb && joySettings.value(QStringLiteral("input/kbdJoy0Enabled"), false).toBool());
     m_kbdJoy1Check->setChecked(port1Kb && joySettings.value(QStringLiteral("input/kbdJoy1Enabled"), false).toBool());
     m_joystickSwapWidget->setSwapped(sn.swap);
+
+    // Show the effective key bindings in the tooltips (customizable in Settings -> Input)
+    updateKbdJoyKeyLabels();
 }
 
 void MainWindow::createAudioToolbarSection()
@@ -1566,7 +1575,8 @@ void MainWindow::restartEmulator()
         if (initSuccess) {
             m_emulator->applyJoystickInputBundle(sn.master, sn.device1, sn.device2,
                                                  sn.effKbd0, sn.effKbd1, sn.swap,
-                                                 sn.preset0, sn.preset1);
+                                                 sn.preset0, sn.preset1,
+                                                 sn.map0, sn.map1);
             m_emulator->setEmulationSpeed(speedPercentage);
         }
     };
@@ -1769,12 +1779,53 @@ void MainWindow::syncEmulatorJoystickFromQSettings()
                                   Q_ARG(bool, sn.effKbd1),
                                   Q_ARG(bool, sn.swap),
                                   Q_ARG(QString, sn.preset0),
-                                  Q_ARG(QString, sn.preset1));
+                                  Q_ARG(QString, sn.preset1),
+                                  Q_ARG(QString, sn.map0),
+                                  Q_ARG(QString, sn.map1));
     } else {
         m_emulator->applyJoystickInputBundle(sn.master, sn.device1, sn.device2,
                                              sn.effKbd0, sn.effKbd1, sn.swap,
-                                             sn.preset0, sn.preset1);
+                                             sn.preset0, sn.preset1,
+                                             sn.map0, sn.map1);
     }
+}
+
+void MainWindow::updateKbdJoyKeyLabels()
+{
+    if (!m_kbdJoy0Check || !m_kbdJoy1Check || !m_joystickSwapWidget) {
+        return;
+    }
+
+    QSettings settings(QStringLiteral("8bitrelics"), QStringLiteral("Fujisan"));
+    JoystickSettingsSnapshot sn = readJoystickSettingsSnapshot(settings);
+
+    auto mapFor = [](const QString& mapStr, const QString& preset) {
+        KbdJoy::KeyboardJoystickMap m;
+        if (!KbdJoy::decodeMapFromString(mapStr, m)) {
+            m = KbdJoy::mapForPreset(preset);
+        }
+        return m;
+    };
+    const KbdJoy::KeyboardJoystickMap m0 = mapFor(sn.map0, sn.preset0);
+    const KbdJoy::KeyboardJoystickMap m1 = mapFor(sn.map1, sn.preset1);
+
+    auto summary = [](const KbdJoy::KeyboardJoystickMap& m) -> QString {
+        return QStringLiteral("%1/%2/%3/%4, Fire: %5")
+            .arg(KbdJoy::keyDisplayName(m.up), KbdJoy::keyDisplayName(m.down),
+                 KbdJoy::keyDisplayName(m.left), KbdJoy::keyDisplayName(m.right),
+                 KbdJoy::keyDisplayName(m.fire));
+    };
+    m_kbdJoy0Check->setToolTip(QStringLiteral("Enable keyboard joystick 1 (%1)").arg(summary(m0)));
+    m_kbdJoy1Check->setToolTip(QStringLiteral("Enable keyboard joystick 2 (%1)").arg(summary(m1)));
+
+    auto lines = [](const KbdJoy::KeyboardJoystickMap& m) -> QStringList {
+        return { KbdJoy::keyDisplayName(m.up),
+                 QStringLiteral("%1 %2 %3").arg(KbdJoy::keyDisplayName(m.left),
+                                               KbdJoy::keyDisplayName(m.down),
+                                               KbdJoy::keyDisplayName(m.right)),
+                 KbdJoy::keyDisplayName(m.fire) };
+    };
+    m_joystickSwapWidget->setJoystickKeyLabels(lines(m0), lines(m1));
 }
 
 void MainWindow::updateToolbarFromSettings()
@@ -1872,6 +1923,8 @@ void MainWindow::updateToolbarFromSettings()
         m_kbdJoy1Check->blockSignals(false);
 
         m_joystickSwapWidget->setSwapped(sn.swap);
+
+        updateKbdJoyKeyLabels();
 
         syncEmulatorJoystickFromQSettings();
 
@@ -3321,7 +3374,8 @@ void MainWindow::loadInitialSettings()
         if (initSuccess) {
             m_emulator->applyJoystickInputBundle(sn.master, sn.device1, sn.device2,
                                                  sn.effKbd0, sn.effKbd1, sn.swap,
-                                                 sn.preset0, sn.preset1);
+                                                 sn.preset0, sn.preset1,
+                                                 sn.map0, sn.map1);
             m_emulator->setEmulationSpeed(speedPercentage);
         }
     }, Qt::BlockingQueuedConnection);
@@ -4034,6 +4088,8 @@ void MainWindow::applyProfileToEmulator(const ConfigurationProfile& profile, boo
         settings.setValue(QStringLiteral("input/joystick2Device"), pj2);
         settings.setValue(QStringLiteral("input/joystick1Preset"), profile.joystick1Preset);
         settings.setValue(QStringLiteral("input/joystick2Preset"), profile.joystick2Preset);
+        settings.setValue(QStringLiteral("input/joy0KeyMap"), profile.joystick1KeyMap);
+        settings.setValue(QStringLiteral("input/joy1KeyMap"), profile.joystick2KeyMap);
         settings.setValue(QStringLiteral("input/swapJoysticks"), profile.swapJoysticks);
         settings.setValue(QStringLiteral("input/kbdJoy0Enabled"), profile.kbdJoy0Enabled);
         settings.setValue(QStringLiteral("input/kbdJoy1Enabled"), profile.kbdJoy1Enabled);

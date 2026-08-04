@@ -296,6 +296,7 @@ set(SOURCES
     src/cassettewidget.cpp
     src/cartridgewidget.cpp
     src/joystickswapwidget.cpp
+    src/keycapturebutton.cpp
     src/volumeknob.cpp
     src/printerwidget.cpp
     src/mediaperipheralsdock.cpp
@@ -331,6 +332,8 @@ set(HEADERS
     include/cassettewidget.h
     include/cartridgewidget.h
     include/joystickswapwidget.h
+    include/keycapturebutton.h
+    include/keyboardjoystickmap.h
     include/volumeknob.h
     include/printerwidget.h
     include/mediaperipheralsdock.h

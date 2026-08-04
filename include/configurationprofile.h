@@ -98,6 +98,9 @@ struct ConfigurationProfile {
     QString joystick2Device;
     QString joystick1Preset = "numpad";
     QString joystick2Preset = "wasd";
+    /// Encoded custom keyboard maps (keyboardjoystickmap.h). Empty = derive from preset.
+    QString joystick1KeyMap;
+    QString joystick2KeyMap;
     bool swapJoysticks = false;
     bool grabMouse = false;
     QString mouseDevice;

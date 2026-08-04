@@ -42,15 +42,26 @@
 | | Shift+Del (⌦) | Delete Line |
 | | Shift+Backspace (Mac) | Delete Line (Mac alternative — maps physical delete key) |
 | | Shift+Home | Clear Screen |
-| **Joystick Controls** | | |
-| | Arrow Keys / Numpad 2,4,6,8 | Joystick Direction. Uncheck "Enable Joystick Support" in System > Settings > Input Configuration to use the arrow keys for text editing. |
-| | Numpad Enter | Joystick Fire |
-| | W,A,S,D | WASD Joystick Direction |
-| | Space | WASD Joystick Fire |
-| | Q,E,Z,C | WASD Joystick Diagonals |
+| **Joystick Controls** (defaults — fully customizable in System > Settings > Input Configuration) | | |
+| | Numpad 2,4,6,8 | Joystick 1 Direction (default) |
+| | Numpad Enter | Joystick 1 Fire (default) |
+| | W,A,S,D | Joystick 2 Direction (default) |
+| | Space | Joystick 2 Fire (default) |
+| | Q,E,Z,C | Joystick 2 Diagonals (default) |
 | **Special Functions** | | |
 | | Escape | Atari Escape |
 | | Caps Lock | Atari Caps Lock |
+
+## Customizing Joystick Keys
+
+Both keyboard joysticks are fully remappable in **System > Settings > Input Configuration**:
+for each joystick you can bind the fire button and all 8 Atari joystick directions
+(Up, Down, Left, Right and the 4 diagonals). Click a key button and press the desired key;
+Escape cancels. Diagonal bindings are optional — clear one with Backspace/Delete and the
+diagonal works by holding two direction keys. The Numpad / Arrows / WASD dropdowns act as
+layout templates; editing any key switches the layout to "Custom". Bindings are saved in
+the application settings and in configuration profiles. Numpad keys are distinguished from
+their main-keyboard equivalents (e.g. Numpad Enter vs Return).
 
 ## Notes
 

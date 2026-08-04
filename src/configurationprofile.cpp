@@ -112,6 +112,8 @@ QJsonObject ConfigurationProfile::toJson() const {
     inputConfig["joystick2Device"] = joystick2Device;
     inputConfig["joystick1Preset"] = joystick1Preset;
     inputConfig["joystick2Preset"] = joystick2Preset;
+    inputConfig["joystick1KeyMap"] = joystick1KeyMap;
+    inputConfig["joystick2KeyMap"] = joystick2KeyMap;
     inputConfig["swapJoysticks"] = swapJoysticks;
     inputConfig["grabMouse"] = grabMouse;
     inputConfig["mouseDevice"] = mouseDevice;
@@ -305,6 +307,8 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
         joystick2Device = inputConfig["joystick2Device"].toString();
         joystick1Preset = inputConfig["joystick1Preset"].toString("numpad");
         joystick2Preset = inputConfig["joystick2Preset"].toString("wasd");
+        joystick1KeyMap = inputConfig["joystick1KeyMap"].toString();
+        joystick2KeyMap = inputConfig["joystick2KeyMap"].toString();
         swapJoysticks = inputConfig["swapJoysticks"].toBool(false);
         grabMouse = inputConfig["grabMouse"].toBool(false);
         mouseDevice = inputConfig["mouseDevice"].toString();
