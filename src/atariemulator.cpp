@@ -2815,21 +2815,42 @@ void AtariEmulator::setKbdJoy1Enabled(bool enabled)
 #endif
 }
 
+void AtariEmulator::resetJoystickPortStateLocked(int port)
+{
+    // Port 0's map/state drives logical joy1 when joysticks are swapped
+    // (mirrors the mapping in handleJoystickKeyboardEmulation).
+    const int INPUT_STICK_CENTRE = 0x0f ^ 0xff;
+    const bool drivesLogical1 = (m_swapJoysticks == (port == 0));
+
+    JoyKeyState& st = (port == 0) ? m_joy0KeyState : m_joy1KeyState;
+    st = JoyKeyState();
+
+    if (drivesLogical1) {
+        m_currentInput.joy1 = INPUT_STICK_CENTRE;
+        m_currentInput.trig1 = 0;
+    } else {
+        m_currentInput.joy0 = INPUT_STICK_CENTRE;
+        m_currentInput.trig0 = 0;
+    }
+}
+
 void AtariEmulator::setJoystick0Preset(const QString& preset)
 {
     if (KbdJoy::isValidPresetName(preset)) {
+        QMutexLocker inputLock(&m_inputMutex);
         m_joystick0Preset = preset;
         m_joystick0Map = KbdJoy::mapForPreset(preset);
-        m_joy0KeyState = JoyKeyState();
+        resetJoystickPortStateLocked(0);
     }
 }
 
 void AtariEmulator::setJoystick1Preset(const QString& preset)
 {
     if (KbdJoy::isValidPresetName(preset)) {
+        QMutexLocker inputLock(&m_inputMutex);
         m_joystick1Preset = preset;
         m_joystick1Map = KbdJoy::mapForPreset(preset);
-        m_joy1KeyState = JoyKeyState();
+        resetJoystickPortStateLocked(1);
     }
 }
 
@@ -2837,9 +2858,10 @@ void AtariEmulator::setJoystick0KeyMap(const QString& encodedMap)
 {
     KbdJoy::KeyboardJoystickMap map;
     if (KbdJoy::decodeMapFromString(encodedMap, map)) {
+        QMutexLocker inputLock(&m_inputMutex);
         m_joystick0Map = map;
         m_joystick0Preset = KbdJoy::presetNameForMap(map);
-        m_joy0KeyState = JoyKeyState();
+        resetJoystickPortStateLocked(0);
     }
 }
 
@@ -2847,9 +2869,10 @@ void AtariEmulator::setJoystick1KeyMap(const QString& encodedMap)
 {
     KbdJoy::KeyboardJoystickMap map;
     if (KbdJoy::decodeMapFromString(encodedMap, map)) {
+        QMutexLocker inputLock(&m_inputMutex);
         m_joystick1Map = map;
         m_joystick1Preset = KbdJoy::presetNameForMap(map);
-        m_joy1KeyState = JoyKeyState();
+        resetJoystickPortStateLocked(1);
     }
 }
 

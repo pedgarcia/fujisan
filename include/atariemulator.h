@@ -293,7 +293,8 @@ public:
     QString getJoystick1Preset() const { return m_joystick1Preset; }
 
     /// Set a custom keyboard map from an encoded string (see keyboardjoystickmap.h).
-    /// Malformed or empty strings are ignored. Marks the port's preset as "custom".
+    /// Malformed or empty strings are ignored. Sets the port's preset name to the
+    /// matching built-in preset, or to "custom" when the map matches no preset.
     void setJoystick0KeyMap(const QString& encodedMap);
     void setJoystick1KeyMap(const QString& encodedMap);
     QString getJoystick0KeyMap() const { return KbdJoy::encodeMapToString(m_joystick0Map); }
@@ -492,6 +493,10 @@ private:
     JoyKeyState m_joy0KeyState;
     JoyKeyState m_joy1KeyState;
     bool m_kbdJoyStateInitialized = false;
+
+    /// Reset held-key state and centre stick / release fire for one port after its
+    /// mapping changed (caller must hold m_inputMutex). Swap-aware.
+    void resetJoystickPortStateLocked(int port);
     float m_targetFps = 59.92f;
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;
