@@ -17,6 +17,7 @@
 #include <QProcess>
 #include <QDir>
 #include <QTextStream>
+#include <QMap>
 
 #ifdef HAVE_SDL2_JOYSTICK
 #include "sdl2joystickmanager.h"
@@ -25,6 +26,7 @@
 #include "fujinetservice.h"
 #include "fujinetprocessmanager.h"
 #include "fujinetbinarymanager.h"
+#include "keycapturebutton.h"
 
 SettingsDialog::SettingsDialog(AtariEmulator* emulator, ConfigurationProfileManager* profileManager,
                                FujiNetService* fujinetService,
@@ -1408,17 +1410,14 @@ void SettingsDialog::createInputConfigTab()
     joy1Layout->addWidget(m_joystick1Device);
 
     m_joystick1Preset = new QComboBox();
-    m_joystick1Preset->setToolTip("Keyboard preset: Numpad, Arrows (Mac-friendly), or WASD");
+    m_joystick1Preset->setToolTip("Keyboard layout template; editing any key below switches to Custom");
     m_joystick1Preset->addItem("Numpad", "numpad");
     m_joystick1Preset->addItem("Arrows", "arrows");
     m_joystick1Preset->addItem("WASD", "wasd");
+    m_joystick1Preset->addItem("Custom", "custom");
     m_joystick1Preset->setVisible(false);
     joy1Layout->addWidget(m_joystick1Preset);
 
-    m_joystick1KeysLabel = new QLabel();
-    m_joystick1KeysLabel->setStyleSheet("QLabel { color: #666; font-style: italic; }");
-    m_joystick1KeysLabel->setVisible(false);
-    joy1Layout->addWidget(m_joystick1KeysLabel);
     joy1Layout->addStretch();
 
     deviceLayout->addRow("Joystick 1:", joy1Layout);
@@ -1430,23 +1429,36 @@ void SettingsDialog::createInputConfigTab()
     joy2Layout->addWidget(m_joystick2Device);
 
     m_joystick2Preset = new QComboBox();
-    m_joystick2Preset->setToolTip("Keyboard preset: Numpad, Arrows (Mac-friendly), or WASD");
+    m_joystick2Preset->setToolTip("Keyboard layout template; editing any key below switches to Custom");
     m_joystick2Preset->addItem("Numpad", "numpad");
     m_joystick2Preset->addItem("Arrows", "arrows");
     m_joystick2Preset->addItem("WASD", "wasd");
+    m_joystick2Preset->addItem("Custom", "custom");
     m_joystick2Preset->setVisible(false);
     joy2Layout->addWidget(m_joystick2Preset);
 
-    m_joystick2KeysLabel = new QLabel();
-    m_joystick2KeysLabel->setStyleSheet("QLabel { color: #666; font-style: italic; }");
-    m_joystick2KeysLabel->setVisible(false);
-    joy2Layout->addWidget(m_joystick2KeysLabel);
     joy2Layout->addStretch();
 
     deviceLayout->addRow("Joystick 2:", joy2Layout);
 
     joystickLayout->addLayout(deviceLayout);
     joystickLayout->addSpacing(10);
+
+    // Per-joystick key binding grids (fire + 8 directions)
+    QHBoxLayout* gridsLayout = new QHBoxLayout();
+    m_joystick1KeysWidget = createKeyBindingGrid(1);
+    m_joystick2KeysWidget = createKeyBindingGrid(2);
+    m_joystick1KeysWidget->setVisible(false);
+    m_joystick2KeysWidget->setVisible(false);
+    gridsLayout->addWidget(m_joystick1KeysWidget);
+    gridsLayout->addWidget(m_joystick2KeysWidget);
+    gridsLayout->addStretch();
+    joystickLayout->addLayout(gridsLayout);
+
+    m_keyConflictLabel = new QLabel();
+    m_keyConflictLabel->setStyleSheet("QLabel { color: #c00; font-style: italic; }");
+    m_keyConflictLabel->setVisible(false);
+    joystickLayout->addWidget(m_keyConflictLabel);
 
     m_swapJoysticks = new QCheckBox("Swap joystick assignments");
     m_swapJoysticks->setToolTip("Swap the assignments between Joystick 1 and Joystick 2");
@@ -1487,16 +1499,13 @@ void SettingsDialog::createInputConfigTab()
         m_joystick1Preset->setEnabled(enabled);
         m_joystick2Preset->setEnabled(enabled);
         m_swapJoysticks->setEnabled(enabled);
-        m_joystick1KeysLabel->setEnabled(enabled);
-        m_joystick2KeysLabel->setEnabled(enabled);
+        m_joystick1KeysWidget->setEnabled(enabled);
+        m_joystick2KeysWidget->setEnabled(enabled);
     });
 
+    // Preset combo = layout template: selecting one fills the binding grid
     connect(m_joystick1Preset, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() { onJoystickPresetChanged(1); });
     connect(m_joystick2Preset, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() { onJoystickPresetChanged(2); });
-    connect(m_joystick1Preset, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsDialog::updateKeyboardMappingLabels);
-    connect(m_joystick2Preset, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsDialog::updateKeyboardMappingLabels);
-    connect(m_joystick1Preset, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsDialog::onJoystickDeviceChanged);
-    connect(m_joystick2Preset, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsDialog::onJoystickDeviceChanged);
 
     // Note: Joystick refresh is handled by event filter on dropdown open
     // This prevents signal re-entrancy issues during refresh
@@ -1504,6 +1513,10 @@ void SettingsDialog::createInputConfigTab()
     // Install event filters to refresh joysticks when dropdown opens
     m_joystick1Device->installEventFilter(this);
     m_joystick2Device->installEventFilter(this);
+
+    // Initial binding grids: historical defaults (loadSettings may override below)
+    setJoyMapButtons(1, KbdJoy::KeyboardJoystickMap::numpadPreset());
+    setJoyMapButtons(2, KbdJoy::KeyboardJoystickMap::wasdPreset());
 
     // Initialize joystick device dropdowns
     populateJoystickDevices();
@@ -2728,7 +2741,7 @@ void SettingsDialog::loadSettings()
     m_grabMouse->setChecked(settings.value("input/grabMouse", false).toBool());
     m_mouseDevice->setText(settings.value("input/mouseDevice", "").toString());
 
-    // Load joystick keyboard presets
+    // Load joystick keyboard presets ("custom" when the user remapped keys)
     QString joystick1Preset = settings.value("input/joystick1Preset", "numpad").toString();
     QString joystick2Preset = settings.value("input/joystick2Preset", "wasd").toString();
     for (int i = 0; m_joystick1Preset && i < m_joystick1Preset->count(); ++i) {
@@ -2744,24 +2757,34 @@ void SettingsDialog::loadSettings()
         }
     }
 
+    // Load custom key maps; fall back to the preset layout when absent/invalid
+    {
+        KbdJoy::KeyboardJoystickMap map1, map2;
+        if (!KbdJoy::decodeMapFromString(settings.value("input/joy0KeyMap", "").toString(), map1)) {
+            map1 = KbdJoy::isValidPresetName(joystick1Preset)
+                 ? KbdJoy::mapForPreset(joystick1Preset)
+                 : KbdJoy::KeyboardJoystickMap::numpadPreset();
+        }
+        if (!KbdJoy::decodeMapFromString(settings.value("input/joy1KeyMap", "").toString(), map2)) {
+            map2 = KbdJoy::isValidPresetName(joystick2Preset)
+                 ? KbdJoy::mapForPreset(joystick2Preset)
+                 : KbdJoy::KeyboardJoystickMap::wasdPreset();
+        }
+        setJoyMapButtons(1, map1);
+        setJoyMapButtons(2, map2);
+    }
+
     // Enable/disable dependent controls based on main joystick state
     m_joystick1Device->setEnabled(mainJoystickEnabled);
     m_joystick2Device->setEnabled(mainJoystickEnabled);
     m_joystick1Preset->setEnabled(mainJoystickEnabled);
     m_joystick2Preset->setEnabled(mainJoystickEnabled);
     m_swapJoysticks->setEnabled(mainJoystickEnabled);
+    m_joystick1KeysWidget->setEnabled(mainJoystickEnabled);
+    m_joystick2KeysWidget->setEnabled(mainJoystickEnabled);
 
-    // Update keyboard mapping labels (preset visibility)
+    // Update keyboard mapping grids visibility + conflict warning
     updateKeyboardMappingLabels();
-
-    // Resolve preset conflict if both joysticks use keyboard and same preset
-    if (mainJoystickEnabled && joystick1Device == "keyboard" && joystick2Device == "keyboard") {
-        QString p1 = m_joystick1Preset ? m_joystick1Preset->currentData().toString() : "numpad";
-        QString p2 = m_joystick2Preset ? m_joystick2Preset->currentData().toString() : "wasd";
-        if (p1 == p2) {
-            onJoystickPresetChanged(1);
-        }
-    }
     
     // Load Media Configuration
     // Floppy Disks
@@ -2968,6 +2991,8 @@ void SettingsDialog::saveSettings()
     settings.setValue("input/joystick2Device", m_joystick2Device->currentData().toString());
     settings.setValue("input/joystick1Preset", m_joystick1Preset ? m_joystick1Preset->currentData().toString() : "numpad");
     settings.setValue("input/joystick2Preset", m_joystick2Preset ? m_joystick2Preset->currentData().toString() : "wasd");
+    settings.setValue("input/joy0KeyMap", KbdJoy::encodeMapToString(currentJoyMap(1)));
+    settings.setValue("input/joy1KeyMap", KbdJoy::encodeMapToString(currentJoyMap(2)));
 
     {
         const QString d1 = m_joystick1Device->currentData().toString();
@@ -3279,7 +3304,9 @@ void SettingsDialog::applySettings()
                                   Q_ARG(bool, kbd1),
                                   Q_ARG(bool, swapped),
                                   Q_ARG(QString, presetJoy1),
-                                  Q_ARG(QString, presetJoy2));
+                                  Q_ARG(QString, presetJoy2),
+                                  Q_ARG(QString, KbdJoy::encodeMapToString(currentJoyMap(1))),
+                                  Q_ARG(QString, KbdJoy::encodeMapToString(currentJoyMap(2))));
 
         qDebug() << "Applied joystick settings live - MainJoystick:" << mainJoystickEnabled
                  << "Swap:" << swapped;
@@ -3721,6 +3748,23 @@ void SettingsDialog::restoreDefaults()
     m_joystick1Device->setCurrentIndex(0); // "Keyboard"
     m_joystick2Device->setCurrentIndex(0); // "Keyboard"
 
+    // Default keyboard layouts: Joy1=Numpad, Joy2=WASD
+    for (int i = 0; i < m_joystick1Preset->count(); ++i) {
+        if (m_joystick1Preset->itemData(i).toString() == QStringLiteral("numpad")) {
+            m_joystick1Preset->setCurrentIndex(i);
+            break;
+        }
+    }
+    for (int i = 0; i < m_joystick2Preset->count(); ++i) {
+        if (m_joystick2Preset->itemData(i).toString() == QStringLiteral("wasd")) {
+            m_joystick2Preset->setCurrentIndex(i);
+            break;
+        }
+    }
+    setJoyMapButtons(1, KbdJoy::KeyboardJoystickMap::numpadPreset());
+    setJoyMapButtons(2, KbdJoy::KeyboardJoystickMap::wasdPreset());
+    updateKeyConflictWarning();
+
     m_swapJoysticks->setChecked(false);  // Default false: Joy0=Numpad, Joy1=WASD
     m_grabMouse->setChecked(false);
     m_mouseDevice->clear();
@@ -3932,6 +3976,8 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     }
     profile.joystick1Preset = m_joystick1Preset ? m_joystick1Preset->currentData().toString() : "numpad";
     profile.joystick2Preset = m_joystick2Preset ? m_joystick2Preset->currentData().toString() : "wasd";
+    profile.joystick1KeyMap = KbdJoy::encodeMapToString(currentJoyMap(1));
+    profile.joystick2KeyMap = KbdJoy::encodeMapToString(currentJoyMap(2));
     profile.swapJoysticks = m_swapJoysticks->isChecked();
     profile.grabMouse = m_grabMouse->isChecked();
     profile.mouseDevice = m_mouseDevice->text();
@@ -4232,8 +4278,23 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
             break;
         }
     }
-    if (profile.kbdJoy0Enabled && profile.kbdJoy1Enabled) {
-        onJoystickPresetChanged(1);  // Resolve conflict if both presets ended up the same
+
+    // Key maps from the profile; fall back to preset layouts for old profiles
+    {
+        KbdJoy::KeyboardJoystickMap map1, map2;
+        if (!KbdJoy::decodeMapFromString(profile.joystick1KeyMap, map1)) {
+            map1 = KbdJoy::isValidPresetName(profile.joystick1Preset)
+                 ? KbdJoy::mapForPreset(profile.joystick1Preset)
+                 : KbdJoy::KeyboardJoystickMap::numpadPreset();
+        }
+        if (!KbdJoy::decodeMapFromString(profile.joystick2KeyMap, map2)) {
+            map2 = KbdJoy::isValidPresetName(profile.joystick2Preset)
+                 ? KbdJoy::mapForPreset(profile.joystick2Preset)
+                 : KbdJoy::KeyboardJoystickMap::wasdPreset();
+        }
+        setJoyMapButtons(1, map1);
+        setJoyMapButtons(2, map2);
+        updateKeyConflictWarning();
     }
 
     // Cartridge Configuration
@@ -4445,40 +4506,169 @@ void SettingsDialog::updateKeyboardMappingLabels()
         return;
     }
 
-    QString device1 = m_joystick1Device->currentData().toString();
-    QString device2 = m_joystick2Device->currentData().toString();
-    QString preset1 = m_joystick1Preset ? m_joystick1Preset->currentData().toString() : "numpad";
-    QString preset2 = m_joystick2Preset ? m_joystick2Preset->currentData().toString() : "wasd";
+    const QString device1 = m_joystick1Device->currentData().toString();
+    const QString device2 = m_joystick2Device->currentData().toString();
 
-    // Labels based on preset (not swap - preset is per slot)
-    auto presetToKeys = [](const QString& preset) -> QString {
-        if (preset == "numpad") return "Keys: ↑ ← ↓ → + Numpad Enter";
-        if (preset == "arrows") return "Keys: ↑ ← ↓ → + Return";
-        if (preset == "wasd") return "Keys: W A S D + Space";
-        return "Keys: ?";
+    // Show/hide preset combos and binding grids based on device selection
+    const bool kbd1 = (device1 == QStringLiteral("keyboard"));
+    const bool kbd2 = (device2 == QStringLiteral("keyboard"));
+    m_joystick1Preset->setVisible(kbd1);
+    m_joystick1KeysWidget->setVisible(kbd1);
+    m_joystick2Preset->setVisible(kbd2);
+    m_joystick2KeysWidget->setVisible(kbd2);
+
+    updateKeyConflictWarning();
+}
+
+QWidget* SettingsDialog::createKeyBindingGrid(int joy)
+{
+    QGroupBox* box = new QGroupBox(tr("Joystick %1 Keys").arg(joy));
+    QGridLayout* grid = new QGridLayout(box);
+
+    // Two columns: cardinals + fire on the left, optional diagonals on the right.
+    // Index order must match the m_joyNKeyButtons convention:
+    // 0=up, 1=down, 2=left, 3=right, 4=ul, 5=ur, 6=ll, 7=lr, 8=fire.
+    struct Row { int binding; const char* label; };
+    static const Row leftColumn[5] = {
+        { 0, "Up:" }, { 1, "Down:" }, { 2, "Left:" }, { 3, "Right:" }, { 8, "Fire:" }
+    };
+    static const Row rightColumn[4] = {
+        { 4, "Up-Left:" }, { 5, "Up-Right:" }, { 6, "Down-Left:" }, { 7, "Down-Right:" }
     };
 
-    QString joy1Keys = presetToKeys(preset1);
-    QString joy2Keys = presetToKeys(preset2);
+    KeyCaptureButton** buttons = (joy == 1) ? m_joy1KeyButtons : m_joy2KeyButtons;
 
-    // Show/hide preset and labels based on device selection
-    if (device1 == "keyboard") {
-        m_joystick1Preset->setVisible(true);
-        m_joystick1KeysLabel->setText(joy1Keys);
-        m_joystick1KeysLabel->setVisible(true);
-    } else {
-        m_joystick1Preset->setVisible(false);
-        m_joystick1KeysLabel->setVisible(false);
+    auto addRow = [this, grid, buttons, joy](const Row& row, int gridRow, int gridCol, bool clearable) {
+        QLabel* label = new QLabel(tr(row.label));
+        KeyCaptureButton* button = new KeyCaptureButton();
+        button->setClearable(clearable);
+        if (clearable) {
+            button->setToolTip(tr("Optional: dedicated diagonal key. Backspace/Delete clears it; "
+                                  "diagonals also work by holding two direction keys."));
+        }
+        grid->addWidget(label, gridRow, gridCol);
+        grid->addWidget(button, gridRow, gridCol + 1);
+        buttons[row.binding] = button;
+        connect(button, &KeyCaptureButton::keyCaptured, this, [this, joy](int) {
+            onKeyBindingCaptured(joy);
+        });
+    };
+
+    for (int i = 0; i < 5; ++i) {
+        addRow(leftColumn[i], i, 0, false);
+    }
+    for (int i = 0; i < 4; ++i) {
+        addRow(rightColumn[i], i, 2, true);
     }
 
-    if (device2 == "keyboard") {
-        m_joystick2Preset->setVisible(true);
-        m_joystick2KeysLabel->setText(joy2Keys);
-        m_joystick2KeysLabel->setVisible(true);
-    } else {
-        m_joystick2Preset->setVisible(false);
-        m_joystick2KeysLabel->setVisible(false);
+    return box;
+}
+
+KbdJoy::KeyboardJoystickMap SettingsDialog::currentJoyMap(int joy) const
+{
+    KeyCaptureButton* const* buttons = (joy == 1) ? m_joy1KeyButtons : m_joy2KeyButtons;
+    KbdJoy::KeyboardJoystickMap map;
+    if (!buttons[0]) {
+        return map;
     }
+    map.up = buttons[0]->encodedKey();
+    map.down = buttons[1]->encodedKey();
+    map.left = buttons[2]->encodedKey();
+    map.right = buttons[3]->encodedKey();
+    map.ul = buttons[4]->encodedKey();
+    map.ur = buttons[5]->encodedKey();
+    map.ll = buttons[6]->encodedKey();
+    map.lr = buttons[7]->encodedKey();
+    map.fire = buttons[8]->encodedKey();
+    return map;
+}
+
+void SettingsDialog::setJoyMapButtons(int joy, const KbdJoy::KeyboardJoystickMap& map)
+{
+    KeyCaptureButton** buttons = (joy == 1) ? m_joy1KeyButtons : m_joy2KeyButtons;
+    if (!buttons[0]) {
+        return;
+    }
+    const int values[9] = { map.up, map.down, map.left, map.right,
+                            map.ul, map.ur, map.ll, map.lr, map.fire };
+    for (int i = 0; i < 9; ++i) {
+        buttons[i]->setEncodedKey(values[i]);
+    }
+}
+
+void SettingsDialog::onKeyBindingCaptured(int joy)
+{
+    // Reflect the (possibly new) layout in the preset combo
+    QComboBox* presetCombo = (joy == 1) ? m_joystick1Preset : m_joystick2Preset;
+    const QString preset = KbdJoy::presetNameForMap(currentJoyMap(joy));
+    presetCombo->blockSignals(true);
+    for (int i = 0; i < presetCombo->count(); ++i) {
+        if (presetCombo->itemData(i).toString() == preset) {
+            presetCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+    presetCombo->blockSignals(false);
+
+    updateKeyConflictWarning();
+    onJoystickDeviceChanged();  // live apply
+}
+
+void SettingsDialog::updateKeyConflictWarning()
+{
+    if (!m_keyConflictLabel) {
+        return;
+    }
+
+    // Collect bindings per joystick: encoded key -> description
+    auto bindingsOf = [](const KbdJoy::KeyboardJoystickMap& m) -> QMap<int, QString> {
+        QMap<int, QString> b;
+        b.insert(m.up, QStringLiteral("Up"));
+        b.insert(m.down, QStringLiteral("Down"));
+        b.insert(m.left, QStringLiteral("Left"));
+        b.insert(m.right, QStringLiteral("Right"));
+        if (m.ul) b.insert(m.ul, QStringLiteral("Up-Left"));
+        if (m.ur) b.insert(m.ur, QStringLiteral("Up-Right"));
+        if (m.ll) b.insert(m.ll, QStringLiteral("Down-Left"));
+        if (m.lr) b.insert(m.lr, QStringLiteral("Down-Right"));
+        b.insert(m.fire, QStringLiteral("Fire"));
+        return b;
+    };
+
+    const KbdJoy::KeyboardJoystickMap map1 = currentJoyMap(1);
+    const KbdJoy::KeyboardJoystickMap map2 = currentJoyMap(2);
+    const QMap<int, QString> b1 = bindingsOf(map1);
+    const QMap<int, QString> b2 = bindingsOf(map2);
+
+    QStringList warnings;
+
+    // Duplicates within one joystick (QMap keeps only the last entry per key)
+    const int count1 = (map1.ul ? 1 : 0) + (map1.ur ? 1 : 0) + (map1.ll ? 1 : 0) + (map1.lr ? 1 : 0) + 5;
+    const int count2 = (map2.ul ? 1 : 0) + (map2.ur ? 1 : 0) + (map2.ll ? 1 : 0) + (map2.lr ? 1 : 0) + 5;
+    if (b1.size() < count1) {
+        warnings << tr("Joystick 1 assigns the same key to multiple actions");
+    }
+    if (b2.size() < count2) {
+        warnings << tr("Joystick 2 assigns the same key to multiple actions");
+    }
+
+    // Overlap across joysticks (only relevant when both are keyboard-driven)
+    const bool bothKbd = m_joystick1Device->currentData().toString() == QStringLiteral("keyboard")
+                      && m_joystick2Device->currentData().toString() == QStringLiteral("keyboard");
+    if (bothKbd) {
+        QStringList shared;
+        for (auto it = b1.constBegin(); it != b1.constEnd(); ++it) {
+            if (b2.contains(it.key())) {
+                shared << KbdJoy::keyDisplayName(it.key());
+            }
+        }
+        if (!shared.isEmpty()) {
+            warnings << tr("Keys used by both joysticks: %1").arg(shared.join(QStringLiteral(", ")));
+        }
+    }
+
+    m_keyConflictLabel->setVisible(!warnings.isEmpty());
+    m_keyConflictLabel->setText(warnings.join(QStringLiteral("  •  ")));
 }
 
 void SettingsDialog::onJoystickDeviceChanged()
@@ -4493,6 +4683,8 @@ void SettingsDialog::onJoystickDeviceChanged()
     const QString device2 = m_joystick2Device->currentData().toString();
     const QString preset1 = m_joystick1Preset ? m_joystick1Preset->currentData().toString() : QStringLiteral("numpad");
     const QString preset2 = m_joystick2Preset ? m_joystick2Preset->currentData().toString() : QStringLiteral("wasd");
+    const QString map1 = KbdJoy::encodeMapToString(currentJoyMap(1));
+    const QString map2 = KbdJoy::encodeMapToString(currentJoyMap(2));
     const bool swapped = m_swapJoysticks->isChecked();
     const bool kbd0 = mainJoystickEnabled && (device1 == QStringLiteral("keyboard")) &&
                       st.value(QStringLiteral("input/kbdJoy0Enabled"), false).toBool();
@@ -4509,43 +4701,22 @@ void SettingsDialog::onJoystickDeviceChanged()
                               Q_ARG(bool, kbd1),
                               Q_ARG(bool, swapped),
                               Q_ARG(QString, preset1),
-                              Q_ARG(QString, preset2));
+                              Q_ARG(QString, preset2),
+                              Q_ARG(QString, map1),
+                              Q_ARG(QString, map2));
 }
 
 void SettingsDialog::onJoystickPresetChanged(int joystickNumber)
 {
-    if (!m_joystick1Preset || !m_joystick2Preset) return;
+    QComboBox* combo = (joystickNumber == 1) ? m_joystick1Preset : m_joystick2Preset;
+    if (!combo) return;
 
-    // Only apply when both joysticks use keyboard
-    QString device1 = m_joystick1Device->currentData().toString();
-    QString device2 = m_joystick2Device->currentData().toString();
-    if (device1 != "keyboard" || device2 != "keyboard") return;
-
-    QString preset1 = m_joystick1Preset->currentData().toString();
-    QString preset2 = m_joystick2Preset->currentData().toString();
-    if (preset1 != preset2) return;  // No conflict
-
-    // Pick alternate preset: numpad -> arrows -> wasd -> numpad
-    auto alternatePreset = [](const QString& p) -> QString {
-        if (p == "numpad") return "arrows";
-        if (p == "arrows") return "wasd";
-        return "numpad";
-    };
-
-    QString newPreset = alternatePreset(preset1);
-    QComboBox* otherCombo = (joystickNumber == 1) ? m_joystick2Preset : m_joystick1Preset;
-
-    otherCombo->blockSignals(true);
-    for (int i = 0; i < otherCombo->count(); ++i) {
-        if (otherCombo->itemData(i).toString() == newPreset) {
-            otherCombo->setCurrentIndex(i);
-            break;
-        }
+    // "Custom" just keeps the current bindings; templates fill the grid
+    const QString preset = combo->currentData().toString();
+    if (preset != QStringLiteral("custom")) {
+        setJoyMapButtons(joystickNumber, KbdJoy::mapForPreset(preset));
     }
-    otherCombo->blockSignals(false);
 
-    // Other combo's signals will update labels and apply; do it explicitly in case
-    // we're in a scenario where the programmatic change doesn't emit
     updateKeyboardMappingLabels();
     onJoystickDeviceChanged();
 }

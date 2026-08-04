@@ -78,6 +78,8 @@ private:
         p.kbdJoy1Enabled = true;
         p.joystick1Preset = "arrows";
         p.joystick2Preset = "numpad";
+        p.joystick1KeyMap = QStringLiteral("16777235,16777237,16777234,16777236,0,0,0,0,16777220");
+        p.joystick2KeyMap = QStringLiteral("87,83,65,68,81,69,90,67,32");
 
         p.primaryCartridge.enabled = true;
         p.primaryCartridge.path = "/carts/game.car";
@@ -188,6 +190,8 @@ private slots:
         QCOMPARE(loaded.kbdJoy1Enabled, original.kbdJoy1Enabled);
         QCOMPARE(loaded.joystick1Preset, original.joystick1Preset);
         QCOMPARE(loaded.joystick2Preset, original.joystick2Preset);
+        QCOMPARE(loaded.joystick1KeyMap, original.joystick1KeyMap);
+        QCOMPARE(loaded.joystick2KeyMap, original.joystick2KeyMap);
 
         QCOMPARE(loaded.primaryCartridge.enabled, original.primaryCartridge.enabled);
         QCOMPARE(loaded.primaryCartridge.path, original.primaryCartridge.path);

@@ -28,11 +28,13 @@
 #include "atariemulator.h"
 #include "configurationprofilemanager.h"
 #include "profileselectionwidget.h"
+#include "keyboardjoystickmap.h"
 
 // FujiNet support (NetSIO on Windows when atari800 built with 0010-netsio-windows-support.patch)
 class FujiNetService;
 class FujiNetProcessManager;
 class FujiNetBinaryManager;
+class KeyCaptureButton;
 
 class SettingsDialog : public QDialog
 {
@@ -113,6 +115,13 @@ private:
     void populateCartridgeTypes(QComboBox* combo);
     void populateJoystickDevices();
     void updateKeyboardMappingLabels();
+
+    // Keyboard joystick key-binding helpers (joy = 1 or 2).
+    QWidget* createKeyBindingGrid(int joy);
+    KbdJoy::KeyboardJoystickMap currentJoyMap(int joy) const;
+    void setJoyMapButtons(int joy, const KbdJoy::KeyboardJoystickMap& map);
+    void onKeyBindingCaptured(int joy);
+    void updateKeyConflictWarning();
     
     // Profile management
     ConfigurationProfile getCurrentUIState() const;
@@ -261,9 +270,13 @@ private:
     QComboBox* m_joystick2Preset;
     QCheckBox* m_swapJoysticks;
 
-    // Keyboard mapping labels (shown when "Keyboard" is selected)
-    QLabel* m_joystick1KeysLabel;
-    QLabel* m_joystick2KeysLabel;
+    // Per-joystick key binding grids (shown when device is "Keyboard").
+    // Button index order: 0=up, 1=down, 2=left, 3=right, 4=ul, 5=ur, 6=ll, 7=lr, 8=fire.
+    QWidget* m_joystick1KeysWidget = nullptr;
+    QWidget* m_joystick2KeysWidget = nullptr;
+    KeyCaptureButton* m_joy1KeyButtons[9] = {};
+    KeyCaptureButton* m_joy2KeyButtons[9] = {};
+    QLabel* m_keyConflictLabel = nullptr;
 
     // Mouse Configuration (hidden for future re-implementation)
     QGroupBox* m_mouseGroup;

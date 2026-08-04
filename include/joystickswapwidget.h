@@ -27,6 +27,10 @@ public:
     void setSwapped(bool swapped);
     void setCompactMode(bool compact);
 
+    /// Short key labels per logical joystick (up to 3 lines each: up, left/down/right, fire).
+    /// Empty strings fall back to the historical Numpad/WASD labels.
+    void setJoystickKeyLabels(const QStringList& joy1Lines, const QStringList& joy2Lines);
+
 signals:
     void toggled(bool swapped);
 
@@ -58,6 +62,8 @@ private:
     bool m_compactMode;
     int m_animationProgress; // 0-100
     QPropertyAnimation* m_animation;
+    QStringList m_joy1KeyLines;
+    QStringList m_joy2KeyLines;
     
     static const int WIDGET_HEIGHT = 80;
     static const int WIDGET_WIDTH = 320;

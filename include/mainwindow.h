@@ -157,6 +157,7 @@ private:
     void updateToolbarFromSettings();
     /// Read input/joystick* from QSettings and apply via AtariEmulator::applyJoystickInputBundle (worker thread).
     void syncEmulatorJoystickFromQSettings();
+    void updateKbdJoyKeyLabels();
     void updateBasicToggleState();
     void updateToolbarLogo();
     void updateToolbarButtonStyles();

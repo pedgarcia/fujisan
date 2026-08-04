@@ -26,6 +26,7 @@
 #include <QMutex>
 #include <QImage>
 #include <atomic>
+#include "keyboardjoystickmap.h"
 
 #ifdef HAVE_SDL2_AUDIO
 // Forward declaration to avoid including SDL headers here
@@ -291,11 +292,22 @@ public:
     QString getJoystick0Preset() const { return m_joystick0Preset; }
     QString getJoystick1Preset() const { return m_joystick1Preset; }
 
+    /// Set a custom keyboard map from an encoded string (see keyboardjoystickmap.h).
+    /// Malformed or empty strings are ignored. Sets the port's preset name to the
+    /// matching built-in preset, or to "custom" when the map matches no preset.
+    void setJoystick0KeyMap(const QString& encodedMap);
+    void setJoystick1KeyMap(const QString& encodedMap);
+    QString getJoystick0KeyMap() const { return KbdJoy::encodeMapToString(m_joystick0Map); }
+    QString getJoystick1KeyMap() const { return KbdJoy::encodeMapToString(m_joystick1Map); }
+
 public slots:
-    /// Apply joystick master flag, per-port devices, kbd-joy flags, swap, and presets (must run on emulator thread).
+    /// Apply joystick master flag, per-port devices, kbd-joy flags, swap, presets and
+    /// custom key maps (must run on emulator thread). Empty map strings derive the
+    /// map from the corresponding preset.
     void applyJoystickInputBundle(bool master, const QString& device1, const QString& device2,
                                   bool kbd0, bool kbd1, bool swap,
-                                  const QString& preset0, const QString& preset1);
+                                  const QString& preset0, const QString& preset1,
+                                  const QString& map0, const QString& map1);
 
 #ifdef HAVE_SDL2_JOYSTICK
     // Real joystick (SDL2) support
@@ -466,8 +478,25 @@ private:
     bool m_kbdJoy0Enabled = false;  // Default false - keyboard joysticks disabled by default
     bool m_kbdJoy1Enabled = false;  // Default false - keyboard joysticks disabled by default
     bool m_swapJoysticks = false;   // Default false: Joy0=Numpad, Joy1=WASD
-    QString m_joystick0Preset = "numpad";  // "numpad" | "arrows" | "wasd"
+    QString m_joystick0Preset = "numpad";  // "numpad" | "arrows" | "wasd" | "custom"
     QString m_joystick1Preset = "wasd";
+    KbdJoy::KeyboardJoystickMap m_joystick0Map = KbdJoy::KeyboardJoystickMap::numpadPreset();
+    KbdJoy::KeyboardJoystickMap m_joystick1Map = KbdJoy::KeyboardJoystickMap::wasdPreset();
+
+    /// Currently-held cardinal keys per keyboard joystick (diagonals are computed).
+    struct JoyKeyState {
+        bool up = false;
+        bool down = false;
+        bool left = false;
+        bool right = false;
+    };
+    JoyKeyState m_joy0KeyState;
+    JoyKeyState m_joy1KeyState;
+    bool m_kbdJoyStateInitialized = false;
+
+    /// Reset held-key state and centre stick / release fire for one port after its
+    /// mapping changed (caller must hold m_inputMutex). Swap-aware.
+    void resetJoystickPortStateLocked(int port);
     float m_targetFps = 59.92f;
     float m_frameTimeMs = 16.67f;
     input_template_t m_currentInput;
