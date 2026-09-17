@@ -36,6 +36,22 @@ instruction per step ($2096 -> $2098 -> $209A -> $209C -> $209F, then JSR/RTS
 transfers), ~20 ms per step, and source-level stepping lands on the next source
 line instead of an arbitrary one.
 
+**Windows follow-up (July 2026):** the injection and the MONITOR_BREAK /
+MONITOR_BREAKPOINTS config.h defines originally lived only in
+`configure-atari800.sh` (Unix/macOS), so every Windows build path failed to
+link with `undefined reference to libatari800_debug_step_instruction` (and PC
+breakpoints would never have fired even where linking succeeded). The same
+post-configure steps are now mirrored in:
+- `scripts/build-libatari800-fujinet.sh` (MinGW cross, NetSIO on),
+- `scripts/build-libatari800-autotools.sh` (MinGW cross, NetSIO off),
+- `scripts/create-minimal-makefile.sh` (native MSYS2 minimal build) -- which
+  also gains HAVE_SETJMP / MONITOR_BREAK / MONITOR_BREAKPOINTS in its generated
+  config.h, a longjmp branch in its PLATFORM_Exit() stub (keeping the
+  `return run_monitor` fall-through that keeps the process alive on unarmed
+  monitor entries), and drops the obsolete "truncate api.c to 495 lines" step
+  that dated from the old inline-patch era and now deletes legitimate patch
+  code (libatari800_set_pc_breakpoints lives near the end of api.c).
+
 ---
 
 ## 0019-libatari800-pc-breakpoints.patch (July 2026)

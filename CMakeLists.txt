@@ -212,7 +212,7 @@ endif()
 # Download and build atari800 with Fujisan patches
 ExternalProject_Add(atari800_external
     GIT_REPOSITORY https://github.com/atari800/atari800.git
-    GIT_TAG f79b4a59e9f7c1bf5b207b19f10f9126acdd1d9f  # PROCEED signal handling
+    GIT_TAG 41c7a9ce26d648d3d71e8cc39322abdb6976e96f  # Netstream + NetSIO sync/HSIO/write_size (includes a068f7f)
     SOURCE_DIR ${ATARI800_SOURCE_DIR}
     BINARY_DIR ${ATARI800_BINARY_DIR}
 
