@@ -156,6 +156,23 @@ if [ -d .git ]; then
                 continue
             fi
 
+            # Skip 0010 - NetSIO Windows support merged upstream (#268 / e646608).
+            # Explicit skip required even when CC is mingw: the *windows* name match
+            # only skips this on non-Windows hosts; forward/reverse apply both fail
+            # against the upstream netsiowin.c tree.
+            if [[ "$patch_name" == "0010-netsio-windows-support.patch" ]]; then
+                echo "Skipping patch 0010 - already in upstream (NetSIO Windows #268)"
+                continue
+            fi
+
+            # Skip 0013 - mozzwald NetSIO sync/HSIO merged upstream (23e3b56).
+            # Required for GIT_TAG 41c7a9c+: forward and reverse apply both fail,
+            # and the script treats that as fatal.
+            if [[ "$patch_name" == "0013-mozzwald-netsio-sync-and-hsio.patch" ]]; then
+                echo "Skipping patch 0013 - already in upstream (23e3b56)"
+                continue
+            fi
+
             # Skip Windows-specific patches on non-Windows systems
             # Allow Windows patches when cross-compiling (CC contains mingw)
             if [[ "$patch_name" == *"windows"* ]] && [[ "$OSTYPE" != "msys" ]] && [[ "$MSYSTEM" == "" ]] && [[ "$CC" != *"mingw"* ]]; then
@@ -298,6 +315,18 @@ else
             # Skip 0017 - POKEY debounce patch disabled for testing
             if [[ "$patch_name" == "0017-libatari800-fresh-keypress-latch.patch" ]]; then
                 echo "Skipping patch 0017 - disabled for testing"
+                continue
+            fi
+
+            # Skip 0010 - NetSIO Windows support merged upstream (#268 / e646608)
+            if [[ "$patch_name" == "0010-netsio-windows-support.patch" ]]; then
+                echo "Skipping patch 0010 - already in upstream (NetSIO Windows #268)"
+                continue
+            fi
+
+            # Skip 0013 - mozzwald NetSIO sync/HSIO merged upstream (23e3b56)
+            if [[ "$patch_name" == "0013-mozzwald-netsio-sync-and-hsio.patch" ]]; then
+                echo "Skipping patch 0013 - already in upstream (23e3b56)"
                 continue
             fi
 

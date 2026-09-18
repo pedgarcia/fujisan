@@ -72,6 +72,51 @@ echo "=== Configuring atari800 with NetSIO support ==="
 # Apply Windows-specific fixes (same as build-libatari800-autotools.sh)
 echo "=== Applying Windows-specific fixes ==="
 
+# Enable per-instruction PC breakpoints (forced off by the libatari800 target
+# preset) and provide libatari800_debug_step_instruction(). This mirrors what
+# scripts/configure-atari800.sh does for the Unix/macOS build; without it the
+# Fujisan link fails with "undefined reference to
+# libatari800_debug_step_instruction" and PC breakpoints never fire.
+sed -i.bak 's|/\* #undef MONITOR_BREAK \*/|#define MONITOR_BREAK 1|' src/config.h
+sed -i.bak 's|/\* #undef MONITOR_BREAKPOINTS \*/|#define MONITOR_BREAKPOINTS 1|' src/config.h
+
+if ! grep -q 'libatari800_debug_step_instruction' src/libatari800/api.c; then
+    cat >> src/libatari800/api.c <<'FUJISAN_STEP_EOF'
+
+/* Execute exactly one 6502 instruction (debugger single-step).
+ *
+ * MONITOR_break_step makes CPU_GO() stop after a single instruction, and the
+ * core skips the PC breakpoint table while it is set -- exactly what a debugger
+ * needs to step off a breakpoint. The stop arrives as DO_BREAK -> ENTER_MONITOR
+ * -> Atari800_Exit(), which in libatari800 would terminate the process, so arm
+ * the same longjmp landing pad libatari800_next_frame() uses (see
+ * PLATFORM_Exit() in exit.c) for the duration of the step. */
+void libatari800_debug_step_instruction(void)
+{
+#if defined(MONITOR_BREAK) && defined(HAVE_SETJMP)
+	if (setjmp(libatari800_monitor_jmp) == 0) {
+		libatari800_monitor_active = 1;
+		MONITOR_break_step = TRUE;
+		/* CPU_GO() runs while ANTIC_xpos < limit, so the limit must be
+		   relative to where we currently are in the scanline. A fixed
+		   limit (e.g. CPU_GO(20)) silently executes nothing whenever the
+		   CPU is already past that cycle, making the "step" a no-op.
+		   MONITOR_break_step stops us after one instruction regardless,
+		   so a small margin is enough. */
+		CPU_GO(ANTIC_xpos + 8);
+	}
+	libatari800_monitor_active = 0;
+	MONITOR_break_step = FALSE;
+#endif
+}
+FUJISAN_STEP_EOF
+    echo "injected libatari800_debug_step_instruction() into api.c"
+fi
+if ! grep -q 'libatari800_debug_step_instruction' src/libatari800/libatari800.h; then
+    sed -i.bak 's|#endif /\* LIBATARI800_H_ \*/|/* Execute exactly one 6502 instruction (debugger single-step). */\nvoid libatari800_debug_step_instruction(void);\n\n#endif /* LIBATARI800_H_ */|' src/libatari800/libatari800.h
+    echo "declared libatari800_debug_step_instruction() in libatari800.h"
+fi
+
 # On MinGW x64, ULONG is 32-bit (LLP64). Do NOT redefine ULONG; that breaks
 # Windows API and causes "conflicting types" for ANTIC_VideoMemset.
 # Guard the ULONG define in libatari800.h so it is skipped on Windows.

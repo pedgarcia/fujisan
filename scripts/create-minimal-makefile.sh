@@ -93,8 +93,27 @@ void PLATFORM_ConfigInit(void) {
     /* Minimal platform configuration initialization */
 }
 
+#ifdef HAVE_SETJMP
+#include <setjmp.h>
+/* Defined in libatari800/api.c (patch 0019): landing pad and guard used to
+   return control to the host when the CPU core enters the monitor (e.g. a
+   debugger PC breakpoint or single-step). */
+extern jmp_buf libatari800_monitor_jmp;
+extern int libatari800_monitor_active;
+#endif
+
 int PLATFORM_Exit(int run_monitor) {
-    /* Clean shutdown - no special handling needed */
+#ifdef HAVE_SETJMP
+    if (run_monitor && libatari800_monitor_active) {
+        /* A monitor break fired while the landing pad was armed: longjmp back
+           into libatari800_next_frame()/libatari800_debug_step_instruction()
+           instead of terminating, CPU parked at the break PC. */
+        libatari800_monitor_active = 0;
+        longjmp(libatari800_monitor_jmp, 1);
+    }
+#endif
+    /* Keep returning run_monitor (nonzero on monitor entry) so the process
+       survives monitor breaks when no landing pad is armed. */
     return run_monitor;
 }
 
@@ -333,6 +352,14 @@ cat > src/config.h << 'EOF'
 #define CYCLE_EXACT 1
 #define PAGED_ATTRIB 1
 
+/* Debugger support: per-instruction PC breakpoints (patch 0019) and
+   libatari800_debug_step_instruction(). monitor.c is compiled in this build,
+   so MONITOR_break_step / MONITOR_breakpoint_table are available. MinGW
+   provides setjmp.h. */
+#define HAVE_SETJMP 1
+#define MONITOR_BREAK 1
+#define MONITOR_BREAKPOINTS 1
+
 /* Disable features that require additional dependencies */
 #define NO_SIMPLE_MENU 1
 
@@ -341,13 +368,11 @@ EOF
 
 echo "Created minimal Makefile and config.h for libatari800"
 
-# Remove any duplicated API functions that are already present
-if grep -q "libatari800_mount_disk_image.*diskno" src/libatari800/api.c 2>/dev/null; then
-    echo "Removing duplicate API functions from api.c..."
-    # Remove the duplicated section that was added previously
-    head -n 495 src/libatari800/api.c > src/libatari800/api.c.tmp
-    mv src/libatari800/api.c.tmp src/libatari800/api.c
-fi
+# NOTE: There used to be a "remove duplicated API functions" step here that
+# truncated api.c to its first 495 lines. With the current git-format patch
+# set (0001, 0019, ...) the Fujisan API functions are proper parts of api.c,
+# not appended duplicates, and truncating the file deletes legitimate code
+# (e.g. libatari800_set_pc_breakpoints from patch 0019). Do not truncate.
 
 # Only add genuinely missing functions that Fujisan needs
 if ! grep -q "libatari800_set_disk_activity_callback" src/libatari800/api.c 2>/dev/null; then
@@ -407,6 +432,48 @@ int libatari800_get_sio_patch_enabled(void);
 int libatari800_get_cartridge_enabled(void);
 void libatari800_set_cartridge_enabled(int enabled);
 HEADER_EOF
+fi
+
+# Provide libatari800_debug_step_instruction() (debugger single-step), same as
+# scripts/configure-atari800.sh injects for the Unix/macOS build. Without it
+# the Fujisan link fails with "undefined reference to
+# libatari800_debug_step_instruction". The landing pad symbols
+# (libatari800_monitor_jmp/libatari800_monitor_active) come from patch 0019 in
+# api.c, and monitor.c is compiled in this build.
+if ! grep -q 'libatari800_debug_step_instruction' src/libatari800/api.c 2>/dev/null; then
+    echo "Adding libatari800_debug_step_instruction() to api.c..."
+    cat >> src/libatari800/api.c <<'FUJISAN_STEP_EOF'
+
+/* Execute exactly one 6502 instruction (debugger single-step).
+ *
+ * MONITOR_break_step makes CPU_GO() stop after a single instruction, and the
+ * core skips the PC breakpoint table while it is set -- exactly what a debugger
+ * needs to step off a breakpoint. The stop arrives as DO_BREAK -> ENTER_MONITOR
+ * -> Atari800_Exit(), so arm the longjmp landing pad (see PLATFORM_Exit() in
+ * platform_minimal.c) for the duration of the step. */
+void libatari800_debug_step_instruction(void)
+{
+#if defined(MONITOR_BREAK) && defined(HAVE_SETJMP)
+	if (setjmp(libatari800_monitor_jmp) == 0) {
+		libatari800_monitor_active = 1;
+		MONITOR_break_step = TRUE;
+		/* CPU_GO() runs while ANTIC_xpos < limit, so the limit must be
+		   relative to where we currently are in the scanline. A fixed
+		   limit (e.g. CPU_GO(20)) silently executes nothing whenever the
+		   CPU is already past that cycle, making the "step" a no-op.
+		   MONITOR_break_step stops us after one instruction regardless,
+		   so a small margin is enough. */
+		CPU_GO(ANTIC_xpos + 8);
+	}
+	libatari800_monitor_active = 0;
+	MONITOR_break_step = FALSE;
+#endif
+}
+FUJISAN_STEP_EOF
+fi
+if ! grep -q 'libatari800_debug_step_instruction' src/libatari800/libatari800.h 2>/dev/null; then
+    sed -i.bak 's|#endif /\* LIBATARI800_H_ \*/|/* Execute exactly one 6502 instruction (debugger single-step). */\nvoid libatari800_debug_step_instruction(void);\n\n#endif /* LIBATARI800_H_ */|' src/libatari800/libatari800.h
+    echo "declared libatari800_debug_step_instruction() in libatari800.h"
 fi
 
 echo "You can now run 'make' to build libatari800.a"
