@@ -99,7 +99,7 @@ public:
 
     // Status queries
     void queryMountStatus();  // Query all disk slots D1-D8
-    void queryDriveStatus();  // Query drive status from root / endpoint (new format)
+    void queryDriveStatus();  // Query drive status from /api/v1/drives (falls back to the / status page)
 
     // FujiNet device actions
     void swapDisks();  // Rotate disk images (Button A equivalent, HTTP GET /swap)
@@ -145,7 +145,7 @@ private slots:
     void onHostsReply();
     void onSetHostReply();
     void onMountStatusReply();
-    void onDriveStatusReply();  // New handler for / endpoint
+    void onDriveStatusReply();  // Handler for /api/v1/drives and the / fallback
     void onBrowseReply();
     void onNetworkError(QNetworkReply::NetworkError error);
 
@@ -154,7 +154,9 @@ private:
     void sendRequest(const QString& endpoint, std::function<void()> onSuccess);
     QUrl buildUrl(const QString& endpoint, const QMap<QString, QString>& params = QMap<QString, QString>());
     void parseMountStatus(const QString& html);
-    void parseDriveStatus(const QString& html);  // New parser for / endpoint
+    void parseDriveStatus(const QString& html);  // Parser for the / status page (fallback)
+    bool parseDriveStatusJson(const QByteArray& json, QVector<FujiNetDrive>& drives);  // Parser for /api/v1/drives
+    void emitDriveStatus(const QVector<FujiNetDrive>& drives);  // Fill in D1-D8 and emit driveStatusUpdated
     QStringList parseHosts(const QString& response);
     QString mapPrinterTypeToAPI(const QString& type);
     void parseSSEData(QByteArray& buffer);
@@ -165,6 +167,8 @@ private:
     QPointer<QNetworkReply> m_healthCheckReply;
     QTimer* m_healthCheckTimer;
     QTimer* m_drivePollingTimer;  // New timer for drive status polling
+    QPointer<QNetworkReply> m_driveStatusReply;  // In-flight drive status request, if any
+    bool m_driveStatusApiUnsupported;  // Server has no /api/v1/drives; poll the / status page instead
     QTimer* m_printerPollTimer;   // Timer for printer output polling
 
     // Printer state

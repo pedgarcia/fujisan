@@ -13,6 +13,8 @@
 
 #include "fujinetservice.h"
 
+Q_DECLARE_METATYPE(QVector<FujiNetDrive>)
+
 class MockHttpServer : public QTcpServer {
     Q_OBJECT
 public:
@@ -37,6 +39,8 @@ public:
         m_pathResponses[path] = {statusCode, body};
     }
 
+    QStringList requestedPaths() const { return m_requestedPaths; }
+
 private slots:
     void handleConnection()
     {
@@ -55,6 +59,7 @@ private slots:
                         path = parts[1];
                     }
                 }
+                m_requestedPaths.append(path);
 
                 int code = m_statusCode;
                 QString body = m_body;
@@ -85,7 +90,43 @@ private:
     int m_statusCode = 200;
     QString m_body;
     QMap<QString, QPair<int, QString>> m_pathResponses;
+    QStringList m_requestedPaths;
 };
+
+// Abridged GET /api/v1/drives reply from FujiNet-PC (fujinet-firmware 26694b1).
+static const char* kDrivesJson =
+    "[{\"slot\":1,\"path\":\"/ANIMALS.XEX\",\"mounted\":true,\"mode\":\"r\",\"host_slot\":0,\"host\":\"SD\"},"
+    "{\"slot\":2,\"path\":\"/GAMES/DEMO.ATR\",\"mounted\":false,\"mode\":\"w\",\"host_slot\":1,\"host\":\"fujinet.online\"},"
+    "{\"slot\":3,\"path\":\"\",\"mounted\":false,\"mode\":\"r\",\"host_slot\":-1},"
+    "{\"slot\":4,\"path\":\"/STALE.ATR\",\"mounted\":false,\"mode\":\"r\",\"host_slot\":255},"
+    "{\"slot\":9,\"path\":\"/IGNORED.ATR\",\"mounted\":false,\"mode\":\"r\",\"host_slot\":0}]";
+
+// The drive divs of the / status page for the same configuration.
+static const char* kStatusPageHtml =
+    "<div class=\"deth detlinecol\" data-mountslot=\"0\" data-mountslotname=\"Drive Slot 1\" data-mount=\"/ANIMALS.XEX (R)\"></div>"
+    "<div class=\"deth detlinecol\" data-mountslot=\"1\" data-mountslotname=\"Drive Slot 2\" data-mount=\"/GAMES/DEMO.ATR (W)\"></div>"
+    "<div class=\"deth detlinecol\" data-mountslot=\"2\" data-mountslotname=\"Drive Slot 3\" data-mount=\"(Empty)\"></div>";
+
+static void verifyExpectedDrives(const QVector<FujiNetDrive>& drives)
+{
+    QCOMPARE(drives.size(), 8);
+    for (int i = 0; i < drives.size(); i++) {
+        QCOMPARE(drives[i].slotNumber, i);
+    }
+
+    QVERIFY(!drives[0].isEmpty);
+    QCOMPARE(drives[0].filename, QString("/ANIMALS.XEX"));
+    QVERIFY(drives[0].isReadOnly);
+
+    QVERIFY(!drives[1].isEmpty);
+    QCOMPARE(drives[1].filename, QString("/GAMES/DEMO.ATR"));
+    QVERIFY(!drives[1].isReadOnly);
+
+    for (int i = 2; i < drives.size(); i++) {
+        QVERIFY(drives[i].isEmpty);
+        QVERIFY(drives[i].filename.isEmpty());
+    }
+}
 
 class TestFujiNetService : public QObject {
     Q_OBJECT
@@ -95,6 +136,11 @@ private:
     int m_port = 0;
 
 private slots:
+    void initTestCase()
+    {
+        qRegisterMetaType<QVector<FujiNetDrive>>();
+    }
+
     void init()
     {
         m_server = new MockHttpServer(this);
@@ -228,6 +274,120 @@ private slots:
         svc.startDrivePolling(100);
         svc.stopDrivePolling();
         // No crash
+    }
+
+    // ---------------------------------------------------------------
+    // Drive status comes from /api/v1/drives; the / status page (which
+    // lists the SD card on every render) is not requested.
+    // ---------------------------------------------------------------
+    void testDriveStatusUsesJsonApi()
+    {
+        m_server->setResponseForPath("/api/v1/drives", 200, kDrivesJson);
+        m_server->setResponseForPath("/", 200, kStatusPageHtml);
+
+        FujiNetService svc;
+        svc.setServerUrl(QString("http://127.0.0.1:%1").arg(m_port));
+        QSignalSpy spy(&svc, &FujiNetService::driveStatusUpdated);
+
+        svc.queryDriveStatus();
+        QVERIFY(spy.wait(3000));
+        verifyExpectedDrives(spy.takeFirst().at(0).value<QVector<FujiNetDrive>>());
+
+        svc.queryDriveStatus();
+        QVERIFY(spy.wait(3000));
+        QCOMPARE(m_server->requestedPaths(),
+                 QStringList({"/api/v1/drives", "/api/v1/drives"}));
+    }
+
+    // ---------------------------------------------------------------
+    // Older FujiNet-PC (no /api/v1/drives -> 404): fall back to the /
+    // status page, stay on it, and re-probe after setServerUrl.
+    // ---------------------------------------------------------------
+    void testDriveStatusFallsBackToStatusPage()
+    {
+        m_server->setResponseForPath("/api/v1/drives", 404, "Not found");
+        m_server->setResponseForPath("/", 200, kStatusPageHtml);
+
+        FujiNetService svc;
+        const QString url = QString("http://127.0.0.1:%1").arg(m_port);
+        svc.setServerUrl(url);
+        QSignalSpy spy(&svc, &FujiNetService::driveStatusUpdated);
+        QSignalSpy errSpy(&svc, &FujiNetService::connectionError);
+
+        svc.queryDriveStatus();
+        QVERIFY(spy.wait(3000));
+        verifyExpectedDrives(spy.takeFirst().at(0).value<QVector<FujiNetDrive>>());
+        QCOMPARE(errSpy.count(), 0);
+        QCOMPARE(m_server->requestedPaths(), QStringList({"/api/v1/drives", "/"}));
+
+        svc.queryDriveStatus();
+        QVERIFY(spy.wait(3000));
+        QCOMPARE(m_server->requestedPaths(), QStringList({"/api/v1/drives", "/", "/"}));
+
+        svc.setServerUrl(url);
+        svc.queryDriveStatus();
+        QVERIFY(spy.wait(3000));
+        QCOMPARE(m_server->requestedPaths(),
+                 QStringList({"/api/v1/drives", "/", "/", "/api/v1/drives", "/"}));
+    }
+
+    // ---------------------------------------------------------------
+    // A server error is not taken as "endpoint missing".
+    // ---------------------------------------------------------------
+    void testDriveStatusServerErrorKeepsJsonApi()
+    {
+        m_server->setResponseForPath("/api/v1/drives", 500, "{\"error\":\"out of memory\"}");
+
+        FujiNetService svc;
+        svc.setServerUrl(QString("http://127.0.0.1:%1").arg(m_port));
+        QSignalSpy spy(&svc, &FujiNetService::driveStatusUpdated);
+        QSignalSpy errSpy(&svc, &FujiNetService::connectionError);
+
+        svc.queryDriveStatus();
+        QVERIFY(errSpy.wait(3000));
+        QCOMPARE(spy.count(), 0);
+
+        m_server->setResponseForPath("/api/v1/drives", 200, kDrivesJson);
+        svc.queryDriveStatus();
+        QVERIFY(spy.wait(3000));
+        verifyExpectedDrives(spy.takeFirst().at(0).value<QVector<FujiNetDrive>>());
+        QCOMPARE(m_server->requestedPaths(),
+                 QStringList({"/api/v1/drives", "/api/v1/drives"}));
+    }
+
+    // ---------------------------------------------------------------
+    // A poll while the previous one is in flight is skipped.
+    // ---------------------------------------------------------------
+    void testDriveStatusSkipsOverlappingPolls()
+    {
+        m_server->setResponseForPath("/api/v1/drives", 200, kDrivesJson);
+
+        FujiNetService svc;
+        svc.setServerUrl(QString("http://127.0.0.1:%1").arg(m_port));
+        QSignalSpy spy(&svc, &FujiNetService::driveStatusUpdated);
+
+        svc.queryDriveStatus();
+        svc.queryDriveStatus();
+        QVERIFY(spy.wait(3000));
+        QTest::qWait(200);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(m_server->requestedPaths(), QStringList({"/api/v1/drives"}));
+    }
+
+    // ---------------------------------------------------------------
+    // stopDrivePolling drops a reply that is still in flight.
+    // ---------------------------------------------------------------
+    void testStopDrivePollingDiscardsPendingReply()
+    {
+        m_server->setResponseForPath("/api/v1/drives", 200, kDrivesJson);
+
+        FujiNetService svc;
+        svc.setServerUrl(QString("http://127.0.0.1:%1").arg(m_port));
+        QSignalSpy spy(&svc, &FujiNetService::driveStatusUpdated);
+
+        svc.startDrivePolling(60000);
+        svc.stopDrivePolling();
+        QVERIFY(!spy.wait(500));
     }
 };
 
