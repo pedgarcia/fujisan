@@ -15,6 +15,14 @@
 #include <QDir>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
+
+namespace {
+constexpr int kMaxDriveSlots = 8;
+constexpr int kMaxHostSlots = 8;
+constexpr int kDriveStatusTimeoutMs = 5000;
+const QString kDrivesApiPath = QStringLiteral("/api/v1/drives");
+}
 
 FujiNetService::FujiNetService(QObject *parent)
     : QObject(parent)
@@ -23,6 +31,7 @@ FujiNetService::FujiNetService(QObject *parent)
     , m_isConnected(false)
     , m_healthCheckTimer(new QTimer(this))
     , m_drivePollingTimer(new QTimer(this))
+    , m_driveStatusApiUnsupported(false)
     , m_printerPollTimer(nullptr)
     , m_printerEnabled(false)
     , m_currentPrinterType("Atari 825")
@@ -47,6 +56,12 @@ void FujiNetService::setServerUrl(const QString& url)
     // Remove trailing slash
     if (m_serverUrl.endsWith('/')) {
         m_serverUrl.chop(1);
+    }
+    // The server may have been upgraded or replaced; probe /api/v1/drives again.
+    m_driveStatusApiUnsupported = false;
+    if (!m_driveStatusReply.isNull()) {
+        m_driveStatusReply->abort();  // Its result belongs to the previous server
+        m_driveStatusReply.clear();
     }
 }
 
@@ -88,6 +103,10 @@ void FujiNetService::startDrivePolling(int intervalMs)
 void FujiNetService::stopDrivePolling()
 {
     m_drivePollingTimer->stop();
+    if (!m_driveStatusReply.isNull()) {
+        m_driveStatusReply->abort();
+        m_driveStatusReply.clear();
+    }
 }
 
 void FujiNetService::resetConnectionState()
@@ -319,15 +338,27 @@ void FujiNetService::queryMountStatus()
 
 void FujiNetService::queryDriveStatus()
 {
-    // Use the root / endpoint to query drive status (new format)
-    QUrl url(m_serverUrl + "/");
+    if (!m_driveStatusReply.isNull()) {
+        return;  // Previous poll still in flight; don't pile requests onto a slow FujiNet
+    }
+
+    // /api/v1/drives is built from FujiNet's config alone. Rendering the / status page
+    // also lists /FujiNet on the SD card (app key count), which on older firmware
+    // clobbers a program's in-progress SD directory read (fujinet-firmware#2018).
+    QUrl url(m_serverUrl + (m_driveStatusApiUnsupported ? QStringLiteral("/") : kDrivesApiPath));
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "Fujisan");
 
     QNetworkReply* reply = m_networkManager->get(request);
+    m_driveStatusReply = reply;
     connect(reply, &QNetworkReply::finished, this, &FujiNetService::onDriveStatusReply);
-    connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::errorOccurred),
-            this, &FujiNetService::onNetworkError);
+    // A FujiNet that accepts the connection but never answers must not stall polling.
+    QTimer::singleShot(kDriveStatusTimeoutMs, reply, [reply]() {
+        if (reply->isRunning()) {
+            qDebug() << "Drive status query timed out:" << reply->url().toString();
+            reply->abort();
+        }
+    });
 }
 
 void FujiNetService::swapDisks()
@@ -503,14 +534,44 @@ void FujiNetService::onDriveStatusReply()
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
 
-    if (reply->error() == QNetworkReply::NoError) {
-        QString html = reply->readAll();
-        parseDriveStatus(html);
-    } else {
-        qDebug() << "Drive status query failed:" << reply->errorString();
+    if (m_driveStatusReply.data() == reply) {
+        m_driveStatusReply.clear();
+    }
+    reply->deleteLater();
+
+    if (reply->error() == QNetworkReply::OperationCanceledError) {
+        return;
     }
 
-    reply->deleteLater();
+    const bool fromApi = reply->url().path() == kDrivesApiPath;
+    const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray body = reply->readAll();
+
+    if (fromApi) {
+        QVector<FujiNetDrive> drives;
+        if (reply->error() == QNetworkReply::NoError && parseDriveStatusJson(body, drives)) {
+            emitDriveStatus(drives);
+            return;
+        }
+
+        // FujiNet-PC builds before fujinet-firmware#1563 answer 404 here. A 4xx, or a 200
+        // that isn't the JSON drive list, means the endpoint isn't there: use / instead.
+        const bool apiMissing = (httpStatus >= 400 && httpStatus < 500)
+                                || (httpStatus == 200 && reply->error() == QNetworkReply::NoError);
+        if (apiMissing) {
+            qDebug() << "FujiNet has no usable" << kDrivesApiPath << "(HTTP" << httpStatus
+                     << ") - falling back to the / status page for drive status";
+            m_driveStatusApiUnsupported = true;
+            queryDriveStatus();
+            return;
+        }
+    } else if (reply->error() == QNetworkReply::NoError) {
+        parseDriveStatus(QString::fromUtf8(body));
+        return;
+    }
+
+    qDebug() << "Drive status query failed:" << reply->errorString();
+    emit connectionError(reply->errorString());
 }
 
 void FujiNetService::onBrowseReply()
@@ -666,6 +727,48 @@ void FujiNetService::parseDriveStatus(const QString& html)
         drives.append(drive);
     }
 
+    emitDriveStatus(drives);
+}
+
+bool FujiNetService::parseDriveStatusJson(const QByteArray& json, QVector<FujiNetDrive>& drives)
+{
+    // Format: [{"slot":1,"path":"/ANIMALS.XEX","mode":"r","host_slot":0,"host":"SD",...}, ...]
+    // "slot" is 1-based; an empty slot has host_slot -1 (0xFF on older firmware).
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(json, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isArray()) {
+        return false;
+    }
+
+    const QJsonArray entries = doc.array();
+    for (const QJsonValue& value : entries) {
+        const QJsonObject obj = value.toObject();
+        const int slotNumber = obj.value("slot").toInt(0) - 1;
+        if (slotNumber < 0 || slotNumber >= kMaxDriveSlots) {
+            continue;
+        }
+
+        FujiNetDrive drive;
+        drive.slotNumber = slotNumber;
+
+        // Same rule as the status page's data-mount: a slot is mounted when it has a host
+        // slot. "mounted" is ignored because it tracks the open image, not the config.
+        const int hostSlot = obj.value("host_slot").toInt(-1);
+        const QString path = obj.value("path").toString();
+        if (hostSlot >= 0 && hostSlot < kMaxHostSlots && !path.isEmpty()) {
+            drive.isEmpty = false;
+            drive.filename = path;
+            drive.isReadOnly = obj.value("mode").toString() != QLatin1String("w");
+        }
+
+        drives.append(drive);
+    }
+
+    return true;
+}
+
+void FujiNetService::emitDriveStatus(const QVector<FujiNetDrive>& drives)
+{
     // Ensure we have all 8 drives (D1-D8)
     // Sort by slot number and fill in missing slots
     QMap<int, FujiNetDrive> driveMap;
@@ -674,7 +777,7 @@ void FujiNetService::parseDriveStatus(const QString& html)
     }
 
     QVector<FujiNetDrive> completeDrives;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < kMaxDriveSlots; i++) {
         if (driveMap.contains(i)) {
             completeDrives.append(driveMap[i]);
         } else {
