@@ -77,6 +77,11 @@ QJsonObject ConfigurationProfile::toJson() const {
     videoConfig["keepAspectRatio"] = keepAspectRatio;
     videoConfig["overscanFactor"] = overscanFactor;
     videoConfig["fullscreenMode"] = fullscreenMode;
+    videoConfig["crtEnabled"] = crtEnabled;
+    videoConfig["crtScanlines"] = crtScanlines;
+    videoConfig["crtMask"] = crtMask;
+    videoConfig["crtCurvature"] = crtCurvature;
+    videoConfig["crtGlow"] = crtGlow;
     json["videoConfig"] = videoConfig;
     
     // Color Settings
@@ -267,6 +272,11 @@ void ConfigurationProfile::fromJson(const QJsonObject& json) {
         keepAspectRatio = videoConfig["keepAspectRatio"].toBool(true);
         overscanFactor = videoConfig["overscanFactor"].toDouble(1.0);
         fullscreenMode = videoConfig["fullscreenMode"].toBool(false);
+        crtEnabled = videoConfig["crtEnabled"].toBool(false);
+        crtScanlines = videoConfig["crtScanlines"].toInt(60);
+        crtMask = videoConfig["crtMask"].toInt(30);
+        crtCurvature = videoConfig["crtCurvature"].toInt(25);
+        crtGlow = videoConfig["crtGlow"].toInt(30);
     }
     
     // Color Settings

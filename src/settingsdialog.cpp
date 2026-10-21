@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QFileDialog>
+#include <QGridLayout>
 #include <QMessageBox>
 #include <QDesktopServices>
 #include <QThread>
@@ -1377,7 +1378,86 @@ void SettingsDialog::createVideoDisplayTab()
     videoOptionsLayout->addWidget(m_ntscGroup);
     
     tabLayout->addLayout(videoOptionsLayout);
+
+    QGroupBox* crtGroup = new QGroupBox("CRT Effect");
+    QGridLayout* crtLayout = new QGridLayout(crtGroup);
+    crtLayout->setVerticalSpacing(4);
+
+    m_crtEnabled = new QCheckBox("Enable CRT effect");
+    m_crtEnabled->setToolTip("Simulate a CRT television: scanlines, phosphor mask, curved glass and glow");
+    crtLayout->addWidget(m_crtEnabled, 0, 0);
+
+    auto addCrtSlider = [&](const QString& caption, const QString& tooltip, int row, int column,
+                            QSlider*& slider, QLabel*& valueLabel) {
+        QLabel* captionLabel = new QLabel(caption);
+        slider = new QSlider(Qt::Horizontal);
+        slider->setRange(0, 100);
+        slider->setToolTip(tooltip);
+        slider->setStyleSheet(sliderStyleSheet);
+        valueLabel = new QLabel();
+        valueLabel->setMinimumWidth(36);
+        valueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        crtLayout->addWidget(captionLabel, row, column);
+        crtLayout->addWidget(slider, row, column + 1);
+        crtLayout->addWidget(valueLabel, row, column + 2);
+        connect(slider, &QSlider::valueChanged, this, [this, valueLabel](int value) {
+            valueLabel->setText(QString("%1%").arg(value));
+            emit crtSettingsPreview(currentCrtSettings());
+        });
+    };
+    addCrtSlider("Scanlines:", "Darkness of the gaps between scanlines", 0, 1,
+                 m_crtScanlinesSlider, m_crtScanlinesLabel);
+    addCrtSlider("Mask:", "Strength of the RGB aperture grille (needs a window at least 2x the Atari resolution)", 0, 4,
+                 m_crtMaskSlider, m_crtMaskLabel);
+    addCrtSlider("Curvature:", "Curved glass, rounded corners and darker edges", 1, 1,
+                 m_crtCurvatureSlider, m_crtCurvatureLabel);
+    addCrtSlider("Glow:", "Phosphor glow bleeding around bright pixels", 1, 4,
+                 m_crtGlowSlider, m_crtGlowLabel);
+    crtLayout->setColumnStretch(2, 1);
+    crtLayout->setColumnStretch(5, 1);
+    crtLayout->setColumnMinimumWidth(3, 12);
+
+    connect(m_crtEnabled, &QCheckBox::toggled, this, [this](bool enabled) {
+        updateCrtControls(enabled);
+        emit crtSettingsPreview(currentCrtSettings());
+    });
+    setCrtSettingsInUI(CrtSettings());
+
+    tabLayout->addWidget(crtGroup);
     tabLayout->addStretch();
+}
+
+CrtSettings SettingsDialog::currentCrtSettings() const
+{
+    CrtSettings crt;
+    crt.enabled = m_crtEnabled->isChecked();
+    crt.scanlines = m_crtScanlinesSlider->value();
+    crt.mask = m_crtMaskSlider->value();
+    crt.curvature = m_crtCurvatureSlider->value();
+    crt.glow = m_crtGlowSlider->value();
+    return crt;
+}
+
+void SettingsDialog::setCrtSettingsInUI(const CrtSettings& crt)
+{
+    m_crtEnabled->setChecked(crt.enabled);
+    m_crtScanlinesSlider->setValue(crt.scanlines);
+    m_crtMaskSlider->setValue(crt.mask);
+    m_crtCurvatureSlider->setValue(crt.curvature);
+    m_crtGlowSlider->setValue(crt.glow);
+    // valueChanged doesn't fire when a slider already holds the value.
+    m_crtScanlinesLabel->setText(QString("%1%").arg(crt.scanlines));
+    m_crtMaskLabel->setText(QString("%1%").arg(crt.mask));
+    m_crtCurvatureLabel->setText(QString("%1%").arg(crt.curvature));
+    m_crtGlowLabel->setText(QString("%1%").arg(crt.glow));
+    updateCrtControls(crt.enabled);
+}
+
+void SettingsDialog::updateCrtControls(bool enabled)
+{
+    for (QSlider* slider : {m_crtScanlinesSlider, m_crtMaskSlider, m_crtCurvatureSlider, m_crtGlowSlider}) {
+        slider->setEnabled(enabled);
+    }
 }
 
 void SettingsDialog::createInputConfigTab()
@@ -2646,10 +2726,7 @@ void SettingsDialog::loadSettings()
         }
     }
     
-    // FUTURE: Load universal scanlines settings (commented out - not working)
-    // m_scanlinesSlider->setValue(settings.value("video/scanlinesPercentage", 0).toInt());
-    // m_scanlinesLabel->setText(QString("%1%").arg(m_scanlinesSlider->value()));
-    // m_scanlinesInterpolation->setChecked(settings.value("video/scanlinesInterpolation", false).toBool());
+    setCrtSettingsInUI(CrtSettings::load(settings));
     
     // NTSC artifacting is now handled by the main artifacting dropdown
     // QString ntscArtifacting = settings.value("video/ntscArtifacting", "standard").toString();
@@ -2962,9 +3039,7 @@ void SettingsDialog::saveSettings()
     settings.setValue("video/show80Column", false);
     settings.setValue("video/vSyncEnabled", m_vSyncEnabled->isChecked());
     settings.setValue("video/palBlending", m_palBlending->currentData().toString());
-    // FUTURE: Save universal scanlines settings (commented out - not working)
-    // settings.setValue("video/scanlinesPercentage", m_scanlinesSlider->value());
-    // settings.setValue("video/scanlinesInterpolation", m_scanlinesInterpolation->isChecked());
+    currentCrtSettings().save(settings);
     // NTSC artifacting is now handled by the main artifacting dropdown
     // settings.setValue("video/ntscArtifacting", m_ntscArtifacting->currentData().toString());
     settings.setValue("video/ntscSharpness", m_ntscSharpness->isChecked());
@@ -3719,10 +3794,7 @@ void SettingsDialog::restoreDefaults()
     m_vSyncEnabled->setChecked(false);     // VSync off (for performance)
     
     m_palBlending->setCurrentIndex(1);     // Simple
-    // FUTURE: Universal scanlines defaults (commented out - not working)
-    // m_scanlinesSlider->setValue(0);
-    // m_scanlinesLabel->setText("0%");
-    // m_scanlinesInterpolation->setChecked(false);
+    setCrtSettingsInUI(CrtSettings());
     // NTSC artifacting is now handled by the main artifacting dropdown
     // m_ntscArtifacting->setCurrentIndex(0); // Standard
     m_ntscSharpness->setChecked(true);
@@ -3941,6 +4013,13 @@ ConfigurationProfile SettingsDialog::getCurrentUIState() const
     // profile.show80Column = m_show80Column->isChecked();
     profile.show80Column = false;  // Always false until properly implemented
     profile.vSyncEnabled = m_vSyncEnabled->isChecked();
+
+    const CrtSettings crt = currentCrtSettings();
+    profile.crtEnabled = crt.enabled;
+    profile.crtScanlines = crt.scanlines;
+    profile.crtMask = crt.mask;
+    profile.crtCurvature = crt.curvature;
+    profile.crtGlow = crt.glow;
     
     // Color Settings
     profile.palSaturation = m_palSaturationSlider->value();
@@ -4168,6 +4247,14 @@ void SettingsDialog::loadProfileToUI(const ConfigurationProfile& profile)
     m_horizontalShift->setValue(profile.horizontalShift);
     m_verticalShift->setValue(profile.verticalShift);
     m_overscanFactor->setValue(profile.overscanFactor);
+
+    CrtSettings crt;
+    crt.enabled = profile.crtEnabled;
+    crt.scanlines = qBound(0, profile.crtScanlines, 100);
+    crt.mask = qBound(0, profile.crtMask, 100);
+    crt.curvature = qBound(0, profile.crtCurvature, 100);
+    crt.glow = qBound(0, profile.crtGlow, 100);
+    setCrtSettingsInUI(crt);
     
     for (int i = 0; i < m_fitScreen->count(); ++i) {
         if (m_fitScreen->itemData(i).toString() == profile.fitScreen) {

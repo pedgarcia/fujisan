@@ -1707,7 +1707,16 @@ void MainWindow::showSettings()
         qDebug() << "Synced PrinterWidget state to Settings Dialog";
     }
 
-    dialog.exec();
+    connect(&dialog, &SettingsDialog::crtSettingsPreview, this, [this](const CrtSettings& crt) {
+        if (m_emulatorWidget) {
+            m_emulatorWidget->setCrtSettings(crt);
+        }
+    });
+
+    if (dialog.exec() != QDialog::Accepted) {
+        // Drop any live CRT preview and go back to the saved settings
+        loadVideoSettings();
+    }
 
     // Restore focus to emulator widget after settings dialog closes (fixes Linux focus loss)
     if (m_emulatorWidget) {
@@ -3570,9 +3579,12 @@ void MainWindow::loadVideoSettings()
     QString fitScreen = settings.value("video/fitScreen", "both").toString();
     double overscanFactor = settings.value("video/overscanFactor", 1.0).toDouble();
 
+    const CrtSettings crt = CrtSettings::load(settings);
+
     // Apply scaling settings to emulator widget
     if (m_emulatorWidget) {
         m_emulatorWidget->setScalingSettings(integerScaling, scalingFilter, fitScreen, m_keepAspectRatio, overscanFactor);
+        m_emulatorWidget->setCrtSettings(crt);
     }
 
     // Apply fullscreen setting based on preference
@@ -3587,7 +3599,8 @@ void MainWindow::loadVideoSettings()
              << "Integer scaling:" << integerScaling
              << "Scaling filter:" << scalingFilter
              << "Fit screen:" << fitScreen
-             << "Overscan factor:" << overscanFactor;
+             << "Overscan factor:" << overscanFactor
+             << "CRT effect:" << crt.enabled;
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)

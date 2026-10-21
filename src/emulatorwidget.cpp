@@ -86,11 +86,29 @@ void EmulatorWidget::paintEvent(QPaintEvent *event)
     // Calculate authentic Atari display area with proper aspect ratio
     QRect targetRect = calculateDisplayRect();
 
+    if (m_crtRenderer.settings().enabled && !targetRect.isEmpty()) {
+        const qreal dpr = devicePixelRatioF();
+        QSize outputSize(qRound(targetRect.width() * dpr), qRound(targetRect.height() * dpr));
+        if (outputSize.height() > MAX_CRT_HEIGHT) {
+            outputSize = outputSize.scaled(outputSize.width(), MAX_CRT_HEIGHT, Qt::KeepAspectRatio);
+        }
+        const QImage crtImage = m_crtRenderer.render(m_screenImage, outputSize);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        painter.drawImage(targetRect, crtImage);
+        return;
+    }
+
     // Apply scaling filter setting (smooth vs nearest-neighbor)
     // Integer scaling always uses nearest-neighbor for pixel-perfect display
     bool useSmoothScaling = m_scalingFilter && !m_integerScaling;
     painter.setRenderHint(QPainter::SmoothPixmapTransform, useSmoothScaling);
     painter.drawImage(targetRect, m_screenImage);
+}
+
+void EmulatorWidget::setCrtSettings(const CrtSettings& settings)
+{
+    m_crtRenderer.setSettings(settings);
+    update();
 }
 
 void EmulatorWidget::updateDisplay(const QImage& image)

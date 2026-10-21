@@ -19,6 +19,7 @@
 #include <QDragLeaveEvent>
 #include <QDropEvent>
 #include "atariemulator.h"
+#include "crtrenderer.h"
 
 class EmulatorWidget : public QWidget
 {
@@ -29,6 +30,8 @@ public:
 
     void setEmulator(AtariEmulator* emulator);
     void setScalingSettings(bool integerScaling, bool scalingFilter, const QString& fitScreen, bool keepAspectRatio, double overscanFactor);
+    void setCrtSettings(const CrtSettings& settings);
+    const CrtSettings& crtSettings() const { return m_crtRenderer.settings(); }
 
 signals:
     void diskDroppedOnEmulator(const QString& filename);
@@ -63,6 +66,8 @@ private:
     QString m_fitScreen;
     bool m_keepAspectRatio;
     double m_overscanFactor;
+
+    CrtRenderer m_crtRenderer;
     
     // Screen buffer constants - show full screen without cropping
     static const int SCREEN_WIDTH = 384;
@@ -74,6 +79,9 @@ private:
     static constexpr double MIN_OVERSCAN_FACTOR = 0.95;
     static constexpr double MAX_OVERSCAN_FACTOR = 1.05;
     static constexpr double DEFAULT_OVERSCAN_FACTOR = 1.0;
+    // Bounds the per-frame CPU cost of the CRT effect on very large displays;
+    // beyond this the rendered image is scaled up by the painter.
+    static const int MAX_CRT_HEIGHT = 1600;
 };
 
 #endif // EMULATORWIDGET_H

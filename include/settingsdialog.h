@@ -26,6 +26,7 @@
 #include <QSettings>
 #include <QProgressBar>
 #include "atariemulator.h"
+#include "crtrenderer.h"
 #include "configurationprofilemanager.h"
 #include "profileselectionwidget.h"
 #include "keyboardjoystickmap.h"
@@ -56,6 +57,8 @@ signals:
     void settingsChanged();
     void syncPrinterStateRequested();
     void netSIOEnabledChanged(bool enabled);
+    // Unsaved CRT settings for live preview; the owner should revert on cancel.
+    void crtSettingsPreview(const CrtSettings& settings);
 
 private slots:
     void accept() override;
@@ -111,6 +114,9 @@ private:
     void applyMediaSettings();
     void triggerNetSIORestart(bool netSIOEnabled);
     void updateVideoSystemDependentControls();
+    CrtSettings currentCrtSettings() const;
+    void setCrtSettingsInUI(const CrtSettings& crt);
+    void updateCrtControls(bool enabled);
     void setupFilePathTooltip(QLineEdit* lineEdit);
     void populateCartridgeTypes(QComboBox* combo);
     void populateJoystickDevices();
@@ -229,10 +235,6 @@ private:
     // PAL-specific controls
     QGroupBox* m_palGroup;
     QComboBox* m_palBlending;
-    // FUTURE: Universal scanlines controls (commented out - not working)
-    // QSlider* m_scanlinesSlider;
-    // QLabel* m_scanlinesLabel;
-    // QCheckBox* m_scanlinesInterpolation;
     QSlider* m_palSaturationSlider;
     QLabel* m_palSaturationLabel;
     QSlider* m_palContrastSlider;
@@ -258,6 +260,17 @@ private:
     QLabel* m_ntscGammaLabel;
     QSlider* m_ntscTintSlider;
     QLabel* m_ntscTintLabel;
+
+    // CRT effect controls
+    QCheckBox* m_crtEnabled;
+    QSlider* m_crtScanlinesSlider;
+    QLabel* m_crtScanlinesLabel;
+    QSlider* m_crtMaskSlider;
+    QLabel* m_crtMaskLabel;
+    QSlider* m_crtCurvatureSlider;
+    QLabel* m_crtCurvatureLabel;
+    QSlider* m_crtGlowSlider;
+    QLabel* m_crtGlowLabel;
     
     // Input Configuration controls
     QWidget* m_inputTab;
