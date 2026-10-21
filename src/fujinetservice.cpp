@@ -20,6 +20,7 @@
 namespace {
 constexpr int kMaxDriveSlots = 8;
 constexpr int kMaxHostSlots = 8;
+constexpr int kDriveStatusTimeoutMs = 5000;
 const QString kDrivesApiPath = QStringLiteral("/api/v1/drives");
 }
 
@@ -58,6 +59,10 @@ void FujiNetService::setServerUrl(const QString& url)
     }
     // The server may have been upgraded or replaced; probe /api/v1/drives again.
     m_driveStatusApiUnsupported = false;
+    if (!m_driveStatusReply.isNull()) {
+        m_driveStatusReply->abort();  // Its result belongs to the previous server
+        m_driveStatusReply.clear();
+    }
 }
 
 void FujiNetService::checkConnection()
@@ -347,6 +352,13 @@ void FujiNetService::queryDriveStatus()
     QNetworkReply* reply = m_networkManager->get(request);
     m_driveStatusReply = reply;
     connect(reply, &QNetworkReply::finished, this, &FujiNetService::onDriveStatusReply);
+    // A FujiNet that accepts the connection but never answers must not stall polling.
+    QTimer::singleShot(kDriveStatusTimeoutMs, reply, [reply]() {
+        if (reply->isRunning()) {
+            qDebug() << "Drive status query timed out:" << reply->url().toString();
+            reply->abort();
+        }
+    });
 }
 
 void FujiNetService::swapDisks()
@@ -544,7 +556,8 @@ void FujiNetService::onDriveStatusReply()
 
         // FujiNet-PC builds before fujinet-firmware#1563 answer 404 here. A 4xx, or a 200
         // that isn't the JSON drive list, means the endpoint isn't there: use / instead.
-        const bool apiMissing = (httpStatus >= 400 && httpStatus < 500) || httpStatus == 200;
+        const bool apiMissing = (httpStatus >= 400 && httpStatus < 500)
+                                || (httpStatus == 200 && reply->error() == QNetworkReply::NoError);
         if (apiMissing) {
             qDebug() << "FujiNet has no usable" << kDrivesApiPath << "(HTTP" << httpStatus
                      << ") - falling back to the / status page for drive status";

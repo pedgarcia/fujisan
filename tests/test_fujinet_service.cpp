@@ -389,6 +389,59 @@ private slots:
         svc.stopDrivePolling();
         QVERIFY(!spy.wait(500));
     }
+
+    // ---------------------------------------------------------------
+    // A server that accepts but never answers doesn't stall polling:
+    // the request times out and the next poll goes out.
+    // ---------------------------------------------------------------
+    void testDriveStatusTimesOutOnSilentServer()
+    {
+        QTcpServer silent;
+        QVERIFY(silent.listen(QHostAddress::LocalHost, 0));
+
+        FujiNetService svc;
+        svc.setServerUrl(QString("http://127.0.0.1:%1").arg(silent.serverPort()));
+        QSignalSpy spy(&svc, &FujiNetService::driveStatusUpdated);
+
+        svc.queryDriveStatus();
+        QTRY_VERIFY_WITH_TIMEOUT(silent.hasPendingConnections(), 3000);
+        QTcpSocket* first = silent.nextPendingConnection();
+        QVERIFY(first);
+
+        // While the first request hangs, polls are skipped.
+        svc.queryDriveStatus();
+        QTest::qWait(300);
+        QVERIFY(!silent.hasPendingConnections());
+
+        QTRY_COMPARE_WITH_TIMEOUT(first->state(), QAbstractSocket::UnconnectedState, 7000);
+        svc.queryDriveStatus();
+        QTRY_VERIFY_WITH_TIMEOUT(silent.hasPendingConnections(), 3000);
+        QCOMPARE(spy.count(), 0);
+    }
+
+    // ---------------------------------------------------------------
+    // setServerUrl drops a poll still in flight to the old server, so
+    // the new server is probed at once.
+    // ---------------------------------------------------------------
+    void testSetServerUrlDropsPendingDrivePoll()
+    {
+        QTcpServer silent;
+        QVERIFY(silent.listen(QHostAddress::LocalHost, 0));
+        m_server->setResponseForPath("/api/v1/drives", 200, kDrivesJson);
+
+        FujiNetService svc;
+        svc.setServerUrl(QString("http://127.0.0.1:%1").arg(silent.serverPort()));
+        QSignalSpy spy(&svc, &FujiNetService::driveStatusUpdated);
+
+        svc.queryDriveStatus();
+        QTRY_VERIFY_WITH_TIMEOUT(silent.hasPendingConnections(), 3000);
+
+        svc.setServerUrl(QString("http://127.0.0.1:%1").arg(m_port));
+        svc.queryDriveStatus();
+        QVERIFY(spy.wait(1000));
+        verifyExpectedDrives(spy.takeFirst().at(0).value<QVector<FujiNetDrive>>());
+        QCOMPARE(m_server->requestedPaths(), QStringList({"/api/v1/drives"}));
+    }
 };
 
 QTEST_MAIN(TestFujiNetService)
