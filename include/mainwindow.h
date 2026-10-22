@@ -167,6 +167,7 @@ private:
     void clearDiskFromSettings(int driveNumber);
     void saveDriveStateToSettings(int driveNumber, bool enabled);
     void loadVideoSettings();
+    void applyCrtSettings(const CrtSettings& crt);
     void enterCustomFullscreen();
     void exitCustomFullscreen();
     void sendTextToEmulator(const QString& text);
