@@ -60,6 +60,13 @@ struct ConfigurationProfile {
     bool keepAspectRatio = true;
     double overscanFactor = 1.0;
     bool fullscreenMode = false;
+
+    // CRT Effect (0-100; defaults match CrtSettings)
+    bool crtEnabled = false;
+    int crtScanlines = 60;
+    int crtMask = 30;
+    int crtCurvature = 25;
+    int crtGlow = 30;
     
     // Screen Display Options
     QString horizontalArea = "tv";

@@ -58,6 +58,11 @@ private:
         p.keepAspectRatio = false;
         p.overscanFactor = 0.95;
         p.fullscreenMode = true;
+        p.crtEnabled = true;
+        p.crtScanlines = 85;
+        p.crtMask = 10;
+        p.crtCurvature = 0;
+        p.crtGlow = 55;
 
         p.palSaturation = 50;
         p.palContrast = -20;
@@ -170,6 +175,11 @@ private slots:
         QCOMPARE(loaded.keepAspectRatio, original.keepAspectRatio);
         QCOMPARE(loaded.overscanFactor, original.overscanFactor);
         QCOMPARE(loaded.fullscreenMode, original.fullscreenMode);
+        QCOMPARE(loaded.crtEnabled, original.crtEnabled);
+        QCOMPARE(loaded.crtScanlines, original.crtScanlines);
+        QCOMPARE(loaded.crtMask, original.crtMask);
+        QCOMPARE(loaded.crtCurvature, original.crtCurvature);
+        QCOMPARE(loaded.crtGlow, original.crtGlow);
 
         QCOMPARE(loaded.palSaturation, original.palSaturation);
         QCOMPARE(loaded.palContrast, original.palContrast);
@@ -236,6 +246,27 @@ private slots:
         QCOMPARE(p.audioFrequency, 44100);
         QCOMPARE(p.audioVolume, 80);
         QCOMPARE(p.enableMapRam, true);
+        QCOMPARE(p.crtEnabled, false);
+        QCOMPARE(p.crtScanlines, 60);
+        QCOMPARE(p.crtCurvature, 25);
+    }
+
+    // Profiles saved before the CRT effect existed keep it off
+    void testFromJsonWithoutCrtKeys()
+    {
+        QJsonObject video;
+        video["integerScaling"] = false;
+        QJsonObject json;
+        json["videoConfig"] = video;
+
+        ConfigurationProfile p;
+        p.crtEnabled = true;
+        p.fromJson(json);
+
+        QCOMPARE(p.integerScaling, false);
+        QCOMPARE(p.crtEnabled, false);
+        QCOMPARE(p.crtMask, 30);
+        QCOMPARE(p.crtGlow, 30);
     }
 
     // ---------------------------------------------------------------

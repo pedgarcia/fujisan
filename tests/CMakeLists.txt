@@ -194,9 +194,26 @@ if(WIN32)
 endif()
 
 # ---------------------------------------------------------------------------
+# 10. CRT effect renderer (pure QImage processing)
+# ---------------------------------------------------------------------------
+add_fujisan_test(test_crt_renderer
+    test_crt_renderer.cpp
+    ${FUJISAN_SRC_DIR}/crtrenderer.cpp
+)
+target_link_libraries(test_crt_renderer Qt5::Test Qt5::Core Qt5::Gui)
+
+if(WIN32)
+    set_target_properties(test_crt_renderer PROPERTIES WIN32_EXECUTABLE OFF)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_link_options(test_crt_renderer PRIVATE -mconsole)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # Convenience target: build all test executables without touching atari800_external
 # ---------------------------------------------------------------------------
 add_custom_target(build_tests DEPENDS
+    test_crt_renderer
     test_settings
     test_profiles
     test_rom_loading

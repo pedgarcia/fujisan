@@ -1707,7 +1707,13 @@ void MainWindow::showSettings()
         qDebug() << "Synced PrinterWidget state to Settings Dialog";
     }
 
-    dialog.exec();
+    connect(&dialog, &SettingsDialog::crtSettingsPreview, this, &MainWindow::applyCrtSettings);
+
+    if (dialog.exec() != QDialog::Accepted) {
+        // Drop any live CRT preview and go back to the saved CRT settings
+        QSettings settings("8bitrelics", "Fujisan");
+        applyCrtSettings(CrtSettings::load(settings));
+    }
 
     // Restore focus to emulator widget after settings dialog closes (fixes Linux focus loss)
     if (m_emulatorWidget) {
@@ -2175,6 +2181,9 @@ void MainWindow::enterCustomFullscreen()
     // Create a new EmulatorWidget for fullscreen (don't move the original)
     EmulatorWidget* fullscreenEmulator = new EmulatorWidget(m_fullscreenWidget);
     fullscreenEmulator->setEmulator(m_emulator);
+    if (m_emulatorWidget) {
+        fullscreenEmulator->setCrtSettings(m_emulatorWidget->crtSettings());
+    }
     layout->addWidget(fullscreenEmulator);
 
     // Show fullscreen
@@ -3570,10 +3579,13 @@ void MainWindow::loadVideoSettings()
     QString fitScreen = settings.value("video/fitScreen", "both").toString();
     double overscanFactor = settings.value("video/overscanFactor", 1.0).toDouble();
 
+    const CrtSettings crt = CrtSettings::load(settings);
+
     // Apply scaling settings to emulator widget
     if (m_emulatorWidget) {
         m_emulatorWidget->setScalingSettings(integerScaling, scalingFilter, fitScreen, m_keepAspectRatio, overscanFactor);
     }
+    applyCrtSettings(crt);
 
     // Apply fullscreen setting based on preference
     if (m_startInFullscreen && !m_isInCustomFullscreen) {
@@ -3587,7 +3599,18 @@ void MainWindow::loadVideoSettings()
              << "Integer scaling:" << integerScaling
              << "Scaling filter:" << scalingFilter
              << "Fit screen:" << fitScreen
-             << "Overscan factor:" << overscanFactor;
+             << "Overscan factor:" << overscanFactor
+             << "CRT effect:" << crt.enabled;
+}
+
+void MainWindow::applyCrtSettings(const CrtSettings& crt)
+{
+    if (m_emulatorWidget) {
+        m_emulatorWidget->setCrtSettings(crt);
+    }
+    if (m_fullscreenEmulatorWidget) {
+        m_fullscreenEmulatorWidget->setCrtSettings(crt);
+    }
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)

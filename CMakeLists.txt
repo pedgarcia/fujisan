@@ -280,6 +280,7 @@ set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
     src/emulatorwidget.cpp
+    src/crtrenderer.cpp
     src/atariemulator.cpp
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:src/unifiedaudiobackend.cpp>
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:src/sdl2audiobackend.cpp>
@@ -317,6 +318,7 @@ endif()
 set(HEADERS
     include/mainwindow.h
     include/emulatorwidget.h
+    include/crtrenderer.h
     include/atariemulator.h
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:include/unifiedaudiobackend.h>
     $<$<BOOL:${HAVE_SDL2_AUDIO}>:include/sdl2audiobackend.h>
