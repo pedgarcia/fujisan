@@ -53,18 +53,24 @@ private:
     QSize m_tableOutputSize;
     bool m_tablesValid = false;
 
-    // Per output pixel: source position in 1/256 source pixels (-1 = outside the tube)
-    // and a 0-256 shade for vignette and anti-aliased tube edges.
-    QVector<qint32> m_srcX;
-    QVector<qint32> m_srcY;
-    QVector<quint16> m_shade;
+    // Everything about an output pixel that depends only on geometry and settings.
+    struct Tap {
+        qint32 sx;       // source x in 1/256 pixels, -1 = outside the tube
+        quint16 row;     // source row
+        quint16 weight;  // scanline beam x vignette x edge, 8.8 fixed point
+        quint16 glow;    // glow strength x vignette x edge, 8.8 fixed point
+    };
+    QVector<Tap> m_taps;
 
-    std::array<quint16, 256> m_beam{};        // scanline weight by position within a line, 8.8 fixed point
     std::array<quint8, 256> m_sharpen{};      // horizontal interpolation curve
     std::array<std::array<quint16, 3>, 3> m_maskWeights{};  // [column % 3][channel], 0-256
-    int m_glowAmount = 0;                     // 0-256
+    bool m_glowEnabled = false;
 
     QVector<quint32> m_glowBuffer;            // blurred source, same size as the source
+
+    // Emulated screens are often static; identical frames reuse the last result.
+    QImage m_lastSource;
+    QImage m_lastOutput;
     QThreadPool m_pool;
 };
 

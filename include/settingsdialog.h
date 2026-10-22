@@ -263,6 +263,7 @@ private:
 
     // CRT effect controls
     QCheckBox* m_crtEnabled;
+    QWidget* m_crtSliders;
     QSlider* m_crtScanlinesSlider;
     QLabel* m_crtScanlinesLabel;
     QSlider* m_crtMaskSlider;

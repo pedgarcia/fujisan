@@ -207,21 +207,43 @@ private slots:
         QVERIFY(brightness(glowing.pixel(nearBlock)) > 0);
     }
 
+    void unchangedFrameReusesOutputButChangesAreRendered()
+    {
+        CrtRenderer renderer;
+        renderer.setSettings(onlyEffect(60, 30, 25, 30));
+        QImage frame = solidFrame(qRgb(100, 100, 100));
+        const QSize size(800, 500);
+        const QImage first = renderer.render(frame, size);
+        const QImage again = renderer.render(solidFrame(qRgb(100, 100, 100)), size);
+        QCOMPARE(again.constBits(), first.constBits());
+
+        frame.setPixel(192, 120, qRgb(255, 255, 255));
+        const QImage changedFrame = renderer.render(frame, size);
+        QVERIFY(changedFrame != first);
+
+        renderer.setSettings(onlyEffect(60, 30, 25, 0));
+        const QImage changedSettings = renderer.render(frame, size);
+        QVERIFY(changedSettings != changedFrame);
+
+        QCOMPARE(renderer.render(frame, QSize(400, 250)).size(), QSize(400, 250));
+    }
+
     void largeFrameRendersQuickly()
     {
         CrtRenderer renderer;
         renderer.setSettings(onlyEffect(60, 30, 25, 30));
-        const QImage frame = solidFrame(qRgb(90, 120, 160));
+        // Alternate frames so every render does the full work.
+        const QImage frames[2] = {solidFrame(qRgb(90, 120, 160)), solidFrame(qRgb(160, 120, 90))};
         const QSize size(1440, 900);
-        renderer.render(frame, size);  // builds lookup tables
+        renderer.render(frames[1], size);  // builds lookup tables
 
         QElapsedTimer timer;
         timer.start();
-        const int frames = 20;
-        for (int i = 0; i < frames; ++i) {
-            renderer.render(frame, size);
+        const int count = 20;
+        for (int i = 0; i < count; ++i) {
+            renderer.render(frames[i % 2], size);
         }
-        const double msPerFrame = timer.nsecsElapsed() / 1e6 / frames;
+        const double msPerFrame = timer.nsecsElapsed() / 1e6 / count;
         qInfo("CRT render %dx%d: %.2f ms/frame", size.width(), size.height(), msPerFrame);
         // Generous bound so slow CI machines pass; real budget is ~16 ms per frame.
         QVERIFY(msPerFrame < 200.0);

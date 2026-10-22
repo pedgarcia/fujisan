@@ -1380,12 +1380,17 @@ void SettingsDialog::createVideoDisplayTab()
     tabLayout->addLayout(videoOptionsLayout);
 
     QGroupBox* crtGroup = new QGroupBox("CRT Effect");
-    QGridLayout* crtLayout = new QGridLayout(crtGroup);
-    crtLayout->setVerticalSpacing(4);
+    QHBoxLayout* crtGroupLayout = new QHBoxLayout(crtGroup);
 
     m_crtEnabled = new QCheckBox("Enable CRT effect");
     m_crtEnabled->setToolTip("Simulate a CRT television: scanlines, phosphor mask, curved glass and glow");
-    crtLayout->addWidget(m_crtEnabled, 0, 0);
+    crtGroupLayout->addWidget(m_crtEnabled, 0, Qt::AlignTop);
+
+    m_crtSliders = new QWidget();
+    QGridLayout* crtLayout = new QGridLayout(m_crtSliders);
+    crtLayout->setContentsMargins(0, 0, 0, 0);
+    crtLayout->setVerticalSpacing(4);
+    crtGroupLayout->addWidget(m_crtSliders, 1);
 
     auto addCrtSlider = [&](const QString& caption, const QString& tooltip, int row, int column,
                             QSlider*& slider, QLabel*& valueLabel) {
@@ -1393,7 +1398,8 @@ void SettingsDialog::createVideoDisplayTab()
         slider = new QSlider(Qt::Horizontal);
         slider->setRange(0, 100);
         slider->setToolTip(tooltip);
-        slider->setStyleSheet(sliderStyleSheet);
+        slider->setStyleSheet(sliderStyleSheet
+                              + "QSlider::handle:horizontal:disabled { background: #d8d8d8; border-color: #b0b0b0; }");
         valueLabel = new QLabel();
         valueLabel->setMinimumWidth(36);
         valueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -1405,15 +1411,15 @@ void SettingsDialog::createVideoDisplayTab()
             emit crtSettingsPreview(currentCrtSettings());
         });
     };
-    addCrtSlider("Scanlines:", "Darkness of the gaps between scanlines", 0, 1,
+    addCrtSlider("Scanlines:", "Darkness of the gaps between scanlines", 0, 0,
                  m_crtScanlinesSlider, m_crtScanlinesLabel);
     addCrtSlider("Mask:", "Strength of the RGB aperture grille (needs a window at least 2x the Atari resolution)", 0, 4,
                  m_crtMaskSlider, m_crtMaskLabel);
-    addCrtSlider("Curvature:", "Curved glass, rounded corners and darker edges", 1, 1,
+    addCrtSlider("Curvature:", "Curved glass, rounded corners and darker edges", 1, 0,
                  m_crtCurvatureSlider, m_crtCurvatureLabel);
     addCrtSlider("Glow:", "Phosphor glow bleeding around bright pixels", 1, 4,
                  m_crtGlowSlider, m_crtGlowLabel);
-    crtLayout->setColumnStretch(2, 1);
+    crtLayout->setColumnStretch(1, 1);
     crtLayout->setColumnStretch(5, 1);
     crtLayout->setColumnMinimumWidth(3, 12);
 
@@ -1455,9 +1461,7 @@ void SettingsDialog::setCrtSettingsInUI(const CrtSettings& crt)
 
 void SettingsDialog::updateCrtControls(bool enabled)
 {
-    for (QSlider* slider : {m_crtScanlinesSlider, m_crtMaskSlider, m_crtCurvatureSlider, m_crtGlowSlider}) {
-        slider->setEnabled(enabled);
-    }
+    m_crtSliders->setEnabled(enabled);
 }
 
 void SettingsDialog::createInputConfigTab()
