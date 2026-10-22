@@ -34,6 +34,7 @@ private:
     TCPServer* m_tcp = nullptr;
     QTcpSocket* m_socket = nullptr;
     quint16 m_port = 0;
+    QVariantMap m_savedRealSettings;
 
     void drainConnectedEvent()
     {
@@ -130,9 +131,17 @@ private slots:
         QCoreApplication::setApplicationName(QStringLiteral("Fujisan"));
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_tempDir.path());
-        // MainWindow uses QSettings("8bitrelics", "Fujisan") (NativeFormat, an INI
-        // file on Linux); keep it off the developer's real config.
+        // MainWindow uses QSettings("8bitrelics", "Fujisan"), i.e. NativeFormat.
+        // setPath() redirects that on Linux; on macOS (CFPreferences) and
+        // Windows (registry) it can't, so the real settings are also snapshotted
+        // here and restored in cleanupTestCase().
         QSettings::setPath(QSettings::NativeFormat, QSettings::UserScope, m_tempDir.path());
+        {
+            QSettings real("8bitrelics", "Fujisan");
+            for (const QString& key : real.allKeys()) {
+                m_savedRealSettings.insert(key, real.value(key));
+            }
+        }
 
         {
             QSettings s;
@@ -187,6 +196,13 @@ private slots:
         delete m_mainWindow;
         m_mainWindow = nullptr;
         m_tcp = nullptr;
+
+        QSettings real("8bitrelics", "Fujisan");
+        real.clear();
+        for (auto it = m_savedRealSettings.constBegin(); it != m_savedRealSettings.constEnd(); ++it) {
+            real.setValue(it.key(), it.value());
+        }
+        real.sync();
     }
 
     void init()

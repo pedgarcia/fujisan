@@ -10,6 +10,12 @@
 #include <QTemporaryDir>
 #include <QtTest/QtTest>
 
+// The explicit constructor uses NativeFormat: the registry on Windows and
+// CFPreferences on macOS, which setPath() can't redirect. Test-only names keep
+// cleanup() away from the user's real Fujisan settings on every platform.
+static const char* const kTestOrg = "8bitrelics-tests";
+static const char* const kTestApp = "Fujisan-tests";
+
 class TestSettings : public QObject {
     Q_OBJECT
 
@@ -18,13 +24,11 @@ private:
 
     void setUpIsolatedSettings()
     {
-        QCoreApplication::setOrganizationName("8bitrelics");
-        QCoreApplication::setApplicationName("Fujisan");
+        QCoreApplication::setOrganizationName(kTestOrg);
+        QCoreApplication::setApplicationName(kTestApp);
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                            m_tempDir.path());
-        // QSettings("8bitrelics", "Fujisan") uses NativeFormat, which is an INI
-        // file on Linux; without this, cleanup() clears the developer's real config.
         QSettings::setPath(QSettings::NativeFormat, QSettings::UserScope,
                            m_tempDir.path());
     }
@@ -38,7 +42,7 @@ private slots:
 
     void cleanup()
     {
-        QSettings settings("8bitrelics", "Fujisan");
+        QSettings settings(kTestOrg, kTestApp);
         settings.clear();
         settings.sync();
     }
@@ -49,7 +53,7 @@ private slots:
     void testRoundTripMachineSettings()
     {
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             s.setValue("machine/type", "-xl");
             s.setValue("machine/videoSystem", "-pal");
             s.setValue("machine/basicEnabled", true);
@@ -58,7 +62,7 @@ private slots:
             s.sync();
         }
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             QCOMPARE(s.value("machine/type").toString(), QString("-xl"));
             QCOMPARE(s.value("machine/videoSystem").toString(), QString("-pal"));
             QCOMPARE(s.value("machine/basicEnabled").toBool(), true);
@@ -71,7 +75,7 @@ private slots:
     void testRoundTripAudioSettings()
     {
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             s.setValue("audio/frequency", 48000);
             s.setValue("audio/bits", 16);
             s.setValue("audio/volume", 65);
@@ -83,7 +87,7 @@ private slots:
             s.sync();
         }
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             QCOMPARE(s.value("audio/frequency").toInt(), 48000);
             QCOMPARE(s.value("audio/bits").toInt(), 16);
             QCOMPARE(s.value("audio/volume").toInt(), 65);
@@ -98,13 +102,13 @@ private slots:
     void testRoundTripMediaSettings()
     {
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             s.setValue("media/netSIOEnabled", true);
             s.setValue("media/rtimeEnabled", false);
             s.sync();
         }
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             QCOMPARE(s.value("media/netSIOEnabled").toBool(), true);
             QCOMPARE(s.value("media/rtimeEnabled").toBool(), false);
         }
@@ -113,14 +117,14 @@ private slots:
     void testRoundTripFujinetSettings()
     {
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             s.setValue("fujinet/apiPort", 9000);
             s.setValue("fujinet/netsioPort", 9998);
             s.setValue("fujinet/customBinaryPath", "/opt/fujinet");
             s.sync();
         }
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             QCOMPARE(s.value("fujinet/apiPort").toInt(), 9000);
             QCOMPARE(s.value("fujinet/netsioPort").toInt(), 9998);
             QCOMPARE(s.value("fujinet/customBinaryPath").toString(),
@@ -131,7 +135,7 @@ private slots:
     void testRoundTripMemorySettings()
     {
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             s.setValue("memory/mosaicEnabled", true);
             s.setValue("memory/mosaicSize", 128);
             s.setValue("memory/axlonEnabled", true);
@@ -141,7 +145,7 @@ private slots:
             s.sync();
         }
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             QCOMPARE(s.value("memory/mosaicEnabled").toBool(), true);
             QCOMPARE(s.value("memory/mosaicSize").toInt(), 128);
             QCOMPARE(s.value("memory/axlonEnabled").toBool(), true);
@@ -156,7 +160,7 @@ private slots:
     // ---------------------------------------------------------------
     void testDefaultValuesWhenMissing()
     {
-        QSettings s("8bitrelics", "Fujisan");
+        QSettings s(kTestOrg, kTestApp);
         QCOMPARE(s.value("machine/type", "-xl").toString(), QString("-xl"));
         QCOMPARE(s.value("machine/videoSystem", "-pal").toString(),
                  QString("-pal"));
@@ -173,29 +177,29 @@ private slots:
     void testPersistenceAcrossObjectLifetimes()
     {
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             s.setValue("test/persistenceKey", 42);
             s.sync();
         }
         // Object destroyed, create a fresh one
         {
-            QSettings s("8bitrelics", "Fujisan");
+            QSettings s(kTestOrg, kTestApp);
             QCOMPARE(s.value("test/persistenceKey").toInt(), 42);
         }
     }
 
     // ---------------------------------------------------------------
-    // Dual-constructor consistency: QSettings() vs QSettings("8bitrelics","Fujisan")
+    // Dual-constructor consistency: QSettings() vs QSettings(org, app)
     //
-    // main.cpp sets QCoreApplication org/app to "8bitrelics"/"Fujisan",
-    // so QSettings() (default constructor) and the explicit constructor
-    // must read/write the same backing store.
+    // main.cpp sets QCoreApplication org/app to the same names the app passes
+    // explicitly, so QSettings() (default constructor) and the explicit
+    // constructor must read/write the same backing store.
     // ---------------------------------------------------------------
     void testDualConstructorConsistency()
     {
         // Write via explicit constructor
         {
-            QSettings explicit_s("8bitrelics", "Fujisan");
+            QSettings explicit_s(kTestOrg, kTestApp);
             explicit_s.setValue("dual/testKey", "hello");
             explicit_s.sync();
         }
@@ -205,7 +209,7 @@ private slots:
         {
             QSettings default_s;
             QString defaultFile = default_s.fileName();
-            QSettings explicit_s("8bitrelics", "Fujisan");
+            QSettings explicit_s(kTestOrg, kTestApp);
             QString explicitFile = explicit_s.fileName();
 
             if (defaultFile == explicitFile) {
@@ -229,7 +233,7 @@ private slots:
             default_s.sync();
         }
         {
-            QSettings explicit_s("8bitrelics", "Fujisan");
+            QSettings explicit_s(kTestOrg, kTestApp);
             QSettings default_s;
             if (default_s.fileName() == explicit_s.fileName()) {
                 QCOMPARE(explicit_s.value("dual/anotherKey").toInt(), 99);
@@ -242,7 +246,7 @@ private slots:
     // ---------------------------------------------------------------
     void testOverwrite()
     {
-        QSettings s("8bitrelics", "Fujisan");
+        QSettings s(kTestOrg, kTestApp);
         s.setValue("overwrite/key", 1);
         s.sync();
         QCOMPARE(s.value("overwrite/key").toInt(), 1);
@@ -257,7 +261,7 @@ private slots:
     // ---------------------------------------------------------------
     void testRemoveKey()
     {
-        QSettings s("8bitrelics", "Fujisan");
+        QSettings s(kTestOrg, kTestApp);
         s.setValue("remove/key", "present");
         s.sync();
         QCOMPARE(s.value("remove/key").toString(), QString("present"));
@@ -274,14 +278,14 @@ private slots:
     // ---------------------------------------------------------------
     void testBulkRoundTrip()
     {
-        QSettings s("8bitrelics", "Fujisan");
+        QSettings s(kTestOrg, kTestApp);
         const int count = 100;
         for (int i = 0; i < count; ++i) {
             s.setValue(QString("bulk/%1").arg(i), i * 7);
         }
         s.sync();
 
-        QSettings s2("8bitrelics", "Fujisan");
+        QSettings s2(kTestOrg, kTestApp);
         for (int i = 0; i < count; ++i) {
             QCOMPARE(s2.value(QString("bulk/%1").arg(i)).toInt(), i * 7);
         }
