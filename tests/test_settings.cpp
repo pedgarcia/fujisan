@@ -23,6 +23,10 @@ private:
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                            m_tempDir.path());
+        // QSettings("8bitrelics", "Fujisan") uses NativeFormat, which is an INI
+        // file on Linux; without this, cleanup() clears the developer's real config.
+        QSettings::setPath(QSettings::NativeFormat, QSettings::UserScope,
+                           m_tempDir.path());
     }
 
 private slots:

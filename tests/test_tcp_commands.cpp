@@ -130,6 +130,9 @@ private slots:
         QCoreApplication::setApplicationName(QStringLiteral("Fujisan"));
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_tempDir.path());
+        // MainWindow uses QSettings("8bitrelics", "Fujisan") (NativeFormat, an INI
+        // file on Linux); keep it off the developer's real config.
+        QSettings::setPath(QSettings::NativeFormat, QSettings::UserScope, m_tempDir.path());
 
         {
             QSettings s;
